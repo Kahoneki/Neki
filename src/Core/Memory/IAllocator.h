@@ -3,6 +3,12 @@
 
 namespace NK
 {
+	enum class ALLOCATOR_TYPE
+	{
+		TRACKING,
+		TRACKING_VERBOSE,
+	};
+	
 	class IAllocator
 	{
 	public:

@@ -9,19 +9,19 @@ namespace NK
 	//Defines the severity of a log message
 	enum class LOGGER_CHANNEL : std::uint32_t
 	{
-		NONE	=	0,
-		HEADING =	1 << 0,
-		INFO	=	1 << 1,
-		WARNING =	1 << 2,
-		ERROR	=	1 << 3,
-		SUCCESS =	1 << 4,
+		NONE    = 0,
+		HEADING = 1 << 0,
+		INFO    = 1 << 1,
+		WARNING = 1 << 2,
+		ERROR   = 1 << 3,
+		SUCCESS = 1 << 4,
 	};
 
 }
 
 //Enable bitmask operators for the VK_LOGGER_CHANNEL type
 template<>
-struct enable_bitmask_operators<NK::LOGGER_CHANNEL> : std::true_type{};
+struct enable_bitmask_operators<NK::LOGGER_CHANNEL> : std::true_type {};
 
 
 namespace NK
@@ -34,7 +34,9 @@ namespace NK
 		VULKAN_PERFORMANCE,
 
 		TRACKING_ALLOCATOR,
-		
+
+		CONTEXT,
+
 		DEVICE,
 		COMMAND_POOL,
 		SWAPCHAIN,
@@ -47,11 +49,17 @@ namespace NK
 		APPLICATION,
 	};
 
-	
+
+	enum class LOGGER_TYPE
+	{
+		CONSOLE,
+	};
+
+
 	class LoggerConfig final
 	{
 	public:
-		explicit LoggerConfig(bool _enableAll=false);
+		explicit LoggerConfig(LOGGER_TYPE _type, bool _enableAll = false);
 		~LoggerConfig() = default;
 
 		//Set the default logging channels for all layers that have not been explicitly set
@@ -62,6 +70,9 @@ namespace NK
 
 		//Get the logging channels for a specific layer
 		[[nodiscard]] LOGGER_CHANNEL GetChannelBitfieldForLayer(LOGGER_LAYER _layer) const;
+
+		const LOGGER_TYPE type;
+
 
 	private:
 		LOGGER_CHANNEL m_defaultChannelBitfield;

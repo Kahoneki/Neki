@@ -4,7 +4,8 @@ namespace NK
 {
 
 
-	LoggerConfig::LoggerConfig(bool _enableAll)
+	LoggerConfig::LoggerConfig(LOGGER_TYPE _type, bool _enableAll)
+	: type(_type)
 	{
 		if (_enableAll) { m_defaultChannelBitfield = LOGGER_CHANNEL::INFO | LOGGER_CHANNEL::HEADING | LOGGER_CHANNEL::WARNING | LOGGER_CHANNEL::ERROR | LOGGER_CHANNEL::SUCCESS; }
 		else { m_defaultChannelBitfield = LOGGER_CHANNEL::NONE; }
