@@ -68,6 +68,10 @@ namespace NK
 
 	void TrackingAllocator::Free(void* _ptr)
 	{
+		if (!m_allocationMap.contains(_ptr))
+		{
+			m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "Free - _ptr does not point to memory allocated through this tracking allocator");
+		}
 		const std::string size{ FormatUtils::GetSizeString(m_allocationMap[_ptr].size) };
 		const std::string file{ m_allocationMap[_ptr].file };
 		const std::string line{ std::to_string(m_allocationMap[_ptr].line) };
