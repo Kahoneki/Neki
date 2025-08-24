@@ -21,13 +21,14 @@ namespace NK
 	class TrackingAllocator final : public IAllocator
 	{
 	public:
-		explicit TrackingAllocator(ILogger* _logger, bool _verbose = false);
+		explicit TrackingAllocator(ILogger* _logger, bool _verbose, bool _vulkanVerbose);
 		virtual ~TrackingAllocator() override;
 		virtual void* Allocate(std::size_t _size, const char* _file, int _line) override;
 		virtual void* Reallocate(void* _original, std::size_t _size, const char* _file, int _line) override;
 		virtual void Free(void* _ptr) override;
 
-		[[nodiscard]] inline const VkAllocationCallbacks* GetVulkanCallbacks() const { return &m_vulkanCallbacks; }
+		[[nodiscard]] virtual inline const VkAllocationCallbacks* GetVulkanCallbacks() const override { return &m_vulkanCallbacks; }
+		std::size_t GetTotalMemoryAllocated(); //Returns the total amount of memory allocated through this allocator (in bytes)
 
 
 	private:
@@ -52,7 +53,7 @@ namespace NK
 		std::unordered_map<void*, AllocationInfo> m_allocationMap;
 		std::mutex m_allocationMapMtx;
 
-		VkAllocationCallbacks m_vulkanCallbacks;
 		bool m_verbose;
+		bool m_vulkanVerbose; //Whether or not to output vulkan internals
 	};
 }

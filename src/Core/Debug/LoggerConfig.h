@@ -9,9 +9,9 @@ namespace NK
 	//Defines the severity of a log message
 	enum class LOGGER_CHANNEL : std::uint32_t
 	{
-		NONE    = 0,
+		NONE	= 0,
 		HEADING = 1 << 0,
-		INFO    = 1 << 1,
+		INFO	= 1 << 1,
 		WARNING = 1 << 2,
 		ERROR   = 1 << 3,
 		SUCCESS = 1 << 4,

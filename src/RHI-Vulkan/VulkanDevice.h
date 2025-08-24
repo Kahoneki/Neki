@@ -7,6 +7,8 @@
 #include <RHI/IDevice.h>
 #include <vulkan/vulkan.h>
 
+#include "Core/Memory/IAllocator.h"
+
 namespace NK
 {
 	class ILogger;
@@ -18,7 +20,7 @@ namespace NK
 	class VulkanDevice final : public IDevice
 	{
 	public:
-		explicit VulkanDevice(ILogger& _logger, VulkanDebugAllocator& _instDebugAllocator, VulkanDebugAllocator& _deviceDebugAllocator);
+		explicit VulkanDevice(ILogger& _logger, IAllocator& _allocator);
 		virtual ~VulkanDevice() override;
 
 		//IDevice interface implementation
@@ -47,12 +49,11 @@ namespace NK
 		void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& _info) const;
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT _messageSeverity, VkDebugUtilsMessageTypeFlagsEXT _messageType, const VkDebugUtilsMessengerCallbackDataEXT* _pCallbackData, void* _pUserData);
 		[[nodiscard]] bool PhysicalDeviceSuitable(VkPhysicalDevice _device) const; //Checks for physical device compatibility with queue, extension, and feature requirements
-		
+
 
 		//Dependency injections
 		ILogger& m_logger;
-		VulkanDebugAllocator& m_instDebugAllocator;
-		VulkanDebugAllocator& m_deviceDebugAllocator;
+		IAllocator& m_allocator;
 
 		//Vulkan handles
 		VkInstance m_instance = VK_NULL_HANDLE;
@@ -64,6 +65,7 @@ namespace NK
 
 		const bool m_enableInstanceValidationLayers = true;
 		const std::array<const char*, 1> m_instanceValidationLayers{ "VK_LAYER_KHRONOS_validation" };
-		const std::array<const char*, 2> requiredDeviceExtensions{ "VK_KHR_SWAPCHAIN_EXTENSION_NAME", "VK_EXT_mesh_shader" }; //Value stores if extension is available
+		const std::array<const char*, 1> m_requiredInstanceExtensions{ VK_KHR_SURFACE_EXTENSION_NAME };
+		const std::array<const char*, 2> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader" };
 	};
 }

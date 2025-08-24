@@ -5,15 +5,14 @@
 #include <set>
 #include <stdexcept>
 
-#include "VulkanDebugAllocator.h"
 #include <Core/Debug/ILogger.h>
 
 #include "GLFW/glfw3.h"
 
 namespace NK
 {
-	VulkanDevice::VulkanDevice(ILogger& _logger, VulkanDebugAllocator& _instDebugAllocator, VulkanDebugAllocator& _deviceDebugAllocator)
-	: m_logger(_logger), m_instDebugAllocator(_instDebugAllocator), m_deviceDebugAllocator(_deviceDebugAllocator)
+	VulkanDevice::VulkanDevice(ILogger& _logger, IAllocator& _allocator)
+	: m_logger(_logger), m_allocator(_allocator)
 	{
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Initialising VulkanDevice\n");
 		CreateInstance();
@@ -29,19 +28,20 @@ namespace NK
 		if (m_device != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(m_device);
-			vkDestroyDevice(m_device, m_deviceDebugAllocator.GetCallbacks());
+			vkDestroyDevice(m_device, m_allocator.GetVulkanCallbacks());
 			m_device = VK_NULL_HANDLE;
 		}
 
 		if (m_debugMessenger != VK_NULL_HANDLE)
 		{
-			vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, m_instDebugAllocator.GetCallbacks());
+			const PFN_vkDestroyDebugUtilsMessengerEXT destroyFunc{ reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(m_instance, "vkDestroyDebugUtilsMessengerEXT")) };
+			destroyFunc(m_instance, m_debugMessenger, m_allocator.GetVulkanCallbacks());
 			m_debugMessenger = VK_NULL_HANDLE;
 		}
 
 		if (m_instance != VK_NULL_HANDLE)
 		{
-			vkDestroyInstance(m_instance, m_instDebugAllocator.GetCallbacks());
+			vkDestroyInstance(m_instance, m_allocator.GetVulkanCallbacks());
 			m_instance = VK_NULL_HANDLE;
 		}
 	}
@@ -74,12 +74,12 @@ namespace NK
 
 	void VulkanDevice::CreateInstance()
 	{
-		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "\tCreating instance\n");
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "  Creating instance\n");
 
 		//Check that validation layers are available
 		if (m_enableInstanceValidationLayers && !ValidationLayerSupported())
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "\t\tValidation layers requested, but not available.\n");
+			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "    Validation layers requested, but not available.\n");
 			throw std::runtime_error("");
 		}
 
@@ -118,28 +118,29 @@ namespace NK
 		}
 
 		//Create the instance
-		const VkResult result{ vkCreateInstance(&createInfo, m_instDebugAllocator.GetCallbacks(), &m_instance) };
+		const VkResult result{ vkCreateInstance(&createInfo, m_allocator.GetVulkanCallbacks(), &m_instance) };
 		if (result != VK_SUCCESS)
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "\t\tFailed to create instance - result: " + std::to_string(result) + "\n");
+			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "    Failed to create instance - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
-		m_logger.Log(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "\t\tInstance successfully created\n");
+		m_logger.Log(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "    Instance successfully created\n");
 	}
 
 
 
 	void VulkanDevice::SetupDebugMessenger()
 	{
-		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "\t\tSetting up debug messenger\n");
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "    Setting up debug messenger\n");
 		VkDebugUtilsMessengerCreateInfoEXT createInfo{};
 		PopulateDebugMessengerCreateInfo(createInfo);
-		if (vkCreateDebugUtilsMessengerEXT(m_instance, &createInfo, m_instDebugAllocator.GetCallbacks(), &m_debugMessenger) != VK_SUCCESS)
+		const PFN_vkCreateDebugUtilsMessengerEXT createFunc{ reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT")) };
+		if (createFunc(m_instance, &createInfo, m_allocator.GetVulkanCallbacks(), &m_debugMessenger) != VK_SUCCESS)
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "\t\t\tFailed to set up debug messenger.\n");
+			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "      Failed to set up debug messenger.\n");
 			throw std::runtime_error("");
 		}
-		m_logger.Log(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "\t\t\tDebug messenger successfully created");
+		m_logger.Log(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "      Debug messenger successfully created\n");
 	}
 
 
@@ -148,14 +149,14 @@ namespace NK
 	{
 		//Prioritise Discrete GPU > Integrated GPU > CPU
 
-		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "\tSelecting physical device\n");
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "  Selecting physical device\n");
 
 		//Enumerate physical devices
 		std::uint32_t physicalDeviceCount{};
 		const VkResult result{ vkEnumeratePhysicalDevices(m_instance, &physicalDeviceCount, nullptr) };
 		if (result != VK_SUCCESS)
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "\t\tFailed to enumerate physical vulkan-compatible devices - result: " + std::to_string(result) + "\n");
+			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "    Failed to enumerate physical vulkan-compatible devices - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
 
@@ -174,7 +175,7 @@ namespace NK
 				//Check if this is the final device and no device has been selected yet
 				if (i == physicalDeviceCount - 1 && physicalDeviceType == VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM)
 				{
-					m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "\t\tNo physical devices match requirements\n");
+					m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "    No physical devices match requirements\n");
 				}
 
 				//Skip to next physical device
@@ -212,11 +213,11 @@ namespace NK
 
 		if (physicalDeviceType == VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM)
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "\t\tNo suitable physical device found (searched for: Discrete GPU, Integrated GPU, CPU)\n");
+			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "    No suitable physical device found (searched for: Discrete GPU, Integrated GPU, CPU)\n");
 			throw std::runtime_error("");
 		}
 
-		m_logger.Log(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "\t\tPhysical device of type " + physicalDeviceTypeString + " selected\n");
+		m_logger.Log(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "    Physical device of type " + physicalDeviceTypeString + " selected\n");
 
 		//Get graphics queue family index
 		std::uint32_t queueFamilyCount;
@@ -237,7 +238,7 @@ namespace NK
 
 	void VulkanDevice::CreateLogicalDevice()
 	{
-		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "\tCreating logical device\n");
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "  Creating logical device\n");
 
 
 		//Set up queue create infos (just a graphics queue for now)
@@ -278,13 +279,13 @@ namespace NK
 		deviceCreateInfo.enabledExtensionCount = requiredDeviceExtensions.size();
 		deviceCreateInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
 
-		const VkResult result{ vkCreateDevice(m_physicalDevice, &deviceCreateInfo, m_deviceDebugAllocator.GetCallbacks(), &m_device) };
+		const VkResult result{ vkCreateDevice(m_physicalDevice, &deviceCreateInfo, m_allocator.GetVulkanCallbacks(), &m_device) };
 		if (result != VK_SUCCESS)
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "\t\tFailed to create logical device - result: " + std::to_string(result) + "\n");
+			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "    Failed to create logical device - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
-		m_logger.Log(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "\t\tSuccessfully created logical device\n");
+		m_logger.Log(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "    Successfully created logical device\n");
 
 
 		//Get the queue handle
@@ -335,6 +336,7 @@ namespace NK
 		{
 			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 		}
+		extensions.insert(extensions.end(), m_requiredInstanceExtensions.begin(), m_requiredInstanceExtensions.end());
 
 		return extensions;
 	}
@@ -394,7 +396,9 @@ namespace NK
 			break;
 		}
 
-		device->m_logger.Log(channel, layer, _pCallbackData->pMessage);
+		std::string msg{ _pCallbackData->pMessage };
+		msg += "\n";
+		device->m_logger.Log(channel, layer, msg);
 
 		return VK_FALSE;
 	}
@@ -419,7 +423,7 @@ namespace NK
 		VkResult result{ vkEnumerateDeviceExtensionProperties(_device, nullptr, &deviceExtensionCount, nullptr) };
 		if (result != VK_SUCCESS)
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "\t\tFailed to enumerate physical device features - result: " + std::to_string(result) + "\n");
+			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "    Failed to enumerate physical device features - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
 		std::vector<VkExtensionProperties> deviceExtensions(deviceExtensionCount);
@@ -437,6 +441,7 @@ namespace NK
 			}
 			if (!extensionFound)
 			{
+				m_logger.Log(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::DEVICE, "    Device is missing required extension: " + std::string(extensionName) + "\n");
 				return false;
 			}
 		}

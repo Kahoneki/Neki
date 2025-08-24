@@ -8,13 +8,17 @@ namespace NK
 	class Context
 	{
 	public:
+		static void Initialise(const LoggerConfig& _loggerConfig, ALLOCATOR_TYPE _allocatorType);
+		static void Shutdown();
+		
+		Context() = delete;
+		~Context() = delete;
+
 		inline static ILogger* GetLogger() { return m_logger; }
 		inline static IAllocator* GetAllocator() { return m_allocator; }
 
 
 	private:
-		Context(const LoggerConfig& _loggerConfig, ALLOCATOR_TYPE _allocatorType);
-		~Context();
 		static ILogger* m_logger;
 		static IAllocator* m_allocator;
 	};

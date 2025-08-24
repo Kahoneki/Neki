@@ -9,8 +9,8 @@
 namespace NK
 {
 
-	TrackingAllocator::TrackingAllocator(ILogger* _logger, bool _verbose)
-	: m_logger(_logger), m_verbose(_verbose)
+	TrackingAllocator::TrackingAllocator(ILogger* _logger, bool _verbose, bool _vulkanVerbose)
+	: m_logger(_logger), m_verbose(_verbose), m_vulkanVerbose(_vulkanVerbose)
 	{
 		m_vulkanCallbacks.pUserData = static_cast<void*>(this);
 		m_vulkanCallbacks.pfnAllocation = &Allocation;
@@ -26,13 +26,40 @@ namespace NK
 		//Report memory leaks
 		if (!m_allocationMap.empty())
 		{
-			m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "\tMemory leaks detected (" + std::to_string(m_allocationMap.size()) + ")\n");
+			m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "  " + std::to_string(m_allocationMap.size()) + " memory leak" + (m_allocationMap.size() == 1 ? "" : "s") + " detected");
+			if (!m_verbose)
+			{
+				m_logger->RawLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "\n");
+				return;
+			}
+
+			//Display all memory leaks
+			//Figure out how many are to be displayed based on the state of m_vulkanVerbose and display the count to the user
+			std::size_t displayCount{ m_vulkanVerbose ? m_allocationMap.size() : 0 };
+			if (!m_vulkanVerbose)
+			{
+				//Not displaying vulkan internal memory leaks, need to count the number of non-vulkan-internal memory leaks
+				for (const std::pair<void*, AllocationInfo> alloc : m_allocationMap)
+				{
+					if (alloc.second.file)
+					{
+						++displayCount;
+					}
+				}
+			}
+			m_logger->RawLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "  - Displaying " + std::to_string(displayCount) + "/" + std::to_string(m_allocationMap.size()) + " based on current verbosity settings\n");
+			
 			for (const std::pair<void*, AllocationInfo> alloc : m_allocationMap)
 			{
+				if (!alloc.second.file)
+				{
+					//Vulkan internal memory leak
+					if (!m_vulkanVerbose) { continue; }
+				}
 				std::string size{ FormatUtils::GetSizeString(alloc.second.size) };
 				std::string file{ alloc.second.file ? alloc.second.file : "Vulkan Internal" };
 				std::string line{ alloc.second.file ? std::to_string(alloc.second.line) : "N/A" };
-				m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "\t\t" + size + " (" + file + " - line " + line + ")");
+				m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "    " + size + " (" + file + " - line " + line + ")\n");
 			}
 		}
 	}
@@ -41,7 +68,7 @@ namespace NK
 
 	void* TrackingAllocator::Allocate(std::size_t _size, const char* _file, int _line)
 	{
-		if (m_verbose) { m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Application Allocation: " + std::string(_file) + " - line " + std::to_string(_line) + "--- Request for " + FormatUtils::GetSizeString(_size) + " (implicitly aligned to " + FormatUtils::GetSizeString(m_defaultAlignment) + ")\n"); }
+		if (m_verbose) { m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Application Allocation: " + std::string(_file) + " - line " + std::to_string(_line) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (implicitly aligned to " + FormatUtils::GetSizeString(m_defaultAlignment) + ")\n"); }
 		void* ptr{ AllocateAligned(_size, m_defaultAlignment) };
 
 		std::lock_guard<std::mutex> lock(m_allocationMapMtx);
@@ -54,7 +81,7 @@ namespace NK
 
 	void* TrackingAllocator::Reallocate(void* _original, std::size_t _size, const char* _file, int _line)
 	{
-		if (m_verbose) { m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Application Reallocation: " + std::string(_file) + " - line " + std::to_string(_line) + "--- Request for " + FormatUtils::GetSizeString(_size) + " (implicitly aligned to " + FormatUtils::GetSizeString(m_defaultAlignment) + "). Freeing previous " + FormatUtils::GetSizeString(m_allocationMap[_original].size) + " from " + m_allocationMap[_original].file + "- line " + std::to_string(m_allocationMap[_original].line)); }
+		if (m_verbose) { m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Application Reallocation: " + std::string(_file) + " - line " + std::to_string(_line) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (implicitly aligned to " + FormatUtils::GetSizeString(m_defaultAlignment) + "). Freeing previous " + FormatUtils::GetSizeString(m_allocationMap[_original].size) + " from " + m_allocationMap[_original].file + "- line " + std::to_string(m_allocationMap[_original].line)); }
 		void* ptr{ ReallocateAligned(_original, _size, m_defaultAlignment) };
 
 		std::lock_guard<std::mutex> lock(m_allocationMapMtx);
@@ -75,7 +102,7 @@ namespace NK
 		const std::string size{ FormatUtils::GetSizeString(m_allocationMap[_ptr].size) };
 		const std::string file{ m_allocationMap[_ptr].file };
 		const std::string line{ std::to_string(m_allocationMap[_ptr].line) };
-		if (m_verbose) { m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Application Free: " + file + " - line " + line + "--- Freeing " + size + " (implicitly aligned to " + FormatUtils::GetSizeString(m_defaultAlignment) + ")\n"); }
+		if (m_verbose) { m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Application Free: " + file + " - line " + line + " --- Freeing " + size + " (implicitly aligned to " + FormatUtils::GetSizeString(m_defaultAlignment) + ")\n"); }
 
 		FreeAligned(_ptr);
 		std::lock_guard<std::mutex> lock(m_allocationMapMtx);
@@ -84,10 +111,23 @@ namespace NK
 
 
 
+	std::size_t TrackingAllocator::GetTotalMemoryAllocated()
+	{
+		std::size_t counter{ 0 };
+		for (const std::pair<void*, AllocationInfo> alloc : m_allocationMap)
+		{
+			counter += alloc.second.size;
+		}
+
+		return counter;
+	}
+
+
+
 	void* VKAPI_CALL TrackingAllocator::Allocation(void* _pUserData, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
 	{
 		TrackingAllocator* allocator{ reinterpret_cast<TrackingAllocator*>(_pUserData) };
-		if (allocator->m_verbose) { allocator->m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Allocation: " + VulkanAllocationScopeToString(_allocationScope) + "--- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
+		if (allocator->m_vulkanVerbose) { allocator->m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Allocation: " + VulkanAllocationScopeToString(_allocationScope) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
 		void* ptr{ allocator->AllocateAligned(_size, _alignment) };
 
 		std::lock_guard<std::mutex> lock(allocator->m_allocationMapMtx);
@@ -101,7 +141,7 @@ namespace NK
 	void* VKAPI_CALL TrackingAllocator::Reallocation(void* _pUserData, void* _pOriginal, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
 	{
 		TrackingAllocator* allocator{ reinterpret_cast<TrackingAllocator*>(_pUserData) };
-		if (allocator->m_verbose) { allocator->m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Reallocation: " + VulkanAllocationScopeToString(_allocationScope) + "--- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
+		if (allocator->m_vulkanVerbose) { allocator->m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Reallocation: " + VulkanAllocationScopeToString(_allocationScope) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
 		void* ptr{ allocator->ReallocateAligned(_pOriginal, _size, _alignment) };
 
 		std::lock_guard<std::mutex> lock(allocator->m_allocationMapMtx);
@@ -116,7 +156,7 @@ namespace NK
 	void VKAPI_CALL TrackingAllocator::Free(void* _pUserData, void* _pMemory)
 	{
 		TrackingAllocator* allocator{ reinterpret_cast<TrackingAllocator*>(_pUserData) };
-		if (allocator->m_verbose) { allocator->m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Free" + std::string("--- Freeing ") + FormatUtils::GetSizeString(allocator->m_allocationMap[_pMemory].size) + "\n"); }
+		if (allocator->m_vulkanVerbose) { allocator->m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Free " + std::string("--- Freeing ") + FormatUtils::GetSizeString(allocator->m_allocationMap[_pMemory].size) + "\n"); }
 		allocator->FreeAligned(_pMemory);
 
 		std::lock_guard<std::mutex> lock(allocator->m_allocationMapMtx);
@@ -150,8 +190,8 @@ namespace NK
 			if (posix_memalign(&ptr, _alignment, _size) != 0)
 		#endif
 		{
-			m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "\tAllocateAligned - Allocation failed.\n");
-			if (!m_verbose) { m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "\tSet TrackingAllocator::m_verbose flag to see more detailed output"); }
+			m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "  AllocateAligned - Allocation failed.\n");
+			if (!m_verbose) { m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "  Set TrackingAllocator::m_verbose flag to see more detailed output"); }
 			throw std::runtime_error("");
 		}
 
@@ -164,13 +204,13 @@ namespace NK
 	{
 		if (_original == nullptr)
 		{
-			m_logger->Log(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::TRACKING_ALLOCATOR, "\tReallocationAligned - _original was nullptr, falling back to AllocationAligned.\n");
+			m_logger->Log(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::TRACKING_ALLOCATOR, "  ReallocationAligned - _original was nullptr, falling back to AllocationAligned.\n");
 			return AllocateAligned(_size, _alignment);
 		}
 		
 		if (_size == 0)
 		{
-			m_logger->Log(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::TRACKING_ALLOCATOR, "\tReallocationImpl - _size was 0, falling back to FreeAligned (returning nullptr)\n");
+			m_logger->Log(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::TRACKING_ALLOCATOR, "  ReallocationImpl - _size was 0, falling back to FreeAligned (returning nullptr)\n");
 			FreeAligned(_original);
 			return nullptr;
 		}
@@ -183,7 +223,7 @@ namespace NK
 		void* newPtr{ AllocateAligned(_size, _alignment) };
 		if (newPtr == nullptr)
 		{
-			m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "\tReallocateAligned - Allocation returned nullptr.\n");
+			m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "  ReallocateAligned - Allocation returned nullptr.\n");
 			throw std::runtime_error("");
 		}
 
@@ -201,8 +241,7 @@ namespace NK
 	{
 		if (_ptr == nullptr)
 		{
-			m_logger->Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "\tFreeAligned - _ptr was nullptr.\n");
-			throw std::runtime_error("");
+			return;
 		}
 
 		#if defined(_WIN32)

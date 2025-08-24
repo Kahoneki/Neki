@@ -12,7 +12,7 @@ namespace NK
 
 
 
-	Context::Context(const LoggerConfig& _loggerConfig, ALLOCATOR_TYPE _allocatorType)
+	void Context::Initialise(const LoggerConfig& _loggerConfig, ALLOCATOR_TYPE _allocatorType)
 	{
 		switch (_loggerConfig.type)
 		{
@@ -23,10 +23,11 @@ namespace NK
 
 		switch (_allocatorType)
 		{
-		case ALLOCATOR_TYPE::TRACKING: m_allocator = new TrackingAllocator(m_logger, false);
+		case ALLOCATOR_TYPE::TRACKING: m_allocator = new TrackingAllocator(m_logger, false, false);
 			break;
-		case ALLOCATOR_TYPE::TRACKING_VERBOSE: m_allocator = new TrackingAllocator(m_logger, true);
+		case ALLOCATOR_TYPE::TRACKING_VERBOSE: m_allocator = new TrackingAllocator(m_logger, true, false);
 			break;
+		case ALLOCATOR_TYPE::TRACKING_VERBOSE_INCLUDE_VULKAN: m_allocator = new TrackingAllocator(m_logger, true, true);
 		}
 
 		m_logger->Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::CONTEXT, "Context Initialised\n");
@@ -34,12 +35,12 @@ namespace NK
 
 
 
-	Context::~Context()
+	void Context::Shutdown()
 	{
 		m_logger->Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::CONTEXT, "Shutting Down Context\n");
 
-		delete m_logger;
 		delete m_allocator;
+		delete m_logger;
 	}
 
 }
