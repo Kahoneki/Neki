@@ -21,23 +21,19 @@ int main()
 
 	logger->Unindent();
 	
-	NK::IDevice* device{ NK_NEW(NK::VulkanDevice, *logger, *allocator) };
+	const NK::UniquePtr<NK::IDevice> device{ NK_NEW(NK::VulkanDevice, *logger, *allocator) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n");
 
 	NK::CommandPoolDesc poolDesc{};
 	poolDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
-	NK::ICommandPool* pool{ device->CreateCommandPool(poolDesc) };
+	const NK::UniquePtr<NK::ICommandPool> pool{ device->CreateCommandPool(poolDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n");
 
 	NK::CommandBufferDesc bufferDesc{};
 	bufferDesc.level = NK::COMMAND_BUFFER_LEVEL::PRIMARY;
-	NK::ICommandBuffer* buffer{ pool->AllocateCommandBuffer(bufferDesc) };
+	const NK::UniquePtr<NK::ICommandBuffer> buffer{ pool->AllocateCommandBuffer(bufferDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n");
 	
 	
 	logger->Log(NK::LOGGER_CHANNEL::SUCCESS, NK::LOGGER_LAYER::APPLICATION, "Engine initialised successfully!\n");
-
-//	NK_DELETE(buffer);
-	NK_DELETE(pool);
-	NK_DELETE(device);
 }

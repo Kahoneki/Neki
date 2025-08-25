@@ -11,7 +11,7 @@ namespace NK
 		virtual ~VulkanCommandPool() override;
 		
 		//ICommandPool interface implementation
-		[[nodiscard]] virtual ICommandBuffer* AllocateCommandBuffer(const CommandBufferDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ICommandBuffer> AllocateCommandBuffer(const CommandBufferDesc& _desc) override;
 		virtual void Reset(COMMAND_POOL_RESET_FLAGS _type) override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)

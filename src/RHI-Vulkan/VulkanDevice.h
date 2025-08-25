@@ -23,10 +23,10 @@ namespace NK
 		virtual ~VulkanDevice() override;
 
 		//IDevice interface implementation
-		[[nodiscard]] virtual IBuffer* CreateBuffer(const BufferDesc& _desc) override;
-		[[nodiscard]] virtual ITexture* CreateTexture(const TextureDesc& _desc) override;
-		[[nodiscard]] virtual ICommandPool* CreateCommandPool(const CommandPoolDesc& _desc) override;
-		[[nodiscard]] virtual ISurface* CreateSurface(const Window* _window) override;
+//		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) override;
+//		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
+//		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] VkInstance GetInstance() const { return m_instance; }

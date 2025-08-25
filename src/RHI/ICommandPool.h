@@ -38,7 +38,7 @@ namespace NK
 	public:
 		virtual ~ICommandPool() = default;
 
-		[[nodiscard]] virtual ICommandBuffer* AllocateCommandBuffer(const CommandBufferDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<ICommandBuffer> AllocateCommandBuffer(const CommandBufferDesc& _desc) = 0;
 		virtual void Reset(COMMAND_POOL_RESET_FLAGS _type) = 0;
 
 

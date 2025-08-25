@@ -1,6 +1,7 @@
 #pragma once
 #include "IDevice.h"
 #include "Core/Debug/ILogger.h"
+#include "Core/Memory/Allocation.h"
 #include "Core/Memory/IAllocator.h"
 
 namespace NK
@@ -28,10 +29,10 @@ namespace NK
 	public:
 		virtual ~IDevice() = default;
 
-		[[nodiscard]] virtual IBuffer* CreateBuffer(const BufferDesc& _desc) = 0;
-		[[nodiscard]] virtual ITexture* CreateTexture(const TextureDesc& _desc) = 0;
-		[[nodiscard]] virtual ICommandPool* CreateCommandPool(const CommandPoolDesc& _desc) = 0;
-		[[nodiscard]] virtual ISurface* CreateSurface(const Window* _window) = 0;
+//		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) = 0;
+//		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) = 0;
+//		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) = 0;
 
 
 	protected:

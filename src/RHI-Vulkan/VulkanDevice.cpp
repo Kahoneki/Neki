@@ -31,7 +31,7 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Shutting Down VulkanDevice\n");
-		
+
 		if (m_device != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(m_device);
@@ -60,32 +60,34 @@ namespace NK
 
 
 
-	IBuffer* VulkanDevice::CreateBuffer(const BufferDesc& _desc)
+//	UniquePtr<IBuffer> VulkanDevice::CreateBuffer(const BufferDesc& _desc)
+//	{
+//		//todo: implement
+//		return { nullptr };
+//	}
+
+
+
+//	UniquePtr<ITexture> VulkanDevice::CreateTexture(const TextureDesc& _desc)
+//	{
+//		//todo: implement
+//		return { nullptr };
+//	}
+
+
+
+	UniquePtr<ICommandPool> VulkanDevice::CreateCommandPool(const CommandPoolDesc& _desc)
 	{
-		return nullptr;
+		return UniquePtr<ICommandPool>(NK_NEW(VulkanCommandPool, m_logger, m_allocator, *this, _desc));
 	}
 
 
 
-	ITexture* VulkanDevice::CreateTexture(const TextureDesc& _desc)
-	{
-		return nullptr;
-	}
-
-
-
-	ICommandPool* VulkanDevice::CreateCommandPool(const CommandPoolDesc& _desc)
-	{
-		return NK_NEW(VulkanCommandPool, m_logger, m_allocator, *this, _desc);
-	}
-
-
-
-	ISurface* VulkanDevice::CreateSurface(const Window* _window)
-	{
-		//todo: implement
-		return nullptr;
-	}
+//	UniquePtr<ISurface> VulkanDevice::CreateSurface(const Window* _window)
+//	{
+//		//todo: implement
+//		return { nullptr };
+//	}
 
 
 
@@ -93,7 +95,7 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating instance\n");
-		
+
 		//Check that validation layers are available
 		if (m_enableInstanceValidationLayers && !ValidationLayerSupported())
 		{
@@ -163,7 +165,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Debug messenger successfully created\n");
-		
+
 		m_logger.Unindent();
 	}
 
@@ -172,7 +174,7 @@ namespace NK
 	void VulkanDevice::SelectPhysicalDevice()
 	{
 		m_logger.Indent();
-		
+
 		//Prioritise Discrete GPU > Integrated GPU > CPU
 
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Selecting physical device\n");
@@ -256,7 +258,7 @@ namespace NK
 			{
 				m_graphicsQueueFamilyIndex = i;
 			}
-			
+
 			//todo: maybe look into changing these `else if` checks to `if` checks - this would allow a single queue family to be used for multiple purposes
 			//todo: ^this also would provide support for devices with a queue family set that has, for example, a combined graphics and transfer queue family, but not a standalone transfer queue family
 			//todo: ^this would probably require having multiple queues from the same queue family being used for different purposes, checking the number of queues in a family against what is required based on the configuration requires logic that would be messy based on the current setup
@@ -529,5 +531,5 @@ namespace NK
 		m_logger.Unindent();
 		return true;
 	}
-	
+
 }

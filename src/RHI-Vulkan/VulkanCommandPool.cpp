@@ -51,9 +51,9 @@ namespace NK
 
 
 
-	ICommandBuffer* VulkanCommandPool::AllocateCommandBuffer(const CommandBufferDesc& _desc)
+	UniquePtr<ICommandBuffer> VulkanCommandPool::AllocateCommandBuffer(const CommandBufferDesc& _desc)
 	{
-		return NK_NEW(VulkanCommandBuffer, m_logger, m_device, *this, _desc);
+		return UniquePtr<ICommandBuffer>(NK_NEW(VulkanCommandBuffer, m_logger, m_device, *this, _desc));
 	}
 
 

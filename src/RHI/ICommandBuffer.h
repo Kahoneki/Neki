@@ -18,7 +18,7 @@ namespace NK
 	class ICommandBuffer
 	{
 	public:
-		virtual ~ICommandBuffer();
+		virtual ~ICommandBuffer() = default;
 
 		//todo: add command buffer methods here
 		virtual void Reset() = 0;

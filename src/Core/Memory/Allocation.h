@@ -1,4 +1,6 @@
 #pragma once
+#include <memory>
+
 #include "Core/Context.h"
 
 #define NK_NEW(Type, ...)	NK::NewImpl<Type>(__FILE__, __LINE__, ##__VA_ARGS__)
@@ -26,4 +28,16 @@ namespace NK
 			Context::GetAllocator()->Free(_ptr);
 		}
 	}
+
+
+
+	//Custom std::unique_ptr wrapper that calls a custom deleter for NK_DELETE()
+	template<typename T>
+	struct Deleter
+	{
+		inline void operator()(T* _ptr) const { NK_DELETE(_ptr); }
+	};
+
+	template<typename T>
+	using UniquePtr = std::unique_ptr<T, Deleter<T>>;
 }
