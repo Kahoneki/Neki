@@ -23,11 +23,11 @@ namespace NK
 
 		switch (_allocatorType)
 		{
-		case ALLOCATOR_TYPE::TRACKING: m_allocator = new TrackingAllocator(m_logger, false, false);
+		case ALLOCATOR_TYPE::TRACKING: m_allocator = new TrackingAllocator(*m_logger, false, false);
 			break;
-		case ALLOCATOR_TYPE::TRACKING_VERBOSE: m_allocator = new TrackingAllocator(m_logger, true, false);
+		case ALLOCATOR_TYPE::TRACKING_VERBOSE: m_allocator = new TrackingAllocator(*m_logger, true, false);
 			break;
-		case ALLOCATOR_TYPE::TRACKING_VERBOSE_INCLUDE_VULKAN: m_allocator = new TrackingAllocator(m_logger, true, true);
+		case ALLOCATOR_TYPE::TRACKING_VERBOSE_INCLUDE_VULKAN: m_allocator = new TrackingAllocator(*m_logger, true, true);
 		}
 
 		m_logger->Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::CONTEXT, "Context Initialised\n");
@@ -37,10 +37,14 @@ namespace NK
 
 	void Context::Shutdown()
 	{
+		m_logger->Indent();
 		m_logger->Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::CONTEXT, "Shutting Down Context\n");
 
 		delete m_allocator;
+
+		m_logger->Unindent();
 		delete m_logger;
+
 	}
 
 }

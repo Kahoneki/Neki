@@ -11,13 +11,50 @@ namespace NK
 
 		//Logs _message from _layer to the _channel channel (if the channel is enabled for the specified layer)
 		//Newline characters are not included by this function, they should be contained within _message
-		virtual void Log(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message) const = 0;
+		//Optionally, pass in an indentation level to override the member
+		inline void Log(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message, std::int32_t _indentationLevel=INT32_MAX) const
+		{
+			//Use non-virtual-interface pattern due to default parameter
+			LogImpl(_channel, _layer, _message, _indentationLevel);
+		}
 		
 		//Same as Log(), but doesn't include any formatting
-		virtual void RawLog(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message) const = 0;
+		inline void RawLog(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message, std::int32_t _indentationLevel=INT32_MAX) const
+		{
+			//Use non-virtual-interface pattern due to default parameter
+			RawLogImpl(_channel, _layer, _message, _indentationLevel);
+		};
+
+		//Calls Indent(), Log(), Unindent()
+		inline void IndentLog(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message)
+		{
+			Indent();
+			Log(_channel, _layer, _message, indentationLevel);
+			Unindent();
+		}
+
+		//Calls Indent(), RawLog(), Unindent()
+		inline void IndentRawLog(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message)
+		{
+			Indent();
+			RawLog(_channel, _layer, _message, indentationLevel);
+			Unindent();
+		}
+
+		//Increment the indentation level
+		inline void Indent() { ++indentationLevel; }
+
+		//Decrement the indentation level
+		//indentation value can be negative and it will be clamped to 0 when outputting - this lets you have an "indentation buffer region"
+		//If indentationLevel is -1, 0-indented logs will be at the same indentation level as 1-indented logs (0 indents)
+		inline void Unindent() { --indentationLevel; }
 		
 	protected:
 		explicit ILogger(const LoggerConfig& _config);
+
+		//NVI impls
+		virtual void LogImpl(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message, std::int32_t _indentationLevel) const = 0;
+		virtual void RawLogImpl(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message, std::int32_t _indentationLevel) const = 0;
 		
 		//For older Windows systems
 		//Attempt to enable ANSI support for access to ANSI colour codes
@@ -41,6 +78,7 @@ namespace NK
 			CHANNEL = 10,
 			LAYER = 25,
 		};
+		int32_t indentationLevel{ 0 }; //Stores the amount of indents currently active - controlled by Indent() and Unindent() - can be negative, acting as a buffer region
 		
 		const LoggerConfig m_config;
 	};

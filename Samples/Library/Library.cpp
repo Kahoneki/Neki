@@ -16,6 +16,8 @@ int main()
 	NK::Context::Initialise(loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE);
 	NK::ILogger* logger{ NK::Context::GetLogger() };
 	NK::IAllocator* allocator{ NK::Context::GetAllocator() };
+
+	logger->Unindent();
 	
 	NK::IDevice* device{ NK_NEW(NK::VulkanDevice, *logger, *allocator) };
 
@@ -23,7 +25,7 @@ int main()
 
 	logger->Log(NK::LOGGER_CHANNEL::SUCCESS, NK::LOGGER_LAYER::APPLICATION, "Engine initialised successfully!\n");
 
-	NK_DELETE(device);
+//	NK_DELETE(device);
 
 	NK::Context::Shutdown();
 }

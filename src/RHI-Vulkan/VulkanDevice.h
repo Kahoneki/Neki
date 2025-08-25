@@ -7,7 +7,6 @@
 #include <RHI/IDevice.h>
 #include <vulkan/vulkan.h>
 
-#include "Core/Memory/IAllocator.h"
 
 namespace NK
 {
@@ -26,7 +25,7 @@ namespace NK
 		//IDevice interface implementation
 		[[nodiscard]] virtual IBuffer* CreateBuffer(const BufferDesc& _desc) override;
 		[[nodiscard]] virtual ITexture* CreateTexture(const TextureDesc& _desc) override;
-		[[nodiscard]] virtual ICommandQueue* CreateCommandQueue(const CommandQueueDesc& _desc) override;
+		[[nodiscard]] virtual ICommandPool* CreateCommandPool(const CommandPoolDesc& _desc) override;
 		[[nodiscard]] virtual ISurface* CreateSurface(const Window* _window) override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
@@ -34,7 +33,8 @@ namespace NK
 		[[nodiscard]] VkDevice GetDevice() const { return m_device; }
 		[[nodiscard]] VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
 		[[nodiscard]] std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
-
+		[[nodiscard]] std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
+		[[nodiscard]] std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
 
 	private:
 		//Init sub-methods
@@ -51,19 +51,23 @@ namespace NK
 		[[nodiscard]] bool PhysicalDeviceSuitable(VkPhysicalDevice _device) const; //Checks for physical device compatibility with queue, extension, and feature requirements
 
 
-		//Dependency injections
-		ILogger& m_logger;
-		IAllocator& m_allocator;
-
 		//Vulkan handles
-		VkInstance m_instance = VK_NULL_HANDLE;
-		VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
-		VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
-		VkDevice m_device = VK_NULL_HANDLE;
-		VkQueue m_graphicsQueue = VK_NULL_HANDLE;
-		std::uint32_t m_graphicsQueueFamilyIndex = UINT32_MAX;
+		VkInstance m_instance{ VK_NULL_HANDLE };
+		VkDebugUtilsMessengerEXT m_debugMessenger{ VK_NULL_HANDLE };
+		VkPhysicalDevice m_physicalDevice{ VK_NULL_HANDLE };
+		VkDevice m_device{ VK_NULL_HANDLE };
 
-		const bool m_enableInstanceValidationLayers = true;
+		VkQueue m_graphicsQueue{ VK_NULL_HANDLE };
+		std::uint32_t m_graphicsQueueFamilyIndex{ UINT32_MAX };
+
+		VkQueue m_computeQueue{ VK_NULL_HANDLE };
+		std::uint32_t m_computeQueueFamilyIndex{ UINT32_MAX };
+
+		VkQueue m_transferQueue{ VK_NULL_HANDLE };
+		std::uint32_t m_transferQueueFamilyIndex{ UINT32_MAX };
+
+
+		bool m_enableInstanceValidationLayers = true;
 		const std::array<const char*, 1> m_instanceValidationLayers{ "VK_LAYER_KHRONOS_validation" };
 		const std::array<const char*, 1> m_requiredInstanceExtensions{ VK_KHR_SURFACE_EXTENSION_NAME };
 		const std::array<const char*, 2> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader" };

@@ -4,22 +4,7 @@
 
 namespace NK
 {
-
-	void ConsoleLogger::Log(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message) const
-	{
-		LogImpl(_channel, _layer, _message, true);
-	}
-
-
-
-	void ConsoleLogger::RawLog(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message) const
-	{
-		LogImpl(_channel, _layer, _message, false);
-	}
-
-
-
-	void ConsoleLogger::LogImpl(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message, bool _formatted) const
+	void ConsoleLogger::LogRawLogImpl(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message, std::int32_t _indentationValue, bool _formatted) const
 	{
 		//Check if channel is enabled for the specified layer
 		//If it's not, just early return
@@ -57,14 +42,23 @@ namespace NK
 			break;
 		}
 
+		//Add spaces to start of message based on indentationLevel or _indentationValue override if it has been provided (!INT32_MAX)
+		constexpr std::uint32_t spacesPerIndent{ 2 };
+		std::string indentedMessage{ _message };
+		indentedMessage.insert(0, std::max((_indentationValue == INT32_MAX ? indentationLevel : _indentationValue), 0) * spacesPerIndent, ' '); //Clamp indentation level to 0
+		
 		//std::cerr for errors, std::cout for everything else
-		std::ostream& stream{ (_channel == LOGGER_CHANNEL::ERROR) ? std::cerr : std::cout };
+		//std::ostream& stream{ (_channel == LOGGER_CHANNEL::ERROR) ? std::cerr : std::cout };
+		//todo: the above causes output-order issues - just use std::cout for everything for now
+		//todo: ^a possible solution would be to persistently store the current stream, then when there's a stream change, flush the current stream first
+		//todo: ^i need to look into the performance impacts of this solution
+		std::ostream& stream{ std::cout };
 		stream << colourCode;
 		if (_formatted)
 		{
 			stream << std::left << std::setw(static_cast<std::underlying_type_t<LOGGER_WIDTH>>(LOGGER_WIDTH::CHANNEL)) << channelStr <<
 			std::left << std::setw(static_cast<std::underlying_type_t<LOGGER_WIDTH>>(LOGGER_WIDTH::LAYER)) << LayerToString(_layer);
 		}
-		stream << _message << COLOUR_RESET;
+		stream << indentedMessage << COLOUR_RESET;
 	}
 }

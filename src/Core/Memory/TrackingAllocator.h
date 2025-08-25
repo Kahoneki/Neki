@@ -21,7 +21,7 @@ namespace NK
 	class TrackingAllocator final : public IAllocator
 	{
 	public:
-		explicit TrackingAllocator(ILogger* _logger, bool _verbose, bool _vulkanVerbose);
+		explicit TrackingAllocator(ILogger& _logger, bool _verbose, bool _vulkanVerbose);
 		virtual ~TrackingAllocator() override;
 		virtual void* Allocate(std::size_t _size, const char* _file, int _line) override;
 		virtual void* Reallocate(void* _original, std::size_t _size, const char* _file, int _line) override;
@@ -45,7 +45,7 @@ namespace NK
 		void FreeAligned(void* _ptr);
 
 		//Dependency injections
-		ILogger* m_logger;
+		ILogger& m_logger;
 
 		static inline constexpr std::size_t m_defaultAlignment{ 16 };
 
