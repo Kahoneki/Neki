@@ -18,7 +18,7 @@ namespace NK
 		inline static IAllocator* GetAllocator() { return m_allocator; }
 
 
-	private:
+	protected:
 		static ILogger* m_logger;
 		static IAllocator* m_allocator;
 	};
