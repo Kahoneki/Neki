@@ -1,10 +1,6 @@
 #pragma once
-#include <array>
-#include <cstdint>
-#include <string>
-#include <unordered_map>
-#include <vector>
 #include <RHI/IDevice.h>
+#include <RHI/ICommandPool.h>
 #include <dxgi1_6.h>
 #include <d3d12.h>
 #include <wrl.h>
@@ -26,47 +22,35 @@ namespace NK
 		//[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
-		[[nodiscard]] Microsoft::WRL::ComPtr<IDXGIFactory> GetInstance() const { return m_instance; }
+		[[nodiscard]] Microsoft::WRL::ComPtr<IDXGIFactory> GetFactory() const { return m_factory; }
+		[[nodiscard]] Microsoft::WRL::ComPtr<IDXGIAdapter> GetAdapter() const { return m_adapter; }
 		[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_device; }
-		[[nodiscard]] Microsoft::WRL::ComPtr<IDXGIAdapter> GetAdapter() const { return m_physicalDevice; }
-		[[nodiscard]] std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
-		[[nodiscard]] std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
-		[[nodiscard]] std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
+		[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetGraphicsQueue() const { return m_graphicsQueue; }
+		[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetComputeQueue() const { return m_computeQueue; }
+		[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetTransferQueue() const { return m_transferQueue; }
+
 
 	private:
 		//Init sub-methods
-		void CreateInstance();
-		void SetupDebugMessenger();
-		void SelectPhysicalDevice();
-		void CreateLogicalDevice();
-
-		//Utility functions
-		[[nodiscard]] bool ValidationLayerSupported() const;
-		[[nodiscard]] std::vector<const char*> GetRequiredExtensions() const;
-		void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& _info) const;
-		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT _messageSeverity, VkDebugUtilsMessageTypeFlagsEXT _messageType, const VkDebugUtilsMessengerCallbackDataEXT* _pCallbackData, void* _pUserData);
-		[[nodiscard]] bool PhysicalDeviceSuitable(VkPhysicalDevice _device) const; //Checks for physical device compatibility with queue, extension, and feature requirements
+		void EnableDebugLayer();
+		void CreateFactory();
+		void SelectAdapter();
+		void CreateDevice();
+		void CreateCommandQueues();
 
 
-		//Vulkan handles
-		VkInstance m_instance{ VK_NULL_HANDLE };
-		VkDebugUtilsMessengerEXT m_debugMessenger{ VK_NULL_HANDLE };
-		VkPhysicalDevice m_physicalDevice{ VK_NULL_HANDLE };
-		VkDevice m_device{ VK_NULL_HANDLE };
+		const D3D_FEATURE_LEVEL m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
 
-		VkQueue m_graphicsQueue{ VK_NULL_HANDLE };
-		std::uint32_t m_graphicsQueueFamilyIndex{ UINT32_MAX };
+		//D3D12 handles
+		Microsoft::WRL::ComPtr<IDXGIFactory4> m_factory;
+		Microsoft::WRL::ComPtr<IDXGIAdapter1> m_adapter;
+		Microsoft::WRL::ComPtr<ID3D12Device> m_device;
 
-		VkQueue m_computeQueue{ VK_NULL_HANDLE };
-		std::uint32_t m_computeQueueFamilyIndex{ UINT32_MAX };
-
-		VkQueue m_transferQueue{ VK_NULL_HANDLE };
-		std::uint32_t m_transferQueueFamilyIndex{ UINT32_MAX };
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_graphicsQueue;
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_computeQueue;
+		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_transferQueue;
 
 
-		bool m_enableInstanceValidationLayers = true;
-		const std::array<const char*, 1> m_instanceValidationLayers{ "VK_LAYER_KHRONOS_validation" };
-		const std::array<const char*, 1> m_requiredInstanceExtensions{ VK_KHR_SURFACE_EXTENSION_NAME };
-		const std::array<const char*, 2> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader" };
+		bool m_enableDebugLayer{ true };
 	};
 }

@@ -39,6 +39,7 @@ if(NEKI_BUILD_VULKAN)
 endif()
 if(NEKI_BUILD_D3D12)
     target_compile_definitions(Neki PUBLIC NEKI_D3D12_SUPPORTED=1)
+    target_link_libraries(Neki PUBLIC d3d12 dxgi)
 endif()
 
 
