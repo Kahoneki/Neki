@@ -4,10 +4,42 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
+#Backend selection
+option(NEKI_BUILD_VULKAN "Enable the Vulkan RHI backend" ON)
+if(WIN32)
+    option(NEKI_BUILD_D3D12 "Enable the D3D12 RHI backend" ON)
+endif()
+
+
 #Define library target
-file(GLOB_RECURSE NEKI_SOURCES "src/*.cpp")
+file(GLOB_RECURSE NEKI_COMMON_SOURCES
+    "src/Core/*.cpp"
+    "src/Platform/*.cpp"
+    "src/Graphics/*.cpp"
+)
+set(NEKI_SOURCES ${NEKI_COMMON_SOURCES})
+
+if(NEKI_BUILD_VULKAN)
+    file(GLOB_RECURSE NEKI_VULKAN_SOURCES "src/RHI-Vulkan/*.cpp")
+    list(APPEND NEKI_SOURCES ${NEKI_VULKAN_SOURCES})
+endif()
+
+if(NEKI_BUILD_D3D12)
+    file(GLOB_RECURSE NEKI_D3D12_SOURCES "src/RHI-D3D12/*.cpp")
+    list(APPEND NEKI_SOURCES ${NEKI_D3D12_SOURCES})
+endif()
+
 add_library(Neki STATIC ${NEKI_SOURCES})
 target_include_directories(Neki PUBLIC src)
+
+
+#Add compile definitions for macro usage
+if(NEKI_BUILD_VULKAN)
+    target_compile_definitions(Neki PUBLIC NEKI_VULKAN_SUPPORTED=1)
+endif()
+if(NEKI_BUILD_D3D12)
+    target_compile_definitions(Neki PUBLIC NEKI_D3D12_SUPPORTED=1)
+endif()
 
 
 
@@ -15,8 +47,24 @@ target_include_directories(Neki PUBLIC src)
 include(FetchContent)
 
 #Vulkan
-find_package(Vulkan REQUIRED)
-target_link_libraries(Neki PUBLIC Vulkan::Vulkan)
+if(NEKI_BUILD_VULKAN)
+    find_package(Vulkan REQUIRED)
+    target_link_libraries(Neki PUBLIC Vulkan::Vulkan)
+endif()
+
+#D3D12 handled automatically
+
+#DXC
+FetchContent_Declare(
+    dxc_artifacts
+    URL "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.7.2212/dxc_2022_12_16.zip"
+)
+FetchContent_MakeAvailable(dxc_artifacts)
+find_program(DXC_EXECUTABLE NAMES dxc HINTS "${dxc_artifacts_SOURCE_DIR}/bin/x64")
+if(NOT DXC_EXECUTABLE)
+    message(FATAL_ERROR "Could not find dxc.exe")
+endif()
+message(STATUS "Found DXC: ${DXC_EXECUTABLE}")
 
 #GLM
 FetchContent_Declare(glm GIT_REPOSITORY https://github.com/g-truc/glm.git GIT_TAG 1.0.1)
@@ -54,6 +102,37 @@ file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Resource Files/" DESTINATION "${CMAKE_BIN
 
 
 
+#Function to compile a shader
+function(CompileShader SHADER_SOURCE)
+
+    get_filename_component(SHADER_NAME ${SHADER_SOURCE} NAME_WE)
+    set(SPIRV_OUTPUT "${PROJECT_BINARY_DIR}/Shaders/${SHADER_NAME}.spirv")
+    set(DXIL_OUTPUT "${PROJECT_BINARY_DIR}/Shaders/${SHADER_NAME}.dxil")
+
+    if(NEKI_BUILD_VULKAN)
+        add_custom_command(
+            OUTPUT ${SPIRV_OUTPUT}
+            COMMAND ${DXC_EXECUTABLE} -T vs_6_6 -E VSMain -spirv -Fo ${SPIRV_OUTPUT} ${SHADER_SOURCE}
+            DEPENDS ${SHADER_SOURCE}
+            COMMENT "Compiling ${SHADER_SOURCE} to SPIR-V"
+        )
+        list(APPEND SHADER_OUTPUTS ${SPIRV_OUTPUT})
+    endif()
+
+     if(NEKI_BUILD_D3D12)
+        add_custom_command(
+            OUTPUT ${DXIL_OUTPUT}
+            COMMAND ${DXC_EXECUTABLE} -T vs_6_6 -E VSMain -Fo ${DXIL_OUTPUT} ${SHADER_SOURCE}
+            DEPENDS ${SHADER_SOURCE}
+            COMMENT "Compiling ${SHADER_SOURCE} to DXIL"
+        )
+        list(APPEND SHADER_OUTPUTS ${DXIL_OUTPUT})
+    endif()
+
+endfunction()
+
+
+
 
 
 
@@ -63,59 +142,41 @@ file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Resource Files/" DESTINATION "${CMAKE_BIN
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 
     #Shader compilation
-    find_program(
-            GLSLC_EXECUTABLE
-            NAMES glslc
-            HINTS "$ENV{VULKAN_SDK}/bin"
-            REQUIRED
-            DOC "Path to the GLSL to SPIR-V compiler"
-    )
-    message(STATUS "Found glslc: ${GLSLC_EXECUTABLE}")
 
     #Define shader files
-    file(GLOB_RECURSE SHADER_SOURCES
-            "${CMAKE_SOURCE_DIR}/Samples/*/Shaders/*.vert"
-            "${CMAKE_SOURCE_DIR}/Samples/*/Shaders/*.frag"
-    )
+    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/Samples/*/Shaders/*.hlsl")
     message(STATUS "---- Found Shader Files ----")
     foreach(FILE ${SHADER_SOURCES})
         message(STATUS "  ${FILE}")
     endforeach()
     message(STATUS "--------------------------------")
 
-    #Get list of all the full paths of all the compiled .spv files and compile them
-    set(SPIRV_OUTPUTS "")
+    #Compile all shaders
+    set(SHADER_OUTPUTS "")
     foreach(SHADER_SRC ${SHADER_SOURCES})
-        get_filename_component(SHADER_FILENAME ${SHADER_SRC} NAME)
-        set(SHADER_SPV "${PROJECT_BINARY_DIR}/Samples/*/Shaders/${SHADER_FILENAME}.spv")
-        list(APPEND SPIRV_OUTPUTS ${SHADER_SPV})
-
-        #Compile shader
-        add_custom_command(
-                OUTPUT ${SHADER_SPV}
-                COMMAND ${GLSLC_EXECUTABLE} ${SHADER_SRC} -o ${SHADER_SPV}
-                DEPENDS ${SHADER_SRC}
-                COMMENT "Compiling ${SHADER_SRC} to ${SHADER_SPV}"
-        )
+        CompileShader(${SHADER_SRC})
     endforeach()
 
     #Create phony target that depends on all the compiled shaders
     add_custom_target(
             Shaders
-            DEPENDS ${SPIRV_OUTPUTS}
+            DEPENDS ${SHADER_OUTPUTS}
     )
 
 
 
     #Create executables
-    add_executable(NKSample_Library "Samples/Library/Library.cpp")
-    target_include_directories(NKSample_Library PUBLIC "${CMAKE_SOURCE_DIR}/src")
-    target_link_libraries(NKSample_Library PRIVATE Neki)
-    add_dependencies(NKSample_Library Shaders)
-
-    # add_executable(Neki_ModelTest "/Samples/ModelTest/ModelTest.h" "/Samples/Model/Model.cpp")
-    # target_link_libraries(Neki_ModelTest PRIVATE Neki)
-    # add_dependencies(Neki_ModelTest Shaders)
-
+    if(NEKI_BUILD_VULKAN)
+        add_executable(NKVulkanSample_Library "Samples/Vulkan/Library/Library.cpp")
+        target_include_directories(NKVulkanSample_Library PUBLIC "${CMAKE_SOURCE_DIR}/src")
+        target_link_libraries(NKVulkanSample_Library PRIVATE Neki)
+        add_dependencies(NKVulkanSample_Library Shaders)
+    endif()
+    if(NEKI_BUILD_D3D12)
+        add_executable(NKD3D12Sample_Library "Samples/D3D12/Library/Library.cpp")
+        target_include_directories(NKD3D12Sample_Library PUBLIC "${CMAKE_SOURCE_DIR}/src")
+        target_link_libraries(NKD3D12Sample_Library PRIVATE Neki)
+        add_dependencies(NKD3D12Sample_Library Shaders)
+    endif()
 
 endif()

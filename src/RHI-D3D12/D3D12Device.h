@@ -5,28 +5,30 @@
 #include <unordered_map>
 #include <vector>
 #include <RHI/IDevice.h>
-#include <vulkan/vulkan.h>
+#include <dxgi1_6.h>
+#include <d3d12.h>
+#include <wrl.h>
 
 
 
 namespace NK
 {
-	class VulkanDevice final : public IDevice
+	class D3D12Device final : public IDevice
 	{
 	public:
-		explicit VulkanDevice(ILogger& _logger, IAllocator& _allocator);
-		virtual ~VulkanDevice() override;
+		explicit D3D12Device(ILogger& _logger, IAllocator& _allocator);
+		virtual ~D3D12Device() override;
 
 		//IDevice interface implementation
-//		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) override;
-//		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
+		//[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) override;
+		//[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
-//		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
+		//[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
 
-		//Vulkan internal API (for use by other RHI-Vulkan classes)
-		[[nodiscard]] VkInstance GetInstance() const { return m_instance; }
-		[[nodiscard]] VkDevice GetDevice() const { return m_device; }
-		[[nodiscard]] VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
+		//D3D12 internal API (for use by other RHI-D3D12 classes)
+		[[nodiscard]] Microsoft::WRL::ComPtr<IDXGIFactory> GetInstance() const { return m_instance; }
+		[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_device; }
+		[[nodiscard]] Microsoft::WRL::ComPtr<IDXGIAdapter> GetAdapter() const { return m_physicalDevice; }
 		[[nodiscard]] std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
 		[[nodiscard]] std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
 		[[nodiscard]] std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
