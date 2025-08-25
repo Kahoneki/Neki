@@ -7,6 +7,8 @@
 
 #include <Core/Debug/ILogger.h>
 
+#include "VulkanCommandPool.h"
+#include "Core/Memory/Allocation.h"
 #include "GLFW/glfw3.h"
 
 namespace NK
@@ -27,11 +29,15 @@ namespace NK
 
 	VulkanDevice::~VulkanDevice()
 	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Shutting Down VulkanDevice\n");
+		
 		if (m_device != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(m_device);
 			vkDestroyDevice(m_device, m_allocator.GetVulkanCallbacks());
 			m_device = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Device Destroyed\n");
 		}
 
 		if (m_debugMessenger != VK_NULL_HANDLE)
@@ -39,37 +45,46 @@ namespace NK
 			const PFN_vkDestroyDebugUtilsMessengerEXT destroyFunc{ reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(m_instance, "vkDestroyDebugUtilsMessengerEXT")) };
 			destroyFunc(m_instance, m_debugMessenger, m_allocator.GetVulkanCallbacks());
 			m_debugMessenger = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Debug Messenger Destroyed\n");
 		}
 
 		if (m_instance != VK_NULL_HANDLE)
 		{
 			vkDestroyInstance(m_instance, m_allocator.GetVulkanCallbacks());
 			m_instance = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Instance Destroyed\n");
 		}
+
+		m_logger.Unindent();
 	}
 
 
 
 	IBuffer* VulkanDevice::CreateBuffer(const BufferDesc& _desc)
 	{
+		return nullptr;
 	}
 
 
 
 	ITexture* VulkanDevice::CreateTexture(const TextureDesc& _desc)
 	{
+		return nullptr;
 	}
 
 
 
 	ICommandPool* VulkanDevice::CreateCommandPool(const CommandPoolDesc& _desc)
 	{
+		return NK_NEW(VulkanCommandPool, m_logger, m_allocator, *this, _desc);
 	}
 
 
 
 	ISurface* VulkanDevice::CreateSurface(const Window* _window)
 	{
+		//todo: implement
+		return nullptr;
 	}
 
 
