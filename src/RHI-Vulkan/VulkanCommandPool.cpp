@@ -75,7 +75,7 @@ namespace NK
 		case COMMAND_POOL_TYPE::TRANSFER: return vulkanDevice.GetTransferQueueFamilyIndex();
 		default:
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "  GetQueueFamilyIndex() - switch case returned default. type = " + GetPoolTypeString());
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "GetQueueFamilyIndex() - switch case returned default. type = " + GetPoolTypeString());
 			throw std::runtime_error("");
 		}
 		}
@@ -92,7 +92,7 @@ namespace NK
 		case COMMAND_POOL_TYPE::TRANSFER: return "TRANSFER";
 		default:
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "  GetPoolTypeString() - switch case returned default. type = " + std::to_string(static_cast<std::underlying_type_t<COMMAND_POOL_TYPE>>(m_type)));
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "GetPoolTypeString() - switch case returned default. type = " + std::to_string(static_cast<std::underlying_type_t<COMMAND_POOL_TYPE>>(m_type)));
 			throw std::runtime_error("");
 		}
 		}

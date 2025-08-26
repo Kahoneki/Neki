@@ -24,12 +24,12 @@ namespace NK
 //		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
-		[[nodiscard]] VkInstance GetInstance() const { return m_instance; }
-		[[nodiscard]] VkDevice GetDevice() const { return m_device; }
-		[[nodiscard]] VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
-		[[nodiscard]] std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
-		[[nodiscard]] std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
-		[[nodiscard]] std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
+		[[nodiscard]] inline VkInstance GetInstance() const { return m_instance; }
+		[[nodiscard]] inline VkDevice GetDevice() const { return m_device; }
+		[[nodiscard]] inline VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
+		[[nodiscard]] inline std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
+		[[nodiscard]] inline std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
+		[[nodiscard]] inline std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
 
 	private:
 		//Init sub-methods

@@ -22,12 +22,12 @@ namespace NK
 		//[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
-		[[nodiscard]] Microsoft::WRL::ComPtr<IDXGIFactory> GetFactory() const { return m_factory; }
-		[[nodiscard]] Microsoft::WRL::ComPtr<IDXGIAdapter> GetAdapter() const { return m_adapter; }
-		[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_device; }
-		[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetGraphicsQueue() const { return m_graphicsQueue; }
-		[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetComputeQueue() const { return m_computeQueue; }
-		[[nodiscard]] Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetTransferQueue() const { return m_transferQueue; }
+		[[nodiscard]] inline Microsoft::WRL::ComPtr<IDXGIFactory> GetFactory() const { return m_factory; }
+		[[nodiscard]] inline Microsoft::WRL::ComPtr<IDXGIAdapter> GetAdapter() const { return m_adapter; }
+		[[nodiscard]] inline Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_device; }
+		[[nodiscard]] inline Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetGraphicsQueue() const { return m_graphicsQueue; }
+		[[nodiscard]] inline Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetComputeQueue() const { return m_computeQueue; }
+		[[nodiscard]] inline Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetTransferQueue() const { return m_transferQueue; }
 
 
 	private:

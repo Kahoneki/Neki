@@ -15,7 +15,7 @@ namespace NK
 		virtual void Reset(COMMAND_POOL_RESET_FLAGS _type) override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
-		[[nodiscard]] VkCommandPool GetCommandPool() const { return m_pool; }
+		[[nodiscard]] inline VkCommandPool GetCommandPool() const { return m_pool; }
 
 
 	private:

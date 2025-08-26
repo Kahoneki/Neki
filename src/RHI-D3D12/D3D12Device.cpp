@@ -1,4 +1,6 @@
 #include "D3D12Device.h"
+#include "Core/Memory/Allocation.h"
+#include "D3D12CommandPool.h"
 #include <stdexcept>
 #ifdef ERROR
 	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
@@ -38,8 +40,7 @@ namespace NK
 
 	UniquePtr<ICommandPool> D3D12Device::CreateCommandPool(const CommandPoolDesc& _desc)
 	{
-		//todo: implement
-		return UniquePtr<ICommandPool>();
+		return UniquePtr<ICommandPool>(NK_NEW(D3D12CommandPool, m_logger, m_allocator, *this, _desc));
 	}
 
 
