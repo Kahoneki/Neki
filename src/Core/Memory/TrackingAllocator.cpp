@@ -2,7 +2,6 @@
 
 #include <cstring>
 #include <stdexcept>
-#include <oneapi/tbb/info.h>
 
 #include "Core/Utils/FormatUtils.h"
 
@@ -12,10 +11,12 @@ namespace NK
 	TrackingAllocator::TrackingAllocator(ILogger& _logger, bool _verbose, bool _vulkanVerbose)
 	: m_logger(_logger), m_verbose(_verbose), m_vulkanVerbose(_vulkanVerbose)
 	{
-		m_vulkanCallbacks.pUserData = static_cast<void*>(this);
-		m_vulkanCallbacks.pfnAllocation = &Allocation;
-		m_vulkanCallbacks.pfnReallocation = &Reallocation;
-		m_vulkanCallbacks.pfnFree = &Free;
+		#if NEKI_VULKAN_SUPPORTED
+			m_vulkanCallbacks.pUserData = static_cast<void*>(this);
+			m_vulkanCallbacks.pfnAllocation = &Allocation;
+			m_vulkanCallbacks.pfnReallocation = &Reallocation;
+			m_vulkanCallbacks.pfnFree = &Free;
+		#endif
 	}
 
 
@@ -141,59 +142,61 @@ namespace NK
 
 
 
-	void* VKAPI_CALL TrackingAllocator::Allocation(void* _pUserData, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
-	{
-		TrackingAllocator* allocator{ reinterpret_cast<TrackingAllocator*>(_pUserData) };
-		if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Allocation: " + VulkanAllocationScopeToString(_allocationScope) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
-		void* ptr{ allocator->AllocateAligned(_size, _alignment) };
-
-		std::lock_guard<std::mutex> lock(allocator->m_allocationMapMtx);
-		allocator->m_allocationMap[ptr] = { _size, nullptr, 0 };
-		
-		return ptr;
-	}
-
-
-
-	void* VKAPI_CALL TrackingAllocator::Reallocation(void* _pUserData, void* _pOriginal, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
-	{
-		TrackingAllocator* allocator{ reinterpret_cast<TrackingAllocator*>(_pUserData) };
-		if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Reallocation: " + VulkanAllocationScopeToString(_allocationScope) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
-		void* ptr{ allocator->ReallocateAligned(_pOriginal, _size, _alignment) };
-
-		std::lock_guard<std::mutex> lock(allocator->m_allocationMapMtx);
-		allocator->m_allocationMap[ptr] = { _size, nullptr, 0 };
-		if (_pOriginal) { allocator->m_allocationMap.erase(_pOriginal); }
-
-		return ptr;
-	}
-
-
-
-	void VKAPI_CALL TrackingAllocator::Free(void* _pUserData, void* _pMemory)
-	{
-		TrackingAllocator* allocator{ reinterpret_cast<TrackingAllocator*>(_pUserData) };
-		if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Free " + std::string("--- Freeing ") + FormatUtils::GetSizeString(allocator->m_allocationMap[_pMemory].size) + "\n"); }
-		allocator->FreeAligned(_pMemory);
-
-		std::lock_guard<std::mutex> lock(allocator->m_allocationMapMtx);
-		allocator->m_allocationMap.erase(_pMemory);
-	}
-
-
-
-	std::string TrackingAllocator::VulkanAllocationScopeToString(VkSystemAllocationScope _scope)
-	{
-		switch (_scope)
+	#if NEKI_VULKAN_SUPPORTED
+		void* VKAPI_CALL TrackingAllocator::Allocation(void* _pUserData, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
 		{
-		case VK_SYSTEM_ALLOCATION_SCOPE_COMMAND: return "COMMAND";
-		case VK_SYSTEM_ALLOCATION_SCOPE_OBJECT: return "SCOPE";
-		case VK_SYSTEM_ALLOCATION_SCOPE_CACHE: return "CACHE";
-		case VK_SYSTEM_ALLOCATION_SCOPE_DEVICE: return "DEVICE";
-		case VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE: return "INSTANCE";
-		default: return "UNDEFINED";
+			TrackingAllocator* allocator{ reinterpret_cast<TrackingAllocator*>(_pUserData) };
+			if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Allocation: " + VulkanAllocationScopeToString(_allocationScope) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
+			void* ptr{ allocator->AllocateAligned(_size, _alignment) };
+
+			std::lock_guard<std::mutex> lock(allocator->m_allocationMapMtx);
+			allocator->m_allocationMap[ptr] = { _size, nullptr, 0 };
+		
+			return ptr;
 		}
-	}
+
+
+
+		void* VKAPI_CALL TrackingAllocator::Reallocation(void* _pUserData, void* _pOriginal, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
+		{
+			TrackingAllocator* allocator{ reinterpret_cast<TrackingAllocator*>(_pUserData) };
+			if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Reallocation: " + VulkanAllocationScopeToString(_allocationScope) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
+			void* ptr{ allocator->ReallocateAligned(_pOriginal, _size, _alignment) };
+
+			std::lock_guard<std::mutex> lock(allocator->m_allocationMapMtx);
+			allocator->m_allocationMap[ptr] = { _size, nullptr, 0 };
+			if (_pOriginal) { allocator->m_allocationMap.erase(_pOriginal); }
+
+			return ptr;
+		}
+
+
+
+		void VKAPI_CALL TrackingAllocator::Free(void* _pUserData, void* _pMemory)
+		{
+			TrackingAllocator* allocator{ reinterpret_cast<TrackingAllocator*>(_pUserData) };
+			if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Free " + std::string("--- Freeing ") + FormatUtils::GetSizeString(allocator->m_allocationMap[_pMemory].size) + "\n"); }
+			allocator->FreeAligned(_pMemory);
+
+			std::lock_guard<std::mutex> lock(allocator->m_allocationMapMtx);
+			allocator->m_allocationMap.erase(_pMemory);
+		}
+
+
+
+		std::string TrackingAllocator::VulkanAllocationScopeToString(VkSystemAllocationScope _scope)
+		{
+			switch (_scope)
+			{
+			case VK_SYSTEM_ALLOCATION_SCOPE_COMMAND: return "COMMAND";
+			case VK_SYSTEM_ALLOCATION_SCOPE_OBJECT: return "SCOPE";
+			case VK_SYSTEM_ALLOCATION_SCOPE_CACHE: return "CACHE";
+			case VK_SYSTEM_ALLOCATION_SCOPE_DEVICE: return "DEVICE";
+			case VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE: return "INSTANCE";
+			default: return "UNDEFINED";
+			}
+		}
+	#endif
 
 
 

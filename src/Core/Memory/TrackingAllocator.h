@@ -3,7 +3,6 @@
 #include <unordered_map>
 
 #include "IAllocator.h"
-#include <vulkan/vulkan.h>
 
 #include "../Debug/ILogger.h"
 
@@ -27,17 +26,21 @@ namespace NK
 		virtual void* Reallocate(void* _original, std::size_t _size, const char* _file, int _line) override;
 		virtual void Free(void* _ptr) override;
 
-		[[nodiscard]] virtual inline const VkAllocationCallbacks* GetVulkanCallbacks() const override { return &m_vulkanCallbacks; }
+		#if NEKI_VULKAN_SUPPORTED
+			[[nodiscard]] virtual inline const VkAllocationCallbacks* GetVulkanCallbacks() const override { return &m_vulkanCallbacks; }
+		#endif
 		std::size_t GetTotalMemoryAllocated(); //Returns the total amount of memory allocated through this allocator (in bytes)
 
 
 	private:
-		//Static C-Style Vulkan Callbacks
-		//todo: maybe add internal allocation notification callbacks ?
-		static void* VKAPI_CALL Allocation(void* _pUserData, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope);
-		static void* VKAPI_CALL Reallocation(void* _pUserData, void* _pOriginal, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope);
-		static void VKAPI_CALL Free(void* _pUserData, void* _pMemory);
-		static std::string VulkanAllocationScopeToString(VkSystemAllocationScope _scope);
+		#if NEKI_VULKAN_SUPPORTED
+			//Static C-Style Vulkan Callbacks
+			//todo: maybe add internal allocation notification callbacks ?
+			static void* VKAPI_CALL Allocation(void* _pUserData, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope);
+			static void* VKAPI_CALL Reallocation(void* _pUserData, void* _pOriginal, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope);
+			static void VKAPI_CALL Free(void* _pUserData, void* _pMemory);
+			static std::string VulkanAllocationScopeToString(VkSystemAllocationScope _scope);
+		#endif
 
 		//Impl
 		void* AllocateAligned(std::size_t _size, std::size_t _alignment);

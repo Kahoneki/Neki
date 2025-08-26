@@ -99,7 +99,7 @@ namespace NK
 		//Check that validation layers are available
 		if (m_enableInstanceValidationLayers && !ValidationLayerSupported())
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Validation layers requested, but not available.\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Validation layers requested, but not available.\n");
 			throw std::runtime_error("");
 		}
 
@@ -141,10 +141,10 @@ namespace NK
 		const VkResult result{ vkCreateInstance(&createInfo, m_allocator.GetVulkanCallbacks(), &m_instance) };
 		if (result != VK_SUCCESS)
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create instance - result: " + std::to_string(result) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create instance - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
-		m_logger.Log(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Instance successfully created\n");
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Instance successfully created\n");
 
 		m_logger.Unindent();
 	}

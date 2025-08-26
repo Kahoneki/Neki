@@ -1,5 +1,7 @@
 #pragma once
-#include <vulkan/vulkan.h>
+#if NEKI_VULKAN_SUPPORTED
+	#include <vulkan/vulkan.h>
+#endif
 
 namespace NK
 {
@@ -19,9 +21,12 @@ namespace NK
 		virtual void* Reallocate(void* _original, std::size_t _size, const char* _file, int line) = 0;
 		virtual void Free(void* _ptr) = 0;
 
-		[[nodiscard]] virtual inline const VkAllocationCallbacks* GetVulkanCallbacks() const = 0;
-
+		#if NEKI_VULKAN_SUPPORTED
+			[[nodiscard]] virtual inline const VkAllocationCallbacks* GetVulkanCallbacks() const = 0;
+		#endif
 	protected:
-		VkAllocationCallbacks m_vulkanCallbacks{ VK_NULL_HANDLE };
+		#if NEKI_VULKAN_SUPPORTED
+			VkAllocationCallbacks m_vulkanCallbacks{ VK_NULL_HANDLE };
+		#endif
 	};
 }
