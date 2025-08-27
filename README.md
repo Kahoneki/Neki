@@ -44,5 +44,5 @@ AGC development is under strict NDA and hence the source code is maintained in a
 While Vulkan remains the only API compatible for development with Neki on Linux based platforms, developing on Windows allows for both Vulkan and D3D12 simultaneously.
 For building on simultaneous DX12 and Vulkan:
 - Set the NEKI_BUILD_VULKAN setting in CMakeSettings.json to true
-- Set the NEKI_BUILD_D3D12 setting in CMakeSettings.json to false
+- Set the NEKI_BUILD_D3D12 setting in CMakeSettings.json to true
 - Configure and generate CMake
