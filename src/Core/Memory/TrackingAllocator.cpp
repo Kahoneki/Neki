@@ -13,9 +13,9 @@ namespace NK
 	{
 		#if NEKI_VULKAN_SUPPORTED
 			m_vulkanCallbacks.pUserData = static_cast<void*>(this);
-			m_vulkanCallbacks.pfnAllocation = &Allocation;
-			m_vulkanCallbacks.pfnReallocation = &Reallocation;
-			m_vulkanCallbacks.pfnFree = &Free;
+			m_vulkanCallbacks.pfnAllocation = &TrackingAllocator::Allocation;
+			m_vulkanCallbacks.pfnReallocation = &TrackingAllocator::Reallocation;
+			m_vulkanCallbacks.pfnFree = &TrackingAllocator::Free;
 		#endif
 	}
 
