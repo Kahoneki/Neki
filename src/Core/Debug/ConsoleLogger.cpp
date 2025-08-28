@@ -36,7 +36,7 @@ namespace NK
 			colourCode = COLOUR_GREEN;
 			break;
 		default:
-			std::cerr << std::endl << "ERR::Logger::Log::DEFAULT_SEVERITY_CASE_REACHED::CHANNEL_WAS_" << std::to_string(static_cast<std::underlying_type_t<LOGGER_CHANNEL>>(_channel)) << "::FALLING_BACK_TO_DEFAULT_CHANNEL" << std::endl;
+			std::cerr << std::endl << "ERR::Logger::Log::DEFAULT_SEVERITY_CASE_REACHED::CHANNEL_WAS_" << std::to_string(std::to_underlying(_channel)) << "::FALLING_BACK_TO_DEFAULT_CHANNEL" << std::endl;
 			channelStr = "[DEFAULT]";
 			colourCode = COLOUR_RESET;
 			break;
@@ -56,8 +56,8 @@ namespace NK
 		stream << colourCode;
 		if (_formatted)
 		{
-			stream << std::left << std::setw(static_cast<std::underlying_type_t<LOGGER_WIDTH>>(LOGGER_WIDTH::CHANNEL)) << channelStr <<
-			std::left << std::setw(static_cast<std::underlying_type_t<LOGGER_WIDTH>>(LOGGER_WIDTH::LAYER)) << LayerToString(_layer);
+			stream << std::left << std::setw(std::to_underlying(LOGGER_WIDTH::CHANNEL)) << channelStr <<
+			std::left << std::setw(std::to_underlying(LOGGER_WIDTH::LAYER)) << LayerToString(_layer);
 		}
 		stream << indentedMessage << COLOUR_RESET;
 	}

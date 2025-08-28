@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <utility>
 
 //Generic helper template to enable bitmask operators for any enum
 //Default specialisation below holds ::value=false - this is the fallback if enable_bitmask_operators isn't explicitly defined for the enum in question
@@ -12,28 +13,28 @@ struct enable_bitmask_operators : std::false_type{};
 template<typename E>
 std::enable_if_t<enable_bitmask_operators<E>::value, E> operator|(E lhs, E rhs)
 {
-	return static_cast<E>(static_cast<std::underlying_type_t<E>>(lhs) | static_cast<std::underlying_type_t<E>>(rhs));
+	return static_cast<E>(std::to_underlying(lhs) | std::to_underlying(rhs));
 }
 
 //Bitwise AND overload
 template<typename E>
 std::enable_if_t<enable_bitmask_operators<E>::value, E> operator&(E lhs, E rhs)
 {
-	return static_cast<E>(static_cast<std::underlying_type_t<E>>(lhs) & static_cast<std::underlying_type_t<E>>(rhs));
+	return static_cast<E>(std::to_underlying(lhs) & std::to_underlying(rhs));
 }
 
 //Bitwise XOR overload
 template<typename E>
 std::enable_if_t<enable_bitmask_operators<E>::value, E> operator^(E lhs, E rhs)
 {
-	return static_cast<E>(static_cast<std::underlying_type_t<E>>(lhs) ^ static_cast<std::underlying_type_t<E>>(rhs));
+	return static_cast<E>(std::to_underlying(lhs) ^ std::to_underlying(rhs));
 }
 
 //Bitwise NOT overload
 template<typename E>
 std::enable_if_t<enable_bitmask_operators<E>::value, E> operator~(E e)
 {
-	return static_cast<E>(~static_cast<std::underlying_type_t<E>>(e));
+	return static_cast<E>(~std::to_underlying(e));
 }
 
 //Bitwise OR assignment overload

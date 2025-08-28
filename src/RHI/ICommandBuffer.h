@@ -27,9 +27,7 @@ namespace NK
 	protected:
 		explicit ICommandBuffer(ILogger& _logger, IDevice& _device, ICommandPool& _pool, const CommandBufferDesc& _desc)
 		: m_logger(_logger), m_device(_device), m_pool(_pool), m_level(_desc.level) {}
-
-
-
+		
 		//Dependency injections
 		ILogger& m_logger;
 		IDevice& m_device;

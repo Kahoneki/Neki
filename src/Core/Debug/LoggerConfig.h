@@ -19,7 +19,7 @@ namespace NK
 
 }
 
-//Enable bitmask operators for the VK_LOGGER_CHANNEL type
+//Enable bitmask operators for the LOGGER_CHANNEL type
 template<>
 struct enable_bitmask_operators<NK::LOGGER_CHANNEL> : std::true_type {};
 
@@ -35,18 +35,19 @@ namespace NK
 
 		CONTEXT,
 		TRACKING_ALLOCATOR,
-
-
+		
 		DEVICE,
 		COMMAND_POOL,
 		COMMAND_BUFFER,
+		BUFFER,
+		IMAGE,
+		
 		SWAPCHAIN,
 		RENDER_MANAGER,
 		DESCRIPTOR_POOL,
 		PIPELINE,
-		BUFFER_FACTORY,
-		IMAGE_FACTORY,
 		MODEL_FACTORY,
+		
 		APPLICATION,
 	};
 

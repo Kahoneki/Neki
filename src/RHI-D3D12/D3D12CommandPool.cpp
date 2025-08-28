@@ -1,7 +1,8 @@
 #include "D3D12CommandPool.h"
-#include "D3D12CommandBuffer.h"
 #include <stdexcept>
+#include "D3D12CommandBuffer.h"
 #include "Core/Memory/Allocation.h"
+#include <utility>
 #ifdef ERROR
 	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
 #endif
@@ -32,6 +33,7 @@ namespace NK
 		else
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "Initialisation unsuccessful. result = " + std::to_string(result) + '\n');
+			throw std::runtime_error("");
 		}
 
 		m_logger.Unindent();
@@ -83,7 +85,7 @@ namespace NK
 		case COMMAND_POOL_TYPE::TRANSFER:	return "TRANSFER";
 		default:
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "GetPoolTypeString() - switch case returned default. type = " + std::to_string(static_cast<std::underlying_type_t<COMMAND_POOL_TYPE>>(m_type)));
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "GetPoolTypeString() - switch case returned default. type = " + std::to_string(std::to_underlying(m_type)));
 			throw std::runtime_error("");
 		}
 		}
