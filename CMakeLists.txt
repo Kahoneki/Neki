@@ -56,12 +56,21 @@ endif()
 #D3D12 handled automatically
 
 #DXC
-FetchContent_Declare(
-    dxc_artifacts
-    URL "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.7.2212/dxc_2022_12_16.zip"
-)
+if(WIN32)
+    FetchContent_Declare(
+            dxc_artifacts
+            URL "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/dxc_2025_07_14.zip"
+    )
+elseif(UNIX AND NOT APPLE)
+    FetchContent_Declare(
+            dxc_artifacts
+            URL "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/linux_dxc_2025_07_14.x86_64.tar.gz"
+    )
+else()
+    message(FATAL_ERROR "Platform not supported. Supported platforms = Windows, Linux, PS5")
+endif ()
 FetchContent_MakeAvailable(dxc_artifacts)
-find_program(DXC_EXECUTABLE NAMES dxc HINTS "${dxc_artifacts_SOURCE_DIR}/bin/x64")
+find_program(DXC_EXECUTABLE NAMES dxc HINTS "${dxc_artifacts_SOURCE_DIR}/bin")
 if(NOT DXC_EXECUTABLE)
     message(FATAL_ERROR "Could not find dxc.exe")
 endif()
