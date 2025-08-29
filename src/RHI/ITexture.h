@@ -80,8 +80,9 @@ namespace NK
 
 	struct TextureDesc
 	{
-		//Size in texels of all 3 dimensions - unused dimensions will be ignored (e.g.: for 2D textures, size.z will be ignored)
+		//Size in texels of all 3 dimensions - unused dimensions should be 1 (e.g.: for 2D textures, size.z will be ignored) - unless arrayTexture=true
 		glm::ivec3 size;
+
 		bool arrayTexture; //If true, the last populated channel will be treated as the number of array elements. If false, it will be treated as the corresponding dimension size
 		TEXTURE_USAGE_FLAGS usage;
 		TEXTURE_FORMAT format;
