@@ -4,9 +4,12 @@
 #include "Core/Memory/TrackingAllocator.h"
 #include "Core/Utils/FormatUtils.h"
 #include "RHI-Vulkan/VulkanDevice.h"
+#include "RHI/IBuffer.h"
 #include "RHI/ICommandBuffer.h"
 #include "RHI/ICommandPool.h"
 #include "RHI/IDevice.h"
+
+#include <utility>
 
 
 
@@ -29,11 +32,18 @@ int main()
 	const NK::UniquePtr<NK::ICommandPool> pool{ device->CreateCommandPool(poolDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n");
 
-	NK::CommandBufferDesc bufferDesc{};
-	bufferDesc.level = NK::COMMAND_BUFFER_LEVEL::PRIMARY;
-	const NK::UniquePtr<NK::ICommandBuffer> buffer{ pool->AllocateCommandBuffer(bufferDesc) };
+	NK::CommandBufferDesc commandBufferDesc{};
+	commandBufferDesc.level = NK::COMMAND_BUFFER_LEVEL::PRIMARY;
+	const NK::UniquePtr<NK::ICommandBuffer> commandBuffer{ pool->AllocateCommandBuffer(commandBufferDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n");
 	
+	NK::BufferDesc bufferDesc{};
+	bufferDesc.size = 1024;
+	bufferDesc.type = NK::MEMORY_TYPE::DEVICE;
+	bufferDesc.usage = NK::BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
+	const NK::UniquePtr<NK::IBuffer> buffer{ device->CreateBuffer(bufferDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n");
+
 	
 	logger->Log(NK::LOGGER_CHANNEL::SUCCESS, NK::LOGGER_LAYER::APPLICATION, "Engine initialised successfully!\n");
 }

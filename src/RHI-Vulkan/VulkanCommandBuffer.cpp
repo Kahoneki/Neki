@@ -1,6 +1,7 @@
 #include "VulkanCommandBuffer.h"
 
 #include "VulkanCommandPool.h"
+#include <stdexcept>
 
 namespace NK
 {
@@ -25,6 +26,7 @@ namespace NK
 		else
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "Initialisation unsuccessful. result = " + std::to_string(result) + '\n');
+			throw std::runtime_error("");
 		}
 		
 		m_logger.Unindent();

@@ -1,5 +1,7 @@
 #include "D3D12CommandBuffer.h"
 #include "D3D12CommandPool.h"
+#include "D3D12Device.h"
+#include <stdexcept>
 #ifdef ERROR
 	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
 #endif
@@ -30,6 +32,7 @@ namespace NK
 		else
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "Initialisation unsuccessful. result = " + std::to_string(result) + '\n');
+			throw std::runtime_error("");
 		}
 
 		m_logger.Unindent();

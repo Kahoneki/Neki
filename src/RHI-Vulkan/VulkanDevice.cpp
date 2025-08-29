@@ -5,8 +5,10 @@
 #include <set>
 #include <stdexcept>
 
-#include <Core/Debug/ILogger.h>
+#include "Core/Debug/ILogger.h"
+#include "Core/Utils/EnumUtils.h"
 
+#include "VulkanBuffer.h"
 #include "VulkanCommandPool.h"
 #include "Core/Memory/Allocation.h"
 #include "GLFW/glfw3.h"
@@ -60,11 +62,10 @@ namespace NK
 
 
 
-//	UniquePtr<IBuffer> VulkanDevice::CreateBuffer(const BufferDesc& _desc)
-//	{
-//		//todo: implement
-//		return { nullptr };
-//	}
+	UniquePtr<IBuffer> VulkanDevice::CreateBuffer(const BufferDesc& _desc)
+	{
+		return UniquePtr<IBuffer>(NK_NEW(VulkanBuffer, m_logger, m_allocator, *this, _desc));
+	}
 
 
 
