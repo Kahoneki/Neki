@@ -17,7 +17,7 @@ namespace NK
 
 		//IDevice interface implementation
 		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) override;
-		//[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 		//[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
 

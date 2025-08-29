@@ -10,6 +10,7 @@
 
 #include "VulkanBuffer.h"
 #include "VulkanCommandPool.h"
+#include "VulkanTexture.h"
 #include "Core/Memory/Allocation.h"
 #include "GLFW/glfw3.h"
 
@@ -69,11 +70,10 @@ namespace NK
 
 
 
-//	UniquePtr<ITexture> VulkanDevice::CreateTexture(const TextureDesc& _desc)
-//	{
-//		//todo: implement
-//		return { nullptr };
-//	}
+	UniquePtr<ITexture> VulkanDevice::CreateTexture(const TextureDesc& _desc)
+	{
+		return UniquePtr<ITexture>(NK_NEW(VulkanTexture, m_logger, m_allocator, *this, _desc));
+	}
 
 
 

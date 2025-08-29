@@ -13,7 +13,7 @@
       "variables": [
         {
           "name": "NEKI_BUILD_VULKAN",
-          "value": "False",
+          "value": "True",
           "type": "BOOL"
         }
       ]

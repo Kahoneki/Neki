@@ -30,7 +30,7 @@ namespace NK
 		virtual ~IDevice() = default;
 
 		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) = 0;
-//		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) = 0;
 //		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) = 0;
 
