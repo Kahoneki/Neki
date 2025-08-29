@@ -3,6 +3,7 @@
 #include "VulkanDevice.h"
 #include "Core/Utils/EnumUtils.h"
 #include "Core/Utils/FormatUtils.h"
+#include <stdexcept>
 
 namespace NK
 {
