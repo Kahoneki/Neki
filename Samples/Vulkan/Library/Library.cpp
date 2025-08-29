@@ -40,7 +40,7 @@ int main()
 	NK::BufferDesc bufferDesc{};
 	bufferDesc.size = 1024;
 	bufferDesc.type = NK::MEMORY_TYPE::DEVICE;
-	bufferDesc.usage = std::to_underlying(NK::BUFFER_USAGE_FLAG_BITS::UNIFORM_BUFFER_BIT);
+	bufferDesc.usage = NK::BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
 	const NK::UniquePtr<NK::IBuffer> buffer{ device->CreateBuffer(bufferDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n");
 

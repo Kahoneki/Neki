@@ -1,7 +1,8 @@
 #include "VulkanBuffer.h"
-
+#include <stdexcept>
 #include "VulkanDevice.h"
 #include "Core/Utils/FormatUtils.h"
+#include "Core/Utils/EnumUtils.h"
 
 namespace NK
 {
@@ -147,13 +148,13 @@ namespace NK
 	{
 		VkBufferUsageFlags vkFlags{ 0 };
 		
-		if (m_usage & std::to_underlying(BUFFER_USAGE_FLAG_BITS::TRANSFER_SRC_BIT))		{ vkFlags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT; }
-		if (m_usage & std::to_underlying(BUFFER_USAGE_FLAG_BITS::TRANSFER_DST_BIT))		{ vkFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT; }
-		if (m_usage & std::to_underlying(BUFFER_USAGE_FLAG_BITS::UNIFORM_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; }
-		if (m_usage & std::to_underlying(BUFFER_USAGE_FLAG_BITS::STORAGE_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; }
-		if (m_usage & std::to_underlying(BUFFER_USAGE_FLAG_BITS::VERTEX_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; }
-		if (m_usage & std::to_underlying(BUFFER_USAGE_FLAG_BITS::INDEX_BUFFER_BIT))		{ vkFlags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT; }
-		if (m_usage & std::to_underlying(BUFFER_USAGE_FLAG_BITS::INDIRECT_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT; }
+		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT))		{ vkFlags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT; }
+		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT))		{ vkFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT; }
+		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; }
+		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; }
+		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; }
+		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT))		{ vkFlags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT; }
+		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::INDIRECT_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT; }
 
 		return vkFlags;
 	}

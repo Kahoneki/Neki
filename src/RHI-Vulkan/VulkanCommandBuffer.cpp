@@ -1,6 +1,7 @@
 #include "VulkanCommandBuffer.h"
 
 #include "VulkanCommandPool.h"
+#include <stdexcept>
 
 namespace NK
 {

@@ -1,6 +1,7 @@
 #include "D3D12Device.h"
 #include "Core/Memory/Allocation.h"
 #include "D3D12CommandPool.h"
+#include "D3D12Buffer.h"
 #include <stdexcept>
 #ifdef ERROR
 	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
@@ -34,6 +35,13 @@ namespace NK
 		//ComPtrs are released automatically
 
 		m_logger.Unindent();
+	}
+
+
+
+	UniquePtr<IBuffer> D3D12Device::CreateBuffer(const BufferDesc& _desc)
+	{
+		return UniquePtr<IBuffer>(NK_NEW(D3D12Buffer, m_logger, m_allocator, *this, _desc));
 	}
 
 

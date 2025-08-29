@@ -5,7 +5,8 @@
 #include <set>
 #include <stdexcept>
 
-#include <Core/Debug/ILogger.h>
+#include "Core/Debug/ILogger.h"
+#include "Core/Utils/EnumUtils.h"
 
 #include "VulkanBuffer.h"
 #include "VulkanCommandPool.h"

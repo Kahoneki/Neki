@@ -1,10 +1,13 @@
 #pragma once
 #include "IDevice.h"
 #include "Core/Debug/ILogger.h"
+#include "ResourceStates.h"
 
 namespace NK
 {
-	enum class BUFFER_USAGE_FLAG_BITS : std::uint32_t
+	//Bitfield of states the buffer is allowed to occupy
+	//For compatibility, this must be specified at creation and cannot be changed
+	enum class BUFFER_USAGE_FLAGS : std::uint32_t
 	{
 		NONE				= 1 << 0,
 		TRANSFER_SRC_BIT	= 1 << 1,
@@ -15,12 +18,11 @@ namespace NK
 		INDEX_BUFFER_BIT	= 1 << 6,
 		INDIRECT_BUFFER_BIT	= 1 << 7,
 	};
-	typedef std::uint64_t BUFFER_USAGE_FLAGS;
 }
 
 //Enable bitmask operators for the BUFFER_USAGE_FLAG_BITS type
 template<>
-struct enable_bitmask_operators<NK::BUFFER_USAGE_FLAG_BITS> : std::true_type {};
+struct enable_bitmask_operators<NK::BUFFER_USAGE_FLAGS> : std::true_type {};
 
 namespace NK
 {
