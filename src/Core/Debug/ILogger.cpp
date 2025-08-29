@@ -54,7 +54,7 @@ namespace NK
 		case LOGGER_LAYER::COMMAND_POOL:		return "[COMMAND POOL]";
 		case LOGGER_LAYER::COMMAND_BUFFER:		return "[COMMAND BUFFER]";
 		case LOGGER_LAYER::BUFFER:				return "[BUFFER]";
-		case LOGGER_LAYER::IMAGE:				return "[IMAGE]";
+		case LOGGER_LAYER::TEXTURE:				return "[TEXTURE]";
 			
 		case LOGGER_LAYER::SWAPCHAIN:			return "[SWAPCHAIN]";
 		case LOGGER_LAYER::RENDER_MANAGER:		return "[RENDER MANAGER]";
