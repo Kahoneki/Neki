@@ -7,6 +7,8 @@
 #include <RHI/IDevice.h>
 #include <vulkan/vulkan.h>
 
+#include "RHI/ISurface.h"
+
 
 namespace NK
 {
@@ -21,7 +23,7 @@ namespace NK
 		[[nodiscard]] virtual ResourceIndex CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
-//		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
+		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] inline VkInstance GetInstance() const { return m_instance; }

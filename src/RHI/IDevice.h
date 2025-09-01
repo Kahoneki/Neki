@@ -17,7 +17,7 @@ namespace NK
 	class ICommandPool;
 	struct CommandPoolDesc;
 
-	class Window;
+	class SurfaceDesc;
 	class ISurface;
 
 
@@ -54,7 +54,7 @@ namespace NK
 		[[nodiscard]] virtual ResourceIndex CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) = 0;
-		//[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) = 0;
+		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) = 0;
 
 
 	protected:

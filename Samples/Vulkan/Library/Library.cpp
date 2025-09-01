@@ -59,6 +59,12 @@ int main()
 	textureDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(textureDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	NK::SurfaceDesc surfaceDesc{};
+	surfaceDesc.name = "Neki Library Sample";
+	surfaceDesc.size = glm::ivec2(1280, 720);
+	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	logger->Log(NK::LOGGER_CHANNEL::SUCCESS, NK::LOGGER_LAYER::APPLICATION, "Engine initialised successfully!\n\n");
 }
