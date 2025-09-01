@@ -15,7 +15,8 @@
 #include "GLFW/glfw3.h"
 
 namespace NK
-{
+{		
+	
 	VulkanDevice::VulkanDevice(ILogger& _logger, IAllocator& _allocator)
 	: IDevice(_logger, _allocator)
 	{
@@ -25,6 +26,11 @@ namespace NK
 		SetupDebugMessenger();
 		SelectPhysicalDevice();
 		CreateLogicalDevice();
+		CreateMutableResourceType();
+		CreateDescriptorPool();
+		CreateDescriptorSetLayout();
+		CreateDescriptorSet();
+		
 		m_logger.Unindent();
 	}
 
@@ -35,6 +41,27 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Shutting Down VulkanDevice\n");
 
+		if (m_descriptorSetLayout != VK_NULL_HANDLE)
+		{
+			vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayout, m_allocator.GetVulkanCallbacks());
+			m_descriptorSetLayout = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Descriptor Set Layout Destroyed\n");
+		}
+
+		if (m_descriptorSet != VK_NULL_HANDLE)
+		{
+			vkFreeDescriptorSets(m_device, m_descriptorPool, 1, &m_descriptorSet);
+			m_descriptorSet = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Descriptor Set Destroyed\n");
+		}
+
+		if (m_descriptorPool != VK_NULL_HANDLE)
+		{
+			vkDestroyDescriptorPool(m_device, m_descriptorPool, m_allocator.GetVulkanCallbacks());
+			m_descriptorPool = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Descriptor Pool Destroyed\n");
+		}
+		
 		if (m_device != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(m_device);
@@ -70,6 +97,71 @@ namespace NK
 
 
 
+	ResourceIndex VulkanDevice::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Creating buffer view\n");
+
+		
+		//Get resource index from free list
+		const ResourceIndex index{ m_resourceIndexAllocator->Allocate() };
+		if (index == FreeListAllocator::INVALID_INDEX)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Resource index allocation failed - max bindless resource count (" + std::to_string(MAX_BINDLESS_RESOURCES) + ") reached.\n");
+			throw std::runtime_error("");
+		}
+
+		//Get underlying VulkanBuffer
+		const VulkanBuffer* vulkanBuffer{ dynamic_cast<const VulkanBuffer*>(_buffer) };
+		if (!vulkanBuffer)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Dynamic cast to VulkanBuffer object expected to pass but failed\n");
+			throw std::runtime_error("");
+		}
+
+		//Convert rhi view type to vulkan descriptor type
+		VkDescriptorType descriptorType;
+		switch (_desc.type)
+		{
+		case BUFFER_VIEW_TYPE::CONSTANT:
+			descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			break;
+
+		case BUFFER_VIEW_TYPE::SHADER_RESOURCE:
+		case BUFFER_VIEW_TYPE::UNORDERED_ACCESS:
+			descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			break;
+
+		default:
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Default case reached when determining vulkan descriptor type\n");
+			throw std::runtime_error("");
+		}
+
+		//Populate descriptor info
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.buffer = vulkanBuffer->GetBuffer();
+		bufferInfo.offset = _desc.offset;
+		bufferInfo.range = _desc.size;
+
+		//Populate write info
+		VkWriteDescriptorSet writeInfo{};
+		writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeInfo.dstSet = m_descriptorSet;
+		writeInfo.dstBinding = 0; //All cbv, srv, uav are in binding point 0
+		writeInfo.dstArrayElement = index;
+		writeInfo.descriptorCount = 1;
+		writeInfo.descriptorType = descriptorType;
+		writeInfo.pBufferInfo = &bufferInfo;
+
+		vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
+		
+		m_logger.Unindent();
+
+		return index;
+	}
+
+
+
 	UniquePtr<ITexture> VulkanDevice::CreateTexture(const TextureDesc& _desc)
 	{
 		return UniquePtr<ITexture>(NK_NEW(VulkanTexture, m_logger, m_allocator, *this, _desc));
@@ -98,7 +190,7 @@ namespace NK
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating instance\n");
 
 		//Check that validation layers are available
-		if (m_enableInstanceValidationLayers && !ValidationLayerSupported())
+		if (m_enableInstanceValidationLayers && !ValidationLayersSupported())
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Validation layers requested, but not available.\n");
 			throw std::runtime_error("");
@@ -342,7 +434,131 @@ namespace NK
 
 
 
-	bool VulkanDevice::ValidationLayerSupported() const
+	void VulkanDevice::CreateMutableResourceType()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating mutable resource type\n");
+
+		m_mutableResourceTypeList.descriptorTypeCount = m_resourceTypes.size();
+		m_mutableResourceTypeList.pDescriptorTypes = m_resourceTypes.data();
+
+		m_mutableResourceTypeInfo.sType = VK_STRUCTURE_TYPE_MUTABLE_DESCRIPTOR_TYPE_CREATE_INFO_EXT;
+		m_mutableResourceTypeInfo.mutableDescriptorTypeListCount = 1;
+		m_mutableResourceTypeInfo.pMutableDescriptorTypeLists = &m_mutableResourceTypeList;
+		
+		m_logger.Unindent();
+	}
+
+
+
+	void VulkanDevice::CreateDescriptorPool()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating descriptor pool\n");
+
+		//Define the pool size
+		constexpr std::array<VkDescriptorPoolSize, 2> poolSizes
+		{
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_MUTABLE_EXT, MAX_BINDLESS_RESOURCES },
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_SAMPLERS }
+		};
+		
+		//Create the pool
+		VkDescriptorPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.pNext = &m_mutableResourceTypeInfo;
+		poolInfo.maxSets = 1;
+		poolInfo.poolSizeCount = poolSizes.size();
+		poolInfo.pPoolSizes = poolSizes.data();
+		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+		const VkResult result{ vkCreateDescriptorPool(m_device, &poolInfo, m_allocator.GetVulkanCallbacks(), &m_descriptorPool) };
+		if (result != VK_SUCCESS)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor pool - result: " + std::to_string(result) + "\n");
+			throw std::runtime_error("");
+		}
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor pool\n");
+		
+		m_logger.Unindent();
+	}
+
+
+
+	void VulkanDevice::CreateDescriptorSetLayout()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating descriptor set layout\n");
+
+
+		//----MUTABLE RESOURCE BINDING----//
+		VkDescriptorSetLayoutBinding mutableResourceBinding{};
+		mutableResourceBinding.binding = 0;
+		mutableResourceBinding.descriptorType = VK_DESCRIPTOR_TYPE_MUTABLE_EXT;
+		mutableResourceBinding.descriptorCount = MAX_BINDLESS_RESOURCES;
+		mutableResourceBinding.stageFlags = VK_SHADER_STAGE_ALL;
+
+
+		//----SAMPLER BINDING----//
+		VkDescriptorSetLayoutBinding samplerBinding{};
+		samplerBinding.binding = 1;
+		samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		samplerBinding.descriptorCount = MAX_BINDLESS_SAMPLERS;
+		samplerBinding.stageFlags = VK_SHADER_STAGE_ALL;
+
+
+		//Create the binding chain
+		constexpr std::array<VkDescriptorBindingFlags, 2> bindingFlags{ VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT };
+		VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
+		bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+		bindingFlagsInfo.bindingCount = 2;
+		bindingFlagsInfo.pBindingFlags = bindingFlags.data();
+		bindingFlagsInfo.pNext = &m_mutableResourceTypeInfo; //nothing to do with the flags, the layout info just needs the mutable type info in its chain
+
+		const std::array<VkDescriptorSetLayoutBinding, 2> bindings{ mutableResourceBinding, samplerBinding };
+		VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.pNext = &bindingFlagsInfo;
+		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+		layoutInfo.bindingCount = bindings.size();
+		layoutInfo.pBindings = bindings.data();
+		
+		const VkResult result{ vkCreateDescriptorSetLayout(m_device, &layoutInfo, m_allocator.GetVulkanCallbacks(), &m_descriptorSetLayout) };
+		if (result != VK_SUCCESS)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set layout - result: " + std::to_string(result) + "\n");
+			throw std::runtime_error("");
+		}
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");		
+		
+		m_logger.Unindent();
+	}
+
+
+
+	void VulkanDevice::CreateDescriptorSet()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating descriptor set layout\n");
+		
+		VkDescriptorSetAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = m_descriptorPool;
+		allocInfo.descriptorSetCount = 1;
+		allocInfo.pSetLayouts = &m_descriptorSetLayout;
+		const VkResult result{ vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSet) };
+		if (result != VK_SUCCESS)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set layout - result: " + std::to_string(result) + "\n");
+			throw std::runtime_error("");
+		}
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");	
+		
+		m_logger.Unindent();
+	}
+
+
+
+	bool VulkanDevice::ValidationLayersSupported() const
 	{
 		std::uint32_t layerCount;
 		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);

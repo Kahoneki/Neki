@@ -16,7 +16,7 @@ namespace NK
 		virtual void Reset(COMMAND_POOL_RESET_FLAGS _type) override;
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
-		[[nodiscard]] inline Microsoft::WRL::ComPtr<ID3D12CommandAllocator> GetCommandPool() const { return m_pool; }
+		[[nodiscard]] inline ID3D12CommandAllocator* GetCommandPool() const { return m_pool.Get(); }
 
 
 	private:

@@ -10,8 +10,6 @@
 #include "RHI/ICommandPool.h"
 #include "RHI/IDevice.h"
 
-#include <utility>
-
 
 
 int main()
@@ -43,6 +41,14 @@ int main()
 	bufferDesc.type = NK::MEMORY_TYPE::DEVICE;
 	bufferDesc.usage = NK::BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
 	const NK::UniquePtr<NK::IBuffer> buffer{ device->CreateBuffer(bufferDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	NK::BufferViewDesc bufferViewDesc{};
+	bufferViewDesc.type = NK::BUFFER_VIEW_TYPE::CONSTANT;
+	bufferViewDesc.offset = 0;
+	bufferViewDesc.size = bufferDesc.size;
+	const NK::ResourceIndex bufferViewIndex{ device->CreateBufferView(buffer.get(), bufferViewDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Buffer view index: " + std::to_string(bufferViewIndex) + "\n");
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	NK::TextureDesc textureDesc{};

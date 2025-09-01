@@ -13,6 +13,9 @@ namespace NK
 		virtual void* Map() override;
 		virtual void Unmap() override;
 
+		//D3D12 internal API (for use by other RHI-D3D12 classes)
+		[[nodiscard]] inline ID3D12Resource* GetBuffer() const { return m_buffer.Get(); }
+
 
 	private:
 		[[nodiscard]] D3D12_RESOURCE_FLAGS GetCreationFlags() const;

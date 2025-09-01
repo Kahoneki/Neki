@@ -12,11 +12,14 @@ namespace NK
 		virtual void* Map() override;
 		virtual void Unmap() override;
 
+		//Vulkan internal API (for use by other RHI-Vulkan classes)
+		[[nodiscard]] inline VkBuffer GetBuffer() const { return m_buffer; }
+
 
 	private:
 		[[nodiscard]] VkBufferUsageFlags GetVulkanUsageFlags() const;
-		
-		
+
+
 		VkBuffer m_buffer{ VK_NULL_HANDLE };
 		VkDeviceMemory m_memory{ VK_NULL_HANDLE };
 	};

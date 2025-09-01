@@ -8,7 +8,6 @@
 #include <vulkan/vulkan.h>
 
 
-
 namespace NK
 {
 	class VulkanDevice final : public IDevice
@@ -19,6 +18,7 @@ namespace NK
 
 		//IDevice interface implementation
 		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) override;
+		[[nodiscard]] virtual ResourceIndex CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 //		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
@@ -31,15 +31,20 @@ namespace NK
 		[[nodiscard]] inline std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
 
+
 	private:
 		//Init sub-methods
 		void CreateInstance();
 		void SetupDebugMessenger();
 		void SelectPhysicalDevice();
 		void CreateLogicalDevice();
+		void CreateMutableResourceType();
+		void CreateDescriptorPool();
+		void CreateDescriptorSetLayout();
+		void CreateDescriptorSet();
 
 		//Utility functions
-		[[nodiscard]] bool ValidationLayerSupported() const;
+		[[nodiscard]] bool ValidationLayersSupported() const;
 		[[nodiscard]] std::vector<const char*> GetRequiredExtensions() const;
 		void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& _info) const;
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT _messageSeverity, VkDebugUtilsMessageTypeFlagsEXT _messageType, const VkDebugUtilsMessengerCallbackDataEXT* _pCallbackData, void* _pUserData);
@@ -61,10 +66,23 @@ namespace NK
 		VkQueue m_transferQueue{ VK_NULL_HANDLE };
 		std::uint32_t m_transferQueueFamilyIndex{ UINT32_MAX };
 
+		inline static constexpr std::array<VkDescriptorType, 4> m_resourceTypes
+		{
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, //cbv
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, //srv
+			VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, //uav read
+			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, //uav read-write
+		};
+		VkMutableDescriptorTypeListEXT m_mutableResourceTypeList{};
+		VkMutableDescriptorTypeCreateInfoEXT m_mutableResourceTypeInfo{};
+		VkDescriptorPool m_descriptorPool{ VK_NULL_HANDLE };
+		VkDescriptorSetLayout m_descriptorSetLayout{ VK_NULL_HANDLE };
+		VkDescriptorSet m_descriptorSet{ VK_NULL_HANDLE };
+
 
 		bool m_enableInstanceValidationLayers = true;
 		const std::array<const char*, 1> m_instanceValidationLayers{ "VK_LAYER_KHRONOS_validation" };
 		const std::array<const char*, 1> m_requiredInstanceExtensions{ VK_KHR_SURFACE_EXTENSION_NAME };
-		const std::array<const char*, 2> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader" };
+		const std::array<const char*, 3> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader", "VK_EXT_mutable_descriptor_type" };
 	};
 }
