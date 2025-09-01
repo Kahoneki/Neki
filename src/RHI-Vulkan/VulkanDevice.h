@@ -7,6 +7,8 @@
 #include <RHI/IDevice.h>
 #include <vulkan/vulkan.h>
 
+#include "Core/Memory/FreeListAllocator.h"
+
 
 
 namespace NK
@@ -19,7 +21,7 @@ namespace NK
 
 		//IDevice interface implementation
 		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) override;
-		[[nodiscard]] virtual ResourceIndex CreateBufferView(const BufferViewDesc& _desc) override;
+		[[nodiscard]] virtual ResourceIndex CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 //		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
@@ -31,6 +33,7 @@ namespace NK
 		[[nodiscard]] inline std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
+
 
 	private:
 		//Init sub-methods
@@ -73,11 +76,12 @@ namespace NK
 			VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, //uav read
 			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, //uav read-write
 		};
-		VkMutableDescriptorTypeListEXT m_mutableResourceTypeList;
-		VkMutableDescriptorTypeCreateInfoEXT m_mutableResourceTypeInfo;
+		VkMutableDescriptorTypeListEXT m_mutableResourceTypeList{};
+		VkMutableDescriptorTypeCreateInfoEXT m_mutableResourceTypeInfo{};
 		VkDescriptorPool m_descriptorPool{ VK_NULL_HANDLE };
 		VkDescriptorSetLayout m_descriptorSetLayout{ VK_NULL_HANDLE };
 		VkDescriptorSet m_descriptorSet{ VK_NULL_HANDLE };
+		UniquePtr<FreeListAllocator> m_resourceIndexAllocator;
 
 
 		bool m_enableInstanceValidationLayers = true;

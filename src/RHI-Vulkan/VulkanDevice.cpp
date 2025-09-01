@@ -22,7 +22,7 @@ namespace NK
 	
 	
 	VulkanDevice::VulkanDevice(ILogger& _logger, IAllocator& _allocator)
-	: IDevice(_logger, _allocator)
+	: IDevice(_logger, _allocator), m_resourceIndexAllocator(NK_NEW(FreeListAllocator, MAX_BINDLESS_RESOURCES))
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Initialising VulkanDevice\n");
@@ -34,6 +34,7 @@ namespace NK
 		CreateDescriptorPool();
 		CreateDescriptorSetLayout();
 		CreateDescriptorSet();
+		
 		m_logger.Unindent();
 	}
 
@@ -100,9 +101,67 @@ namespace NK
 
 
 
-	ResourceIndex VulkanDevice::CreateBufferView(const BufferViewDesc& _desc)
+	ResourceIndex VulkanDevice::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
 	{
-		return 0;
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Creating buffer view\n");
+
+		
+		//Get resource index from free list
+		const ResourceIndex index{ m_resourceIndexAllocator->Allocate() };
+		if (index == FreeListAllocator::INVALID_INDEX)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Resource index allocation failed - max bindless resource count (" + std::to_string(MAX_BINDLESS_RESOURCES) + ") reached.\n");
+			throw std::runtime_error("");
+		}
+
+		//Get underlying VulkanBuffer
+		const VulkanBuffer* vulkanBuffer{ dynamic_cast<const VulkanBuffer*>(_buffer) };
+		if (!vulkanBuffer)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Dynamic cast to VulkanBuffer object expected to pass but failed\n");
+			throw std::runtime_error("");
+		}
+
+		//Convert rhi view type to vulkan descriptor type
+		VkDescriptorType descriptorType;
+		switch (_desc.type)
+		{
+		case BUFFER_VIEW_TYPE::CONSTANT:
+			descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			break;
+
+		case BUFFER_VIEW_TYPE::SHADER_RESOURCE:
+		case BUFFER_VIEW_TYPE::UNORDERED_ACCESS:
+			descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			break;
+
+		default:
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Default case reached when determining vulkan descriptor type\n");
+			throw std::runtime_error("");
+		}
+
+		//Populate descriptor info
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.buffer = vulkanBuffer->GetBuffer();
+		bufferInfo.offset = _desc.offset;
+		bufferInfo.range = _desc.size;
+
+		//Populate write info
+		VkWriteDescriptorSet writeInfo{};
+		writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeInfo.dstSet = m_descriptorSet;
+		writeInfo.dstBinding = 0; //All cbv, srv, uav are in binding point 0
+		writeInfo.dstArrayElement = index;
+		writeInfo.descriptorCount = 1;
+		writeInfo.descriptorType = descriptorType;
+		writeInfo.pBufferInfo = &bufferInfo;
+
+		vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
+		
+		m_logger.Unindent();
+
+		return index;
 	}
 
 
