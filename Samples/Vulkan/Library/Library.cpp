@@ -4,11 +4,12 @@
 #include "Core/Memory/TrackingAllocator.h"
 #include "Core/Utils/FormatUtils.h"
 #include "RHI-Vulkan/VulkanDevice.h"
+#include "RHI/ICommandPool.h"
+#include "RHI/ICommandBuffer.h"
 #include "RHI/IBuffer.h"
 #include "RHI/ITexture.h"
-#include "RHI/ICommandBuffer.h"
-#include "RHI/ICommandPool.h"
-#include "RHI/IDevice.h"
+#include "RHI/ISurface.h"
+#include "RHI/ISwapchain.h"
 
 
 
@@ -64,6 +65,12 @@ int main()
 	surfaceDesc.name = "Neki-Vulkan Library Sample";
 	surfaceDesc.size = glm::ivec2(1280, 720);
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	NK::SwapchainDesc swapchainDesc{};
+	swapchainDesc.surface = surface.get();
+	swapchainDesc.numBuffers = 3;
+	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	logger->Log(NK::LOGGER_CHANNEL::SUCCESS, NK::LOGGER_LAYER::APPLICATION, "Engine initialised successfully!\n\n");

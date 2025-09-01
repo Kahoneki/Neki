@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include "IDevice.h"
 
 #include <GLFW/glfw3.h>
@@ -20,9 +21,11 @@ namespace NK
 	public:
 		virtual ~ISurface() = default;
 
-
+		[[nodiscard]] inline glm::ivec2 GetSize() const { return m_size; }
+		
+		
 	protected:
-		explicit ISurface(ILogger& _logger,IAllocator& _allocator, IDevice& _device, const SurfaceDesc& _desc)
+		explicit ISurface(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const SurfaceDesc& _desc)
 		: m_logger(_logger), m_allocator(_allocator), m_device(_device), m_name(_desc.name), m_size(_desc.size), m_window(nullptr) {}
 		
 		//Dependency injections
@@ -30,8 +33,8 @@ namespace NK
 		IAllocator& m_allocator;
 		IDevice& m_device;
 
-		std::string m_name;
-		glm::ivec2 m_size;
+		const std::string m_name;
+		const glm::ivec2 m_size; //const for now O_O
 
 		GLFWwindow* m_window;
 	};

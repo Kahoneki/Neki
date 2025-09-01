@@ -17,8 +17,11 @@ namespace NK
 	class ICommandPool;
 	struct CommandPoolDesc;
 
-	class SurfaceDesc;
 	class ISurface;
+	struct SurfaceDesc;
+
+	class ISwapchain;
+	struct SwapchainDesc;
 
 
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
@@ -55,6 +58,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) = 0;
 
 
 	protected:

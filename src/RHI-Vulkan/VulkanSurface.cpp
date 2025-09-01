@@ -1,7 +1,6 @@
 #include "VulkanSurface.h"
 
 #include "VulkanDevice.h"
-#include <stdexcept>
 
 namespace NK
 {
@@ -11,9 +10,6 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::SURFACE, "Initialising VulkanSurface\n");
-
-		glfwInit();
-		m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SURFACE, "GLFW initialised\n");
 
 		CreateWindow();
 		CreateSurface();
@@ -30,13 +26,10 @@ namespace NK
 
 		if (m_surface != VK_NULL_HANDLE)
 		{
-			vkDestroySurfaceKHR(dynamic_cast<VulkanDevice&>(m_device).GetInstance(), m_surface, m_allocator.GetVulkanCallbacks());
+			vkDestroySurfaceKHR(dynamic_cast<VulkanDevice&>(m_device).GetInstance(), m_surface, nullptr); //glfw does internal allocations which get buggy when combined with VkAllocationCallbacks
 			m_surface = VK_NULL_HANDLE;
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SURFACE, "Surface Destroyed\n");
 		}
-
-		glfwTerminate();
-		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SURFACE, "GLFW Terminated\n");
 
 		m_logger.Unindent();
 	}
@@ -72,13 +65,13 @@ namespace NK
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SURFACE, "Creating surface\n");
 
 		const VkResult result{ glfwCreateWindowSurface(dynamic_cast<VulkanDevice&>(m_device).GetInstance(), m_window, nullptr, &m_surface) }; //glfw does internal allocations which get buggy when combined with VkAllocationCallbacks
-		if (result)
+		if (result == VK_SUCCESS)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SURFACE, "Surface successfully created\n");
 		}
 		else
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::SURFACE, "Failed to create surface\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::SURFACE, "Failed to create surface - result = " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
 

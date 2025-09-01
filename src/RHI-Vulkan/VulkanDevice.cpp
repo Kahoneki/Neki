@@ -9,9 +9,10 @@
 #include "Core/Utils/EnumUtils.h"
 
 #include "VulkanBuffer.h"
+#include "VulkanTexture.h"
 #include "VulkanCommandPool.h"
 #include "VulkanSurface.h"
-#include "VulkanTexture.h"
+#include "VulkanSwapchain.h"
 #include "Core/Memory/Allocation.h"
 #include "GLFW/glfw3.h"
 
@@ -23,6 +24,7 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Initialising VulkanDevice\n");
+		
 		CreateInstance();
 		SetupDebugMessenger();
 		SelectPhysicalDevice();
@@ -180,6 +182,13 @@ namespace NK
 	UniquePtr<ISurface> VulkanDevice::CreateSurface(const SurfaceDesc& _desc)
 	{
 		return UniquePtr<ISurface>(NK_NEW(VulkanSurface, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<ISwapchain> VulkanDevice::CreateSwapchain(const SwapchainDesc& _desc)
+	{
+		return UniquePtr<ISwapchain>(NK_NEW(VulkanSwapchain, m_logger, m_allocator, *this, _desc));
 	}
 
 
