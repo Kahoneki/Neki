@@ -12,8 +12,6 @@
 #include "VulkanCommandPool.h"
 #include "VulkanSurface.h"
 #include "VulkanTexture.h"
-#include "../../cmake-build-debug/_deps/assimp-src/code/AssetLib/MDC/MDCFileData.h"
-#include "../../cmake-build-debug/_deps/assimp-src/code/AssetLib/Ogre/OgreBinarySerializer.h"
 #include "Core/Memory/Allocation.h"
 #include "GLFW/glfw3.h"
 

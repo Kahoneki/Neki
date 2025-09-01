@@ -21,7 +21,7 @@ namespace NK
 		[[nodiscard]] virtual ResourceIndex CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
-		//[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) override;
+		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline IDXGIFactory* GetFactory() const { return m_factory.Get(); }

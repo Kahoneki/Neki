@@ -1,6 +1,7 @@
 #include "VulkanSurface.h"
 
 #include "VulkanDevice.h"
+#include <stdexcept>
 
 namespace NK
 {
@@ -35,7 +36,7 @@ namespace NK
 		}
 
 		glfwTerminate();
-		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "GLFW Terminated\n");
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SURFACE, "GLFW Terminated\n");
 
 		m_logger.Unindent();
 	}

@@ -1,9 +1,11 @@
 #include "D3D12Device.h"
+#include "D3D12Device.h"
 #include "Core/Memory/Allocation.h"
 #include "Core/Utils/FormatUtils.h"
 #include "D3D12CommandPool.h"
 #include "D3D12Buffer.h"
 #include "D3D12Texture.h"
+#include "D3D12Surface.h"
 #include <stdexcept>
 #include <array>
 #ifdef ERROR
@@ -138,6 +140,13 @@ namespace NK
 	UniquePtr<ICommandPool> D3D12Device::CreateCommandPool(const CommandPoolDesc& _desc)
 	{
 		return UniquePtr<ICommandPool>(NK_NEW(D3D12CommandPool, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<ISurface> D3D12Device::CreateSurface(const SurfaceDesc& _desc)
+	{
+		return UniquePtr<ISurface>(NK_NEW(D3D12Surface, m_logger, m_allocator, *this, _desc));
 	}
 
 

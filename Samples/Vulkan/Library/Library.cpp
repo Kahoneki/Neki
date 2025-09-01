@@ -61,7 +61,7 @@ int main()
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::SurfaceDesc surfaceDesc{};
-	surfaceDesc.name = "Neki Library Sample";
+	surfaceDesc.name = "Neki-Vulkan Library Sample";
 	surfaceDesc.size = glm::ivec2(1280, 720);
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
