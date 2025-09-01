@@ -7,9 +7,6 @@
 #include <RHI/IDevice.h>
 #include <vulkan/vulkan.h>
 
-#include "Core/Memory/FreeListAllocator.h"
-
-
 
 namespace NK
 {
@@ -81,7 +78,6 @@ namespace NK
 		VkDescriptorPool m_descriptorPool{ VK_NULL_HANDLE };
 		VkDescriptorSetLayout m_descriptorSetLayout{ VK_NULL_HANDLE };
 		VkDescriptorSet m_descriptorSet{ VK_NULL_HANDLE };
-		UniquePtr<FreeListAllocator> m_resourceIndexAllocator;
 
 
 		bool m_enableInstanceValidationLayers = true;

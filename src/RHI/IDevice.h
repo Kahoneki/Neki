@@ -2,6 +2,8 @@
 #include "Core/Debug/ILogger.h"
 #include "Core/Memory/Allocation.h"
 #include "Core/Memory/IAllocator.h"
+#include "Core/Memory/FreeListAllocator.h"
+
 
 namespace NK
 {
@@ -18,7 +20,9 @@ namespace NK
 	class Window;
 	class ISurface;
 
-	
+
+	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
+	constexpr std::uint32_t MAX_BINDLESS_SAMPLERS{ 2048 };
 	typedef std::uint32_t ResourceIndex;
 
 
@@ -41,7 +45,6 @@ namespace NK
 
 namespace NK
 {
-	
 	class IDevice
 	{
 	public:
@@ -55,10 +58,13 @@ namespace NK
 
 
 	protected:
-		explicit IDevice(ILogger& _logger, IAllocator& _allocator) : m_logger(_logger), m_allocator(_allocator) {}
+		explicit IDevice(ILogger& _logger, IAllocator& _allocator)
+		: m_logger(_logger), m_allocator(_allocator), m_resourceIndexAllocator(NK_NEW(FreeListAllocator, MAX_BINDLESS_RESOURCES)) {}
 
 		//Dependency injections
 		ILogger& m_logger;
 		IAllocator& m_allocator;
+
+		UniquePtr<FreeListAllocator> m_resourceIndexAllocator;
 	};
 }

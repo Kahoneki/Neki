@@ -75,7 +75,7 @@ namespace NK
 		textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		textureDesc.Flags = GetCreationFlags();
 
-		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice().Get()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &textureDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_texture)) };
+		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &textureDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_texture)) };
 
 		if (SUCCEEDED(result))
 		{

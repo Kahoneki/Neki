@@ -15,14 +15,10 @@
 #include "GLFW/glfw3.h"
 
 namespace NK
-{
-	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
-	constexpr std::uint32_t MAX_BINDLESS_SAMPLERS{ 2048 };
-	
-	
+{		
 	
 	VulkanDevice::VulkanDevice(ILogger& _logger, IAllocator& _allocator)
-	: IDevice(_logger, _allocator), m_resourceIndexAllocator(NK_NEW(FreeListAllocator, MAX_BINDLESS_RESOURCES))
+	: IDevice(_logger, _allocator)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Initialising VulkanDevice\n");
