@@ -19,6 +19,7 @@ int main()
 	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::NONE);
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::NONE);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::NONE);
 	NK::RAIIContext context{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE };
 	NK::ILogger* logger{ NK::Context::GetLogger() };
 	NK::IAllocator* allocator{ NK::Context::GetAllocator() };
@@ -63,6 +64,13 @@ int main()
 	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(textureDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
+	NK::TextureViewDesc textureViewDesc{};
+	textureViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	textureViewDesc.format = textureDesc.format;
+	textureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateTextureView(texture.get(), textureViewDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+	
 	NK::SurfaceDesc surfaceDesc{};
 	surfaceDesc.name = "Neki-Vulkan Library Sample";
 	surfaceDesc.size = glm::ivec2(1280, 720);
