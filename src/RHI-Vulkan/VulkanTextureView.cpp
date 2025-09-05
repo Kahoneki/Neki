@@ -1,6 +1,7 @@
 #include "VulkanTextureView.h"
 
 #include "VulkanTexture.h"
+#include <stdexcept>
 
 namespace NK
 {

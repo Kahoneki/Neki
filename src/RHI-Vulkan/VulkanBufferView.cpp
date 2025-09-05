@@ -1,6 +1,7 @@
 #include "VulkanBufferView.h"
 #include "VulkanBuffer.h"
 #include "VulkanDevice.h"
+#include <stdexcept>
 
 namespace NK
 {
