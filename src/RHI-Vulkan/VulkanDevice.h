@@ -20,8 +20,9 @@ namespace NK
 
 		//IDevice interface implementation
 		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) override;
-		[[nodiscard]] virtual ResourceIndex CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IBufferView> CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ITextureView> CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
@@ -71,10 +72,10 @@ namespace NK
 
 		inline static constexpr std::array<VkDescriptorType, 4> m_resourceTypes
 		{
-			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, //cbv
-			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, //srv
-			VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, //uav read
-			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, //uav read-write
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 		};
 		VkMutableDescriptorTypeListEXT m_mutableResourceTypeList{};
 		VkMutableDescriptorTypeCreateInfoEXT m_mutableResourceTypeInfo{};

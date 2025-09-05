@@ -1,6 +1,7 @@
 #pragma once
 #include "IDevice.h"
 #include "ISurface.h"
+#include "ITextureView.h"
 
 namespace NK
 {
@@ -32,6 +33,9 @@ namespace NK
 		std::uint32_t m_numBuffers;
 
 		VkExtent2D m_extent{ 0,0 };
+
+		std::vector<UniquePtr<ITexture>> m_backBuffers;
+		std::vector<UniquePtr<ITextureView>> m_backBufferViews;
 	};
 	
 }

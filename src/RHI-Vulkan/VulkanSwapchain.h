@@ -18,7 +18,5 @@ namespace NK
 
 		VkFormat m_format{ VK_FORMAT_UNDEFINED };
 		VkSwapchainKHR m_swapchain{ VK_NULL_HANDLE };
-		std::vector<VkImage> swapchainImages;
-		std::vector<VkImageView> swapchainImageViews;
 	};
 }

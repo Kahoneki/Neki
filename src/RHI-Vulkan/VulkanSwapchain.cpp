@@ -4,6 +4,8 @@
 
 #include "VulkanDevice.h"
 #include "VulkanSurface.h"
+#include "VulkanTexture.h"
+#include "VulkanTextureView.h"
 
 namespace NK
 {
@@ -26,18 +28,6 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::SWAPCHAIN, "Shutting Down VulkanSwapchain\n");
-
-		for (VkImageView iv : swapchainImageViews)
-		{
-			if (iv != VK_NULL_HANDLE)
-			{
-				vkDestroyImageView(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), iv, m_allocator.GetVulkanCallbacks());
-				iv = VK_NULL_HANDLE;
-			}
-		}
-		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SWAPCHAIN, "Image Views Destroyed\n");
-
-		//m_swapchainImages are owned by m_swapchain
 
 		if (m_swapchain != VK_NULL_HANDLE)
 		{
@@ -175,10 +165,23 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SWAPCHAIN, "Number of requested buffers (" + std::to_string(m_numBuffers) + ") does not match number of swapchain images created by the device (" + std::to_string(swapchainImageCount) + "). Setting m_numBuffers to " + std::to_string(swapchainImageCount) + " accordingly\n");
 			m_numBuffers = swapchainImageCount;
 		}
-		swapchainImages.resize(m_numBuffers);
+		std::vector<VkImage> swapchainImages(m_numBuffers);
 		vkGetSwapchainImagesKHR(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_swapchain, &swapchainImageCount, swapchainImages.data());
-		
 
+
+		//Convert swapchain images to VulkanTexture to populate m_backBuffers
+		for (VkImage image : swapchainImages)
+		{
+			TextureDesc desc{};
+			desc.size = glm::ivec3(m_extent.width, m_extent.height, 1);
+			desc.arrayTexture = false;
+			desc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT;
+			desc.format = VulkanTexture::GetRHIFormat(m_format);
+			desc.dimension = TEXTURE_DIMENSION::DIM_2;
+			m_backBuffers.push_back(UniquePtr<ITexture>(NK_NEW(VulkanTexture, m_logger, m_allocator, m_device, desc, image)));
+		}
+
+		
 		m_logger.Unindent();
 	}
 
@@ -188,33 +191,15 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SURFACE, "Creating swapchain image views\n");
-
-		swapchainImageViews.resize(swapchainImages.size());
-		for (std::size_t i{ 0 }; i < swapchainImages.size(); ++i)
+		
+		for (std::size_t i{ 0 }; i < m_backBuffers.size(); ++i)
 		{
-			VkImageViewCreateInfo createInfo{};
-			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			createInfo.image = swapchainImages[i];
-			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			createInfo.format = m_format;
+			TextureViewDesc desc{};
+			desc.dimension = TEXTURE_DIMENSION::DIM_2;
+			desc.format = VulkanTexture::GetRHIFormat(m_format);
+			desc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
 
-			createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			createInfo.subresourceRange.baseMipLevel = 0;
-			createInfo.subresourceRange.levelCount = 1;
-			createInfo.subresourceRange.baseArrayLayer = 0;
-			createInfo.subresourceRange.layerCount = 1;
-
-			const VkResult result = vkCreateImageView(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), &createInfo, m_allocator.GetVulkanCallbacks(), &swapchainImageViews[i]);
-			if (result != VK_SUCCESS)
-			{
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::SWAPCHAIN, "Failed to create image view " + std::to_string(i) + "/" + std::to_string(swapchainImageViews.size()) + " - result = " + std::to_string(result) + "\n");
-				throw std::runtime_error("");
-			}
+			m_backBufferViews.push_back(UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, m_device, m_backBuffers[i].get(), desc)));
 		}
 
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SWAPCHAIN, "Successfully created image views\n");

@@ -1,9 +1,9 @@
 #include "VulkanTexture.h"
 
+#include <stdexcept>
 #include "VulkanDevice.h"
 #include "Core/Utils/EnumUtils.h"
 #include "Core/Utils/FormatUtils.h"
-#include <stdexcept>
 
 namespace NK
 {
@@ -14,6 +14,9 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE, "Initialising VulkanTexture\n");
 
+		m_isOwned = true;
+
+		
 		//m_dimension represents the dimensionality of the underlying image
 		//If m_arrayTexture == true and m_dimension == TEXTURE_DIMENSION::DIM_3, this likely means there has been a misunderstanding of the parameters
 		if (m_arrayTexture && m_dimension == TEXTURE_DIMENSION::DIM_3)
@@ -22,6 +25,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+		
 		//Create the image
 		VkImageCreateInfo imageInfo{};
 		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -50,10 +54,10 @@ namespace NK
 			imageInfo.arrayLayers = 1;
 		}
 
-		imageInfo.format = GetVulkanFormat();
+		imageInfo.format = GetVulkanFormat(m_format);
 		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imageInfo.usage = GetVulkanUsageFlags();
+		imageInfo.usage = GetVulkanUsageFlags(m_usage);
 		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		VkResult result{ vkCreateImage(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), &imageInfo, m_allocator.GetVulkanCallbacks(), &m_texture) };
@@ -132,6 +136,13 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE, "Shutting Down VulkanTexture\n");
 
+		if (!m_isOwned)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TEXTURE, "Texture not owned by VulkanTexture class, skipping shutdown sequence\n");
+			m_logger.Unindent();
+			return;
+		}
+		
 		if (m_memory != VK_NULL_HANDLE)
 		{
 			vkFreeMemory(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_memory, m_allocator.GetVulkanCallbacks());
@@ -151,25 +162,56 @@ namespace NK
 
 
 
-	VkImageUsageFlags VulkanTexture::GetVulkanUsageFlags() const
+	VulkanTexture::VulkanTexture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc, VkImage _image)
+	: ITexture(_logger, _allocator, _device, _desc)
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE, "Initialising VulkanTexture (wrapping existing VkImage)\n");
+
+		m_isOwned = false;
+		m_texture = _image;
+		//m_memory can stay uninitialised, it isn't managed by this class
+		
+		m_logger.Unindent();
+	}
+
+
+
+	VkImageUsageFlags VulkanTexture::GetVulkanUsageFlags(TEXTURE_USAGE_FLAGS _flags)
 	{
 		VkImageUsageFlags vkFlags{ 0 };
 		
-		if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT))			{ vkFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT; }
-		if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT))			{ vkFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT; }
-		if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::READ_ONLY))					{ vkFlags |= VK_IMAGE_USAGE_SAMPLED_BIT; }
-		if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::READ_WRITE))					{ vkFlags |= VK_IMAGE_USAGE_STORAGE_BIT; }
-		if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT))			{ vkFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; }
-		if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT))	{ vkFlags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT; }
+		if (EnumUtils::Contains(_flags, TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT))			{ vkFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT; }
+		if (EnumUtils::Contains(_flags, TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT))			{ vkFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT; }
+		if (EnumUtils::Contains(_flags, TEXTURE_USAGE_FLAGS::READ_ONLY))				{ vkFlags |= VK_IMAGE_USAGE_SAMPLED_BIT; }
+		if (EnumUtils::Contains(_flags, TEXTURE_USAGE_FLAGS::READ_WRITE))				{ vkFlags |= VK_IMAGE_USAGE_STORAGE_BIT; }
+		if (EnumUtils::Contains(_flags, TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT))		{ vkFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; }
+		if (EnumUtils::Contains(_flags, TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT))	{ vkFlags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT; }
 
 		return vkFlags;
 	}
 
 
 
-	VkFormat VulkanTexture::GetVulkanFormat() const
+	TEXTURE_USAGE_FLAGS VulkanTexture::GetRHIUsageFlags(VkImageUsageFlags _flags)
 	{
-		switch (m_format)
+		TEXTURE_USAGE_FLAGS rhiFlags{ 0 };
+
+		if (_flags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)			{ rhiFlags |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT; }
+		if (_flags & VK_IMAGE_USAGE_TRANSFER_DST_BIT)			{ rhiFlags |= TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT; }
+		if (_flags & VK_IMAGE_USAGE_SAMPLED_BIT)				{ rhiFlags |= TEXTURE_USAGE_FLAGS::READ_ONLY; }
+		if (_flags & VK_IMAGE_USAGE_STORAGE_BIT)				{ rhiFlags |= TEXTURE_USAGE_FLAGS::READ_WRITE; }
+		if (_flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)		{ rhiFlags |= TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT; }
+		if (_flags & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)	{ rhiFlags |= TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT; }
+
+		return rhiFlags;
+	}
+
+
+
+	VkFormat VulkanTexture::GetVulkanFormat(TEXTURE_FORMAT _format)
+	{
+		switch (_format)
 		{
 		case TEXTURE_FORMAT::UNDEFINED:					return VK_FORMAT_UNDEFINED;
 			
@@ -210,9 +252,59 @@ namespace NK
 
 		default:
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE, "GetVulkanFormat() default case reached. Format = " + std::to_string(std::to_underlying(m_format)));
-			throw std::runtime_error("");
+			throw std::runtime_error("GetVulkanFormat() default case reached. Format = " + std::to_string(std::to_underlying(_format)));
 		}
 		}
 	}
+
+
+
+	TEXTURE_FORMAT VulkanTexture::GetRHIFormat(VkFormat _format)
+	{
+		switch (_format)
+		{
+		case VK_FORMAT_UNDEFINED:					return TEXTURE_FORMAT::UNDEFINED;
+
+		case VK_FORMAT_R8_UNORM:					return TEXTURE_FORMAT::R8_UNORM;
+		case VK_FORMAT_R8G8_UNORM:					return TEXTURE_FORMAT::R8G8_UNORM;
+		case VK_FORMAT_R8G8B8A8_UNORM:				return TEXTURE_FORMAT::R8G8B8A8_UNORM;
+		case VK_FORMAT_R8G8B8A8_SRGB:				return TEXTURE_FORMAT::R8G8B8A8_SRGB;
+		case VK_FORMAT_B8G8R8A8_UNORM:				return TEXTURE_FORMAT::B8G8R8A8_UNORM;
+		case VK_FORMAT_B8G8R8A8_SRGB:				return TEXTURE_FORMAT::B8G8R8A8_SRGB;
+
+		case VK_FORMAT_R16_SFLOAT:					return TEXTURE_FORMAT::R16_SFLOAT;
+		case VK_FORMAT_R16G16_SFLOAT:				return TEXTURE_FORMAT::R16G16_SFLOAT;
+		case VK_FORMAT_R16G16B16A16_SFLOAT:			return TEXTURE_FORMAT::R16G16B16A16_SFLOAT;
+
+		case VK_FORMAT_R32_SFLOAT:					return TEXTURE_FORMAT::R32_SFLOAT;
+		case VK_FORMAT_R32G32_SFLOAT:				return TEXTURE_FORMAT::R32G32_SFLOAT;
+		case VK_FORMAT_R32G32B32A32_SFLOAT:			return TEXTURE_FORMAT::R32G32B32A32_SFLOAT;
+
+		case VK_FORMAT_B10G11R11_UFLOAT_PACK32:		return TEXTURE_FORMAT::B10G11R11_UFLOAT_PACK32;
+		case VK_FORMAT_A2R10G10B10_UNORM_PACK32:	return TEXTURE_FORMAT::R10G10B10A2_UNORM;
+
+		case VK_FORMAT_D16_UNORM:					return TEXTURE_FORMAT::D16_UNORM;
+		case VK_FORMAT_D32_SFLOAT:					return TEXTURE_FORMAT::D32_SFLOAT;
+		case VK_FORMAT_D24_UNORM_S8_UINT:			return TEXTURE_FORMAT::D24_UNORM_S8_UINT;
+
+		case VK_FORMAT_BC1_RGB_UNORM_BLOCK:			return TEXTURE_FORMAT::BC1_RGB_UNORM;
+		case VK_FORMAT_BC1_RGB_SRGB_BLOCK:			return TEXTURE_FORMAT::BC1_RGB_SRGB;
+		case VK_FORMAT_BC3_UNORM_BLOCK:				return TEXTURE_FORMAT::BC3_RGBA_UNORM;
+		case VK_FORMAT_BC3_SRGB_BLOCK:				return TEXTURE_FORMAT::BC3_RGBA_SRGB;
+		case VK_FORMAT_BC4_UNORM_BLOCK:				return TEXTURE_FORMAT::BC4_R_UNORM;
+		case VK_FORMAT_BC4_SNORM_BLOCK:				return TEXTURE_FORMAT::BC4_R_SNORM;
+		case VK_FORMAT_BC5_UNORM_BLOCK:				return TEXTURE_FORMAT::BC5_RG_UNORM;
+		case VK_FORMAT_BC5_SNORM_BLOCK:				return TEXTURE_FORMAT::BC5_RG_SNORM;
+		case VK_FORMAT_BC7_UNORM_BLOCK:				return TEXTURE_FORMAT::BC7_RGBA_UNORM;
+		case VK_FORMAT_BC7_SRGB_BLOCK:				return TEXTURE_FORMAT::BC7_RGBA_SRGB;
+
+		case VK_FORMAT_R32_UINT:					return TEXTURE_FORMAT::R32_UINT;
+
+		default:
+		{
+			throw std::runtime_error("GetTextureFormat() default case reached. Format = " + std::to_string(std::to_underlying(_format)));
+		}
+		}
+	}
+	
 }

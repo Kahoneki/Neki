@@ -9,22 +9,24 @@
 #include "Core/Utils/EnumUtils.h"
 
 #include "VulkanBuffer.h"
-#include "VulkanTexture.h"
+#include "VulkanBufferView.h"
 #include "VulkanCommandPool.h"
 #include "VulkanSurface.h"
 #include "VulkanSwapchain.h"
+#include "VulkanTexture.h"
+#include "VulkanTextureView.h"
 #include "Core/Memory/Allocation.h"
 #include "GLFW/glfw3.h"
 
 namespace NK
-{		
-	
+{
+
 	VulkanDevice::VulkanDevice(ILogger& _logger, IAllocator& _allocator)
 	: IDevice(_logger, _allocator)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Initialising VulkanDevice\n");
-		
+
 		CreateInstance();
 		SetupDebugMessenger();
 		SelectPhysicalDevice();
@@ -33,7 +35,7 @@ namespace NK
 		CreateDescriptorPool();
 		CreateDescriptorSetLayout();
 		CreateDescriptorSet();
-		
+
 		m_logger.Unindent();
 	}
 
@@ -64,7 +66,7 @@ namespace NK
 			m_descriptorPool = VK_NULL_HANDLE;
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Descriptor Pool Destroyed\n");
 		}
-		
+
 		if (m_device != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(m_device);
@@ -100,67 +102,9 @@ namespace NK
 
 
 
-	ResourceIndex VulkanDevice::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
+	UniquePtr<IBufferView> VulkanDevice::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
 	{
-		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Creating buffer view\n");
-
-		
-		//Get resource index from free list
-		const ResourceIndex index{ m_resourceIndexAllocator->Allocate() };
-		if (index == FreeListAllocator::INVALID_INDEX)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Resource index allocation failed - max bindless resource count (" + std::to_string(MAX_BINDLESS_RESOURCES) + ") reached.\n");
-			throw std::runtime_error("");
-		}
-
-		//Get underlying VulkanBuffer
-		const VulkanBuffer* vulkanBuffer{ dynamic_cast<const VulkanBuffer*>(_buffer) };
-		if (!vulkanBuffer)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Dynamic cast to VulkanBuffer object expected to pass but failed\n");
-			throw std::runtime_error("");
-		}
-
-		//Convert rhi view type to vulkan descriptor type
-		VkDescriptorType descriptorType;
-		switch (_desc.type)
-		{
-		case BUFFER_VIEW_TYPE::CONSTANT:
-			descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			break;
-
-		case BUFFER_VIEW_TYPE::SHADER_RESOURCE:
-		case BUFFER_VIEW_TYPE::UNORDERED_ACCESS:
-			descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			break;
-
-		default:
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Default case reached when determining vulkan descriptor type\n");
-			throw std::runtime_error("");
-		}
-
-		//Populate descriptor info
-		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.buffer = vulkanBuffer->GetBuffer();
-		bufferInfo.offset = _desc.offset;
-		bufferInfo.range = _desc.size;
-
-		//Populate write info
-		VkWriteDescriptorSet writeInfo{};
-		writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeInfo.dstSet = m_descriptorSet;
-		writeInfo.dstBinding = 0; //All cbv, srv, uav are in binding point 0
-		writeInfo.dstArrayElement = index;
-		writeInfo.descriptorCount = 1;
-		writeInfo.descriptorType = descriptorType;
-		writeInfo.pBufferInfo = &bufferInfo;
-
-		vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
-		
-		m_logger.Unindent();
-
-		return index;
+		return UniquePtr<IBufferView>(NK_NEW(VulkanBufferView, m_logger, *m_resourceIndexAllocator, *this, _buffer, _desc, m_descriptorSet));
 	}
 
 
@@ -168,6 +112,13 @@ namespace NK
 	UniquePtr<ITexture> VulkanDevice::CreateTexture(const TextureDesc& _desc)
 	{
 		return UniquePtr<ITexture>(NK_NEW(VulkanTexture, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<ITextureView> VulkanDevice::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
+	{
+		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, m_resourceIndexAllocator.get(), m_descriptorSet));
 	}
 
 
@@ -454,7 +405,7 @@ namespace NK
 		m_mutableResourceTypeInfo.sType = VK_STRUCTURE_TYPE_MUTABLE_DESCRIPTOR_TYPE_CREATE_INFO_EXT;
 		m_mutableResourceTypeInfo.mutableDescriptorTypeListCount = 1;
 		m_mutableResourceTypeInfo.pMutableDescriptorTypeLists = &m_mutableResourceTypeList;
-		
+
 		m_logger.Unindent();
 	}
 
@@ -471,7 +422,7 @@ namespace NK
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_MUTABLE_EXT, MAX_BINDLESS_RESOURCES },
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_SAMPLERS }
 		};
-		
+
 		//Create the pool
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -487,7 +438,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor pool\n");
-		
+
 		m_logger.Unindent();
 	}
 
@@ -530,15 +481,15 @@ namespace NK
 		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 		layoutInfo.bindingCount = bindings.size();
 		layoutInfo.pBindings = bindings.data();
-		
+
 		const VkResult result{ vkCreateDescriptorSetLayout(m_device, &layoutInfo, m_allocator.GetVulkanCallbacks(), &m_descriptorSetLayout) };
 		if (result != VK_SUCCESS)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set layout - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
-		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");		
-		
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");
+
 		m_logger.Unindent();
 	}
 
@@ -548,7 +499,7 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating descriptor set layout\n");
-		
+
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		allocInfo.descriptorPool = m_descriptorPool;
@@ -560,8 +511,8 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set layout - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
-		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");	
-		
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");
+
 		m_logger.Unindent();
 	}
 

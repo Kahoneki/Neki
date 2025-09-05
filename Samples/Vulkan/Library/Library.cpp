@@ -7,6 +7,7 @@
 #include "RHI/ICommandPool.h"
 #include "RHI/ICommandBuffer.h"
 #include "RHI/IBuffer.h"
+#include "RHI/IBufferView.h"
 #include "RHI/ITexture.h"
 #include "RHI/ISurface.h"
 #include "RHI/ISwapchain.h"
@@ -45,17 +46,18 @@ int main()
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::BufferViewDesc bufferViewDesc{};
-	bufferViewDesc.type = NK::BUFFER_VIEW_TYPE::CONSTANT;
+	bufferViewDesc.type = NK::BUFFER_VIEW_TYPE::UNIFORM;
 	bufferViewDesc.offset = 0;
 	bufferViewDesc.size = bufferDesc.size;
-	const NK::ResourceIndex bufferViewIndex{ device->CreateBufferView(buffer.get(), bufferViewDesc) };
+	NK::UniquePtr<NK::IBufferView> bufferView{ device->CreateBufferView(buffer.get(), bufferViewDesc) };
+	const NK::ResourceIndex bufferViewIndex{ bufferView->GetIndex() };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Buffer view index: " + std::to_string(bufferViewIndex) + "\n");
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	NK::TextureDesc textureDesc{};
-	textureDesc.size = glm::ivec3(1920, 1080, 1);
+	textureDesc.size = glm::ivec3(400, 400, 1);
 	textureDesc.arrayTexture = false;
-	textureDesc.usage = NK::TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT;
+	textureDesc.usage = NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
 	textureDesc.format = NK::TEXTURE_FORMAT::R8G8B8A8_SRGB;
 	textureDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(textureDesc) };
