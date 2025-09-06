@@ -18,18 +18,22 @@ namespace NK
 
 		//IDevice interface implementation
 		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) override;
-		[[nodiscard]] virtual ResourceIndex CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IBufferView> CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ITextureView> CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
-		[[nodiscard]] inline IDXGIFactory* GetFactory() const { return m_factory.Get(); }
+		[[nodiscard]] inline IDXGIFactory4* GetFactory() const { return m_factory.Get(); }
 		[[nodiscard]] inline IDXGIAdapter* GetAdapter() const { return m_adapter.Get(); }
 		[[nodiscard]] inline ID3D12Device* GetDevice()  const { return m_device.Get();  }
 		[[nodiscard]] inline ID3D12CommandQueue* GetGraphicsQueue() const { return m_graphicsQueue.Get(); }
 		[[nodiscard]] inline ID3D12CommandQueue* GetComputeQueue()  const { return m_computeQueue.Get(); }
 		[[nodiscard]] inline ID3D12CommandQueue* GetTransferQueue() const { return m_transferQueue.Get(); }
+		[[nodiscard]] inline ID3D12DescriptorHeap* GetResourceDescriptorHeap() const { return m_resourceDescriptorHeap.Get(); }
+		[[nodiscard]] inline UINT GetResourceDescriptorSize() const { return m_resourceDescriptorSize; }
 
 
 	private:

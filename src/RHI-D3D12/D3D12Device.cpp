@@ -4,8 +4,11 @@
 #include "Core/Utils/FormatUtils.h"
 #include "D3D12CommandPool.h"
 #include "D3D12Buffer.h"
+#include "D3D12BufferView.h"
 #include "D3D12Texture.h"
+#include "D3D12TextureView.h"
 #include "D3D12Surface.h"
+#include "D3D12Swapchain.h"
 #include <stdexcept>
 #include <array>
 #ifdef ERROR
@@ -53,79 +56,9 @@ namespace NK
 
 
 
-	ResourceIndex D3D12Device::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
+	UniquePtr<IBufferView> D3D12Device::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
 	{
-		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Creating buffer view\n");
-
-		//Get resource index from free list
-		const ResourceIndex index{ m_resourceIndexAllocator->Allocate() };
-		if (index == FreeListAllocator::INVALID_INDEX)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Resource index allocation failed - max bindless resource count (" + std::to_string(MAX_BINDLESS_RESOURCES) + ") reached.\n");
-			throw std::runtime_error("");
-		}
-
-		//Get underlying D3D12Buffer
-		const D3D12Buffer* d3d12Buffer{ dynamic_cast<const D3D12Buffer*>(_buffer) };
-		if (!d3d12Buffer)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Dynamic cast to D3D12Buffer object expected to pass but failed\n");
-			throw std::runtime_error("");
-		}
-
-		//Calculate memory address of descriptor slot
-		D3D12_CPU_DESCRIPTOR_HANDLE addr{ m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart() };
-		addr.ptr += index * m_resourceDescriptorSize;
-
-		//Create appropriate view based on provided type
-		switch (_desc.type)
-		{
-		case BUFFER_VIEW_TYPE::CONSTANT:
-		{
-			//d3d12 requires cbv size is a multiple of 256 bytes
-			if (_desc.size % 256 != 0)
-			{
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "_desc.type = BUFFER_VIEW_TYPE::CONSTANT but _desc.size (" + FormatUtils::GetSizeString(_desc.size) + ") is not a multiple of 256 bytes as required by d3d12 for cbvs\n");
-				throw std::runtime_error("");
-			}
-
-			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{};
-			cbvDesc.BufferLocation = d3d12Buffer->GetBuffer()->GetGPUVirtualAddress() + _desc.offset;
-			cbvDesc.SizeInBytes = static_cast<UINT>(_desc.size);
-			m_device->CreateConstantBufferView(&cbvDesc, addr);
-			break;
-		}
-		case BUFFER_VIEW_TYPE::SHADER_RESOURCE:
-		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-			srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Buffer.FirstElement = static_cast<UINT>(_desc.offset / 4); //offset is measured in elements (4 bytes for r32 format)
-			srvDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / 4);
-			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-
-			m_device->CreateShaderResourceView(d3d12Buffer->GetBuffer(), &srvDesc, addr);
-			break;
-		}
-		case BUFFER_VIEW_TYPE::UNORDERED_ACCESS:
-		{
-			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-			uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-			uavDesc.Buffer.FirstElement = static_cast<UINT>(_desc.offset / 4); //offset is measured in elements (4 bytes for r32 format)
-			uavDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / 4);
-			uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
-			
-			m_device->CreateUnorderedAccessView(d3d12Buffer->GetBuffer(), nullptr, &uavDesc, addr);
-			break;
-		}
-		}
-
-		m_logger.Unindent();
-	
-		return index;
+		return UniquePtr<IBufferView>(NK_NEW(D3D12BufferView, m_logger, *m_resourceIndexAllocator, *this, _buffer, _desc));
 	}
 
 
@@ -133,6 +66,13 @@ namespace NK
 	UniquePtr<ITexture> D3D12Device::CreateTexture(const TextureDesc& _desc)
 	{
 		return UniquePtr<ITexture>(NK_NEW(D3D12Texture, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<ITextureView> D3D12Device::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
+	{
+		return UniquePtr<ITextureView>(NK_NEW(D3D12TextureView, m_logger, m_allocator, *this, _texture, _desc, m_resourceDescriptorHeap.Get(), m_resourceDescriptorSize, m_resourceIndexAllocator.get()));
 	}
 
 
@@ -147,6 +87,13 @@ namespace NK
 	UniquePtr<ISurface> D3D12Device::CreateSurface(const SurfaceDesc& _desc)
 	{
 		return UniquePtr<ISurface>(NK_NEW(D3D12Surface, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<ISwapchain> D3D12Device::CreateSwapchain(const SwapchainDesc& _desc)
+	{
+		return UniquePtr<ISwapchain>(NK_NEW(D3D12Swapchain, m_logger, m_allocator, *this, _desc));
 	}
 
 
@@ -185,7 +132,8 @@ namespace NK
 			createFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
 		}
 
-		const HRESULT result{ CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&m_factory)) };
+		Microsoft::WRL::ComPtr<IDXGIFactory1> tempFactory;
+		HRESULT result{ CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&tempFactory)) };
 		if (SUCCEEDED(result))
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Factory successfully created\n");
@@ -193,6 +141,17 @@ namespace NK
 		else
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create factory\n");
+			throw std::runtime_error("");
+		}
+
+		result = tempFactory.As(&m_factory);
+		if (SUCCEEDED(result))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Factory successfully upgraded to DXGIFactory4\n");
+		}
+		else
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to upgrade factory to DXGIFactory4\n");
 			throw std::runtime_error("");
 		}
 

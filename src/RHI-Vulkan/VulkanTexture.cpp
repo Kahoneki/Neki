@@ -9,12 +9,10 @@ namespace NK
 {
 
 	VulkanTexture::VulkanTexture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc)
-	: ITexture(_logger, _allocator, _device, _desc)
+	: ITexture(_logger, _allocator, _device, _desc, true)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE, "Initialising VulkanTexture\n");
-
-		m_isOwned = true;
 
 		
 		//m_dimension represents the dimensionality of the underlying image
@@ -163,12 +161,11 @@ namespace NK
 
 
 	VulkanTexture::VulkanTexture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc, VkImage _image)
-	: ITexture(_logger, _allocator, _device, _desc)
+	: ITexture(_logger, _allocator, _device, _desc, false)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE, "Initialising VulkanTexture (wrapping existing VkImage)\n");
 
-		m_isOwned = false;
 		m_texture = _image;
 		//m_memory can stay uninitialised, it isn't managed by this class
 		
@@ -197,11 +194,11 @@ namespace NK
 	{
 		TEXTURE_USAGE_FLAGS rhiFlags{ 0 };
 
-		if (_flags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)			{ rhiFlags |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT; }
-		if (_flags & VK_IMAGE_USAGE_TRANSFER_DST_BIT)			{ rhiFlags |= TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT; }
-		if (_flags & VK_IMAGE_USAGE_SAMPLED_BIT)				{ rhiFlags |= TEXTURE_USAGE_FLAGS::READ_ONLY; }
-		if (_flags & VK_IMAGE_USAGE_STORAGE_BIT)				{ rhiFlags |= TEXTURE_USAGE_FLAGS::READ_WRITE; }
-		if (_flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)		{ rhiFlags |= TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT; }
+		if (_flags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)				{ rhiFlags |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT; }
+		if (_flags & VK_IMAGE_USAGE_TRANSFER_DST_BIT)				{ rhiFlags |= TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT; }
+		if (_flags & VK_IMAGE_USAGE_SAMPLED_BIT)					{ rhiFlags |= TEXTURE_USAGE_FLAGS::READ_ONLY; }
+		if (_flags & VK_IMAGE_USAGE_STORAGE_BIT)					{ rhiFlags |= TEXTURE_USAGE_FLAGS::READ_WRITE; }
+		if (_flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)			{ rhiFlags |= TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT; }
 		if (_flags & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)	{ rhiFlags |= TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT; }
 
 		return rhiFlags;

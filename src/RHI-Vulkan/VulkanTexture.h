@@ -25,11 +25,5 @@ namespace NK
 	private:
 		VkImage m_texture{ VK_NULL_HANDLE };
 		VkDeviceMemory m_memory{ VK_NULL_HANDLE };
-
-		//True if the lifetime of the texture is to be managed by this class (i.e. if the normal VulkanTexture constructor is called)
-		//False is the lifetime of the texture is to be managed elsewhere (i.e. if the VulkanTexture object is constructed with a VkImage)
-		//This flag exists mainly for the swapchain which in Vulkan, owns its images
-		//^trying to destroy the images yourself (e.g. in this class' destructor) results in a crash
-		bool m_isOwned;
 	};
 }

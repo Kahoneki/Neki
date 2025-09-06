@@ -6,8 +6,7 @@ namespace NK
 	enum class TEXTURE_VIEW_TYPE
 	{
 		RENDER_TARGET,
-		DEPTH,
-		STENCIL,
+		DEPTH_STENCIL,
 		
 		SHADER_READ_ONLY,
 		SHADER_READ_WRITE,
@@ -42,6 +41,7 @@ namespace NK
 		FreeListAllocator* m_resourceIndexAllocator;
 		IDevice& m_device;
 		
+		bool m_freeListAllocated; //True if m_resourceIndex was allocated from a free list allocator
 		ResourceIndex m_resourceIndex{ FreeListAllocator::INVALID_INDEX };
 		TEXTURE_VIEW_TYPE m_type;
 		TEXTURE_DIMENSION m_dimension;

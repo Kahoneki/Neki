@@ -10,7 +10,7 @@ namespace NK
 	: ITextureView(_logger, _allocator, _device, _texture, _desc, _freeListAllocator)
 	{
 		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE_VIEW, "Creating texture view\n");
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE_VIEW, "Creating Texture View\n");
 
 		VkImageViewCreateInfo viewInfo{};
 		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -37,8 +37,11 @@ namespace NK
 			break;
 		}
 			
-		case TEXTURE_VIEW_TYPE::DEPTH:		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
-		case TEXTURE_VIEW_TYPE::STENCIL:	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT; break;
+		case TEXTURE_VIEW_TYPE::DEPTH_STENCIL:
+		{
+			viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+			break;
+		}
 		}
 
 		
