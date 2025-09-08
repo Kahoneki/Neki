@@ -5,8 +5,9 @@
 #include <set>
 #include <stdexcept>
 
-#include "Core/Debug/ILogger.h"
-#include "Core/Utils/EnumUtils.h"
+#include <Core/Debug/ILogger.h>
+#include <Core/Utils/EnumUtils.h>
+#include <Core/Memory/Allocation.h>
 
 #include "VulkanBuffer.h"
 #include "VulkanBufferView.h"
@@ -15,8 +16,7 @@
 #include "VulkanSwapchain.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
-#include "Core/Memory/Allocation.h"
-#include "GLFW/glfw3.h"
+#include <GLFW/glfw3.h>
 
 namespace NK
 {
@@ -118,7 +118,7 @@ namespace NK
 
 	UniquePtr<ITextureView> VulkanDevice::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
-		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, m_resourceIndexAllocator.get(), m_descriptorSet));
+		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, m_descriptorSet, m_resourceIndexAllocator.get()));
 	}
 
 
@@ -355,6 +355,13 @@ namespace NK
 		//Define required features
 		VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
 		features12.descriptorIndexing = VK_TRUE;
+		features12.descriptorBindingPartiallyBound = VK_TRUE; //Allow empty descriptor slots - don't crash when accessing
+		features12.runtimeDescriptorArray = VK_TRUE; //Enable variable-indexing
+		//Allow updates to the descriptor set while the queue is using it
+		features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+		features12.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+		features12.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
+		features12.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
 		features12.bufferDeviceAddress = VK_TRUE;
 
 		VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES };
@@ -365,11 +372,15 @@ namespace NK
 		deviceFeatures2.features.samplerAnisotropy = VK_TRUE;
 		deviceFeatures2.pNext = &dynamicRenderingFeatures;
 
+		VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutableTypeFeatures{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT };
+		mutableTypeFeatures.mutableDescriptorType = VK_TRUE;
+		mutableTypeFeatures.pNext = &deviceFeatures2;
+
 
 		//Create device
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		deviceCreateInfo.pNext = &deviceFeatures2;
+		deviceCreateInfo.pNext = &mutableTypeFeatures;
 		deviceCreateInfo.queueCreateInfoCount = static_cast<std::uint32_t>(queueCreateInfos.size());
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 		deviceCreateInfo.enabledExtensionCount = requiredDeviceExtensions.size();
@@ -420,7 +431,7 @@ namespace NK
 		constexpr std::array<VkDescriptorPoolSize, 2> poolSizes
 		{
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_MUTABLE_EXT, MAX_BINDLESS_RESOURCES },
-			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_SAMPLERS }
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLER, MAX_BINDLESS_SAMPLERS }
 		};
 
 		//Create the pool
@@ -461,7 +472,7 @@ namespace NK
 		//----SAMPLER BINDING----//
 		VkDescriptorSetLayoutBinding samplerBinding{};
 		samplerBinding.binding = 1;
-		samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
 		samplerBinding.descriptorCount = MAX_BINDLESS_SAMPLERS;
 		samplerBinding.stageFlags = VK_SHADER_STAGE_ALL;
 
@@ -498,7 +509,7 @@ namespace NK
 	void VulkanDevice::CreateDescriptorSet()
 	{
 		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating descriptor set layout\n");
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating descriptor set\n");
 
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -508,10 +519,10 @@ namespace NK
 		const VkResult result{ vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSet) };
 		if (result != VK_SUCCESS)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set layout - result: " + std::to_string(result) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
-		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set\n");
 
 		m_logger.Unindent();
 	}
@@ -622,7 +633,19 @@ namespace NK
 
 		std::string msg{ _pCallbackData->pMessage };
 		if (msg.back() != '\n') { msg += '\n'; } //vulkan just like sometimes doesn't do this
-		device->m_logger.Log(channel, layer, msg);
+		device->m_logger.IndentLog(channel, layer, msg);
+
+		if (channel == LOGGER_CHANNEL::ERROR)
+		{
+			if (EnumUtils::Contains(device->m_logger.GetLoggerConfig().GetChannelBitfieldForLayer(layer), LOGGER_CHANNEL::ERROR))
+			{
+				throw std::runtime_error("");
+			}
+			else
+			{
+				throw std::runtime_error("Error thrown from " + device->m_logger.LayerToString(layer) + " but ERROR channel for this layer was disabled - enable it to view the error.\n");
+			}
+		}
 
 		return VK_FALSE;
 	}

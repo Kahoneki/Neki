@@ -21,8 +21,6 @@
 int main()
 {
 	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::NONE);
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::NONE);
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::ERROR | NK::LOGGER_CHANNEL::WARNING);
 	NK::RAIIContext context{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE };
 	NK::ILogger* logger{ NK::Context::GetLogger() };

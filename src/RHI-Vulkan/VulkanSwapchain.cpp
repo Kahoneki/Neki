@@ -30,12 +30,14 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::SWAPCHAIN, "Shutting Down VulkanSwapchain\n");
 
+
 		if (m_swapchain != VK_NULL_HANDLE)
 		{
 			vkDestroySwapchainKHR(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_swapchain, m_allocator.GetVulkanCallbacks());
 			m_swapchain = VK_NULL_HANDLE;
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SWAPCHAIN, "Swapchain (and associated images) Destroyed\n");
 		}
+
 
 		m_logger.Unindent();
 	}
@@ -49,6 +51,7 @@ namespace NK
 
 		const VkPhysicalDevice physicalDevice{ dynamic_cast<VulkanDevice&>(m_device).GetPhysicalDevice() };
 		const VkSurfaceKHR surface{ dynamic_cast<VulkanSurface*>(m_surface)->GetSurface() };
+
 
 		VkSurfaceCapabilitiesKHR capabilities;
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);

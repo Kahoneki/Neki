@@ -1,7 +1,6 @@
 #include "D3D12Device.h"
-#include "D3D12Device.h"
-#include "Core/Memory/Allocation.h"
-#include "Core/Utils/FormatUtils.h"
+#include <Core/Memory/Allocation.h>
+#include <Core/Utils/FormatUtils.h>
 #include "D3D12CommandPool.h"
 #include "D3D12Buffer.h"
 #include "D3D12BufferView.h"
@@ -58,7 +57,7 @@ namespace NK
 
 	UniquePtr<IBufferView> D3D12Device::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
 	{
-		return UniquePtr<IBufferView>(NK_NEW(D3D12BufferView, m_logger, *m_resourceIndexAllocator, *this, _buffer, _desc));
+		return UniquePtr<IBufferView>(NK_NEW(D3D12BufferView, m_logger, *m_resourceIndexAllocator, *this, _buffer, _desc, m_resourceDescriptorHeap.Get(), m_resourceDescriptorSize));
 	}
 
 

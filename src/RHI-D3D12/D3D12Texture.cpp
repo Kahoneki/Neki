@@ -15,6 +15,7 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE, "Initialising D3D12Texture\n");
 
+
 		//m_dimension represents the dimensionality of the underlying image
 		//If m_arrayTexture == true and m_dimension == TEXTURE_DIMENSION::DIM_3, this likely means there has been a misunderstanding of the parameters
 		if (m_arrayTexture && m_dimension == TEXTURE_DIMENSION::DIM_3)
@@ -23,6 +24,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+
 		//Define heap props
 		D3D12_HEAP_PROPERTIES heapProps{};
 		heapProps.Type = D3D12_HEAP_TYPE_DEFAULT; //Device-local
@@ -30,6 +32,7 @@ namespace NK
 		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 		heapProps.CreationNodeMask = 1;
 		heapProps.VisibleNodeMask = 1;
+
 
 		//Create texture
 		D3D12_RESOURCE_DESC textureDesc{};
@@ -74,6 +77,7 @@ namespace NK
 		textureDesc.SampleDesc.Quality = 0;
 		textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		textureDesc.Flags = GetCreationFlags();
+
 
 		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &textureDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_texture)) };
 

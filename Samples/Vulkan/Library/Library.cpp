@@ -1,25 +1,25 @@
-#include "Core/RAIIContext.h"
-#include "Core/Debug/ILogger.h"
-#include "Core/Memory/Allocation.h"
-#include "Core/Memory/TrackingAllocator.h"
-#include "Core/Utils/FormatUtils.h"
-#include "RHI-Vulkan/VulkanDevice.h"
-#include "RHI/ICommandPool.h"
-#include "RHI/ICommandBuffer.h"
-#include "RHI/IBuffer.h"
-#include "RHI/IBufferView.h"
-#include "RHI/ITexture.h"
-#include "RHI/ISurface.h"
-#include "RHI/ISwapchain.h"
+#include <Core/RAIIContext.h>
+#include <Core/Debug/ILogger.h>
+#include <Core/Memory/Allocation.h>
+#include <Core/Memory/TrackingAllocator.h>
+#include <Core/Utils/FormatUtils.h>
+#include <RHI-Vulkan/VulkanDevice.h>
+#include <RHI/ICommandPool.h>
+#include <RHI/ICommandBuffer.h>
+#include <RHI/IBuffer.h>
+#include <RHI/IBufferView.h>
+#include <RHI/ITexture.h>
+#include <RHI/ISurface.h>
+#include <RHI/ISwapchain.h>
 
 
 
 int main()
 {
 	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::NONE);
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::NONE);
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::NONE);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	NK::RAIIContext context{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE };
 	NK::ILogger* logger{ NK::Context::GetLogger() };
 	NK::IAllocator* allocator{ NK::Context::GetAllocator() };

@@ -1,6 +1,5 @@
 #include "D3D12BufferView.h"
 #include "D3D12Buffer.h"
-#include "D3D12Device.h"
 #include <Core/Utils/FormatUtils.h>
 #include <stdexcept>
 #ifdef ERROR
@@ -10,7 +9,7 @@
 namespace NK
 {
 
-	D3D12BufferView::D3D12BufferView(ILogger& _logger, FreeListAllocator& _allocator, IDevice& _device, IBuffer* _buffer, const BufferViewDesc& _desc)
+	D3D12BufferView::D3D12BufferView(ILogger& _logger, FreeListAllocator& _allocator, IDevice& _device, IBuffer* _buffer, const BufferViewDesc& _desc, ID3D12DescriptorHeap* _descriptorHeap, UINT _descriptorSize)
 	: IBufferView(_logger, _allocator, _device, _buffer, _desc)
 	{
 		m_logger.Indent();
@@ -25,6 +24,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+
 		//Get underlying D3D12Buffer
 		const D3D12Buffer* d3d12Buffer{ dynamic_cast<const D3D12Buffer*>(_buffer) };
 		if (!d3d12Buffer)
@@ -33,10 +33,12 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
-		//Calculate memory address of descriptor slot
-		D3D12_CPU_DESCRIPTOR_HANDLE addr{ dynamic_cast<D3D12Device&>(m_device).GetResourceDescriptorHeap()->GetCPUDescriptorHandleForHeapStart()};
-		addr.ptr += m_resourceIndex * dynamic_cast<D3D12Device&>(m_device).GetResourceDescriptorSize();
 
+		//Calculate memory address of descriptor slot
+		D3D12_CPU_DESCRIPTOR_HANDLE addr{ _descriptorHeap->GetCPUDescriptorHandleForHeapStart() };
+		addr.ptr += m_resourceIndex * _descriptorSize;
+
+		
 		//Create appropriate view based on provided type
 		switch (_desc.type)
 		{
@@ -63,7 +65,7 @@ namespace NK
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			srvDesc.Buffer.FirstElement = static_cast<UINT>(_desc.offset / 4); //offset is measured in elements (4 bytes for r32 format)
 			srvDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / 4);
-			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW; //ByteAddressBuffer instead of StructuredBuffer
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateShaderResourceView(d3d12Buffer->GetBuffer(), &srvDesc, addr);
 			break;
@@ -82,6 +84,7 @@ namespace NK
 		}
 		}
 		
+
 		m_logger.Unindent();
 	}
 

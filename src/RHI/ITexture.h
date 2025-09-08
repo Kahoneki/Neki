@@ -1,7 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include "IDevice.h"
-#include "Core/Debug/ILogger.h"
+#include <Core/Debug/ILogger.h>
 
 namespace NK
 {

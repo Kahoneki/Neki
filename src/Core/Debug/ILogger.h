@@ -48,7 +48,13 @@ namespace NK
 		//indentation value can be negative and it will be clamped to 0 when outputting - this lets you have an "indentation buffer region"
 		//If indentationLevel is -1, 0-indented logs will be at the same indentation level as 1-indented logs (0 indents)
 		inline void Unindent() { --indentationLevel; }
+
+
+		inline const LoggerConfig& GetLoggerConfig() const { return m_config; }
 		
+		static std::string LayerToString(LOGGER_LAYER _layer);
+
+
 	protected:
 		explicit ILogger(const LoggerConfig& _config);
 
@@ -60,8 +66,6 @@ namespace NK
 		//Attempt to enable ANSI support for access to ANSI colour codes
 		//Returns success status
 		static bool EnableAnsiSupport();
-
-		static std::string LayerToString(LOGGER_LAYER _layer);
 
 		
 		//ANSI colour codes

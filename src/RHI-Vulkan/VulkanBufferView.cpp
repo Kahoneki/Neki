@@ -21,6 +21,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+
 		//Get underlying VulkanBuffer
 		const VulkanBuffer* vulkanBuffer{ dynamic_cast<const VulkanBuffer*>(_buffer) };
 		if (!vulkanBuffer)
@@ -28,6 +29,7 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::BUFFER_VIEW, "Dynamic cast to VulkanBuffer object expected to pass but failed\n");
 			throw std::runtime_error("");
 		}
+
 
 		//Convert rhi view type to vulkan descriptor type
 		VkDescriptorType descriptorType;
@@ -47,11 +49,13 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+
 		//Populate descriptor info
 		VkDescriptorBufferInfo bufferInfo{};
 		bufferInfo.buffer = vulkanBuffer->GetBuffer();
 		bufferInfo.offset = _desc.offset;
 		bufferInfo.range = _desc.size;
+
 
 		//Populate write info
 		VkWriteDescriptorSet writeInfo{};
@@ -63,8 +67,10 @@ namespace NK
 		writeInfo.descriptorType = descriptorType;
 		writeInfo.pBufferInfo = &bufferInfo;
 
+
 		vkUpdateDescriptorSets(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), 1, &writeInfo, 0, nullptr);
 		
+
 		m_logger.Unindent();
 	}
 

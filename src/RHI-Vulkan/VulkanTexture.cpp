@@ -44,8 +44,7 @@ namespace NK
 
 		if (m_arrayTexture)
 		{
-			if (m_dimension == TEXTURE_DIMENSION::DIM_1) { imageInfo.arrayLayers = m_size.y; }
-			else { imageInfo.arrayLayers = m_size.z; }
+			imageInfo.arrayLayers = (m_dimension == TEXTURE_DIMENSION::DIM_1 ? m_size.y : m_size.z);
 		}
 		else
 		{

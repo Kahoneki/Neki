@@ -21,14 +21,17 @@ namespace NK
 	class IBufferView
 	{
 	public:
-		explicit IBufferView(ILogger& _logger, FreeListAllocator& _allocator, IDevice& _device, IBuffer* _buffer, const BufferViewDesc& _desc)
-		: m_logger(_logger), m_allocator(_allocator), m_device(_device), m_type(_desc.type), m_offset(_desc.offset), m_size(_desc.size) {}
 		virtual ~IBufferView() = default;
 
 		[[nodiscard]] inline ResourceIndex GetIndex() const { return m_resourceIndex; }
 
 
 	protected:
+		explicit IBufferView(ILogger& _logger, FreeListAllocator& _allocator, IDevice& _device, IBuffer* _buffer, const BufferViewDesc& _desc)
+		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
+		  m_type(_desc.type), m_offset(_desc.offset), m_size(_desc.size) {}
+		
+		
 		//Dependency injections
 		ILogger& m_logger;
 		FreeListAllocator& m_allocator;

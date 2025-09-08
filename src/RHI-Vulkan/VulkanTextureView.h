@@ -8,9 +8,11 @@ namespace NK
 	class VulkanTextureView final : public ITextureView
 	{
 	public:
-		//If creating a texture view for a shader-accessible texture (_desc.type = SHADER_RESOURCE or UNORDERED_ACCESS, pass a free list allocator and descriptor set for the bindless update)
-		//Otherwise (if _desc.type = RENDER_TARGET, DEPTH, or STENCIL), leave _freeListAllocator and _descriptorSet uninitialised
-		explicit VulkanTextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc, FreeListAllocator* _freeListAllocator = nullptr, VkDescriptorSet _descriptorSet = VK_NULL_HANDLE);
+		//Use this constructor if you want a free list allocator to be used for allocation (will be the case for shader-accessible view types)
+		explicit VulkanTextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc, VkDescriptorSet _descriptorSet, FreeListAllocator* _freeListAllocator);
+
+		//Use this constructor if just making a raw image view, i.e.: this constructor will not write to a descriptor set (will be the case for non-shader-accessible view types)
+		explicit VulkanTextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc);
 
 		virtual ~VulkanTextureView() override;
 

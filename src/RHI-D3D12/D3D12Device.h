@@ -32,8 +32,6 @@ namespace NK
 		[[nodiscard]] inline ID3D12CommandQueue* GetGraphicsQueue() const { return m_graphicsQueue.Get(); }
 		[[nodiscard]] inline ID3D12CommandQueue* GetComputeQueue()  const { return m_computeQueue.Get(); }
 		[[nodiscard]] inline ID3D12CommandQueue* GetTransferQueue() const { return m_transferQueue.Get(); }
-		[[nodiscard]] inline ID3D12DescriptorHeap* GetResourceDescriptorHeap() const { return m_resourceDescriptorHeap.Get(); }
-		[[nodiscard]] inline UINT GetResourceDescriptorSize() const { return m_resourceDescriptorSize; }
 
 
 	private:
@@ -64,7 +62,6 @@ namespace NK
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
 		UINT m_samplerDescriptorSize;
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSig;
-
 
 
 		bool m_enableDebugLayer{ true };

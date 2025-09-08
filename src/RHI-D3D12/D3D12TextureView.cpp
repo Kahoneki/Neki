@@ -1,5 +1,4 @@
 #include "D3D12TextureView.h"
-
 #include "D3D12Texture.h"
 #include <stdexcept>
 #ifdef ERROR
@@ -10,12 +9,10 @@ namespace NK
 {
 
 	D3D12TextureView::D3D12TextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc, ID3D12DescriptorHeap* _descriptorHeap, UINT _descriptorSize, FreeListAllocator* _freeListAllocator)
-	: ITextureView(_logger, _allocator, _device, _texture, _desc, _freeListAllocator)
+	: ITextureView(_logger, _allocator, _device, _texture, _desc, _freeListAllocator, true)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE_VIEW, "Creating Texture View\n");
-
-		m_freeListAllocated = true;
 
 		
 		//This constructor logically requires shader-accessible view type
@@ -34,26 +31,67 @@ namespace NK
 
 		switch (_desc.type)
 		{
+		//Shader-resource view
 		case TEXTURE_VIEW_TYPE::SHADER_READ_ONLY:
 		{
-			//Shader-resource view
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
 			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
-			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+
+			//todo: add array support
+			switch (m_dimension)
+			{
+			case TEXTURE_DIMENSION::DIM_1:
+			{
+				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D;
+				desc.Texture1D.MipLevels = 1;
+				break;
+			}
+			case TEXTURE_DIMENSION::DIM_2:
+			{
+				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				desc.Texture2D.MipLevels = 1;
+				break;
+			}
+			case TEXTURE_DIMENSION::DIM_3:
+			{
+				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+				desc.Texture3D.MipLevels = 1;
+				break;
+			}
+			}
+
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			desc.Texture2D.MipLevels = 1;
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateShaderResourceView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, handle);
 
 			break;
 		}
 
+		//Unordered-access view
 		case TEXTURE_VIEW_TYPE::SHADER_READ_WRITE:
 		{
-			//Unordered-access view
 			D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
 			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
-			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+			//todo: add array support
+			switch (m_dimension)
+			{
+			case TEXTURE_DIMENSION::DIM_1:
+			{
+				desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
+				break;
+			}
+			case TEXTURE_DIMENSION::DIM_2:
+			{
+				desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+				break;
+			}
+			case TEXTURE_DIMENSION::DIM_3:
+			{
+				desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+				break;
+			}
+			}
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateUnorderedAccessView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), nullptr, &desc, handle);
 
@@ -68,12 +106,10 @@ namespace NK
 
 
 	D3D12TextureView::D3D12TextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc, ID3D12DescriptorHeap* _descriptorHeap, UINT _descriptorSize, std::uint32_t _resourceIndex)
-	: ITextureView(_logger, _allocator, _device, _texture, _desc, nullptr)
+	: ITextureView(_logger, _allocator, _device, _texture, _desc, nullptr, false)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE_VIEW, "Creating Texture View\n");
-
-		m_freeListAllocated = false;
 
 
 		//This constructor logically requires non-shader-accessible view type
@@ -94,10 +130,10 @@ namespace NK
 		{
 		case TEXTURE_VIEW_TYPE::RENDER_TARGET:
 		{
-			//Shader-resource view
+			//Render-target view
 			D3D12_RENDER_TARGET_VIEW_DESC desc{};
 			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
-			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d rtv?
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateRenderTargetView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, handle);
 
@@ -106,10 +142,10 @@ namespace NK
 
 		case TEXTURE_VIEW_TYPE::DEPTH_STENCIL:
 		{
-			//Unordered-access view
+			//Depth-stencil view
 			D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
 			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
-			desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+			desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d dsv?
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateDepthStencilView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, handle);
 
