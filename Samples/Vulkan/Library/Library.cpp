@@ -1,22 +1,25 @@
-#include "Core/RAIIContext.h"
-#include "Core/Debug/ILogger.h"
-#include "Core/Memory/Allocation.h"
-#include "Core/Memory/TrackingAllocator.h"
-#include "Core/Utils/FormatUtils.h"
-#include "RHI-Vulkan/VulkanDevice.h"
-#include "RHI/IBuffer.h"
-#include "RHI/ITexture.h"
-#include "RHI/ICommandBuffer.h"
-#include "RHI/ICommandPool.h"
-#include "RHI/IDevice.h"
+#include <Core/RAIIContext.h>
+#include <Core/Debug/ILogger.h>
+#include <Core/Memory/Allocation.h>
+#include <Core/Memory/TrackingAllocator.h>
+#include <Core/Utils/FormatUtils.h>
+#include <RHI-Vulkan/VulkanDevice.h>
+#include <RHI/ICommandPool.h>
+#include <RHI/ICommandBuffer.h>
+#include <RHI/IBuffer.h>
+#include <RHI/IBufferView.h>
+#include <RHI/ITexture.h>
+#include <RHI/ISurface.h>
+#include <RHI/ISwapchain.h>
 
 
 
 int main()
 {
 	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::NONE);
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::NONE);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	NK::RAIIContext context{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE };
 	NK::ILogger* logger{ NK::Context::GetLogger() };
 	NK::IAllocator* allocator{ NK::Context::GetAllocator() };
@@ -44,20 +47,40 @@ int main()
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::BufferViewDesc bufferViewDesc{};
-	bufferViewDesc.type = NK::BUFFER_VIEW_TYPE::CONSTANT;
+	bufferViewDesc.type = NK::BUFFER_VIEW_TYPE::UNIFORM;
 	bufferViewDesc.offset = 0;
 	bufferViewDesc.size = bufferDesc.size;
-	const NK::ResourceIndex bufferViewIndex{ device->CreateBufferView(buffer.get(), bufferViewDesc) };
+	NK::UniquePtr<NK::IBufferView> bufferView{ device->CreateBufferView(buffer.get(), bufferViewDesc) };
+	const NK::ResourceIndex bufferViewIndex{ bufferView->GetIndex() };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Buffer view index: " + std::to_string(bufferViewIndex) + "\n");
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	NK::TextureDesc textureDesc{};
-	textureDesc.size = glm::ivec3(1920, 1080, 1);
+	textureDesc.size = glm::ivec3(400, 400, 1);
 	textureDesc.arrayTexture = false;
-	textureDesc.usage = NK::TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT;
+	textureDesc.usage = NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
 	textureDesc.format = NK::TEXTURE_FORMAT::R8G8B8A8_SRGB;
 	textureDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(textureDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	NK::TextureViewDesc textureViewDesc{};
+	textureViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	textureViewDesc.format = textureDesc.format;
+	textureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateTextureView(texture.get(), textureViewDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+	
+	NK::SurfaceDesc surfaceDesc{};
+	surfaceDesc.name = "Neki-Vulkan Library Sample";
+	surfaceDesc.size = glm::ivec2(1280, 720);
+	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	NK::SwapchainDesc swapchainDesc{};
+	swapchainDesc.surface = surface.get();
+	swapchainDesc.numBuffers = 3;
+	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	logger->Log(NK::LOGGER_CHANNEL::SUCCESS, NK::LOGGER_LAYER::APPLICATION, "Engine initialised successfully!\n\n");

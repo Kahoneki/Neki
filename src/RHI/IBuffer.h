@@ -1,7 +1,6 @@
 #pragma once
 #include "IDevice.h"
 #include "Core/Debug/ILogger.h"
-#include "ResourceStates.h"
 
 namespace NK
 {

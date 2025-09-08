@@ -5,23 +5,28 @@
 #include <set>
 #include <stdexcept>
 
-#include "Core/Debug/ILogger.h"
-#include "Core/Utils/EnumUtils.h"
+#include <Core/Debug/ILogger.h>
+#include <Core/Utils/EnumUtils.h>
+#include <Core/Memory/Allocation.h>
 
 #include "VulkanBuffer.h"
+#include "VulkanBufferView.h"
 #include "VulkanCommandPool.h"
+#include "VulkanSurface.h"
+#include "VulkanSwapchain.h"
 #include "VulkanTexture.h"
-#include "Core/Memory/Allocation.h"
-#include "GLFW/glfw3.h"
+#include "VulkanTextureView.h"
+#include <GLFW/glfw3.h>
 
 namespace NK
-{		
-	
+{
+
 	VulkanDevice::VulkanDevice(ILogger& _logger, IAllocator& _allocator)
 	: IDevice(_logger, _allocator)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Initialising VulkanDevice\n");
+
 		CreateInstance();
 		SetupDebugMessenger();
 		SelectPhysicalDevice();
@@ -30,7 +35,7 @@ namespace NK
 		CreateDescriptorPool();
 		CreateDescriptorSetLayout();
 		CreateDescriptorSet();
-		
+
 		m_logger.Unindent();
 	}
 
@@ -61,7 +66,7 @@ namespace NK
 			m_descriptorPool = VK_NULL_HANDLE;
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Descriptor Pool Destroyed\n");
 		}
-		
+
 		if (m_device != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(m_device);
@@ -97,67 +102,9 @@ namespace NK
 
 
 
-	ResourceIndex VulkanDevice::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
+	UniquePtr<IBufferView> VulkanDevice::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
 	{
-		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Creating buffer view\n");
-
-		
-		//Get resource index from free list
-		const ResourceIndex index{ m_resourceIndexAllocator->Allocate() };
-		if (index == FreeListAllocator::INVALID_INDEX)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Resource index allocation failed - max bindless resource count (" + std::to_string(MAX_BINDLESS_RESOURCES) + ") reached.\n");
-			throw std::runtime_error("");
-		}
-
-		//Get underlying VulkanBuffer
-		const VulkanBuffer* vulkanBuffer{ dynamic_cast<const VulkanBuffer*>(_buffer) };
-		if (!vulkanBuffer)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Dynamic cast to VulkanBuffer object expected to pass but failed\n");
-			throw std::runtime_error("");
-		}
-
-		//Convert rhi view type to vulkan descriptor type
-		VkDescriptorType descriptorType;
-		switch (_desc.type)
-		{
-		case BUFFER_VIEW_TYPE::CONSTANT:
-			descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			break;
-
-		case BUFFER_VIEW_TYPE::SHADER_RESOURCE:
-		case BUFFER_VIEW_TYPE::UNORDERED_ACCESS:
-			descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			break;
-
-		default:
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Default case reached when determining vulkan descriptor type\n");
-			throw std::runtime_error("");
-		}
-
-		//Populate descriptor info
-		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.buffer = vulkanBuffer->GetBuffer();
-		bufferInfo.offset = _desc.offset;
-		bufferInfo.range = _desc.size;
-
-		//Populate write info
-		VkWriteDescriptorSet writeInfo{};
-		writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeInfo.dstSet = m_descriptorSet;
-		writeInfo.dstBinding = 0; //All cbv, srv, uav are in binding point 0
-		writeInfo.dstArrayElement = index;
-		writeInfo.descriptorCount = 1;
-		writeInfo.descriptorType = descriptorType;
-		writeInfo.pBufferInfo = &bufferInfo;
-
-		vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
-		
-		m_logger.Unindent();
-
-		return index;
+		return UniquePtr<IBufferView>(NK_NEW(VulkanBufferView, m_logger, *m_resourceIndexAllocator, *this, _buffer, _desc, m_descriptorSet));
 	}
 
 
@@ -169,6 +116,13 @@ namespace NK
 
 
 
+	UniquePtr<ITextureView> VulkanDevice::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
+	{
+		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, m_descriptorSet, m_resourceIndexAllocator.get()));
+	}
+
+
+
 	UniquePtr<ICommandPool> VulkanDevice::CreateCommandPool(const CommandPoolDesc& _desc)
 	{
 		return UniquePtr<ICommandPool>(NK_NEW(VulkanCommandPool, m_logger, m_allocator, *this, _desc));
@@ -176,11 +130,17 @@ namespace NK
 
 
 
-//	UniquePtr<ISurface> VulkanDevice::CreateSurface(const Window* _window)
-//	{
-//		//todo: implement
-//		return { nullptr };
-//	}
+	UniquePtr<ISurface> VulkanDevice::CreateSurface(const SurfaceDesc& _desc)
+	{
+		return UniquePtr<ISurface>(NK_NEW(VulkanSurface, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<ISwapchain> VulkanDevice::CreateSwapchain(const SwapchainDesc& _desc)
+	{
+		return UniquePtr<ISwapchain>(NK_NEW(VulkanSwapchain, m_logger, m_allocator, *this, _desc));
+	}
 
 
 
@@ -395,6 +355,13 @@ namespace NK
 		//Define required features
 		VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
 		features12.descriptorIndexing = VK_TRUE;
+		features12.descriptorBindingPartiallyBound = VK_TRUE; //Allow empty descriptor slots - don't crash when accessing
+		features12.runtimeDescriptorArray = VK_TRUE; //Enable variable-indexing
+		//Allow updates to the descriptor set while the queue is using it
+		features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+		features12.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+		features12.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
+		features12.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
 		features12.bufferDeviceAddress = VK_TRUE;
 
 		VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES };
@@ -405,11 +372,15 @@ namespace NK
 		deviceFeatures2.features.samplerAnisotropy = VK_TRUE;
 		deviceFeatures2.pNext = &dynamicRenderingFeatures;
 
+		VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutableTypeFeatures{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT };
+		mutableTypeFeatures.mutableDescriptorType = VK_TRUE;
+		mutableTypeFeatures.pNext = &deviceFeatures2;
+
 
 		//Create device
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		deviceCreateInfo.pNext = &deviceFeatures2;
+		deviceCreateInfo.pNext = &mutableTypeFeatures;
 		deviceCreateInfo.queueCreateInfoCount = static_cast<std::uint32_t>(queueCreateInfos.size());
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 		deviceCreateInfo.enabledExtensionCount = requiredDeviceExtensions.size();
@@ -445,7 +416,7 @@ namespace NK
 		m_mutableResourceTypeInfo.sType = VK_STRUCTURE_TYPE_MUTABLE_DESCRIPTOR_TYPE_CREATE_INFO_EXT;
 		m_mutableResourceTypeInfo.mutableDescriptorTypeListCount = 1;
 		m_mutableResourceTypeInfo.pMutableDescriptorTypeLists = &m_mutableResourceTypeList;
-		
+
 		m_logger.Unindent();
 	}
 
@@ -460,9 +431,9 @@ namespace NK
 		constexpr std::array<VkDescriptorPoolSize, 2> poolSizes
 		{
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_MUTABLE_EXT, MAX_BINDLESS_RESOURCES },
-			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_SAMPLERS }
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLER, MAX_BINDLESS_SAMPLERS }
 		};
-		
+
 		//Create the pool
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -478,7 +449,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor pool\n");
-		
+
 		m_logger.Unindent();
 	}
 
@@ -501,7 +472,7 @@ namespace NK
 		//----SAMPLER BINDING----//
 		VkDescriptorSetLayoutBinding samplerBinding{};
 		samplerBinding.binding = 1;
-		samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
 		samplerBinding.descriptorCount = MAX_BINDLESS_SAMPLERS;
 		samplerBinding.stageFlags = VK_SHADER_STAGE_ALL;
 
@@ -521,15 +492,15 @@ namespace NK
 		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 		layoutInfo.bindingCount = bindings.size();
 		layoutInfo.pBindings = bindings.data();
-		
+
 		const VkResult result{ vkCreateDescriptorSetLayout(m_device, &layoutInfo, m_allocator.GetVulkanCallbacks(), &m_descriptorSetLayout) };
 		if (result != VK_SUCCESS)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set layout - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
-		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");		
-		
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");
+
 		m_logger.Unindent();
 	}
 
@@ -538,8 +509,8 @@ namespace NK
 	void VulkanDevice::CreateDescriptorSet()
 	{
 		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating descriptor set layout\n");
-		
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating descriptor set\n");
+
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		allocInfo.descriptorPool = m_descriptorPool;
@@ -548,11 +519,11 @@ namespace NK
 		const VkResult result{ vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSet) };
 		if (result != VK_SUCCESS)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set layout - result: " + std::to_string(result) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
-		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set layout\n");	
-		
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set\n");
+
 		m_logger.Unindent();
 	}
 
@@ -662,7 +633,19 @@ namespace NK
 
 		std::string msg{ _pCallbackData->pMessage };
 		if (msg.back() != '\n') { msg += '\n'; } //vulkan just like sometimes doesn't do this
-		device->m_logger.Log(channel, layer, msg);
+		device->m_logger.IndentLog(channel, layer, msg);
+
+		if (channel == LOGGER_CHANNEL::ERROR)
+		{
+			if (EnumUtils::Contains(device->m_logger.GetLoggerConfig().GetChannelBitfieldForLayer(layer), LOGGER_CHANNEL::ERROR))
+			{
+				throw std::runtime_error("");
+			}
+			else
+			{
+				throw std::runtime_error("Error thrown from " + device->m_logger.LayerToString(layer) + " but ERROR channel for this layer was disabled - enable it to view the error.\n");
+			}
+		}
 
 		return VK_FALSE;
 	}

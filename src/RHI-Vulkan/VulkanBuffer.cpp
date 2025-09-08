@@ -1,8 +1,8 @@
 #include "VulkanBuffer.h"
 #include <stdexcept>
 #include "VulkanDevice.h"
-#include "Core/Utils/FormatUtils.h"
-#include "Core/Utils/EnumUtils.h"
+#include <Core/Utils/FormatUtils.h>
+#include <Core/Utils/EnumUtils.h>
 
 namespace NK
 {
@@ -39,10 +39,8 @@ namespace NK
 		VkMemoryPropertyFlags memProps;
 		switch (m_memType)
 		{
-		case MEMORY_TYPE::HOST: memProps = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-			break;
-		case MEMORY_TYPE::DEVICE: memProps = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			break;
+		case MEMORY_TYPE::HOST:		memProps = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT; break;
+		case MEMORY_TYPE::DEVICE:	memProps = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT; break;
 		default:
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::BUFFER, "Provided _desc.type (" + std::to_string(std::to_underlying(m_memType)) + ") not supported\n");

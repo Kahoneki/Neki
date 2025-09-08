@@ -1,0 +1,25 @@
+#pragma once
+#include <RHI/ITextureView.h>
+#include "VulkanDevice.h"
+
+namespace NK
+{
+
+	class VulkanTextureView final : public ITextureView
+	{
+	public:
+		//Use this constructor if you want a free list allocator to be used for allocation (will be the case for shader-accessible view types)
+		explicit VulkanTextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc, VkDescriptorSet _descriptorSet, FreeListAllocator* _freeListAllocator);
+
+		//Use this constructor if just making a raw image view, i.e.: this constructor will not write to a descriptor set (will be the case for non-shader-accessible view types)
+		explicit VulkanTextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc);
+
+		virtual ~VulkanTextureView() override;
+
+
+	private:
+		//Vulkan handles
+		VkImageView m_imageView{ VK_NULL_HANDLE };
+	};
+
+}

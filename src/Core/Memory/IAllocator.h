@@ -12,6 +12,7 @@ namespace NK
 		TRACKING_VERBOSE_INCLUDE_VULKAN,
 	};
 
+
 	class IAllocator
 	{
 	public:
@@ -24,6 +25,8 @@ namespace NK
 		#if NEKI_VULKAN_SUPPORTED
 			[[nodiscard]] virtual inline const VkAllocationCallbacks* GetVulkanCallbacks() const = 0;
 		#endif
+
+
 	protected:
 		#if NEKI_VULKAN_SUPPORTED
 			VkAllocationCallbacks m_vulkanCallbacks{ VK_NULL_HANDLE };

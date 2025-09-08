@@ -1,7 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include "IDevice.h"
-#include "Core/Debug/ILogger.h"
+#include <Core/Debug/ILogger.h>
 
 namespace NK
 {
@@ -97,9 +97,10 @@ namespace NK
 
 
 	protected:
-		explicit ITexture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc)
+		explicit ITexture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc, bool _isOwned)
 		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
-		  m_size(_desc.size), m_arrayTexture(_desc.arrayTexture), m_usage(_desc.usage), m_format(_desc.format), m_dimension(_desc.dimension) {}
+		  m_size(_desc.size), m_arrayTexture(_desc.arrayTexture), m_usage(_desc.usage), m_format(_desc.format), m_dimension(_desc.dimension),
+		  m_isOwned(_isOwned) {}
 
 
 
@@ -113,5 +114,12 @@ namespace NK
 		TEXTURE_USAGE_FLAGS m_usage;
 		TEXTURE_FORMAT m_format;
 		TEXTURE_DIMENSION m_dimension;
+
+		//True if the lifetime of the texture is to be managed by this class (i.e. if the implemented derived constructor is called)
+		//False is the lifetime of the texture is to be managed elsewhere (i.e. if the implemented wrapper constructor is called)
+		//See VulkanTexture / D3D12Texture for an example of the above
+		//This flag exists mainly for the swapchain which in Vulkan/D3D12, owns its images
+		//^trying to destroy the images yourself (e.g. in this class' destructor) results in a crash
+		bool m_isOwned;
 	};
 }

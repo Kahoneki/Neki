@@ -10,10 +10,11 @@ namespace NK
 {
 
 	D3D12Texture::D3D12Texture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc)
-	: ITexture(_logger, _allocator, _device, _desc)
+	: ITexture(_logger, _allocator, _device, _desc, true)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE, "Initialising D3D12Texture\n");
+
 
 		//m_dimension represents the dimensionality of the underlying image
 		//If m_arrayTexture == true and m_dimension == TEXTURE_DIMENSION::DIM_3, this likely means there has been a misunderstanding of the parameters
@@ -23,6 +24,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+
 		//Define heap props
 		D3D12_HEAP_PROPERTIES heapProps{};
 		heapProps.Type = D3D12_HEAP_TYPE_DEFAULT; //Device-local
@@ -30,6 +32,7 @@ namespace NK
 		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 		heapProps.CreationNodeMask = 1;
 		heapProps.VisibleNodeMask = 1;
+
 
 		//Create texture
 		D3D12_RESOURCE_DESC textureDesc{};
@@ -69,11 +72,12 @@ namespace NK
 		}
 		textureDesc.Alignment = 0;
 		textureDesc.MipLevels = 1;
-		textureDesc.Format = GetDXGIFormat();
+		textureDesc.Format = GetDXGIFormat(m_format);
 		textureDesc.SampleDesc.Count = 1;
 		textureDesc.SampleDesc.Quality = 0;
 		textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		textureDesc.Flags = GetCreationFlags();
+
 
 		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &textureDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_texture)) };
 
@@ -87,6 +91,19 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+
+		m_logger.Unindent();
+	}
+
+
+
+	D3D12Texture::D3D12Texture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc, ID3D12Resource* _resource)
+	: ITexture(_logger, _allocator, _device, _desc, false)
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE, "Initialising D3D12Texture (wrapping existing ID3D12Resource)\n");
+
+		m_texture = _resource;
 
 		m_logger.Unindent();
 	}
@@ -139,9 +156,9 @@ namespace NK
 
 
 
-	DXGI_FORMAT D3D12Texture::GetDXGIFormat() const
+	DXGI_FORMAT D3D12Texture::GetDXGIFormat(TEXTURE_FORMAT _format)
 	{
-		switch (m_format)
+		switch (_format)
 		{
 		case TEXTURE_FORMAT::R8_UNORM:					return DXGI_FORMAT_R8_UNORM;
 		case TEXTURE_FORMAT::R8G8_UNORM:				return DXGI_FORMAT_R8G8_UNORM;
@@ -180,8 +197,7 @@ namespace NK
 
 		default:
 		{
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE, "GetDXGIFormat() default case reached. Format = " + std::to_string(std::to_underlying(m_format)));
-			throw std::runtime_error("");
+			throw std::runtime_error("GetDXGIFormat() default case reached. Format = " + std::to_string(std::to_underlying(_format)));
 		}
 		}
 	}

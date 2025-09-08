@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "Debug/ConsoleLogger.h"
+#include "GLFW/glfw3.h"
 #include "Memory/TrackingAllocator.h"
 
 namespace NK
@@ -30,7 +31,10 @@ namespace NK
 		case ALLOCATOR_TYPE::TRACKING_VERBOSE_INCLUDE_VULKAN: m_allocator = new TrackingAllocator(*m_logger, true, true);
 		}
 
-		m_logger->Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::CONTEXT, "Context Initialised\n");
+		glfwInit();
+		m_logger->IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::CONTEXT, "GLFW initialised\n");
+		
+		m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::CONTEXT, "Context Initialised\n");
 	}
 
 
@@ -42,6 +46,9 @@ namespace NK
 
 		delete m_allocator;
 
+		glfwTerminate();
+		m_logger->IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::CONTEXT, "GLFW Terminated\n");
+		
 		m_logger->Unindent();
 		delete m_logger;
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "RHI/IBuffer.h"
+#include <RHI/IBuffer.h>
 #include "D3D12Device.h"
 
 namespace NK

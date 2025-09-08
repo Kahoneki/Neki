@@ -10,35 +10,27 @@ namespace NK
 	//Forward declarations
 	class IBuffer;
 	struct BufferDesc;
-
+	class IBufferView;
+	struct BufferViewDesc;
+	
 	class ITexture;
 	struct TextureDesc;
+	class ITextureView;
+	struct TextureViewDesc;
 
 	class ICommandPool;
 	struct CommandPoolDesc;
 
-	class Window;
 	class ISurface;
+	struct SurfaceDesc;
 
+	class ISwapchain;
+	struct SwapchainDesc;
 
+	
+	typedef std::uint32_t ResourceIndex;
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
 	constexpr std::uint32_t MAX_BINDLESS_SAMPLERS{ 2048 };
-	typedef std::uint32_t ResourceIndex;
-
-
-	enum class BUFFER_VIEW_TYPE
-	{
-		CONSTANT,
-		SHADER_RESOURCE,
-		UNORDERED_ACCESS,
-	};
-	
-	struct BufferViewDesc
-	{
-		BUFFER_VIEW_TYPE type;
-		std::uint64_t offset; //Offset from start of IBuffer in bytes (must be aligned to hardware specific requirements)
-		std::uint64_t size; //Size of view in bytes
-	};
 }
 
 
@@ -51,10 +43,12 @@ namespace NK
 		virtual ~IDevice() = default;
 
 		[[nodiscard]] virtual UniquePtr<IBuffer> CreateBuffer(const BufferDesc& _desc) = 0;
-		[[nodiscard]] virtual ResourceIndex CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<IBufferView> CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<ITextureView> CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) = 0;
-		//[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const Window* _window) = 0;
+		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) = 0;
 
 
 	protected:
