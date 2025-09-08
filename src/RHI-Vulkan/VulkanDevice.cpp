@@ -18,6 +18,8 @@
 #include "VulkanTextureView.h"
 #include <GLFW/glfw3.h>
 
+#include "VulkanShader.h"
+
 namespace NK
 {
 
@@ -140,6 +142,13 @@ namespace NK
 	UniquePtr<ISwapchain> VulkanDevice::CreateSwapchain(const SwapchainDesc& _desc)
 	{
 		return UniquePtr<ISwapchain>(NK_NEW(VulkanSwapchain, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<IShader> VulkanDevice::CreateShader(const ShaderDesc& _desc)
+	{
+		return UniquePtr<IShader>(NK_NEW(VulkanShader, m_logger, _desc));
 	}
 
 

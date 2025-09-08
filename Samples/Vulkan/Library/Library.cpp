@@ -11,6 +11,7 @@
 #include <RHI/ITexture.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
+#include <RHI/IShader.h>
 
 
 
@@ -81,6 +82,12 @@ int main()
 	swapchainDesc.surface = surface.get();
 	swapchainDesc.numBuffers = 3;
 	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	NK::ShaderDesc vertShaderDesc{};
+	vertShaderDesc.type = NK::SHADER_TYPE::VERTEX;
+	vertShaderDesc.filepath = "Samples/Vulkan/Library/Shaders/Library_vs";
+	const NK::UniquePtr<NK::IShader> vertShader{ device->CreateShader(vertShaderDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	logger->Log(NK::LOGGER_CHANNEL::SUCCESS, NK::LOGGER_LAYER::APPLICATION, "Engine initialised successfully!\n\n");

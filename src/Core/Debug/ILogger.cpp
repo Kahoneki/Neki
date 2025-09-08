@@ -58,12 +58,10 @@ namespace NK
 		case LOGGER_LAYER::TEXTURE:				return "[TEXTURE]";
 		case LOGGER_LAYER::TEXTURE_VIEW:		return "[TEXTURE VIEW]";
 		case LOGGER_LAYER::SURFACE:				return "[SURFACE]";
-			
 		case LOGGER_LAYER::SWAPCHAIN:			return "[SWAPCHAIN]";
-		case LOGGER_LAYER::RENDER_MANAGER:		return "[RENDER MANAGER]";
-		case LOGGER_LAYER::DESCRIPTOR_POOL:		return "[DESCRIPTOR POOL]";
+		case LOGGER_LAYER::SHADER:				return "[SHADER]";
 		case LOGGER_LAYER::PIPELINE:			return "[PIPELINE]";
-		case LOGGER_LAYER::MODEL_FACTORY:		return "[MODEL FACTORY]";
+
 		case LOGGER_LAYER::APPLICATION:			return "[APPLICATION]";
 
 		default:								return "[UNDEFINED]";
