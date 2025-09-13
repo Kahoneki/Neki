@@ -1,13 +1,9 @@
 #pragma once
 #include <array>
 #include <cstdint>
-#include <string>
-#include <unordered_map>
 #include <vector>
 #include <RHI/IDevice.h>
 #include <vulkan/vulkan.h>
-
-#include "RHI/ISurface.h"
 
 
 namespace NK
@@ -27,6 +23,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] inline VkInstance GetInstance() const { return m_instance; }
@@ -35,6 +32,7 @@ namespace NK
 		[[nodiscard]] inline std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
+		[[nodiscard]] inline VkPipelineLayout GetPipelineLayout() const { return m_pipelineLayout; }
 
 
 	private:
@@ -47,6 +45,7 @@ namespace NK
 		void CreateDescriptorPool();
 		void CreateDescriptorSetLayout();
 		void CreateDescriptorSet();
+		void CreatePipelineLayout();
 
 		//Utility functions
 		[[nodiscard]] bool ValidationLayersSupported() const;
@@ -83,6 +82,7 @@ namespace NK
 		VkDescriptorPool m_descriptorPool{ VK_NULL_HANDLE };
 		VkDescriptorSetLayout m_descriptorSetLayout{ VK_NULL_HANDLE };
 		VkDescriptorSet m_descriptorSet{ VK_NULL_HANDLE };
+		VkPipelineLayout m_pipelineLayout{ VK_NULL_HANDLE };
 
 
 		bool m_enableInstanceValidationLayers = true;

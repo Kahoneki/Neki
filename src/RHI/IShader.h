@@ -37,6 +37,8 @@ namespace NK
 	public:
 		virtual ~IShader() = default;
 
+		[[nodiscard]] const std::vector<char>& GetBytecode() const { return m_bytecode; }
+
 		
 	protected:
 		IShader(ILogger& _logger, const ShaderDesc& _desc)

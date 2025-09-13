@@ -16,7 +16,7 @@ namespace NK
 	{
 		TEXTURE_VIEW_TYPE type;
 		TEXTURE_DIMENSION dimension;
-		TEXTURE_FORMAT format;
+		DATA_FORMAT format;
 		//todo: add array support
 		//todo: add mip support
 	};
@@ -48,6 +48,6 @@ namespace NK
 		ResourceIndex m_resourceIndex{ FreeListAllocator::INVALID_INDEX };
 		TEXTURE_VIEW_TYPE m_type;
 		TEXTURE_DIMENSION m_dimension;
-		TEXTURE_FORMAT m_format;
+		DATA_FORMAT m_format;
 	};
 }

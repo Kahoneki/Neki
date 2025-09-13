@@ -30,6 +30,9 @@ namespace NK
 	class IShader;
 	struct ShaderDesc;
 
+	class IPipeline;
+	struct PipelineDesc;
+
 	
 	typedef std::uint32_t ResourceIndex;
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
@@ -53,6 +56,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) = 0;
 
 
 	protected:
