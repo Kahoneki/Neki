@@ -8,14 +8,11 @@
 #include <RHI/IBufferView.h>
 #include <RHI/ICommandBuffer.h>
 #include <RHI/ICommandPool.h>
+#include <RHI/IPipeline.h>
 #include <RHI/IShader.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
 #include <RHI/ITexture.h>
-#include <RHI/IPipeline.h>
-
-#include "../../../cmake-build-debug/_deps/assimp-src/code/AssetLib/3MF/3MFXmlTags.h"
-
 
 
 int main()
@@ -98,9 +95,15 @@ int main()
 	fragShaderDesc.filepath = "Samples/Vulkan/Library/Shaders/Library_fs";
 	const NK::UniquePtr<NK::IShader> fragShader{ device->CreateShader(fragShaderDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	NK::ShaderDesc compShaderDesc{};
+	compShaderDesc.type = NK::SHADER_TYPE::COMPUTE;
+	compShaderDesc.filepath = "Samples/Vulkan/Library/Shaders/Library_cs";
+	const NK::UniquePtr<NK::IShader> compShader{ device->CreateShader(compShaderDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 
-	//Pipeline
+	//Graphics Pipeline
 	struct Vertex { glm::vec3 pos; };
 	std::vector<NK::VertexAttributeDesc> vertexAttributes(1);
 	vertexAttributes[0].binding = 0;
@@ -133,19 +136,27 @@ int main()
 	colourBlendDesc.logicOpEnable = false;
 	colourBlendDesc.attachments = colourBlendAttachments;
 	
-	NK::PipelineDesc pipelineDesc{};
-	pipelineDesc.type = NK::PIPELINE_TYPE::GRAPHICS;
-	pipelineDesc.vertexShader = vertShader.get();
-	pipelineDesc.fragmentShader = fragShader.get();
-	pipelineDesc.vertexInputDesc = vertexInputDesc;
-	pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
-	pipelineDesc.multisamplingDesc = multisamplingDesc;
-	pipelineDesc.colourBlendDesc = colourBlendDesc;
-	pipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };
-	pipelineDesc.depthAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
-	pipelineDesc.stencilAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
+	NK::PipelineDesc graphicsPipelineDesc{};
+	graphicsPipelineDesc.type = NK::PIPELINE_TYPE::GRAPHICS;
+	graphicsPipelineDesc.vertexShader = vertShader.get();
+	graphicsPipelineDesc.fragmentShader = fragShader.get();
+	graphicsPipelineDesc.vertexInputDesc = vertexInputDesc;
+	graphicsPipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
+	graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
+	graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
+	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };
+	graphicsPipelineDesc.depthAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
+	graphicsPipelineDesc.stencilAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
 
-	const NK::UniquePtr<NK::IPipeline> pipeline{ device->CreatePipeline(pipelineDesc) };
+	const NK::UniquePtr<NK::IPipeline> graphicsPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+	
+	
+	//Compute pipeline
+	NK::PipelineDesc computePipelineDesc{};
+	computePipelineDesc.type = NK::PIPELINE_TYPE::COMPUTE;
+	computePipelineDesc.computeShader = compShader.get();
+	const NK::UniquePtr<NK::IPipeline> computePipeline{ device->CreatePipeline(computePipelineDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	

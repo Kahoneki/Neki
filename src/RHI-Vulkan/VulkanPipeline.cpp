@@ -117,8 +117,7 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::PIPELINE, "Creating compute pipeline\n");
-
-
+		
 		//Create shader stage
 		VkPipelineShaderStageCreateInfo compShaderStageInfo{};
 		compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -126,7 +125,23 @@ namespace NK
 		compShaderStageInfo.module = m_computeShaderModule;
 		compShaderStageInfo.pName = "CSMain";
 
+		//Create pipeline
+		VkComputePipelineCreateInfo pipelineInfo{};
+		pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		pipelineInfo.stage = compShaderStageInfo;
+		pipelineInfo.layout = dynamic_cast<VulkanDevice&>(m_device).GetPipelineLayout();
+		const VkResult result{ vkCreateComputePipelines(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, m_allocator.GetVulkanCallbacks(), &m_pipeline) };
+		if (result == VK_SUCCESS)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::PIPELINE, "Successfully created pipeline\n");
+		}
+		else
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PIPELINE, "Failed to create pipeline. Result = " + std::to_string(result) + "\n");
+			throw std::runtime_error("");
+		}
 
+		
 		m_logger.Unindent();
 	}
 
