@@ -1,7 +1,7 @@
 #pragma once
 #include <Core/Memory/IAllocator.h>
 #include <Types/DataFormat.h>
-#include <Types/SemanticNames.h>
+#include <Types/ShaderAttribute.h>
 #include "IDevice.h"
 #include "IShader.h"
 

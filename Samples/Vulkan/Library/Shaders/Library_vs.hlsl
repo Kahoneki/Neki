@@ -1,4 +1,11 @@
-float4 VSMain() : SV_POSITION
+#include <Types/ShaderAttribute.hlsl>
+
+struct VertexInput
 {
-    return float4(1.0f, 1.0f, 1.0f, 1.0f);
+	ATTRIBUTE(float3, aPos, NK::SHADER_ATTRIBUTE_LOCATION_POSITION, POSITION);
+};
+
+float4 VSMain(VertexInput vertex) : SV_POSITION
+{
+    return float4(vertex.aPos, 1.0f);
 }

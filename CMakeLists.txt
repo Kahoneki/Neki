@@ -145,12 +145,15 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
     file(MAKE_DIRECTORY ${OUTPUT_DIRECTORY})
 
     
-    set(LOCAL_SHADER_OUTPUTS "")
+    #Add include directory to shader files for the root directory of source tree
+    set(SHADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/src")
     
+    set(LOCAL_SHADER_OUTPUTS "")
+
     if(NEKI_BUILD_VULKAN)
         add_custom_command(
             OUTPUT ${SPV_OUTPUT}
-            COMMAND "${DXC_EXECUTABLE}" "${SHADER_SOURCE}" -T ${SHADER_TYPE} -E ${ENTRY_POINT} -spirv -Fo "${SPV_OUTPUT}"
+            COMMAND "${DXC_EXECUTABLE}" "-I" ${SHADER_INCLUDE_PATH} "${SHADER_SOURCE}" -T ${SHADER_TYPE} -E ${ENTRY_POINT} -spirv -Fo "${SPV_OUTPUT}"
             DEPENDS ${SHADER_SOURCE}
             COMMENT "Compiling ${SHADER_SOURCE} to SPIR-V"
             VERBATIM
@@ -161,7 +164,7 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
      if(NEKI_BUILD_D3D12)
         add_custom_command(
             OUTPUT ${DXIL_OUTPUT}
-            COMMAND "${DXC_EXECUTABLE}" -T ${SHADER_TYPE} -E ${ENTRY_POINT} -Fo "${DXIL_OUTPUT}" "${SHADER_SOURCE}"
+            COMMAND "${DXC_EXECUTABLE}" "-I" ${SHADER_INCLUDE_PATH} -T ${SHADER_TYPE} -E ${ENTRY_POINT} -Fo "${DXIL_OUTPUT}" "${SHADER_SOURCE}"
             DEPENDS ${SHADER_SOURCE}
             COMMENT "Compiling ${SHADER_SOURCE} to DXIL"
             VERBATIM
