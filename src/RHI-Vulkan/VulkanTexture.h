@@ -14,8 +14,8 @@ namespace NK
 
 		[[nodiscard]] static VkImageUsageFlags GetVulkanUsageFlags(TEXTURE_USAGE_FLAGS _flags);
 		[[nodiscard]] static TEXTURE_USAGE_FLAGS GetRHIUsageFlags(VkImageUsageFlags _flags);
-		[[nodiscard]] static VkFormat GetVulkanFormat(TEXTURE_FORMAT _format);
-		[[nodiscard]] static TEXTURE_FORMAT GetRHIFormat(VkFormat _format);
+		[[nodiscard]] static VkFormat GetVulkanFormat(DATA_FORMAT _format);
+		[[nodiscard]] static DATA_FORMAT GetRHIFormat(VkFormat _format);
 
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)

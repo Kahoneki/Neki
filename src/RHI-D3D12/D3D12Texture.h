@@ -14,7 +14,7 @@ namespace NK
 		virtual ~D3D12Texture() override;
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
-		[[nodiscard]] static DXGI_FORMAT GetDXGIFormat(TEXTURE_FORMAT _format);
+		[[nodiscard]] static DXGI_FORMAT GetDXGIFormat(DATA_FORMAT _format);
 		[[nodiscard]] ID3D12Resource* GetResource() const { return m_texture.Get(); }
 
 

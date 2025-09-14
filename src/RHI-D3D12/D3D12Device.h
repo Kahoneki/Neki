@@ -24,6 +24,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) override;
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline IDXGIFactory4* GetFactory() const { return m_factory.Get(); }
@@ -32,6 +34,7 @@ namespace NK
 		[[nodiscard]] inline ID3D12CommandQueue* GetGraphicsQueue() const { return m_graphicsQueue.Get(); }
 		[[nodiscard]] inline ID3D12CommandQueue* GetComputeQueue()  const { return m_computeQueue.Get(); }
 		[[nodiscard]] inline ID3D12CommandQueue* GetTransferQueue() const { return m_transferQueue.Get(); }
+		[[nodiscard]] inline ID3D12RootSignature* GetRootSignature() const { return m_rootSig.Get(); }
 
 
 	private:

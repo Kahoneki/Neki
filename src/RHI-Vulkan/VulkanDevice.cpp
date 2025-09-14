@@ -18,6 +18,9 @@
 #include "VulkanTextureView.h"
 #include <GLFW/glfw3.h>
 
+#include "VulkanPipeline.h"
+#include "VulkanShader.h"
+
 namespace NK
 {
 
@@ -35,6 +38,7 @@ namespace NK
 		CreateDescriptorPool();
 		CreateDescriptorSetLayout();
 		CreateDescriptorSet();
+		CreatePipelineLayout();
 
 		m_logger.Unindent();
 	}
@@ -46,6 +50,13 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Shutting Down VulkanDevice\n");
 
+		if (m_pipelineLayout != VK_NULL_HANDLE)
+		{
+			vkDestroyPipelineLayout(m_device, m_pipelineLayout, m_allocator.GetVulkanCallbacks());
+			m_pipelineLayout = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Pipeline Layout Destroyed\n");
+		}
+		
 		if (m_descriptorSetLayout != VK_NULL_HANDLE)
 		{
 			vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayout, m_allocator.GetVulkanCallbacks());
@@ -140,6 +151,20 @@ namespace NK
 	UniquePtr<ISwapchain> VulkanDevice::CreateSwapchain(const SwapchainDesc& _desc)
 	{
 		return UniquePtr<ISwapchain>(NK_NEW(VulkanSwapchain, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<IShader> VulkanDevice::CreateShader(const ShaderDesc& _desc)
+	{
+		return UniquePtr<IShader>(NK_NEW(VulkanShader, m_logger, _desc));
+	}
+
+
+
+	UniquePtr<IPipeline> VulkanDevice::CreatePipeline(const PipelineDesc& _desc)
+	{
+		return UniquePtr<IPipeline>(NK_NEW(VulkanPipeline, m_logger, m_allocator, *this, _desc));
 	}
 
 
@@ -524,6 +549,41 @@ namespace NK
 		}
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set\n");
 
+		m_logger.Unindent();
+	}
+
+
+
+	void VulkanDevice::CreatePipelineLayout()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating Pipeline Layout\n");
+		
+		
+		VkPushConstantRange pushConstantRange;
+		pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL;
+		pushConstantRange.offset = 0;
+		pushConstantRange.size = 128; //128 is the minimum required by the spec
+
+		VkPipelineLayoutCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		createInfo.setLayoutCount = 1;
+		createInfo.pSetLayouts = &m_descriptorSetLayout;
+		createInfo.pushConstantRangeCount = 1;
+		createInfo.pPushConstantRanges = &pushConstantRange;
+
+		const VkResult result = vkCreatePipelineLayout(m_device, &createInfo, m_allocator.GetVulkanCallbacks(), &m_pipelineLayout);
+		if (result == VK_SUCCESS)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Pipeline Layout creation successful.\n");
+		}
+		else
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Pipeline Layout creation unsuccessful.\n");
+			throw std::runtime_error("");
+		}
+
+		
 		m_logger.Unindent();
 	}
 

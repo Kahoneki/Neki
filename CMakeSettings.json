@@ -15,6 +15,11 @@
           "name": "NEKI_BUILD_VULKAN",
           "value": "True",
           "type": "BOOL"
+        },
+        {
+          "name": "NEKI_BUILD_D3D12",
+          "value": "False",
+          "type": "BOOL"
         }
       ]
     }

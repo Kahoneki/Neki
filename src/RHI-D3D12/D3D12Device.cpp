@@ -1,4 +1,6 @@
 #include "D3D12Device.h"
+#include "D3D12Device.h"
+#include "D3D12Device.h"
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/FormatUtils.h>
 #include "D3D12CommandPool.h"
@@ -8,6 +10,8 @@
 #include "D3D12TextureView.h"
 #include "D3D12Surface.h"
 #include "D3D12Swapchain.h"
+#include "D3D12Shader.h"
+#include "D3D12Pipeline.h"
 #include <stdexcept>
 #include <array>
 #ifdef ERROR
@@ -93,6 +97,20 @@ namespace NK
 	UniquePtr<ISwapchain> D3D12Device::CreateSwapchain(const SwapchainDesc& _desc)
 	{
 		return UniquePtr<ISwapchain>(NK_NEW(D3D12Swapchain, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<IShader> D3D12Device::CreateShader(const ShaderDesc& _desc)
+	{
+		return UniquePtr<IShader>(NK_NEW(D3D12Shader, m_logger, _desc));
+	}
+
+
+
+	UniquePtr<IPipeline> D3D12Device::CreatePipeline(const PipelineDesc& _desc)
+	{
+		return UniquePtr<IPipeline>(NK_NEW(D3D12Pipeline, m_logger, m_allocator, *this, _desc));
 	}
 
 

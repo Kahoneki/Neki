@@ -2,8 +2,8 @@
 
 #include <stdexcept>
 
+#include <GLFW/glfw3.h>
 #include "Debug/ConsoleLogger.h"
-#include "GLFW/glfw3.h"
 #include "Memory/TrackingAllocator.h"
 
 namespace NK

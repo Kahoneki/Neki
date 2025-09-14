@@ -70,11 +70,18 @@ else()
     message(FATAL_ERROR "Platform not supported. Supported platforms = Windows, Linux, PS5")
 endif ()
 FetchContent_MakeAvailable(dxc_artifacts)
-find_program(DXC_EXECUTABLE NAMES dxc HINTS "${dxc_artifacts_SOURCE_DIR}/bin")
+if(WIN32)
+    set(DXC_EXECUTABLE "${dxc_artifacts_SOURCE_DIR}/bin/x64/dxc.exe")
+else()
+    set(DXC_EXECUTABLE "${dxc_artifacts_SOURCE_DIR}/bin/dxc")
+endif()
 if(NOT DXC_EXECUTABLE)
     message(FATAL_ERROR "Could not find dxc.exe")
 endif()
 message(STATUS "Found DXC: ${DXC_EXECUTABLE}")
+if(UNIX AND NOT APPLE)
+    execute_process(COMMAND chmod +x "${DXC_EXECUTABLE}")
+endif()
 
 #GLM
 FetchContent_Declare(glm GIT_REPOSITORY https://github.com/g-truc/glm.git GIT_TAG 1.0.1)
@@ -112,32 +119,76 @@ file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Resource Files/" DESTINATION "${CMAKE_BIN
 
 
 
-#Function to compile a shader
-function(CompileShader SHADER_SOURCE)
+#Compiles a given HLSL shader source file to SPIR-V and/or DXIL
+#Usage:
+#- SOURCE_FILE: Path to the HLSL shader file
+#- SHADER_TYPE: Shader model profile (e.g.: "vs_6_6")
+#- ENTRY_POINT: Name of the main function in the shader
+#- OUTPUT_LIST: Name of the list to contain the returned shader paths - will contain with the .spv and/or .dxil paths from this function
+function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
 
-    get_filename_component(SHADER_NAME ${SHADER_SOURCE} NAME_WE)
-    set(SPIRV_OUTPUT "${PROJECT_BINARY_DIR}/Shaders/${SHADER_NAME}.spirv")
-    set(DXIL_OUTPUT "${PROJECT_BINARY_DIR}/Shaders/${SHADER_NAME}.dxil")
+    #Get relative path from project directory (maintain subdirectory structure)
+    file(RELATIVE_PATH SHADER_RELATIVE_PATH "${CMAKE_SOURCE_DIR}" ${SHADER_SOURCE})
+
+    #Get directory and filename without extension
+    get_filename_component(SHADER_DIRECTORY ${SHADER_RELATIVE_PATH} PATH)
+    get_filename_component(SHADER_NAME_WE ${SHADER_RELATIVE_PATH} NAME_WE)
+
+    # Recombine them to get the base for the output filename.
+    if(SHADER_DIRECTORY)
+        set(SHADER_OUTPUT_PATH "${SHADER_DIRECTORY}/${SHADER_NAME_WE}")
+    else()
+        set(SHADER_OUTPUT_PATH "${SHADER_NAME_WE}")
+    endif()
+    
+    set(SPV_OUTPUT "${PROJECT_BINARY_DIR}/${SHADER_OUTPUT_PATH}.spv")
+    set(DXIL_OUTPUT "${PROJECT_BINARY_DIR}/${SHADER_OUTPUT_PATH}.dxil")
+
+    #Ensure output directory exists before trying to write to it
+    get_filename_component(OUTPUT_DIRECTORY ${SPV_OUTPUT} DIRECTORY)
+    file(MAKE_DIRECTORY ${OUTPUT_DIRECTORY})
+
+    
+    #Add include directory to shader files for the root directory of source tree
+    set(SHADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/src")
+    
+    set(LOCAL_SHADER_OUTPUTS "")
 
     if(NEKI_BUILD_VULKAN)
         add_custom_command(
-            OUTPUT ${SPIRV_OUTPUT}
-            COMMAND ${DXC_EXECUTABLE} -T vs_6_6 -E VSMain -spirv -Fo ${SPIRV_OUTPUT} ${SHADER_SOURCE}
+            OUTPUT ${SPV_OUTPUT}
+            COMMAND ${DXC_EXECUTABLE}
+                    -I ${SHADER_INCLUDE_PATH}
+                    ${SHADER_SOURCE}
+                    -T ${SHADER_TYPE}
+                    -E ${ENTRY_POINT}
+                    -spirv
+                    -Fo ${SPV_OUTPUT}
             DEPENDS ${SHADER_SOURCE}
             COMMENT "Compiling ${SHADER_SOURCE} to SPIR-V"
         )
-        list(APPEND SHADER_OUTPUTS ${SPIRV_OUTPUT})
+        list(APPEND LOCAL_SHADER_OUTPUTS ${SPV_OUTPUT})
     endif()
 
-     if(NEKI_BUILD_D3D12)
+    if(NEKI_BUILD_D3D12)
         add_custom_command(
             OUTPUT ${DXIL_OUTPUT}
-            COMMAND ${DXC_EXECUTABLE} -T vs_6_6 -E VSMain -Fo ${DXIL_OUTPUT} ${SHADER_SOURCE}
+            COMMAND ${DXC_EXECUTABLE}
+                    -I ${SHADER_INCLUDE_PATH}
+                    ${SHADER_SOURCE}
+                    -T ${SHADER_TYPE}
+                    -E ${ENTRY_POINT}
+                    -Fo ${DXIL_OUTPUT}
             DEPENDS ${SHADER_SOURCE}
             COMMENT "Compiling ${SHADER_SOURCE} to DXIL"
         )
-        list(APPEND SHADER_OUTPUTS ${DXIL_OUTPUT})
-    endif()
+        list(APPEND LOCAL_SHADER_OUTPUTS ${DXIL_OUTPUT})
+     endif()
+    
+    
+    #Append to output list
+    set(${OUTPUT_LIST} ${LOCAL_SHADER_OUTPUTS} PARENT_SCOPE)
+    
 
 endfunction()
 
@@ -154,7 +205,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     #Shader compilation
 
     #Define shader files
-    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/Samples/*/Shaders/*.hlsl")
+    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/Samples/*.hlsl")
     message(STATUS "---- Found Shader Files ----")
     foreach(FILE ${SHADER_SOURCES})
         message(STATUS "  ${FILE}")
@@ -162,15 +213,24 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     message(STATUS "--------------------------------")
 
     #Compile all shaders
-    set(SHADER_OUTPUTS "")
+    set(ALL_SHADER_OUTPUTS "")
     foreach(SHADER_SRC ${SHADER_SOURCES})
-        CompileShader(${SHADER_SRC})
+        set(CURRENT_SHADER_OUTPUTS "")
+        if(SHADER_SRC MATCHES ".*_vs\\.hlsl$")
+            CompileShader(${SHADER_SRC} "vs_6_6" "VSMain" CURRENT_SHADER_OUTPUTS)
+        elseif(SHADER_SRC MATCHES ".*_fs\\.hlsl$")
+            CompileShader(${SHADER_SRC} "ps_6_6" "FSMain" CURRENT_SHADER_OUTPUTS)
+        elseif(SHADER_SRC MATCHES ".*_cs\\.hlsl$")
+            CompileShader(${SHADER_SRC} "cs_6_6" "CSMain" CURRENT_SHADER_OUTPUTS)
+        endif()
+
+        list(APPEND ALL_SHADER_OUTPUTS ${CURRENT_SHADER_OUTPUTS})
     endforeach()
 
     #Create phony target that depends on all the compiled shaders
     add_custom_target(
             Shaders
-            DEPENDS ${SHADER_OUTPUTS}
+            DEPENDS ${ALL_SHADER_OUTPUTS}
     )
 
 
