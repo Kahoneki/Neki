@@ -121,6 +121,17 @@ int main()
 	NK::InputAssemblyDesc inputAssemblyDesc{};
 	inputAssemblyDesc.topology = NK::INPUT_TOPOLOGY::TRIANGLE_LIST;
 
+	NK::RasteriserDesc rasteriserDesc{};
+	rasteriserDesc.cullMode = NK::CULL_MODE::BACK;
+	rasteriserDesc.frontFace = NK::WINDING_DIRECTION::CLOCKWISE;
+	rasteriserDesc.depthBiasEnable = false;
+
+	NK::DepthStencilDesc depthStencilDesc{};
+	depthStencilDesc.depthTestEnable = true;
+	depthStencilDesc.depthWriteEnable = true;
+	depthStencilDesc.depthCompareOp = NK::COMPARE_OP::LESS;
+	depthStencilDesc.stencilTestEnable = false;
+
 	NK::MultisamplingDesc multisamplingDesc{};
 	multisamplingDesc.sampleCount = NK::SAMPLE_COUNT::BIT_1;
 	multisamplingDesc.supersamplingEnable = false;
@@ -142,6 +153,8 @@ int main()
 	graphicsPipelineDesc.fragmentShader = fragShader.get();
 	graphicsPipelineDesc.vertexInputDesc = vertexInputDesc;
 	graphicsPipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
+	graphicsPipelineDesc.rasteriserDesc = rasteriserDesc;
+	graphicsPipelineDesc.depthStencilDesc = depthStencilDesc;
 	graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
 	graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
 	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };

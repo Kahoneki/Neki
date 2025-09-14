@@ -18,8 +18,14 @@ namespace NK
 		[[nodiscard]] VkShaderModule CreateShaderModule(IShader* _shader) const;
 
 		[[nodiscard]] static VkPrimitiveTopology GetVulkanTopology(INPUT_TOPOLOGY _topology);
+		[[nodiscard]] static VkCullModeFlags GetVulkanCullMode(CULL_MODE _mode);
+		[[nodiscard]] static VkFrontFace GetVulkanWindingDirection(WINDING_DIRECTION _direction);
+		[[nodiscard]] static VkCompareOp GetVulkanCompareOp(COMPARE_OP _op);
+		[[nodiscard]] static VkStencilOp GetVulkanStencilOp(STENCIL_OP _op);
+		[[nodiscard]] static std::uint32_t Convert8BitMaskTo32BitMask(std::uint8_t _mask);
+		[[nodiscard]] static VkStencilOpState GetVulkanStencilOpState(StencilOpState _state, std::uint8_t _readMask, std::uint8_t _writeMask);
 		[[nodiscard]] static VkSampleCountFlagBits GetVulkanSampleCount(SAMPLE_COUNT _count);
-		[[nodiscard]] static VkFlags GetVulkanColourAspectFlags(COLOUR_ASPECT_FLAGS _mask);
+		[[nodiscard]] static VkColorComponentFlags GetVulkanColourAspectFlags(COLOUR_ASPECT_FLAGS _mask);
 		[[nodiscard]] static VkBlendFactor GetVulkanBlendFactor(BLEND_FACTOR _factor);
 		[[nodiscard]] static VkBlendOp GetVulkanBlendOp(BLEND_OP _op);
 		[[nodiscard]] static VkLogicOp GetVulkanLogicOp(LOGIC_OP _op);

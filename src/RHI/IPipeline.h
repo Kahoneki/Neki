@@ -64,6 +64,76 @@ namespace NK
 	};
 
 
+	enum class CULL_MODE
+	{
+		NONE,
+		FRONT,
+		BACK,
+		FRONT_AND_BACK,
+	};
+
+	enum class WINDING_DIRECTION
+	{
+		CLOCKWISE,
+		COUNTER_CLOCKWISE,
+	};
+	
+	struct RasteriserDesc
+	{
+		CULL_MODE cullMode;
+		WINDING_DIRECTION frontFace;
+		bool depthBiasEnable;
+		float depthBiasConstantFactor;
+		float depthBiasClamp;
+		float depthBiasSlopeFactor;
+	};
+
+
+	enum class COMPARE_OP
+	{
+		NEVER,
+		LESS,
+		EQUAL,
+		LESS_OR_EQUAL,
+		GREATER,
+		NOT_EQUAL,
+		GREATER_OR_EQUAL,
+		ALWAYS,
+	};
+
+	enum class STENCIL_OP
+	{
+		KEEP,
+		ZERO,
+		REPLACE,
+		INCREMENT_AND_CLAMP,
+		DECREMENT_AND_CLAMP,
+		INVERT,
+		INCREMENT_AND_WRAP,
+		DECREMENT_AND_WRAP,
+	};
+
+	struct StencilOpState
+	{
+		STENCIL_OP failOp;
+		STENCIL_OP passOp;
+		STENCIL_OP depthFailOp;
+		COMPARE_OP compareOp;
+	};
+	
+	struct DepthStencilDesc
+	{
+		bool depthTestEnable;
+		bool depthWriteEnable;
+		COMPARE_OP depthCompareOp;
+		bool stencilTestEnable;
+		std::uint8_t stencilReadMask;
+		std::uint8_t stencilWriteMask;
+		StencilOpState stencilFrontFace;
+		StencilOpState stencilBackFace;
+	};
+
+
 	enum class SAMPLE_COUNT
 	{
 		BIT_1	= 1 << 0,
@@ -187,6 +257,8 @@ namespace NK
 		
 		VertexInputDesc vertexInputDesc;
 		InputAssemblyDesc inputAssemblyDesc;
+		RasteriserDesc rasteriserDesc;
+		DepthStencilDesc depthStencilDesc;
 		MultisamplingDesc multisamplingDesc;
 		ColourBlendDesc colourBlendDesc;
 
@@ -206,7 +278,7 @@ namespace NK
 		IPipeline(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const PipelineDesc& _desc)
 		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
 		  m_type(_desc.type),
-		  m_vertexInputDesc(_desc.vertexInputDesc), m_inputAssemblyDesc(_desc.inputAssemblyDesc), m_multisamplingDesc(_desc.multisamplingDesc), m_colourBlendDesc(_desc.colourBlendDesc),
+		  m_vertexInputDesc(_desc.vertexInputDesc), m_inputAssemblyDesc(_desc.inputAssemblyDesc), m_rasteriserDesc(_desc.rasteriserDesc), m_depthStencilDesc(_desc.depthStencilDesc), m_multisamplingDesc(_desc.multisamplingDesc), m_colourBlendDesc(_desc.colourBlendDesc),
 		  m_colourAttachmentFormats(_desc.colourAttachmentFormats), m_depthAttachmentFormat(_desc.depthAttachmentFormat), m_stencilAttachmentFormat(_desc.stencilAttachmentFormat) {}
 
 		
@@ -219,6 +291,8 @@ namespace NK
 		
 		VertexInputDesc m_vertexInputDesc;
 		InputAssemblyDesc m_inputAssemblyDesc;
+		RasteriserDesc m_rasteriserDesc;
+		DepthStencilDesc m_depthStencilDesc;
 		MultisamplingDesc m_multisamplingDesc;
 		ColourBlendDesc m_colourBlendDesc;
 		

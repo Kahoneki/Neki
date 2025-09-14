@@ -1,9 +1,9 @@
 #include "VulkanPipeline.h"
+#include <stdexcept>
 #include <Core/Utils/EnumUtils.h>
 #include "VulkanDevice.h"
 #include "VulkanShader.h"
 #include "VulkanTexture.h"
-#include <stdexcept>
 
 namespace NK
 {
@@ -225,10 +225,24 @@ namespace NK
 		rasteriserInfo.depthClampEnable = VK_FALSE;
 		rasteriserInfo.rasterizerDiscardEnable = VK_FALSE;
 		rasteriserInfo.polygonMode = VK_POLYGON_MODE_FILL;
+		rasteriserInfo.cullMode = GetVulkanCullMode(m_rasteriserDesc.cullMode);
+		rasteriserInfo.frontFace = GetVulkanWindingDirection(m_rasteriserDesc.frontFace);
+		rasteriserInfo.depthBiasEnable = m_rasteriserDesc.depthBiasEnable;
+		rasteriserInfo.depthBiasConstantFactor = m_rasteriserDesc.depthBiasConstantFactor;
+		rasteriserInfo.depthBiasClamp = m_rasteriserDesc.depthBiasClamp;
+		rasteriserInfo.depthBiasSlopeFactor = m_rasteriserDesc.depthBiasSlopeFactor;
+		rasteriserInfo.lineWidth = 1.0f; //For parity with dx12
 
 		//Depth-stencil
 		VkPipelineDepthStencilStateCreateInfo depthStencilInfo{};
 		depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depthStencilInfo.depthTestEnable = m_depthStencilDesc.depthTestEnable;
+		depthStencilInfo.depthWriteEnable = m_depthStencilDesc.depthWriteEnable;
+		depthStencilInfo.depthCompareOp = GetVulkanCompareOp(m_depthStencilDesc.depthCompareOp);
+		depthStencilInfo.depthBoundsTestEnable = VK_FALSE; //For parity with dx12
+		depthStencilInfo.stencilTestEnable = m_depthStencilDesc.stencilTestEnable;
+		depthStencilInfo.front = GetVulkanStencilOpState(m_depthStencilDesc.stencilFrontFace, m_depthStencilDesc.stencilReadMask, m_depthStencilDesc.stencilWriteMask);
+		depthStencilInfo.back = GetVulkanStencilOpState(m_depthStencilDesc.stencilBackFace, m_depthStencilDesc.stencilReadMask, m_depthStencilDesc.stencilWriteMask);
 
 		//Multisampling
 		VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -271,22 +285,8 @@ namespace NK
 		{
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR,
-			VK_DYNAMIC_STATE_LINE_WIDTH,
-			VK_DYNAMIC_STATE_DEPTH_BIAS,
 			VK_DYNAMIC_STATE_BLEND_CONSTANTS,
-			VK_DYNAMIC_STATE_DEPTH_BOUNDS,
-			VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
-			VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
 			VK_DYNAMIC_STATE_STENCIL_REFERENCE,
-			VK_DYNAMIC_STATE_CULL_MODE,
-			VK_DYNAMIC_STATE_FRONT_FACE,
-			VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,
-			VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
-			VK_DYNAMIC_STATE_DEPTH_COMPARE_OP,
-			VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE,
-			VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE,
-			VK_DYNAMIC_STATE_STENCIL_OP,
-			VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE,
 		};
 
 		VkPipelineDynamicStateCreateInfo dynamicState{};
@@ -325,7 +325,7 @@ namespace NK
 		pipelineInfo.pColorBlendState = &colourBlending;
 		pipelineInfo.pDynamicState = &dynamicState;
 		pipelineInfo.layout = dynamic_cast<VulkanDevice&>(m_device).GetPipelineLayout();
-		const VkResult result{ vkCreateGraphicsPipelines(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, static_cast<const VkAllocationCallbacks*>(m_allocator.GetVulkanCallbacks()), &m_pipeline) };
+		const VkResult result{ vkCreateGraphicsPipelines(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, m_allocator.GetVulkanCallbacks(), &m_pipeline) };
 		if (result == VK_SUCCESS)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::PIPELINE, "Successfully created pipeline\n");
@@ -382,6 +382,110 @@ namespace NK
 			throw std::runtime_error("Default case reached for VulkanPipeline::GetVulkanTopology() - topology = " + std::to_string(std::to_underlying(_topology)));
 		}
 		}
+	}
+
+
+
+	VkCullModeFlags VulkanPipeline::GetVulkanCullMode(CULL_MODE _mode)
+	{
+		switch (_mode)
+		{
+		case CULL_MODE::NONE:			return VK_CULL_MODE_NONE;
+		case CULL_MODE::FRONT:			return VK_CULL_MODE_FRONT_BIT;
+		case CULL_MODE::BACK:			return VK_CULL_MODE_BACK_BIT;
+		case CULL_MODE::FRONT_AND_BACK:	return VK_CULL_MODE_FRONT_AND_BACK;
+		default:
+		{
+			throw std::runtime_error("Default case reached for VulkanPipeline::GetVulkanCullMode() - cull mode = " + std::to_string(std::to_underlying(_mode)));
+		}
+		}
+	}
+
+
+
+	VkFrontFace VulkanPipeline::GetVulkanWindingDirection(WINDING_DIRECTION _direction)
+	{
+		switch (_direction)
+		{
+		case WINDING_DIRECTION::CLOCKWISE:			return VK_FRONT_FACE_CLOCKWISE;
+		case WINDING_DIRECTION::COUNTER_CLOCKWISE:	return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		default:
+		{
+			throw std::runtime_error("Default case reached for VulkanPipeline::GetVulkanWindingDirection() - winding direction = " + std::to_string(std::to_underlying(_direction)));
+		}
+		}
+	}
+
+
+
+	VkCompareOp VulkanPipeline::GetVulkanCompareOp(COMPARE_OP _op)
+	{
+		switch (_op)
+		{
+		case COMPARE_OP::NEVER:				return VK_COMPARE_OP_NEVER;
+		case COMPARE_OP::LESS:				return VK_COMPARE_OP_LESS;
+		case COMPARE_OP::EQUAL:				return VK_COMPARE_OP_EQUAL;
+		case COMPARE_OP::LESS_OR_EQUAL:		return VK_COMPARE_OP_LESS_OR_EQUAL;
+		case COMPARE_OP::GREATER:			return VK_COMPARE_OP_GREATER;
+		case COMPARE_OP::NOT_EQUAL:			return VK_COMPARE_OP_NOT_EQUAL;
+		case COMPARE_OP::GREATER_OR_EQUAL:	return VK_COMPARE_OP_GREATER_OR_EQUAL;
+		case COMPARE_OP::ALWAYS:			return VK_COMPARE_OP_ALWAYS;
+		default:
+		{
+			throw std::runtime_error("Default case reached for VulkanPipeline::GetVulkanCompareOp() - op = " + std::to_string(std::to_underlying(_op)));
+		}
+		}
+	}
+
+
+
+	VkStencilOp VulkanPipeline::GetVulkanStencilOp(STENCIL_OP _op)
+	{
+		switch (_op)
+		{
+		case STENCIL_OP::KEEP:					return VK_STENCIL_OP_KEEP;
+		case STENCIL_OP::ZERO:					return VK_STENCIL_OP_ZERO;
+		case STENCIL_OP::REPLACE:				return VK_STENCIL_OP_REPLACE;
+		case STENCIL_OP::INCREMENT_AND_CLAMP:	return VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+		case STENCIL_OP::DECREMENT_AND_CLAMP:	return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+		case STENCIL_OP::INVERT:				return VK_STENCIL_OP_INVERT;
+		case STENCIL_OP::INCREMENT_AND_WRAP:	return VK_STENCIL_OP_INCREMENT_AND_WRAP;
+		case STENCIL_OP::DECREMENT_AND_WRAP:	return VK_STENCIL_OP_DECREMENT_AND_WRAP;
+		default:
+		{
+			throw std::runtime_error("Default case reached for VulkanPipeline::GetVulkanStencilOp() - op = " + std::to_string(std::to_underlying(_op)));
+		}
+		}
+	}
+
+
+
+	std::uint32_t VulkanPipeline::Convert8BitMaskTo32BitMask(std::uint8_t _mask)
+	{
+		//For each set bit in the input mask, the corresponding 4 bits in the output mask will be set
+		std::uint32_t result{ 0 };
+		for (int i{ 0 }; i < 8; ++i)
+		{
+			if ((_mask >> i) & 1)
+			{
+				result |= (0b1111 << (i * 4));
+			}
+		}
+		return result;
+	}
+
+
+
+	VkStencilOpState VulkanPipeline::GetVulkanStencilOpState(StencilOpState _state, std::uint8_t _readMask, std::uint8_t _writeMask)
+	{
+		VkStencilOpState vkState{};
+		vkState.failOp = GetVulkanStencilOp(_state.failOp);
+		vkState.passOp = GetVulkanStencilOp(_state.passOp);
+		vkState.depthFailOp = GetVulkanStencilOp(_state.depthFailOp);
+		vkState.compareOp = GetVulkanCompareOp(_state.compareOp);
+		vkState.compareMask = Convert8BitMaskTo32BitMask(_readMask);
+		vkState.writeMask = Convert8BitMaskTo32BitMask(_writeMask);
+		return vkState;
 	}
 
 
