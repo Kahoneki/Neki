@@ -2,7 +2,7 @@
 #if NEKI_VULKAN_SUPPORTED
 	#include <vulkan/vulkan.h>
 #endif
-#include <cstdint>
+#include <cstddef>
 
 namespace NK
 {

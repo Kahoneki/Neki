@@ -3,6 +3,7 @@
 #include "VulkanDevice.h"
 #include "VulkanShader.h"
 #include "VulkanTexture.h"
+#include <stdexcept>
 
 namespace NK
 {

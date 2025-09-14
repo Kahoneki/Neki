@@ -71,7 +71,7 @@ else()
 endif ()
 FetchContent_MakeAvailable(dxc_artifacts)
 if(WIN32)
-    set(DXC_EXECUTABLE "${dxc_artifacts_SOURCE_DIR}/bin/dxc.exe")
+    set(DXC_EXECUTABLE "${dxc_artifacts_SOURCE_DIR}/bin/x64/dxc.exe")
 else()
     set(DXC_EXECUTABLE "${dxc_artifacts_SOURCE_DIR}/bin/dxc")
 endif()
@@ -157,21 +157,30 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
     if(NEKI_BUILD_VULKAN)
         add_custom_command(
             OUTPUT ${SPV_OUTPUT}
-            COMMAND "${DXC_EXECUTABLE}" "-I" ${SHADER_INCLUDE_PATH} "${SHADER_SOURCE}" -T ${SHADER_TYPE} -E ${ENTRY_POINT} -spirv -Fo "${SPV_OUTPUT}"
+            COMMAND ${DXC_EXECUTABLE}
+                    -I ${SHADER_INCLUDE_PATH}
+                    ${SHADER_SOURCE}
+                    -T ${SHADER_TYPE}
+                    -E ${ENTRY_POINT}
+                    -spirv
+                    -Fo ${SPV_OUTPUT}
             DEPENDS ${SHADER_SOURCE}
             COMMENT "Compiling ${SHADER_SOURCE} to SPIR-V"
-            VERBATIM
         )
         list(APPEND LOCAL_SHADER_OUTPUTS ${SPV_OUTPUT})
     endif()
 
-     if(NEKI_BUILD_D3D12)
+    if(NEKI_BUILD_D3D12)
         add_custom_command(
             OUTPUT ${DXIL_OUTPUT}
-            COMMAND "${DXC_EXECUTABLE}" "-I" ${SHADER_INCLUDE_PATH} -T ${SHADER_TYPE} -E ${ENTRY_POINT} -Fo "${DXIL_OUTPUT}" "${SHADER_SOURCE}"
+            COMMAND ${DXC_EXECUTABLE}
+                    -I ${SHADER_INCLUDE_PATH}
+                    ${SHADER_SOURCE}
+                    -T ${SHADER_TYPE}
+                    -E ${ENTRY_POINT}
+                    -Fo ${DXIL_OUTPUT}
             DEPENDS ${SHADER_SOURCE}
             COMMENT "Compiling ${SHADER_SOURCE} to DXIL"
-            VERBATIM
         )
         list(APPEND LOCAL_SHADER_OUTPUTS ${DXIL_OUTPUT})
      endif()

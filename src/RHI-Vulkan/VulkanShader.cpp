@@ -1,5 +1,6 @@
 #include "VulkanShader.h"
 #include <fstream>
+#include <stdexcept>
 
 namespace NK
 {

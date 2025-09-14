@@ -86,19 +86,19 @@ int main()
 
 	NK::ShaderDesc vertShaderDesc{};
 	vertShaderDesc.type = NK::SHADER_TYPE::VERTEX;
-	vertShaderDesc.filepath = "Samples/Vulkan/Library/Shaders/Library_vs";
+	vertShaderDesc.filepath = "Samples/Shaders/Library_vs";
 	const NK::UniquePtr<NK::IShader> vertShader{ device->CreateShader(vertShaderDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::ShaderDesc fragShaderDesc{};
 	fragShaderDesc.type = NK::SHADER_TYPE::FRAGMENT;
-	fragShaderDesc.filepath = "Samples/Vulkan/Library/Shaders/Library_fs";
+	fragShaderDesc.filepath = "Samples/Shaders/Library_fs";
 	const NK::UniquePtr<NK::IShader> fragShader{ device->CreateShader(fragShaderDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::ShaderDesc compShaderDesc{};
 	compShaderDesc.type = NK::SHADER_TYPE::COMPUTE;
-	compShaderDesc.filepath = "Samples/Vulkan/Library/Shaders/Library_cs";
+	compShaderDesc.filepath = "Samples/Shaders/Library_cs";
 	const NK::UniquePtr<NK::IShader> compShader{ device->CreateShader(compShaderDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
