@@ -69,7 +69,6 @@ namespace NK
 		NONE,
 		FRONT,
 		BACK,
-		FRONT_AND_BACK,
 	};
 
 	enum class WINDING_DIRECTION
@@ -142,19 +141,15 @@ namespace NK
 		BIT_8	= 1 << 3,
 		BIT_16	= 1 << 4,
 		BIT_32	= 1 << 5,
-		BIT_64	= 1 << 6,
 	};
 
-	typedef std::uint64_t SampleMask;
+	typedef std::uint32_t SampleMask;
 	
 	struct MultisamplingDesc
 	{
 		SAMPLE_COUNT sampleCount;
-		bool supersamplingEnable;
-		float supersamplingMinSampleShading;
 		SampleMask sampleMask;
 		bool alphaToCoverageEnable;
-		bool alphaToOneEnable;
 	};
 
 
@@ -263,8 +258,7 @@ namespace NK
 		ColourBlendDesc colourBlendDesc;
 
 		std::vector<DATA_FORMAT> colourAttachmentFormats;
-		DATA_FORMAT depthAttachmentFormat;
-		DATA_FORMAT stencilAttachmentFormat;
+		DATA_FORMAT depthStencilAttachmentFormat;
 	};
 
 
@@ -279,7 +273,7 @@ namespace NK
 		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
 		  m_type(_desc.type),
 		  m_vertexInputDesc(_desc.vertexInputDesc), m_inputAssemblyDesc(_desc.inputAssemblyDesc), m_rasteriserDesc(_desc.rasteriserDesc), m_depthStencilDesc(_desc.depthStencilDesc), m_multisamplingDesc(_desc.multisamplingDesc), m_colourBlendDesc(_desc.colourBlendDesc),
-		  m_colourAttachmentFormats(_desc.colourAttachmentFormats), m_depthAttachmentFormat(_desc.depthAttachmentFormat), m_stencilAttachmentFormat(_desc.stencilAttachmentFormat) {}
+		  m_colourAttachmentFormats(_desc.colourAttachmentFormats), m_depthStencilAttachmentFormat(_desc.depthStencilAttachmentFormat) {}
 
 		
 		//Dependency injections
@@ -297,7 +291,6 @@ namespace NK
 		ColourBlendDesc m_colourBlendDesc;
 		
 		std::vector<DATA_FORMAT> m_colourAttachmentFormats;
-		DATA_FORMAT m_depthAttachmentFormat;
-		DATA_FORMAT m_stencilAttachmentFormat;
+		DATA_FORMAT m_depthStencilAttachmentFormat;
 	};
 }

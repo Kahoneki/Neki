@@ -17,10 +17,8 @@ namespace NK
 		CreateShaderModules(_desc.computeShader, _desc.vertexShader, _desc.fragmentShader);
 		switch (m_type)
 		{
-		case PIPELINE_TYPE::COMPUTE: CreateComputePipeline();
-			break;
-		case PIPELINE_TYPE::GRAPHICS: CreateGraphicsPipeline();
-			break;
+		case PIPELINE_TYPE::COMPUTE: CreateComputePipeline(); break;
+		case PIPELINE_TYPE::GRAPHICS: CreateGraphicsPipeline(); break;
 		}
 
 
@@ -119,6 +117,7 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::PIPELINE, "Creating compute pipeline\n");
 		
+
 		//Create shader stage
 		VkPipelineShaderStageCreateInfo compShaderStageInfo{};
 		compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -181,10 +180,8 @@ namespace NK
 			bindingDescs[i].stride = m_vertexInputDesc.bufferBindingDescriptions[i].stride;
 			switch (m_vertexInputDesc.bufferBindingDescriptions[i].inputRate)
 			{
-			case VERTEX_INPUT_RATE::VERTEX: bindingDescs[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-				break;
-			case VERTEX_INPUT_RATE::INSTANCE: bindingDescs[i].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-				break;
+			case VERTEX_INPUT_RATE::VERTEX: bindingDescs[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX; break;
+			case VERTEX_INPUT_RATE::INSTANCE: bindingDescs[i].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; break;
 			}
 		}
 
@@ -247,17 +244,12 @@ namespace NK
 		//Multisampling
 		VkPipelineMultisampleStateCreateInfo multisampling{};
 		multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-		multisampling.sampleShadingEnable = m_multisamplingDesc.supersamplingEnable;
+		multisampling.sampleShadingEnable = false; //For parity with dx12
 		multisampling.rasterizationSamples = GetVulkanSampleCount(m_multisamplingDesc.sampleCount);
-		multisampling.minSampleShading = m_multisamplingDesc.supersamplingMinSampleShading;
-		const VkSampleMask vulkanSampleMask[]
-		{
-			static_cast<VkSampleMask>(m_multisamplingDesc.sampleMask & 0xFFFFFFFF),
-			static_cast<VkSampleMask>(m_multisamplingDesc.sampleMask >> 32),
-		};
-		multisampling.pSampleMask = vulkanSampleMask;
+		multisampling.minSampleShading = false; //For parity with dx12
+		multisampling.pSampleMask = &m_multisamplingDesc.sampleMask;
 		multisampling.alphaToCoverageEnable = m_multisamplingDesc.alphaToCoverageEnable;
-		multisampling.alphaToOneEnable = m_multisamplingDesc.alphaToOneEnable;
+		multisampling.alphaToOneEnable = false; //For parity with dx12
 		
 		//Blending
 		std::vector<VkPipelineColorBlendAttachmentState> vulkanColourBlendAttachments(m_colourBlendDesc.attachments.size());
@@ -305,8 +297,9 @@ namespace NK
 			vulkanColourAttachmentFormats.push_back(VulkanTexture::GetVulkanFormat(f));
 		}
 		renderingInfo.pColorAttachmentFormats = vulkanColourAttachmentFormats.data();
-		renderingInfo.depthAttachmentFormat = VulkanTexture::GetVulkanFormat(m_depthAttachmentFormat);
-		renderingInfo.stencilAttachmentFormat = VulkanTexture::GetVulkanFormat(m_stencilAttachmentFormat);
+		//Use same format for depth and stencil for parity with dx12
+		renderingInfo.depthAttachmentFormat = VulkanTexture::GetVulkanFormat(m_depthStencilAttachmentFormat);
+		renderingInfo.stencilAttachmentFormat = VulkanTexture::GetVulkanFormat(m_depthStencilAttachmentFormat);
 
 
 		//Create pipeline (todo: add tessellation support)
@@ -393,7 +386,6 @@ namespace NK
 		case CULL_MODE::NONE:			return VK_CULL_MODE_NONE;
 		case CULL_MODE::FRONT:			return VK_CULL_MODE_FRONT_BIT;
 		case CULL_MODE::BACK:			return VK_CULL_MODE_BACK_BIT;
-		case CULL_MODE::FRONT_AND_BACK:	return VK_CULL_MODE_FRONT_AND_BACK;
 		default:
 		{
 			throw std::runtime_error("Default case reached for VulkanPipeline::GetVulkanCullMode() - cull mode = " + std::to_string(std::to_underlying(_mode)));
@@ -500,7 +492,7 @@ namespace NK
 		case SAMPLE_COUNT::BIT_8:	return VK_SAMPLE_COUNT_8_BIT;
 		case SAMPLE_COUNT::BIT_16:	return VK_SAMPLE_COUNT_16_BIT;
 		case SAMPLE_COUNT::BIT_32:	return VK_SAMPLE_COUNT_32_BIT;
-		case SAMPLE_COUNT::BIT_64:	return VK_SAMPLE_COUNT_64_BIT;
+		//64 samples not supported for parity with dx12
 		default:
 		{
 			throw std::runtime_error("Default case reached for VulkanPipeline::GetVulkanSampleCount() - sample count = " + std::to_string(std::to_underlying(_count)));

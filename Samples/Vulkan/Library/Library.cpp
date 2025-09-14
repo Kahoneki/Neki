@@ -134,11 +134,8 @@ int main()
 
 	NK::MultisamplingDesc multisamplingDesc{};
 	multisamplingDesc.sampleCount = NK::SAMPLE_COUNT::BIT_1;
-	multisamplingDesc.supersamplingEnable = false;
-	multisamplingDesc.supersamplingMinSampleShading = 0.0f;
 	multisamplingDesc.sampleMask = UINT64_MAX;
 	multisamplingDesc.alphaToCoverageEnable = false;
-	multisamplingDesc.alphaToOneEnable = false;
 
 	std::vector<NK::ColourBlendAttachmentDesc> colourBlendAttachments(1);
 	colourBlendAttachments[0].colourWriteMask = NK::COLOUR_ASPECT_FLAGS::R_BIT | NK::COLOUR_ASPECT_FLAGS::G_BIT | NK::COLOUR_ASPECT_FLAGS::B_BIT | NK::COLOUR_ASPECT_FLAGS::A_BIT;
@@ -158,8 +155,7 @@ int main()
 	graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
 	graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
 	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };
-	graphicsPipelineDesc.depthAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
-	graphicsPipelineDesc.stencilAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
+	graphicsPipelineDesc.depthStencilAttachmentFormat = NK::DATA_FORMAT::D24_UNORM_S8_UINT;
 
 	const NK::UniquePtr<NK::IPipeline> graphicsPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");

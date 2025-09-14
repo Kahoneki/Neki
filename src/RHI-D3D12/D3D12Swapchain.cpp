@@ -89,7 +89,7 @@ namespace NK
 			m_swapchain->GetBuffer(i, IID_PPV_ARGS(&backBuffer));
 
 			TextureDesc desc{};
-			desc.format = TEXTURE_FORMAT::R8G8B8A8_UNORM;
+			desc.format = DATA_FORMAT::R8G8B8A8_UNORM;
 			desc.arrayTexture = false;
 			desc.dimension = TEXTURE_DIMENSION::DIM_2;
 			desc.size = glm::ivec3(m_surface->GetSize().x, m_surface->GetSize().y, 1);
@@ -128,7 +128,7 @@ namespace NK
 		{
 			TextureViewDesc desc{};
 			desc.dimension = TEXTURE_DIMENSION::DIM_2;
-			desc.format = TEXTURE_FORMAT::R8G8B8A8_UNORM;
+			desc.format = DATA_FORMAT::R8G8B8A8_UNORM;
 			desc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
 
 			m_backBufferViews[i] = UniquePtr<ITextureView>(NK_NEW(D3D12TextureView, m_logger, m_allocator, m_device, m_backBuffers[i].get(), desc, m_rtvDescriptorHeap.Get(), m_rtvDescriptorSize, i));
