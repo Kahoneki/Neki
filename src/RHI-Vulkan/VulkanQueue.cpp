@@ -1,7 +1,11 @@
 #include "VulkanQueue.h"
 #include <stdexcept>
 #include <Core/Utils/FormatUtils.h>
+
+#include "VulkanCommandBuffer.h"
 #include "VulkanDevice.h"
+#include "VulkanFence.h"
+#include "VulkanSemaphore.h"
 
 namespace NK
 {
@@ -69,7 +73,28 @@ namespace NK
 
 	void VulkanQueue::Submit(ICommandBuffer* _cmdBuffer, ISemaphore* _waitSemaphore, ISemaphore* _signalSemaphore, IFence* _signalFence)
 	{
-		//todo: implement
+		VkSemaphore vkWaitSemaphore{ _waitSemaphore ? dynamic_cast<VulkanSemaphore*>(_waitSemaphore)->GetSemaphore() : nullptr };
+		VkPipelineStageFlags vkStageMask{ VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
+		VkSemaphore vkSignalSemaphore{ _signalSemaphore ? dynamic_cast<VulkanSemaphore*>(_signalSemaphore)->GetSemaphore() : nullptr };
+		VkFence vkSignalFence{ _signalFence ? dynamic_cast<VulkanFence*>(_signalFence)->GetFence() : VK_NULL_HANDLE };
+		VkCommandBuffer vkCommandBuffer{ dynamic_cast<VulkanCommandBuffer*>(_cmdBuffer)->GetBuffer() };
+		
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.waitSemaphoreCount = _waitSemaphore ? 1 : 0;
+		submitInfo.pWaitSemaphores = &vkWaitSemaphore;
+		submitInfo.pWaitDstStageMask = &vkStageMask;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &vkCommandBuffer;
+		submitInfo.signalSemaphoreCount = _signalSemaphore ? 1 : 0;
+		submitInfo.pSignalSemaphores = &vkSignalSemaphore;
+
+		const VkResult result{ vkQueueSubmit(m_queue, 1, &submitInfo, vkSignalFence) };
+		if (result != VK_SUCCESS)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::QUEUE, "Failed to submit queue. result = " + std::to_string(result) + '\n');
+			throw std::runtime_error("");
+		}
 	}
 
 }

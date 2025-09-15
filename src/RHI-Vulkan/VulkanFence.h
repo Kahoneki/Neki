@@ -12,6 +12,9 @@ namespace NK
 		virtual void Wait() override;
 		virtual void Reset() override;
 
+		//Vulkan internal API (for use by other RHI-Vulkan classes)
+		[[nodiscard]] inline VkFence GetFence() const { return m_fence; }
+
 
 	private:
 		VkFence m_fence{ VK_NULL_HANDLE };
