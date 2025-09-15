@@ -2,7 +2,7 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "vulkan-debug",
+      "name": "Vulkan (Debug)",
       "displayName": "Vulkan (Debug)",
       "description": "Builds with Vulkan backend for debugging",
       "generator": "Ninja",
@@ -15,39 +15,13 @@
     },
 
     {
-      "name": "d3d12-debug",
+      "name": "D3D12 (Debug)",
       "displayName": "D3D12 (Debug)",
       "description": "Builds with D3D12 backend for debugging",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/d3d12-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "NEKI_BUILD_VULKAN": "OFF",
-        "NEKI_BUILD_D3D12": "ON"
-      }
-    },
-
-    {
-      "name": "vulkan-release",
-      "displayName": "Vulkan (Release)",
-      "description": "Builds with Vulkan backend for release",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/vulkan-release",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "NEKI_BUILD_VULKAN": "ON",
-        "NEKI_BUILD_D3D12": "OFF"
-      }
-    },
-
-    {
-      "name": "d3d12-release",
-      "displayName": "D3D12 (Release)",
-      "description": "Builds with D3D12 backend for release",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/d3d12-release",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
         "NEKI_BUILD_VULKAN": "OFF",
         "NEKI_BUILD_D3D12": "ON"
       }
