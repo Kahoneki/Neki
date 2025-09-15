@@ -13,6 +13,7 @@
 #include "VulkanBuffer.h"
 #include "VulkanBufferView.h"
 #include "VulkanCommandPool.h"
+#include "VulkanFence.h"
 #include "VulkanPipeline.h"
 #include "VulkanQueue.h"
 #include "VulkanShader.h"
@@ -173,6 +174,13 @@ namespace NK
 	UniquePtr<IQueue> VulkanDevice::CreateQueue(const QueueDesc& _desc)
 	{
 		return UniquePtr<IQueue>(NK_NEW(VulkanQueue, m_logger, *this, _desc, *m_queueIndexAllocatorLookup[_desc.type]->get()));
+	}
+
+
+
+	UniquePtr<IFence> VulkanDevice::CreateFence(const FenceDesc& _desc)
+	{
+		return UniquePtr<IFence>(NK_NEW(VulkanFence, m_logger, m_allocator, *this, _desc));
 	}
 
 

@@ -4,6 +4,12 @@
 namespace NK
 {
 
+	struct FenceDesc
+	{
+		bool initiallySignaled;
+	};
+	
+	
 	class IFence
 	{
 	public:
@@ -14,11 +20,14 @@ namespace NK
 
 
 	protected:
-		explicit IFence(ILogger& _logger) : m_logger(_logger) {}
+		explicit IFence(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const FenceDesc& _desc)
+		: m_logger(_logger), m_allocator(_allocator), m_device(_device) {}
 
 
 		//Dependency injections
 		ILogger& m_logger;
+		IAllocator& m_allocator;
+		IDevice& m_device;
 	};
 
 }

@@ -48,6 +48,8 @@ namespace NK
 		SHADER,
 		PIPELINE,
 		QUEUE,
+		FENCE,
+		SEMAPHORE,
 		
 		APPLICATION,
 	};
