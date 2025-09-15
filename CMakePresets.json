@@ -25,6 +25,19 @@
         "NEKI_BUILD_VULKAN": "OFF",
         "NEKI_BUILD_D3D12": "ON"
       }
+    },
+
+    {
+      "name": "Vulkan/D3D12 (Debug)",
+      "displayName": "Vulkan/D3D12 (Debug)",
+      "description": "Builds with both Vulkan and D3D12 backends for cross-api debugging",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/cross-api-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NEKI_BUILD_VULKAN": "ON",
+        "NEKI_BUILD_D3D12": "ON"
+      }
     }
   ]
 }
