@@ -12,9 +12,10 @@ namespace NK
 			return index;
 		}
 
-		if (m_nextFreeIndex == m_maxActiveAllocations + 1)
+		if (m_nextFreeIndex == m_maxActiveAllocations)
 		{
-			//Max active allocations reached since next free index would be max active allocations + 1
+			//Max active allocations has been reached since the next free index would be max active allocations
+			//^(index is 0-indexed so the range it can be is [0, max active allocations - 1])
 			//Return invalid index
 			return INVALID_INDEX;
 		}

@@ -33,6 +33,9 @@ namespace NK
 	class IPipeline;
 	struct PipelineDesc;
 
+	class IQueue;
+	struct QueueDesc;
+
 	
 	typedef std::uint32_t ResourceIndex;
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
@@ -57,6 +60,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) = 0;
 
 
 	protected:

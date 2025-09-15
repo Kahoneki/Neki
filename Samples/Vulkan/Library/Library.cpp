@@ -9,6 +9,7 @@
 #include <RHI/ICommandBuffer.h>
 #include <RHI/ICommandPool.h>
 #include <RHI/IPipeline.h>
+#include <RHI/IQueue.h>
 #include <RHI/IShader.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
@@ -166,6 +167,24 @@ int main()
 	computePipelineDesc.type = NK::PIPELINE_TYPE::COMPUTE;
 	computePipelineDesc.computeShader = compShader.get();
 	const NK::UniquePtr<NK::IPipeline> computePipeline{ device->CreatePipeline(computePipelineDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Graphics queue
+	NK::QueueDesc graphicsQueueDesc{};
+	graphicsQueueDesc.type = NK::QUEUE_TYPE::GRAPHICS;
+	const NK::UniquePtr<NK::IQueue> graphicsQueue1{ device->CreateQueue(graphicsQueueDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Compute queue
+	NK::QueueDesc computeQueueDesc{};
+	computeQueueDesc.type = NK::QUEUE_TYPE::COMPUTE;
+	const NK::UniquePtr<NK::IQueue> computeQueue{ device->CreateQueue(computeQueueDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Transfer queue
+	NK::QueueDesc transferQueueDesc{};
+	transferQueueDesc.type = NK::QUEUE_TYPE::TRANSFER;
+	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	

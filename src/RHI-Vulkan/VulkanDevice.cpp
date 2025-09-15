@@ -4,22 +4,23 @@
 #include <cstring>
 #include <set>
 #include <stdexcept>
+#include <GLFW/glfw3.h>
 
 #include <Core/Debug/ILogger.h>
-#include <Core/Utils/EnumUtils.h>
 #include <Core/Memory/Allocation.h>
+#include <Core/Utils/EnumUtils.h>
 
 #include "VulkanBuffer.h"
 #include "VulkanBufferView.h"
 #include "VulkanCommandPool.h"
+#include "VulkanPipeline.h"
+#include "VulkanQueue.h"
+#include "VulkanShader.h"
 #include "VulkanSurface.h"
 #include "VulkanSwapchain.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
-#include <GLFW/glfw3.h>
 
-#include "VulkanPipeline.h"
-#include "VulkanShader.h"
 
 namespace NK
 {
@@ -165,6 +166,13 @@ namespace NK
 	UniquePtr<IPipeline> VulkanDevice::CreatePipeline(const PipelineDesc& _desc)
 	{
 		return UniquePtr<IPipeline>(NK_NEW(VulkanPipeline, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<IQueue> VulkanDevice::CreateQueue(const QueueDesc& _desc)
+	{
+		return UniquePtr<IQueue>(NK_NEW(VulkanQueue, m_logger, *this, _desc, *m_queueIndexAllocatorLookup[_desc.type]->get()));
 	}
 
 
@@ -325,16 +333,21 @@ namespace NK
 
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Physical device of type " + physicalDeviceTypeString + " selected\n");
 
-		//Get graphics queue family index
+		//Get queue family indexes
 		std::uint32_t queueFamilyCount;
 		vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, nullptr);
 		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 		vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, queueFamilies.data());
+		//Also store the queue counts of each respective family to initialise the free list allocators
+		std::uint32_t numGraphicsQueues;
+		std::uint32_t numComputeQueues;
+		std::uint32_t numTransferQueues;
 		for (std::size_t i{ 0 }; i < queueFamilies.size(); ++i)
 		{
 			if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 			{
 				m_graphicsQueueFamilyIndex = i;
+				numGraphicsQueues = queueFamilies[i].queueCount;
 			}
 
 			//todo: maybe look into changing these `else if` checks to `if` checks - this would allow a single queue family to be used for multiple purposes
@@ -343,14 +356,22 @@ namespace NK
 			else if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)
 			{
 				m_computeQueueFamilyIndex = i;
+				numComputeQueues = queueFamilies[i].queueCount;
 			}
 
 			else if (queueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT)
 			{
 				m_transferQueueFamilyIndex = i;
+				numTransferQueues = queueFamilies[i].queueCount;
 			}
 		}
-
+		
+		//Initialise the free list allocators
+		m_graphicsQueueIndexAllocator = UniquePtr<FreeListAllocator>(NK_NEW(FreeListAllocator, numGraphicsQueues));
+		m_computeQueueIndexAllocator = UniquePtr<FreeListAllocator>(NK_NEW(FreeListAllocator, numComputeQueues));
+		m_transferQueueIndexAllocator = UniquePtr<FreeListAllocator>(NK_NEW(FreeListAllocator, numTransferQueues));
+		
+		
 		m_logger.Unindent();
 	}
 
@@ -362,17 +383,26 @@ namespace NK
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating logical device\n");
 
 
-		//Set up queue create infos (just a graphics queue for now)
+		//Set up queue create infos
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		const std::set<std::uint32_t> uniqueQueueFamilies{ m_graphicsQueueFamilyIndex, m_computeQueueFamilyIndex, m_transferQueueFamilyIndex }; //Use a set to handle cases where graphics/compute/transfer/etc. are the same family
-		constexpr float queuePriority{ 1.0f };
+
+		std::uint32_t queueFamilyCount;
+		vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, nullptr);
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &queueFamilyCount, queueFamilies.data());
+
+		//Get max number of queues across all families for size of queuePriorities vector
+		const std::size_t maxQueues{ std::max(std::max(queueFamilies[m_graphicsQueueFamilyIndex].queueCount, queueFamilies[m_computeQueueFamilyIndex].queueCount), queueFamilies[m_transferQueueFamilyIndex].queueCount) };
+		const std::vector<float> queuePriorities(maxQueues, 1.0f);
+
 		for (std::uint32_t queueFamilyIndex : uniqueQueueFamilies)
 		{
 			VkDeviceQueueCreateInfo queueCreateInfo{};
 			queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 			queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
-			queueCreateInfo.queueCount = 1;
-			queueCreateInfo.pQueuePriorities = &queuePriority;
+			queueCreateInfo.queueCount = queueFamilies[queueFamilyIndex].queueCount;
+			queueCreateInfo.pQueuePriorities = queuePriorities.data();
 			queueCreateInfos.push_back(queueCreateInfo);
 		}
 
@@ -418,12 +448,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created logical device\n");
-
-
-		//Get the queue handles
-		vkGetDeviceQueue(m_device, m_graphicsQueueFamilyIndex, 0, &m_graphicsQueue);
-		vkGetDeviceQueue(m_device, m_computeQueueFamilyIndex, 0, &m_computeQueue);
-		vkGetDeviceQueue(m_device, m_transferQueueFamilyIndex, 0, &m_transferQueue);
+		
 
 		m_logger.Unindent();
 	}

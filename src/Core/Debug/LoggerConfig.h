@@ -47,6 +47,7 @@ namespace NK
 		SWAPCHAIN,
 		SHADER,
 		PIPELINE,
+		QUEUE,
 		
 		APPLICATION,
 	};

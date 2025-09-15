@@ -61,6 +61,7 @@ namespace NK
 		case LOGGER_LAYER::SWAPCHAIN:			return "[SWAPCHAIN]";
 		case LOGGER_LAYER::SHADER:				return "[SHADER]";
 		case LOGGER_LAYER::PIPELINE:			return "[PIPELINE]";
+		case LOGGER_LAYER::QUEUE:				return "[QUEUE]";
 
 		case LOGGER_LAYER::APPLICATION:			return "[APPLICATION]";
 

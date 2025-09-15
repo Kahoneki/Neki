@@ -5,6 +5,15 @@
 #include <RHI/IDevice.h>
 #include <vulkan/vulkan.h>
 
+#include "RHI/IQueue.h"
+
+
+namespace NK
+{
+	//Forward declarations
+	enum class QUEUE_TYPE;
+}
+
 
 namespace NK
 {
@@ -24,6 +33,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] inline VkInstance GetInstance() const { return m_instance; }
@@ -61,14 +71,21 @@ namespace NK
 		VkPhysicalDevice m_physicalDevice{ VK_NULL_HANDLE };
 		VkDevice m_device{ VK_NULL_HANDLE };
 
-		VkQueue m_graphicsQueue{ VK_NULL_HANDLE };
 		std::uint32_t m_graphicsQueueFamilyIndex{ UINT32_MAX };
+		UniquePtr<FreeListAllocator> m_graphicsQueueIndexAllocator;
 
-		VkQueue m_computeQueue{ VK_NULL_HANDLE };
 		std::uint32_t m_computeQueueFamilyIndex{ UINT32_MAX };
+		UniquePtr<FreeListAllocator> m_computeQueueIndexAllocator;
 
-		VkQueue m_transferQueue{ VK_NULL_HANDLE };
 		std::uint32_t m_transferQueueFamilyIndex{ UINT32_MAX };
+		UniquePtr<FreeListAllocator> m_transferQueueIndexAllocator;
+
+		std::unordered_map<QUEUE_TYPE, UniquePtr<FreeListAllocator>*> m_queueIndexAllocatorLookup
+		{
+			{ QUEUE_TYPE::GRAPHICS, &m_graphicsQueueIndexAllocator },
+			{ QUEUE_TYPE::COMPUTE, &m_computeQueueIndexAllocator },
+			{ QUEUE_TYPE::TRANSFER, &m_transferQueueIndexAllocator },
+		};
 
 		inline static constexpr std::array<VkDescriptorType, 4> m_resourceTypes
 		{
