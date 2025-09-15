@@ -134,7 +134,7 @@ int main()
 
 	NK::MultisamplingDesc multisamplingDesc{};
 	multisamplingDesc.sampleCount = NK::SAMPLE_COUNT::BIT_1;
-	multisamplingDesc.sampleMask = UINT64_MAX;
+	multisamplingDesc.sampleMask = UINT32_MAX;
 	multisamplingDesc.alphaToCoverageEnable = false;
 
 	std::vector<NK::ColourBlendAttachmentDesc> colourBlendAttachments(1);

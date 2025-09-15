@@ -506,9 +506,9 @@ namespace NK
 	{
 		VkColorComponentFlags result = 0;
 		if (EnumUtils::Contains(_mask, COLOUR_ASPECT_FLAGS::R_BIT)) { result |= VK_COLOR_COMPONENT_R_BIT; }
-		if (EnumUtils::Contains(_mask, COLOUR_ASPECT_FLAGS::R_BIT)) { result |= VK_COLOR_COMPONENT_G_BIT; }
-		if (EnumUtils::Contains(_mask, COLOUR_ASPECT_FLAGS::R_BIT)) { result |= VK_COLOR_COMPONENT_B_BIT; }
-		if (EnumUtils::Contains(_mask, COLOUR_ASPECT_FLAGS::R_BIT)) { result |= VK_COLOR_COMPONENT_A_BIT; }
+		if (EnumUtils::Contains(_mask, COLOUR_ASPECT_FLAGS::G_BIT)) { result |= VK_COLOR_COMPONENT_G_BIT; }
+		if (EnumUtils::Contains(_mask, COLOUR_ASPECT_FLAGS::B_BIT)) { result |= VK_COLOR_COMPONENT_B_BIT; }
+		if (EnumUtils::Contains(_mask, COLOUR_ASPECT_FLAGS::A_BIT)) { result |= VK_COLOR_COMPONENT_A_BIT; }
 		return result;
 	}
 
