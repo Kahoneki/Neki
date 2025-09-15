@@ -7,7 +7,7 @@ namespace NK
 	{
 	public:
 		explicit VulkanFence(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const FenceDesc& _desc);
-		virtual ~VulkanFence();
+		virtual ~VulkanFence() override;
 
 		virtual void Wait() override;
 		virtual void Reset() override;

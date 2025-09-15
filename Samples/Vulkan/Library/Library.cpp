@@ -187,10 +187,14 @@ int main()
 	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
-	//Transfer queue
+	//Fence
 	NK::FenceDesc fenceDesc{};
 	fenceDesc.initiallySignaled = true;
 	const NK::UniquePtr<NK::IFence> fence{ device->CreateFence(fenceDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Semaphore
+	const NK::UniquePtr<NK::ISemaphore> semaphore{ device->CreateSemaphore() };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
 	

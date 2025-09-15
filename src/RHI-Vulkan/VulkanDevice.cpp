@@ -16,6 +16,7 @@
 #include "VulkanFence.h"
 #include "VulkanPipeline.h"
 #include "VulkanQueue.h"
+#include "VulkanSemaphore.h"
 #include "VulkanShader.h"
 #include "VulkanSurface.h"
 #include "VulkanSwapchain.h"
@@ -181,6 +182,13 @@ namespace NK
 	UniquePtr<IFence> VulkanDevice::CreateFence(const FenceDesc& _desc)
 	{
 		return UniquePtr<IFence>(NK_NEW(VulkanFence, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<ISemaphore> VulkanDevice::CreateSemaphore()
+	{
+		return UniquePtr<ISemaphore>(NK_NEW(VulkanSemaphore, m_logger, m_allocator, *this));
 	}
 
 

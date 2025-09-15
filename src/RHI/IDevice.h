@@ -39,6 +39,8 @@ namespace NK
 	class IFence;
 	struct FenceDesc;
 
+	class ISemaphore;
+
 	
 	typedef std::uint32_t ResourceIndex;
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
@@ -65,6 +67,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() = 0;
 
 
 	protected:
