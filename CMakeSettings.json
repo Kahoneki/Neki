@@ -1,7 +1,7 @@
 ﻿{
   "configurations": [
     {
-      "name": "x64-Debug",
+      "name": "x64-Debug-Vulkan",
       "generator": "Ninja",
       "configurationType": "Debug",
       "inheritEnvironments": [ "msvc_x64_x64" ],
@@ -19,6 +19,30 @@
         {
           "name": "NEKI_BUILD_D3D12",
           "value": "False",
+          "type": "BOOL"
+        }
+      ]
+    },
+
+    {
+      "name": "x64-Debug-D3D12",
+      "generator": "Ninja",
+      "configurationType": "Debug",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "variables": [
+        {
+          "name": "NEKI_BUILD_VULKAN",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "NEKI_BUILD_D3D12",
+          "value": "True",
           "type": "BOOL"
         }
       ]
