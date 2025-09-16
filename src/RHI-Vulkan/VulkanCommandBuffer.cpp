@@ -2,7 +2,6 @@
 
 #include "VulkanCommandPool.h"
 #include <stdexcept>
-#include <X11/X.h>
 
 namespace NK
 {

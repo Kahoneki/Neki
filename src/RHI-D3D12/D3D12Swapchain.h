@@ -11,8 +11,15 @@ namespace NK
 		explicit D3D12Swapchain(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const SwapchainDesc& _desc);
 		virtual ~D3D12Swapchain() override;
 
+		//Acquire the index of the next image in the swapchain - signals _signalSemaphore when the image is ready to be rendered to.
+		virtual std::uint32_t AcquireNextImage(ISemaphore* _signalSemaphore) override;
+
+		//Presents image with index _imageIndex to the screen - waits for _waitSemaphore before presenting
+		virtual void Present(ISemaphore* _waitSemaphore, std::uint32_t _imageIndex) override;
+
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline IDXGISwapChain3* GetSwapchain() const { return m_swapchain.Get(); }
+
 
 	private:
 		void CreateSwapchain();

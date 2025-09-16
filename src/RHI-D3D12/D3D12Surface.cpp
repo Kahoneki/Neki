@@ -31,9 +31,6 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::SURFACE, "Shutting Down D3D12Surface\n");
 
-		glfwTerminate();
-		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SURFACE, "GLFW Terminated\n");
-
 		m_logger.Unindent();
 	}
 

@@ -1,6 +1,4 @@
 #include "D3D12Device.h"
-#include "D3D12Device.h"
-#include "D3D12Device.h"
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/FormatUtils.h>
 #include "D3D12CommandPool.h"
@@ -12,6 +10,9 @@
 #include "D3D12Swapchain.h"
 #include "D3D12Shader.h"
 #include "D3D12Pipeline.h"
+#include "D3D12Queue.h"
+#include "D3D12Fence.h"
+#include "D3D12Semaphore.h"
 #include <stdexcept>
 #include <array>
 #ifdef ERROR
@@ -31,7 +32,6 @@ namespace NK
 		CreateFactory();
 		SelectAdapter();
 		CreateDevice();
-		CreateCommandQueues();
 		CreateDescriptorHeaps();
 		CreateRootSignature();
 
@@ -111,6 +111,27 @@ namespace NK
 	UniquePtr<IPipeline> D3D12Device::CreatePipeline(const PipelineDesc& _desc)
 	{
 		return UniquePtr<IPipeline>(NK_NEW(D3D12Pipeline, m_logger, m_allocator, *this, _desc));
+	}
+
+	
+	
+	UniquePtr<IQueue> D3D12Device::CreateQueue(const QueueDesc& _desc)
+	{
+		return UniquePtr<IQueue>(NK_NEW(D3D12Queue, m_logger, *this, _desc));
+	}
+
+	
+	
+	UniquePtr<IFence> D3D12Device::CreateFence(const FenceDesc& _desc)
+	{
+		return UniquePtr<IFence>(NK_NEW(D3D12Fence, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
+	UniquePtr<ISemaphore> D3D12Device::CreateSemaphore()
+	{
+		return UniquePtr<ISemaphore>(NK_NEW(D3D12Semaphore, m_logger, m_allocator, *this));
 	}
 
 
@@ -243,57 +264,6 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
-
-		m_logger.Unindent();
-	}
-
-
-
-	void D3D12Device::CreateCommandQueues()
-	{
-		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating command queues\n");
-
-		//Graphics (Direct) Queue
-		D3D12_COMMAND_QUEUE_DESC queueDesc{};
-		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		HRESULT hr{ m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_graphicsQueue)) };
-		if (SUCCEEDED(hr))
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Graphics Command Queue created.\n");
-		}
-		else
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create Graphics Command Queue.\n");
-			throw std::runtime_error("");
-		}
-
-		//Compute Queue
-		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-		hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_computeQueue));
-		if (SUCCEEDED(hr))
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Compute Command Queue created.\n");
-		}
-		else
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create Compute Command Queue.\n");
-			throw std::runtime_error("");
-		}
-
-		//Transfer (Copy) Queue
-		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_COPY;
-		hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_transferQueue));
-		if (SUCCEEDED(hr))
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Transfer Command Queue created.\n");
-		}
-		else
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create Transfer Command Queue.\n");
-			throw std::runtime_error("");
-		}
 
 		m_logger.Unindent();
 	}

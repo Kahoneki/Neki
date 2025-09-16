@@ -9,6 +9,12 @@ namespace NK
 		explicit VulkanSwapchain(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const SwapchainDesc& _desc);
 		virtual ~VulkanSwapchain() override;
 
+		//Acquire the index of the next image in the swapchain - signals _signalSemaphore when the image is ready to be rendered to.
+		virtual std::uint32_t AcquireNextImage(ISemaphore* _signalSemaphore) override;
+
+		//Presents image with index _imageIndex to the screen - waits for _waitSemaphore before presenting
+		virtual void Present(ISemaphore* _waitSemaphore, std::uint32_t _imageIndex) override;
+
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] inline VkSwapchainKHR GetSwapchain() const { return m_swapchain; }
 

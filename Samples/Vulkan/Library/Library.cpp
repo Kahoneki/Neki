@@ -79,12 +79,6 @@ int main()
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
-	NK::SwapchainDesc swapchainDesc{};
-	swapchainDesc.surface = surface.get();
-	swapchainDesc.numBuffers = 3;
-	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
-	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
-
 	NK::ShaderDesc vertShaderDesc{};
 	vertShaderDesc.type = NK::SHADER_TYPE::VERTEX;
 	vertShaderDesc.filepath = "Samples/Shaders/Library_vs";
@@ -197,6 +191,14 @@ int main()
 	const NK::UniquePtr<NK::ISemaphore> signalSemaphore{ device->CreateSemaphore() };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
+	//Swapchain
+	NK::SwapchainDesc swapchainDesc{};
+	swapchainDesc.surface = surface.get();
+	swapchainDesc.numBuffers = 3;
+	swapchainDesc.presentQueue = graphicsQueue.get();
+	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
 	//Queue submit
 	commandBuffer->Begin();
 	constexpr float blendConstants[4]{ 0,0,0,0 };

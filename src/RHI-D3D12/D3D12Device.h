@@ -5,6 +5,9 @@
 #include <dxgi1_6.h>
 #include <d3d12.h>
 #include <wrl.h>
+#ifdef CreateSemaphore
+	#undef CreateSemaphore
+#endif
 
 
 
@@ -26,14 +29,14 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() override;
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline IDXGIFactory4* GetFactory() const { return m_factory.Get(); }
 		[[nodiscard]] inline IDXGIAdapter* GetAdapter() const { return m_adapter.Get(); }
 		[[nodiscard]] inline ID3D12Device* GetDevice()  const { return m_device.Get();  }
-		[[nodiscard]] inline ID3D12CommandQueue* GetGraphicsQueue() const { return m_graphicsQueue.Get(); }
-		[[nodiscard]] inline ID3D12CommandQueue* GetComputeQueue()  const { return m_computeQueue.Get(); }
-		[[nodiscard]] inline ID3D12CommandQueue* GetTransferQueue() const { return m_transferQueue.Get(); }
 		[[nodiscard]] inline ID3D12RootSignature* GetRootSignature() const { return m_rootSig.Get(); }
 
 
@@ -55,10 +58,6 @@ namespace NK
 		Microsoft::WRL::ComPtr<IDXGIFactory4> m_factory;
 		Microsoft::WRL::ComPtr<IDXGIAdapter1> m_adapter;
 		Microsoft::WRL::ComPtr<ID3D12Device> m_device;
-
-		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_graphicsQueue;
-		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_computeQueue;
-		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_transferQueue;
 
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_resourceDescriptorHeap;
 		UINT m_resourceDescriptorSize;
