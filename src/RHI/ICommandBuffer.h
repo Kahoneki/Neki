@@ -23,6 +23,10 @@ namespace NK
 		//todo: add command buffer methods here
 		virtual void Reset() = 0;
 
+		virtual void Begin() = 0;
+		virtual void SetBlendConstants(const float _blendConstants[4]) = 0;
+		virtual void End() = 0;
+
 
 	protected:
 		explicit ICommandBuffer(ILogger& _logger, IDevice& _device, ICommandPool& _pool, const CommandBufferDesc& _desc)

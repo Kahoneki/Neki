@@ -35,6 +35,10 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+		//Put the command list in the closed state immediately to be able to call Begin() on it and start recording
+		m_buffer->Close();
+
+
 		m_logger.Unindent();
 	}
 
@@ -56,4 +60,37 @@ namespace NK
 	{
 		//todo: implement
 	}
+	
+	
+	
+	void D3D12CommandBuffer::Begin()
+	{
+		ID3D12CommandAllocator* allocator{ dynamic_cast<D3D12CommandPool&>(m_pool).GetCommandPool() };
+		const HRESULT hr{ m_buffer->Reset(allocator, nullptr) };
+		if (FAILED(hr))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "Failed to reset command buffer in Begin()\n");
+			throw std::runtime_error("");
+		}
+	}
+	
+	
+	
+	void D3D12CommandBuffer::SetBlendConstants(const float _blendConstants[4])
+	{
+		m_buffer->OMSetBlendFactor(_blendConstants);
+	}
+
+
+
+	void D3D12CommandBuffer::End()
+	{
+		const HRESULT hr{ m_buffer->Close() };
+		if (FAILED(hr))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "Failed to close command buffer in End()\n");
+			throw std::runtime_error("");
+		}
+	}
+
 }

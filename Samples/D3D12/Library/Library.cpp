@@ -13,6 +13,9 @@
 #include <RHI/ISwapchain.h>
 #include <RHI/IPipeline.h>
 #include <RHI/IShader.h>
+#include <RHI/IQueue.h>
+#include <RHI/IFence.h>
+#include <RHI/ISemaphore.h>
 
 #ifdef ERROR
 	#undef ERROR
@@ -72,12 +75,6 @@ int main()
 	surfaceDesc.name = "Neki-D3D12 Library Sample";
 	surfaceDesc.size = glm::ivec2(1280, 720);
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
-	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
-
-	NK::SwapchainDesc swapchainDesc{};
-	swapchainDesc.surface = surface.get();
-	swapchainDesc.numBuffers = 3;
-	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 
@@ -165,6 +162,50 @@ int main()
 	computePipelineDesc.computeShader = compShader.get();
 	const NK::UniquePtr<NK::IPipeline> computePipeline{ device->CreatePipeline(computePipelineDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Graphics queue
+	NK::QueueDesc graphicsQueueDesc{};
+	graphicsQueueDesc.type = NK::QUEUE_TYPE::GRAPHICS;
+	const NK::UniquePtr<NK::IQueue> graphicsQueue{ device->CreateQueue(graphicsQueueDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Compute queue
+	NK::QueueDesc computeQueueDesc{};
+	computeQueueDesc.type = NK::QUEUE_TYPE::COMPUTE;
+	const NK::UniquePtr<NK::IQueue> computeQueue{ device->CreateQueue(computeQueueDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Transfer queue
+	NK::QueueDesc transferQueueDesc{};
+	transferQueueDesc.type = NK::QUEUE_TYPE::TRANSFER;
+	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Fence
+	NK::FenceDesc fenceDesc{};
+	fenceDesc.initiallySignaled = false;
+	const NK::UniquePtr<NK::IFence> signalFence{ device->CreateFence(fenceDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Semaphore
+	const NK::UniquePtr<NK::ISemaphore> signalSemaphore{ device->CreateSemaphore() };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Swapchain
+	NK::SwapchainDesc swapchainDesc{};
+	swapchainDesc.surface = surface.get();
+	swapchainDesc.numBuffers = 3;
+	swapchainDesc.presentQueue = graphicsQueue.get();
+	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	//Queue submit
+	commandBuffer->Begin();
+	constexpr float blendConstants[4]{ 0,0,0,0 };
+	commandBuffer->SetBlendConstants(blendConstants);
+	commandBuffer->End();
+	graphicsQueue->Submit(commandBuffer.get(), nullptr, signalSemaphore.get(), signalFence.get());
+	signalFence->Wait();
 
 
 	logger->Log(NK::LOGGER_CHANNEL::SUCCESS, NK::LOGGER_LAYER::APPLICATION, "Engine initialised successfully!\n\n");

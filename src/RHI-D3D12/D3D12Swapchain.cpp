@@ -7,6 +7,8 @@
 	#undef ERROR
 #endif
 #include <stdexcept>
+#include "D3D12Queue.h"
+#include "D3D12Semaphore.h"
 
 
 namespace NK
@@ -36,6 +38,22 @@ namespace NK
 		m_logger.Unindent();
 	}
 
+	
+	
+	std::uint32_t D3D12Swapchain::AcquireNextImage(ISemaphore* _signalSemaphore)
+	{
+		return m_swapchain->GetCurrentBackBufferIndex();
+	}
+
+
+
+	void D3D12Swapchain::Present(ISemaphore* _waitSemaphore, std::uint32_t _imageIndex)
+	{
+		D3D12Semaphore* d3d12WaitSemaphore{ dynamic_cast<D3D12Semaphore*>(_waitSemaphore) };
+		dynamic_cast<D3D12Queue*>(m_presentQueue)->GetQueue()->Wait(d3d12WaitSemaphore->GetFence(), d3d12WaitSemaphore->GetFenceValue());
+		m_swapchain->Present(1, 0);
+	}
+
 
 
 	void D3D12Swapchain::CreateSwapchain()
@@ -60,7 +78,7 @@ namespace NK
 
 		//Create swapchain
 		Microsoft::WRL::ComPtr<IDXGISwapChain1> tempSwapchain;
-		HRESULT hr{ device.GetFactory()->CreateSwapChainForHwnd(device.GetGraphicsQueue(), surface->GetSurface(), &swapchainDesc, nullptr, nullptr, &tempSwapchain) };
+		HRESULT hr{ device.GetFactory()->CreateSwapChainForHwnd(dynamic_cast<D3D12Queue*>(m_presentQueue)->GetQueue(), surface->GetSurface(), &swapchainDesc, nullptr, nullptr, &tempSwapchain)};
 		if (SUCCEEDED(hr))
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SWAPCHAIN, "Successfully created swapchain\n");

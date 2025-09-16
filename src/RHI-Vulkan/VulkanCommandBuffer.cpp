@@ -55,4 +55,28 @@ namespace NK
 	{
 		//todo: implement
 	}
+
+
+
+	void VulkanCommandBuffer::Begin()
+	{
+		//todo: maybe add some of these flags as parameters
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		vkBeginCommandBuffer(m_buffer, &beginInfo);
+	}
+
+
+
+	void VulkanCommandBuffer::SetBlendConstants(const float _blendConstants[4])
+	{
+		vkCmdSetBlendConstants(m_buffer, _blendConstants);
+	}
+
+
+
+	void VulkanCommandBuffer::End()
+	{
+		vkEndCommandBuffer(m_buffer);
+	}
 }

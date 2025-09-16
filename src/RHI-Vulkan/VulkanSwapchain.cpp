@@ -7,6 +7,8 @@
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
 #include <stdexcept>
+#include "VulkanSemaphore.h"
+#include "VulkanQueue.h"
 
 namespace NK
 {
@@ -40,6 +42,33 @@ namespace NK
 
 
 		m_logger.Unindent();
+	}
+
+	
+	
+	std::uint32_t VulkanSwapchain::AcquireNextImage(ISemaphore* _signalSemaphore)
+	{
+		std::uint32_t imageIndex;
+		VkSemaphore vkSignalSemaphore{ dynamic_cast<VulkanSemaphore*>(_signalSemaphore)->GetSemaphore() };
+		vkAcquireNextImageKHR(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_swapchain, UINT64_MAX, vkSignalSemaphore, VK_NULL_HANDLE, &imageIndex);
+		return imageIndex;
+	}
+
+
+
+	void VulkanSwapchain::Present(ISemaphore* _waitSemaphore, std::uint32_t _imageIndex)
+	{
+		VkSemaphore vkWaitSemaphore{ dynamic_cast<VulkanSemaphore*>(_waitSemaphore)->GetSemaphore() };
+		
+		VkPresentInfoKHR presentInfo{};
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = &vkWaitSemaphore;
+		presentInfo.swapchainCount = 1;
+		presentInfo.pSwapchains = &m_swapchain;
+		presentInfo.pImageIndices = &_imageIndex;
+
+		vkQueuePresentKHR(dynamic_cast<VulkanQueue*>(m_presentQueue)->GetQueue(), &presentInfo);
 	}
 
 
