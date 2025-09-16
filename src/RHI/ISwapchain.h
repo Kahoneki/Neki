@@ -32,8 +32,6 @@ namespace NK
 		ISurface* m_surface;
 		std::uint32_t m_numBuffers;
 
-		VkExtent2D m_extent{ 0,0 };
-
 		std::vector<UniquePtr<ITexture>> m_backBuffers;
 		std::vector<UniquePtr<ITextureView>> m_backBufferViews;
 	};

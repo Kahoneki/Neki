@@ -5,10 +5,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 #Backend selection
-option(NEKI_BUILD_VULKAN "Enable the Vulkan RHI backend" ON)
-if(WIN32)
-    option(NEKI_BUILD_D3D12 "Enable the D3D12 RHI backend" ON)
-endif()
+option(NEKI_BUILD_VULKAN "Enable the Vulkan RHI backend" OFF)
+option(NEKI_BUILD_D3D12 "Enable the D3D12 RHI backend" OFF)
 
 
 #Define library target

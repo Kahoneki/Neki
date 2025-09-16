@@ -12,9 +12,13 @@ namespace NK
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] inline VkSwapchainKHR GetSwapchain() const { return m_swapchain; }
 
+
 	private:
 		void CreateSwapchain();
 		void CreateSwapchainImageViews();
+
+
+		VkExtent2D m_extent{ 0, 0 };
 
 		VkFormat m_format{ VK_FORMAT_UNDEFINED };
 		VkSwapchainKHR m_swapchain{ VK_NULL_HANDLE };
