@@ -12,6 +12,9 @@
 #include <RHI/ISwapchain.h>
 
 #include "RHI/IPipeline.h"
+#ifdef ERROR
+	#undef ERROR
+#endif
 
 
 
@@ -136,9 +139,6 @@ int main()
 	
 	while (!surface->ShouldClose())
 	{
-		inFlightFence->Wait();
-		inFlightFence->Reset();
-		
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphore.get(), inFlightFence.get()) };
 		
 		//Wait for the previous frame to finish presenting before starting a new one
@@ -151,7 +151,7 @@ int main()
 		commandBuffer->Begin();
 		commandBuffer->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
-		commandBuffer->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr, nullptr);
+		commandBuffer->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffer->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 		commandBuffer->SetViewport({ 0, 0 }, { 1280, 720 });
 		commandBuffer->SetScissor({ 0, 0 }, { 1280, 720 });
@@ -167,5 +167,4 @@ int main()
 		//todo: very VERY sloppy temporary workaround - need to figure out how to do all this synchronisation stuff properly
 		graphicsQueue->WaitIdle();
 	}
-
 }

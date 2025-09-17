@@ -122,8 +122,8 @@ namespace NK
 
 
 		m_resourceIndex = _resourceIndex;
-		D3D12_CPU_DESCRIPTOR_HANDLE handle{ _descriptorHeap->GetCPUDescriptorHandleForHeapStart() };
-		handle.ptr += m_resourceIndex * _descriptorSize;
+		m_handle = _descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		m_handle.ptr += m_resourceIndex * _descriptorSize;
 
 
 		switch (_desc.type)
@@ -135,7 +135,7 @@ namespace NK
 			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
 			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d rtv?
 
-			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateRenderTargetView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, handle);
+			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateRenderTargetView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
 
 			break;
 		}
@@ -147,7 +147,7 @@ namespace NK
 			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
 			desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d dsv?
 
-			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateDepthStencilView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, handle);
+			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateDepthStencilView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
 
 			break;
 		}

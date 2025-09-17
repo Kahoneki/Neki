@@ -15,6 +15,13 @@ namespace NK
 		explicit D3D12TextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc, ID3D12DescriptorHeap* _descriptorHeap, UINT _descriptorSize, std::uint32_t _resourceIndex);
 
 		virtual ~D3D12TextureView() override;
+
+		//D3D12 internal API (for use by other RHI-D3D12 classes)
+		[[nodiscard]] inline D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle() { return m_handle; }
+
+
+	private:
+		D3D12_CPU_DESCRIPTOR_HANDLE m_handle;
 	};
 
 }

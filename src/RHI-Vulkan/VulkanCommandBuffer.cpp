@@ -115,7 +115,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
+	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment)
 	{
 		//Colour attachments
 		std::vector<VkRenderingAttachmentInfo> colourAttachmentInfos(_numColourAttachments);
@@ -129,30 +129,17 @@ namespace NK
 			colourAttachmentInfos[i].clearValue.color = { {0.0f, 1.0f, 0.0f, 1.0f} };
 		}
 		
-	    //Depth attachment
-	    VkRenderingAttachmentInfo depthAttachmentInfo{};
-	    if (_depthAttachment)
+	    //Depth-stencil attachment
+	    VkRenderingAttachmentInfo depthStencilAttachmentInfo{};
+	    if (_depthStencilAttachment)
 	    {
-	        depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-	        depthAttachmentInfo.pNext = nullptr;
-	        depthAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_depthAttachment)->GetImageView();
-	        depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	        depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	        depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	        depthAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
-	    }
-
-	    //Stencil attachment
-	    VkRenderingAttachmentInfo stencilAttachmentInfo{};
-	    if (_stencilAttachment)
-	    {
-	        stencilAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-	        stencilAttachmentInfo.pNext = nullptr;
-	        stencilAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_stencilAttachment)->GetImageView();
-	        stencilAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	        stencilAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	        stencilAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	        stencilAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
+			depthStencilAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			depthStencilAttachmentInfo.pNext = nullptr;
+			depthStencilAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_depthAttachment)->GetImageView();
+			depthStencilAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			depthStencilAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			depthStencilAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			depthStencilAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
 	    }
 
 	    VkRenderingInfo renderingInfo{};
@@ -161,8 +148,8 @@ namespace NK
 	    renderingInfo.layerCount = 1;
 	    renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
 	    renderingInfo.pColorAttachments = colourAttachmentInfos.data();
-	    renderingInfo.pDepthAttachment = _depthAttachment ? &depthAttachmentInfo : nullptr;
-	    renderingInfo.pStencilAttachment = _stencilAttachment ? &stencilAttachmentInfo : nullptr;
+	    renderingInfo.pDepthAttachment = _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr;
+	    renderingInfo.pStencilAttachment = _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr;
 
 	    vkCmdBeginRendering(m_buffer, &renderingInfo);
 	}

@@ -6,6 +6,8 @@
 	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
 #endif
 #include "D3D12Texture.h"
+#include "D3D12TextureView.h"
+#include "D3D12Pipeline.h"
 
 namespace NK
 {
@@ -110,86 +112,90 @@ namespace NK
 
 
 
-	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
-	{	
+	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment)
+	{
 		//Colour attachments
-		std::vector<VkRenderingAttachmentInfo> colourAttachmentInfos(_numColourAttachments);
+		std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> colourAttachmentInfos(_numColourAttachments);
 		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
 		{
-			colourAttachmentInfos[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-			colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[i]))->GetImageView();
-			colourAttachmentInfos[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			colourAttachmentInfos[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			colourAttachmentInfos[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			colourAttachmentInfos[i].clearValue.color = { {0.0f, 1.0f, 0.0f, 1.0f} };
+			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
+			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_colourAttachments[i].GetFormat());
+			for (std::size_t i{ 0 }; i < 4; ++i) { beg.Clear.ClearValue.Color[i] = 0.0f; }
+			
+			colourAttachmentInfos[i].BeginningAccess = beg;
+			colourAttachmentInfos[i].EndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
+			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_colourAttachments[i]))->GetCPUDescriptorHandle();
 		}
 
-		//Depth attachment
-		VkRenderingAttachmentInfo depthAttachmentInfo{};
-		if (_depthAttachment)
+		//Depth-stencil attachment
+		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC depthStencilAttachmentInfo{};
+		if (_depthStencilAttachment)
 		{
-			depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-			depthAttachmentInfo.pNext = nullptr;
-			depthAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_depthAttachment)->GetImageView();
-			depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			depthAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
+			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
+			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_depthStencilAttachment->GetFormat());
+			beg.Clear.ClearValue.DepthStencil.Depth = 1.0f;
+			beg.Clear.ClearValue.DepthStencil.Stencil = 0;
+			
+			depthStencilAttachmentInfo.DepthBeginningAccess = beg;
+			depthStencilAttachmentInfo.StencilBeginningAccess = beg;
+			depthStencilAttachmentInfo.DepthEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
+			depthStencilAttachmentInfo.StencilEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
+			depthStencilAttachmentInfo.cpuDescriptor = dynamic_cast<D3D12TextureView*>(_depthStencilAttachment)->GetCPUDescriptorHandle();
 		}
 
-		//Stencil attachment
-		VkRenderingAttachmentInfo stencilAttachmentInfo{};
-		if (_stencilAttachment)
-		{
-			stencilAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-			stencilAttachmentInfo.pNext = nullptr;
-			stencilAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_stencilAttachment)->GetImageView();
-			stencilAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			stencilAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			stencilAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			stencilAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
-		}
-
-		VkRenderingInfo renderingInfo{};
-		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-		renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[0]))->GetRenderArea();
-		renderingInfo.layerCount = 1;
-		renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
-		renderingInfo.pColorAttachments = colourAttachmentInfos.data();
-		renderingInfo.pDepthAttachment = _depthAttachment ? &depthAttachmentInfo : nullptr;
-		renderingInfo.pStencilAttachment = _stencilAttachment ? &stencilAttachmentInfo : nullptr;
-
-		vkCmdBeginRendering(m_buffer, &renderingInfo);
+		//todo: look into allow uav write flag?
+		m_buffer->BeginRenderPass(_numColourAttachments, colourAttachmentInfos.data(), _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr, D3D12_RENDER_PASS_FLAG_NONE);
 	}
 
 
 
 	void D3D12CommandBuffer::EndRendering()
 	{
+		m_buffer->EndRenderPass();
 	}
 
 	
 	
 	void D3D12CommandBuffer::BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint)
 	{
+		m_buffer->SetPipelineState(dynamic_cast<D3D12Pipeline*>(_pipeline)->GetPipeline());
 	}
 
 
 
 	void D3D12CommandBuffer::SetViewport(glm::vec2 _pos, glm::vec2 _extent)
 	{
+		//todo: look into depth members of D3D12_VIEWPORT?
+		D3D12_VIEWPORT viewport{};
+		viewport.TopLeftX = _pos.x;
+		viewport.TopLeftY = _pos.y;
+		viewport.Width = _extent.x;
+		viewport.Height = _extent.y;
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
+		m_buffer->RSSetViewports(1, &viewport);
 	}
 
 
 
 	void D3D12CommandBuffer::SetScissor(glm::ivec2 _pos, glm::ivec2 _extent)
 	{
+		//todo: maybe top-bottom should be reversed?
+		D3D12_RECT scissor{};
+		scissor.left = _pos.x;
+		scissor.top = _pos.y;
+		scissor.right = _pos.x + _extent.x;
+		scissor.bottom = _pos.y + _extent.y;
+		m_buffer->RSSetScissorRects(1, &scissor);
 	}
 
 
 
 	void D3D12CommandBuffer::Draw(std::uint32_t _vertexCount, std::uint32_t _instanceCount, std::uint32_t _firstVertex, std::uint32_t _firstInstance)
 	{
+		m_buffer->DrawInstanced(_vertexCount, _instanceCount, _firstVertex, _firstInstance);
 	}
 
 

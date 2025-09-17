@@ -77,7 +77,7 @@ namespace NK
 		if (m_state == FENCE_STATE::UNSIGNALLED)
 		{
 			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::FENCE, "Wait() called on a fence that was not in-flight - this would have resulted in an infinite wait\n");
-			return;
+			throw std::runtime_error("");
 		}
 
 		//Check that the GPU hasn't already passed the point we're waiting for

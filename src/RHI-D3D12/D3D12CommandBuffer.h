@@ -19,7 +19,7 @@ namespace NK
 		virtual void End() override;
 
 		virtual void TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
-		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment) override;
+		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment) override;
 		virtual void EndRendering() override;
 
 		virtual void BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint) override;
@@ -34,6 +34,6 @@ namespace NK
 	private:
 		[[nodiscard]] D3D12_RESOURCE_STATES GetD3D12ResourceState(RESOURCE_STATE _state) const;
 
-		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_buffer;
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> m_buffer;
 	};
 }
