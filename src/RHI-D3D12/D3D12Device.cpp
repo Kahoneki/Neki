@@ -1,4 +1,5 @@
 #include "D3D12Device.h"
+#include "D3D12Device.h"
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/FormatUtils.h>
 #include "D3D12CommandPool.h"

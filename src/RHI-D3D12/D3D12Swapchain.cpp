@@ -40,8 +40,11 @@ namespace NK
 
 	
 	
-	std::uint32_t D3D12Swapchain::AcquireNextImage(ISemaphore* _signalSemaphore)
+	std::uint32_t D3D12Swapchain::AcquireNextImageIndex(ISemaphore* _signalSemaphore, IFence* _signalFence)
 	{
+		//todo: look into adding semaphore and fence to this??
+		//obviously d3d12 doesn't have semaphores so it would be a case of looking into if they have a way of signalling fences on presentation completion
+		//^then signalling both the fence and the semaphore-underlying-fence
 		return m_swapchain->GetCurrentBackBufferIndex();
 	}
 

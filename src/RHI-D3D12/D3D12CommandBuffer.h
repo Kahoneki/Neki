@@ -4,6 +4,7 @@
 
 namespace NK
 {
+
 	class D3D12CommandBuffer final : public ICommandBuffer
 	{
 	public:
@@ -17,11 +18,22 @@ namespace NK
 		virtual void SetBlendConstants(const float _blendConstants[4]) override;
 		virtual void End() override;
 
+		virtual void TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
+		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment) override;
+		virtual void EndRendering() override;
+
+		virtual void BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint) override;
+		virtual void SetViewport(glm::vec2 _pos, glm::vec2 _extent) override;
+		virtual void SetScissor(glm::ivec2 _pos, glm::ivec2 _extent) override;
+		virtual void Draw(std::uint32_t _vertexCount, std::uint32_t _instanceCount, std::uint32_t _firstVertex, std::uint32_t _firstInstance) override;
+
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline ID3D12GraphicsCommandList* GetCommandList() const { return m_buffer.Get(); }
 
 
 	private:
+		[[nodiscard]] D3D12_RESOURCE_STATES GetD3D12ResourceState(RESOURCE_STATE _state) const;
+
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_buffer;
 	};
 }

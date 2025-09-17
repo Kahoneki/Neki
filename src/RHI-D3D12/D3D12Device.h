@@ -33,6 +33,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() override;
 
+		virtual void WaitIdle() override;
+
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline IDXGIFactory4* GetFactory() const { return m_factory.Get(); }
 		[[nodiscard]] inline IDXGIAdapter* GetAdapter() const { return m_adapter.Get(); }

@@ -193,13 +193,6 @@ namespace NK
 
 
 
-	void VulkanDevice::WaitIdle()
-	{
-		vkDeviceWaitIdle(m_device);
-	}
-
-
-
 	void VulkanDevice::CreateInstance()
 	{
 		m_logger.Indent();

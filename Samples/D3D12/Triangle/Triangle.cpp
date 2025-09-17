@@ -4,7 +4,7 @@
 #include <Core/Memory/Allocation.h>
 #include <Core/Memory/TrackingAllocator.h>
 #include <Core/Utils/FormatUtils.h>
-#include <RHI-Vulkan/VulkanDevice.h>
+#include <RHI-D3D12/D3D12Device.h>
 #include <RHI/IBuffer.h>
 #include <RHI/IShader.h>
 #include <RHI/ISurface.h>
@@ -28,7 +28,7 @@ int main()
 	logger->Unindent();
 
 	//Device
-	const NK::UniquePtr<NK::IDevice> device{ NK_NEW(NK::VulkanDevice, *logger, *allocator) };
+	const NK::UniquePtr<NK::IDevice> device{ NK_NEW(NK::D3D12Device, *logger, *allocator) };
 
 	//Surface
 	NK::SurfaceDesc surfaceDesc{};
