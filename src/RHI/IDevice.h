@@ -69,6 +69,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() = 0;
 
+		virtual void WaitIdle() = 0;
+
 
 	protected:
 		explicit IDevice(ILogger& _logger, IAllocator& _allocator)

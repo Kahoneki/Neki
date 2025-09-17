@@ -9,6 +9,9 @@ namespace NK
 		VulkanPipeline(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const PipelineDesc& _desc);
 		virtual ~VulkanPipeline() override;
 
+		//Vulkan internal API (for use by other RHI-Vulkan classes)
+		[[nodiscard]] inline VkPipeline GetPipeline() const { return m_pipeline; }
+
 
 	private:
 		void CreateShaderModules(IShader* _compute, IShader* _vertex, IShader* _fragment);

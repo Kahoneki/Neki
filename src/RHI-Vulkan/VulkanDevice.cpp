@@ -193,6 +193,13 @@ namespace NK
 
 
 
+	void VulkanDevice::WaitIdle()
+	{
+		vkDeviceWaitIdle(m_device);
+	}
+
+
+
 	void VulkanDevice::CreateInstance()
 	{
 		m_logger.Indent();
@@ -791,7 +798,6 @@ namespace NK
 			}
 			if (!extensionFound)
 			{
-				m_logger.Log(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::DEVICE, "Device is missing required extension: " + std::string(extensionName) + "\n");
 				m_logger.Unindent();
 				return false;
 			}

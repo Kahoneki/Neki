@@ -7,6 +7,8 @@
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
 #include <stdexcept>
+
+#include "VulkanFence.h"
 #include "VulkanSemaphore.h"
 #include "VulkanQueue.h"
 
@@ -46,11 +48,28 @@ namespace NK
 
 	
 	
-	std::uint32_t VulkanSwapchain::AcquireNextImage(ISemaphore* _signalSemaphore)
+	std::uint32_t VulkanSwapchain::AcquireNextImageIndex(ISemaphore* _signalSemaphore, IFence* _signalFence)
 	{
+		//todo: look into adding VK_EXT(/KHR)_swapchain_maintance1 device extension for this
+//		std::uint32_t imageIndex;
+//		
+//		VkAcquireNextImageInfoKHR nextImageInfo{};
+//		nextImageInfo.sType = VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR;
+//		nextImageInfo.swapchain = m_swapchain;
+//		nextImageInfo.deviceMask = 0;
+//		nextImageInfo.timeout = UINT64_MAX;
+//		nextImageInfo.fence = dynamic_cast<VulkanFence*>(_signalFence)->GetFence();
+//		nextImageInfo.semaphore = dynamic_cast<VulkanSemaphore*>(_signalSemaphore)->GetSemaphore();
+//		vkAcquireNextImage2KHR(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), &nextImageInfo, &imageIndex);
+
+//		return imageIndex;
+
+
+		
 		std::uint32_t imageIndex;
 		VkSemaphore vkSignalSemaphore{ dynamic_cast<VulkanSemaphore*>(_signalSemaphore)->GetSemaphore() };
-		vkAcquireNextImageKHR(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_swapchain, UINT64_MAX, vkSignalSemaphore, VK_NULL_HANDLE, &imageIndex);
+		VkFence vkSignalFence{ dynamic_cast<VulkanFence*>(_signalFence)->GetFence() };
+		vkAcquireNextImageKHR(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_swapchain, UINT64_MAX, vkSignalSemaphore, vkSignalFence, &imageIndex);
 		return imageIndex;
 	}
 
@@ -99,7 +118,7 @@ namespace NK
 		bool idealFound{ false };
 		for (const VkSurfaceFormatKHR& availableFormat : formats)
 		{
-			if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+			if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 			{
 				idealFound = true;
 				surfaceFormat = availableFormat;
@@ -108,7 +127,7 @@ namespace NK
 		}
 		if (!idealFound)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SWAPCHAIN, "Ideal swapchain image format (B8G8R8A8_SRGB with SRGB-nonlinear colour space) unavailable, falling back to format " + std::to_string(surfaceFormat.format) + " with colour space " + std::to_string(surfaceFormat.colorSpace) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SWAPCHAIN, "Ideal swapchain image format (R8G8B8A8_SRGB with SRGB-nonlinear colour space) unavailable, falling back to format " + std::to_string(surfaceFormat.format) + " with colour space " + std::to_string(surfaceFormat.colorSpace) + "\n");
 		}
 		m_format = surfaceFormat.format;
 

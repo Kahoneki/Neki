@@ -22,6 +22,7 @@ namespace NK
 		virtual ~ISurface() = default;
 
 		[[nodiscard]] inline glm::ivec2 GetSize() const { return m_size; }
+		[[nodiscard]] inline bool ShouldClose() const { return glfwWindowShouldClose(m_window); }
 		
 		
 	protected:
