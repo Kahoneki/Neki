@@ -135,7 +135,7 @@ namespace NK
 	    {
 			depthStencilAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 			depthStencilAttachmentInfo.pNext = nullptr;
-			depthStencilAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_depthAttachment)->GetImageView();
+			depthStencilAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_depthStencilAttachment)->GetImageView();
 			depthStencilAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			depthStencilAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			depthStencilAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -178,9 +178,9 @@ namespace NK
 	{
 		VkViewport viewport{};
 		viewport.x = _pos.x;
-		viewport.y = _pos.y;
+		viewport.y = _extent.y + _pos.y; //Add height extent offset to compensate for using -_extent.y for height
 		viewport.width = _extent.x;
-		viewport.height = _extent.y;
+		viewport.height = -_extent.y; //Flip the viewport for parity with D3D12's +Y up coordinate system.
 		vkCmdSetViewport(m_buffer, 0, 1, &viewport);
 	}
 

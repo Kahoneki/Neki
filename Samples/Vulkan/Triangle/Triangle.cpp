@@ -1,4 +1,3 @@
-#include <queue>
 #include <Core/RAIIContext.h>
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/Allocation.h>
@@ -10,7 +9,6 @@
 #include <RHI/ISurface.h>
 #include <RHI/ITexture.h>
 #include <RHI/ISwapchain.h>
-
 #include "RHI/IPipeline.h"
 
 
@@ -138,20 +136,18 @@ int main()
 	{
 		inFlightFence->Wait();
 		inFlightFence->Reset();
-		
+
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphore.get(), inFlightFence.get()) };
-		
-		//Wait for the previous frame to finish presenting before starting a new one
+
 		inFlightFence->Wait();
 		inFlightFence->Reset();
-		
-		glfwPollEvents();
 
+		glfwPollEvents();
 
 		commandBuffer->Begin();
 		commandBuffer->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
-		commandBuffer->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr, nullptr);
+		commandBuffer->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffer->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 		commandBuffer->SetViewport({ 0, 0 }, { 1280, 720 });
 		commandBuffer->SetScissor({ 0, 0 }, { 1280, 720 });

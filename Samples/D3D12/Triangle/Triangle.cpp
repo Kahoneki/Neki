@@ -1,4 +1,3 @@
-#include <queue>
 #include <Core/RAIIContext.h>
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/Allocation.h>
@@ -10,7 +9,6 @@
 #include <RHI/ISurface.h>
 #include <RHI/ITexture.h>
 #include <RHI/ISwapchain.h>
-
 #include "RHI/IPipeline.h"
 #ifdef ERROR
 	#undef ERROR
@@ -139,14 +137,15 @@ int main()
 	
 	while (!surface->ShouldClose())
 	{
+		inFlightFence->Wait();
+		inFlightFence->Reset();
+
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphore.get(), inFlightFence.get()) };
 		
-		//Wait for the previous frame to finish presenting before starting a new one
-		inFlightFence->Wait();
+		//inFlightFence->Wait();
 		inFlightFence->Reset();
 		
 		glfwPollEvents();
-
 
 		commandBuffer->Begin();
 		commandBuffer->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);

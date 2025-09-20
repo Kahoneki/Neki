@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include "D3D12Queue.h"
 #include "D3D12Semaphore.h"
+#include "D3D12Fence.h"
 
 
 namespace NK
@@ -45,6 +46,18 @@ namespace NK
 		//todo: look into adding semaphore and fence to this??
 		//obviously d3d12 doesn't have semaphores so it would be a case of looking into if they have a way of signalling fences on presentation completion
 		//^then signalling both the fence and the semaphore-underlying-fence
+
+		//For parity with Vulkan, fence must be unsignalled
+		if (dynamic_cast<D3D12Fence*>(_signalFence)->GetState() != FENCE_STATE::UNSIGNALLED)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::SWAPCHAIN, "_signalFence passed to ISwapchain::AcquireNextImageIndex() was not in the UNSIGNALLED state as is required by this function - did you forget to wait/reset?\n");
+			throw std::runtime_error("");
+		}
+		else
+		{
+			dynamic_cast<D3D12Fence*>(_signalFence)->SetState(FENCE_STATE::SIGNALLED);
+		}
+
 		return m_swapchain->GetCurrentBackBufferIndex();
 	}
 

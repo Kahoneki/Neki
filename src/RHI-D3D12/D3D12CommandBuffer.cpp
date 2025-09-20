@@ -121,7 +121,10 @@ namespace NK
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
 			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_colourAttachments[i].GetFormat());
-			for (std::size_t i{ 0 }; i < 4; ++i) { beg.Clear.ClearValue.Color[i] = 0.0f; }
+			beg.Clear.ClearValue.Color[0] = 0.0f;
+			beg.Clear.ClearValue.Color[1] = 1.0f;
+			beg.Clear.ClearValue.Color[2] = 0.0f;
+			beg.Clear.ClearValue.Color[3] = 1.0f;
 			
 			colourAttachmentInfos[i].BeginningAccess = beg;
 			colourAttachmentInfos[i].EndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;

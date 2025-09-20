@@ -67,8 +67,8 @@ namespace NK
 
 		
 		std::uint32_t imageIndex;
-		VkSemaphore vkSignalSemaphore{ dynamic_cast<VulkanSemaphore*>(_signalSemaphore)->GetSemaphore() };
-		VkFence vkSignalFence{ dynamic_cast<VulkanFence*>(_signalFence)->GetFence() };
+		VkSemaphore vkSignalSemaphore{ _signalSemaphore ? dynamic_cast<VulkanSemaphore*>(_signalSemaphore)->GetSemaphore() : VK_NULL_HANDLE };
+		VkFence vkSignalFence{ _signalFence ? dynamic_cast<VulkanFence*>(_signalFence)->GetFence() : VK_NULL_HANDLE };
 		vkAcquireNextImageKHR(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_swapchain, UINT64_MAX, vkSignalSemaphore, vkSignalFence, &imageIndex);
 		return imageIndex;
 	}
@@ -77,12 +77,12 @@ namespace NK
 
 	void VulkanSwapchain::Present(ISemaphore* _waitSemaphore, std::uint32_t _imageIndex)
 	{
-		VkSemaphore vkWaitSemaphore{ dynamic_cast<VulkanSemaphore*>(_waitSemaphore)->GetSemaphore() };
+		VkSemaphore vkWaitSemaphore{ _waitSemaphore ? dynamic_cast<VulkanSemaphore*>(_waitSemaphore)->GetSemaphore() : VK_NULL_HANDLE };
 		
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &vkWaitSemaphore;
+		presentInfo.waitSemaphoreCount = _waitSemaphore ? 1 : 0;
+		presentInfo.pWaitSemaphores = _waitSemaphore ? &vkWaitSemaphore : nullptr;
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = &m_swapchain;
 		presentInfo.pImageIndices = &_imageIndex;
