@@ -12,7 +12,7 @@ namespace NK
 		virtual ~D3D12Swapchain() override;
 
 		//Acquire the index of the next image in the swapchain - signals _signalSemaphore when the image is ready to be rendered to.
-		virtual std::uint32_t AcquireNextImage(ISemaphore* _signalSemaphore) override;
+		virtual std::uint32_t AcquireNextImageIndex(ISemaphore* _signalSemaphore, IFence* _signalFence) override;
 
 		//Presents image with index _imageIndex to the screen - waits for _waitSemaphore before presenting
 		virtual void Present(ISemaphore* _waitSemaphore, std::uint32_t _imageIndex) override;

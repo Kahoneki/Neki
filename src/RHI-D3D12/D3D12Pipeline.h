@@ -11,6 +11,9 @@ namespace NK
 		D3D12Pipeline(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const PipelineDesc& _desc);
 		virtual ~D3D12Pipeline() override;
 
+		//D3D12 internal API (for use by other RHI-D3D12 classes)
+		[[nodiscard]] inline ID3D12PipelineState* GetPipeline() { return m_pipeline.Get(); }
+
 
 	private:
 		void CreateComputePipeline(IShader* _compShader);

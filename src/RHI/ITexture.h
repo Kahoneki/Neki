@@ -49,6 +49,8 @@ namespace NK
 	public:
 		virtual ~ITexture() = default;
 
+		[[nodiscard]] inline glm::ivec3 GetSize() const { return m_size; }
+
 
 	protected:
 		explicit ITexture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc, bool _isOwned)

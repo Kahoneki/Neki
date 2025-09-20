@@ -127,6 +127,12 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE, "Shutting Down D3D12Texture\n");
 
+		if (!m_isOwned)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TEXTURE, "Texture not owned by D3D12Texture class, skipping shutdown sequence\n");
+			m_texture.Detach(); //Detach from the comptr so as to not try and decrement the reference counter
+		}
+
 		//ComPtrs are released automatically
 
 		m_logger.Unindent();
@@ -160,6 +166,7 @@ namespace NK
 	{
 		switch (_format)
 		{
+		case DATA_FORMAT::UNDEFINED:				return DXGI_FORMAT_UNKNOWN;
 		case DATA_FORMAT::R8_UNORM:					return DXGI_FORMAT_R8_UNORM;
 		case DATA_FORMAT::R8G8_UNORM:				return DXGI_FORMAT_R8G8_UNORM;
 		case DATA_FORMAT::R8G8B8A8_UNORM:			return DXGI_FORMAT_R8G8B8A8_UNORM;

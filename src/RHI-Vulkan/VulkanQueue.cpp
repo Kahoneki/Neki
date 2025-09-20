@@ -97,4 +97,11 @@ namespace NK
 		}
 	}
 
+
+
+	void VulkanQueue::WaitIdle()
+	{
+		vkQueueWaitIdle(m_queue);
+	}
+
 }

@@ -292,9 +292,9 @@ namespace NK
 		renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 		renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(m_colourAttachmentFormats.size());
 		std::vector<VkFormat> vulkanColourAttachmentFormats(m_colourAttachmentFormats.size());
-		for (DATA_FORMAT f : m_colourAttachmentFormats)
+		for (size_t i = 0; i < m_colourAttachmentFormats.size(); ++i)
 		{
-			vulkanColourAttachmentFormats.push_back(VulkanTexture::GetVulkanFormat(f));
+			vulkanColourAttachmentFormats[i] = VulkanTexture::GetVulkanFormat(m_colourAttachmentFormats[i]);
 		}
 		renderingInfo.pColorAttachmentFormats = vulkanColourAttachmentFormats.data();
 		//Use same format for depth and stencil for parity with dx12

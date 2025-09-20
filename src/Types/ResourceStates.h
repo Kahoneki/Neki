@@ -6,7 +6,6 @@ namespace NK
 	enum class RESOURCE_STATE
 	{
 		UNDEFINED,
-		COMMON,
 		
 		//Read-only
 		VERTEX_BUFFER,

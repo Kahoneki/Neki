@@ -102,4 +102,11 @@ namespace NK
 		}
 	}
 
+
+
+	void D3D12Queue::WaitIdle()
+	{
+		//todo: implement
+	}
+
 }

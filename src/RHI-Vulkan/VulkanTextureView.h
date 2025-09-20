@@ -16,10 +16,16 @@ namespace NK
 
 		virtual ~VulkanTextureView() override;
 
+		//Vulkan internal API (for use by other RHI-Vulkan classes)
+		[[nodiscard]] inline VkImageView GetImageView() const { return m_imageView; }
+		[[nodiscard]] inline VkRect2D GetRenderArea() const { return m_renderArea; }
+
 
 	private:
 		//Vulkan handles
 		VkImageView m_imageView{ VK_NULL_HANDLE };
+
+		VkRect2D m_renderArea;
 	};
 
 }

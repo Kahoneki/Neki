@@ -46,7 +46,6 @@ namespace NK
 		void CreateFactory();
 		void SelectAdapter();
 		void CreateDevice();
-		void CreateCommandQueues();
 		void CreateDescriptorHeaps();
 		void CreateRootSignature();
 

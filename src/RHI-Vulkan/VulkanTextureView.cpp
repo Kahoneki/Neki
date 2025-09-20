@@ -99,6 +99,14 @@ namespace NK
 		writeInfo.pImageInfo = &imageInfo;
 
 		vkUpdateDescriptorSets(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), 1, &writeInfo, 0, nullptr);
+
+
+		//Populate m_renderArea if _texture is 2D
+		if (m_dimension == TEXTURE_DIMENSION::DIM_2)
+		{
+			m_renderArea.offset = { 0, 0 };
+			m_renderArea.extent = { static_cast<std::uint32_t>(_texture->GetSize().x), static_cast<std::uint32_t>(_texture->GetSize().y) };
+		}
 		
 		
 		m_logger.Unindent();
@@ -152,6 +160,14 @@ namespace NK
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE_VIEW, "Failed to create texture view - result = " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
+		}
+
+
+		//Populate m_renderArea if _texture is 2D
+		if (m_dimension == TEXTURE_DIMENSION::DIM_2)
+		{
+			m_renderArea.offset = { 0, 0 };
+			m_renderArea.extent = { static_cast<std::uint32_t>(_texture->GetSize().x), static_cast<std::uint32_t>(_texture->GetSize().y) };
 		}
 
 
