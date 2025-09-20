@@ -21,3 +21,4 @@ cmake-build-*
 #Visual Studio
 .vs/
 out/
+build/
