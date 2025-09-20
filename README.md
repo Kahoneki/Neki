@@ -29,7 +29,7 @@ For building on Vulkan:
   - Linux (Arch) - AUR Packages: `vulkan-headers`, `vulkan-validation-layers`, `vulkan-man-pages`, `vulkan-tools`
 
 ### D3D12
-DX12 is only available for Windows development. If building on a Windows platform, the DX12 SDK should alraedy be installed for you.
+DX12 is only available for Windows development. If building on a Windows platform, the DX12 SDK should already be installed for you.
 
 ### AGC
 AGC development is under strict NDA and hence the source code is maintained in a private repository fork.
