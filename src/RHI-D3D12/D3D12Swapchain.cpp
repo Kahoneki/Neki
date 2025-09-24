@@ -48,14 +48,17 @@ namespace NK
 		//^then signalling both the fence and the semaphore-underlying-fence
 
 		//For parity with Vulkan, fence must be unsignalled
-		if (dynamic_cast<D3D12Fence*>(_signalFence)->GetState() != FENCE_STATE::UNSIGNALLED)
+		if (_signalFence != nullptr)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::SWAPCHAIN, "_signalFence passed to ISwapchain::AcquireNextImageIndex() was not in the UNSIGNALLED state as is required by this function - did you forget to wait/reset?\n");
-			throw std::runtime_error("");
-		}
-		else
-		{
-			dynamic_cast<D3D12Fence*>(_signalFence)->SetState(FENCE_STATE::SIGNALLED);
+			if (dynamic_cast<D3D12Fence*>(_signalFence)->GetState() != FENCE_STATE::UNSIGNALLED)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::SWAPCHAIN, "_signalFence passed to ISwapchain::AcquireNextImageIndex() was not in the UNSIGNALLED state as is required by this function - did you forget to wait/reset?\n");
+				throw std::runtime_error("");
+			}
+			else
+			{
+				dynamic_cast<D3D12Fence*>(_signalFence)->SetState(FENCE_STATE::SIGNALLED);
+			}
 		}
 
 		return m_swapchain->GetCurrentBackBufferIndex();

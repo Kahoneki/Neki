@@ -120,50 +120,71 @@ int main()
 	commandPoolDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
 	const NK::UniquePtr<NK::ICommandPool> commandPool{ device->CreateCommandPool(commandPoolDesc) };
 
-	//Command Buffer
+	//Number of frames the CPU can get ahead of the GPU
+	constexpr std::uint32_t MAX_FRAMES_IN_FLIGHT{ 2 };
+
+	//Command Buffers
 	NK::CommandBufferDesc commandBufferDesc{};
 	commandBufferDesc.level = NK::COMMAND_BUFFER_LEVEL::PRIMARY;
-	const NK::UniquePtr<NK::ICommandBuffer> commandBuffer{ commandPool->AllocateCommandBuffer(commandBufferDesc) };
+	std::vector<NK::UniquePtr<NK::ICommandBuffer>> commandBuffers(MAX_FRAMES_IN_FLIGHT);
+	for (std::size_t i{ 0 }; i<MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		commandBuffers[i] = commandPool->AllocateCommandBuffer(commandBufferDesc);
+	}
 
 	//Semaphores
-	const NK::UniquePtr<NK::ISemaphore> imageAvailableSemaphore{ device->CreateSemaphore() };
-	const NK::UniquePtr<NK::ISemaphore> renderFinishedSemaphore{ device->CreateSemaphore() };
+	std::vector<NK::UniquePtr<NK::ISemaphore>> imageAvailableSemaphores(MAX_FRAMES_IN_FLIGHT);
+	for (std::size_t i{ 0 }; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		imageAvailableSemaphores[i] = device->CreateSemaphore();
+	}
+	
+	std::vector<NK::UniquePtr<NK::ISemaphore>> renderFinishedSemaphores(swapchain->GetNumImages());
+	for (std::size_t i{ 0 }; i < swapchain->GetNumImages(); ++i)
+	{
+		renderFinishedSemaphores[i] = device->CreateSemaphore();
+	}
 
-	//Fence
+
+	//Fences
 	NK::FenceDesc fenceDesc{};
 	fenceDesc.initiallySignaled = true;
-	const NK::UniquePtr<NK::IFence> inFlightFence{ device->CreateFence(fenceDesc) };
+	std::vector<NK::UniquePtr<NK::IFence>> inFlightFences(MAX_FRAMES_IN_FLIGHT);
+	for (std::size_t i{ 0 }; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		inFlightFences[i] = device->CreateFence(fenceDesc);
+	}
 
+	//Tracks the current frame in range [0, MAX_FRAMES_IN_FLIGHT-1]
+	std::uint32_t currentFrame{ 0 };
 	
 	while (!surface->ShouldClose())
 	{
-		inFlightFence->Wait();
-		inFlightFence->Reset();
+		inFlightFences[currentFrame]->Wait();
+		inFlightFences[currentFrame]->Reset();
 
-		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphore.get(), inFlightFence.get()) };
-		
-		//inFlightFence->Wait();
-		inFlightFence->Reset();
+		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphores[currentFrame].get(), nullptr) };
 		
 		glfwPollEvents();
 
-		commandBuffer->Begin();
-		commandBuffer->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
+		commandBuffers[currentFrame]->Begin();
+		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
-		commandBuffer->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
-		commandBuffer->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
-		commandBuffer->SetViewport({ 0, 0 }, { 1280, 720 });
-		commandBuffer->SetScissor({ 0, 0 }, { 1280, 720 });
-		commandBuffer->Draw(3, 1, 0, 0);
-		commandBuffer->EndRendering();
+		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
+		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
+		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { 1280, 720 });
+		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { 1280, 720 });
+		commandBuffers[currentFrame]->Draw(3, 1, 0, 0);
+		commandBuffers[currentFrame]->EndRendering();
 
-		commandBuffer->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);
-		commandBuffer->End();
+		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);
+		commandBuffers[currentFrame]->End();
 
-		graphicsQueue->Submit(commandBuffer.get(), imageAvailableSemaphore.get(), renderFinishedSemaphore.get(), inFlightFence.get());
-		swapchain->Present(renderFinishedSemaphore.get(), imageIndex);
+		graphicsQueue->Submit(commandBuffers[currentFrame].get(), imageAvailableSemaphores[currentFrame].get(), renderFinishedSemaphores[imageIndex].get(), inFlightFences[currentFrame].get());
+		swapchain->Present(renderFinishedSemaphores[imageIndex].get(), imageIndex);
 
-		//todo: very VERY sloppy temporary workaround - need to figure out how to do all this synchronisation stuff properly
-		graphicsQueue->WaitIdle();
+		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
 	}
+	graphicsQueue->WaitIdle();
 }

@@ -24,8 +24,9 @@ namespace NK
 		//Acquire the index of the next image in the swapchain - signals _signalSemaphore and _signalFence when the image is ready to be rendered to.
 		virtual std::uint32_t AcquireNextImageIndex(ISemaphore* _signalSemaphore, IFence* _signalFence) = 0;
 
-		[[nodiscard]] inline ITexture* GetImage(std::uint32_t _index) { return m_backBuffers[_index].get(); }
-		[[nodiscard]] inline ITextureView* GetImageView(uint32_t _index) { return m_backBufferViews[_index].get(); }
+		[[nodiscard]] inline ITexture* GetImage(std::uint32_t _index) const { return m_backBuffers[_index].get(); }
+		[[nodiscard]] inline ITextureView* GetImageView(std::uint32_t _index) const { return m_backBufferViews[_index].get(); }
+		[[nodiscard]] inline std::uint32_t GetNumImages() const { return m_numBuffers; }
 
 		//Presents image with index _imageIndex to the screen - waits for _waitSemaphore before presenting
 		virtual void Present(ISemaphore* _waitSemaphore, std::uint32_t _imageIndex) = 0;

@@ -156,8 +156,8 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
         add_custom_command(
             OUTPUT ${SPV_OUTPUT}
             COMMAND ${DXC_EXECUTABLE}
-                    -I ${SHADER_INCLUDE_PATH}
                     ${SHADER_SOURCE}
+                    -I ${SHADER_INCLUDE_PATH}
                     -T ${SHADER_TYPE}
                     -E ${ENTRY_POINT}
                     -spirv
@@ -172,8 +172,8 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
         add_custom_command(
             OUTPUT ${DXIL_OUTPUT}
             COMMAND ${DXC_EXECUTABLE}
-                    -I ${SHADER_INCLUDE_PATH}
                     ${SHADER_SOURCE}
+                    -I ${SHADER_INCLUDE_PATH}
                     -T ${SHADER_TYPE}
                     -E ${ENTRY_POINT}
                     -Fo ${DXIL_OUTPUT}
@@ -199,6 +199,8 @@ endfunction()
 
 #Test executables - check only passes if building the Neki library directly, not when it's being included by another project via FetchContent
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+
+
 
     #Shader compilation
 
@@ -230,6 +232,15 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
             Shaders
             DEPENDS ${ALL_SHADER_OUTPUTS}
     )
+
+
+    message(STATUS "Shader include path: ${SHADER_INCLUDE_PATH}")
+message(STATUS "Looking for: ${CMAKE_SOURCE_DIR}/src/Types/ShaderAttribute.hlsli")
+if(EXISTS "${CMAKE_SOURCE_DIR}/src/Types/ShaderAttribute.hlsli")
+    message(STATUS "File found!")
+else()
+    message(STATUS "File NOT found!")
+endif()
 
 
 

@@ -122,7 +122,7 @@ namespace NK
 			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
 			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_colourAttachments[i].GetFormat());
 			beg.Clear.ClearValue.Color[0] = 0.0f;
-			beg.Clear.ClearValue.Color[1] = 1.0f;
+			beg.Clear.ClearValue.Color[1] = 0.0f;
 			beg.Clear.ClearValue.Color[2] = 0.0f;
 			beg.Clear.ClearValue.Color[3] = 1.0f;
 			

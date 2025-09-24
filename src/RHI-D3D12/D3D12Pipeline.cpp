@@ -232,9 +232,10 @@ namespace NK
 	{
 		switch (_attribute)
 		{
-		case SHADER_ATTRIBUTE::POSITION:	return std::make_pair<std::string, UINT>("POSITION", 0);
+		case SHADER_ATTRIBUTE::POSITION:	return std::make_pair<std::string, UINT>("SV_POSITION", 0);
 		case SHADER_ATTRIBUTE::NORMAL:		return std::make_pair<std::string, UINT>("NORMAL", 0);
 		case SHADER_ATTRIBUTE::TEXCOORD_0:	return std::make_pair<std::string, UINT>("TEXCOORD", 0);
+		case SHADER_ATTRIBUTE::COLOUR_0:	return std::make_pair<std::string, UINT>("COLOR", 0);
 		default:
 		{
 			throw std::runtime_error("Default case reached for D3D12Pipeline::GetSemanticNameIndexPair() - attribute = " + std::to_string(std::to_underlying(_attribute)));
