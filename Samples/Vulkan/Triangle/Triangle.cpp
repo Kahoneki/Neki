@@ -106,7 +106,7 @@ int main()
 	graphicsPipelineDesc.depthStencilDesc = depthStencilDesc;
 	graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
 	graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
-	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };
+	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_UNORM };
 	graphicsPipelineDesc.depthStencilAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
 
 	const NK::UniquePtr<NK::IPipeline> graphicsPipeline{ device->CreatePipeline(graphicsPipelineDesc) };

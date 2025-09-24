@@ -104,7 +104,7 @@ namespace NK
 		}
 		else
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::SWAPCHAIN, "Failed to create swapchain\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::SWAPCHAIN, "Failed to create swapchain. Result = " + std::to_string(hr) + '\n');
 			throw std::runtime_error("");
 		}
 
