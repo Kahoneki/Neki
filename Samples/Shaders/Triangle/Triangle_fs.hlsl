@@ -8,5 +8,5 @@ struct VertexOutput
 
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
-    return float4(float3(vertexOutput.colour), 1.0f);
+    return float4(vertexOutput.colour, 1.0f);
 }

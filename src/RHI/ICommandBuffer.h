@@ -2,6 +2,7 @@
 #include "ICommandPool.h"
 #include "glm/vec2.hpp"
 #include "Types/ResourceStates.h"
+#include <Types/DataFormat.h>
 
 namespace NK
 {
@@ -39,10 +40,15 @@ namespace NK
 		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment) = 0;
 		virtual void EndRendering() = 0;
 
+		virtual void BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides) = 0;
+		virtual void BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format) = 0;
 		virtual void BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint) = 0;
 		virtual void SetViewport(glm::vec2 _pos, glm::vec2 _extent) = 0;
 		virtual void SetScissor(glm::ivec2 _pos, glm::ivec2 _extent) = 0;
 		virtual void Draw(std::uint32_t _vertexCount, std::uint32_t _instanceCount, std::uint32_t _firstVertex, std::uint32_t _firstInstance) = 0;
+
+		virtual void CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) = 0;
+		virtual void UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer) = 0;
 
 
 	protected:

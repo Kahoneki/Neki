@@ -1,19 +1,19 @@
 #include <Types/ShaderAttribute.hlsli>
 
-struct VertexOutput
+struct VertexInput
 {
-	ATTRIBUTE(float4, pos, NK::SHADER_ATTRIBUTE_LOCATION_POSITION, SV_POSITION);
+	ATTRIBUTE(float2, pos, NK::SHADER_ATTRIBUTE_LOCATION_POSITION, POSITION);
 	ATTRIBUTE(float3, colour, NK::SHADER_ATTRIBUTE_LOCATION_COLOUR_0, COLOR0);
 };
 
-VertexOutput VSMain(uint vertexID : SV_VertexID)
+struct VertexOutput
 {
-    float2 positions[3] =
-    {
-        float2(0.0f, 0.5f), //Top center
-		float2(0.5f, -0.5f), //Bottom right
-		float2(-0.5f, -0.5f) //Bottom left
-    };
+	float4 pos : SV_POSITION;
+	float3 colour : COLOR0;
+};
+
+VertexOutput VSMain(VertexInput input)
+{
 	
     float3 colours[3] =
     {
@@ -23,8 +23,8 @@ VertexOutput VSMain(uint vertexID : SV_VertexID)
     };
 	
     VertexOutput output;
-    output.pos = float4(positions[vertexID], 0.0, 1.0);
-    output.colour = colours[vertexID];
+    output.pos = float4(input.pos, 0.0, 1.0);
+	output.colour = input.colour;
 
     return output;
 }

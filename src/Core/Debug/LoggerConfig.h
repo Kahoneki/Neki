@@ -50,6 +50,8 @@ namespace NK
 		QUEUE,
 		FENCE,
 		SEMAPHORE,
+
+		GPU_UPLOADER,
 		
 		APPLICATION,
 	};
