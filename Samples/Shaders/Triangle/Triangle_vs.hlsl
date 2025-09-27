@@ -9,7 +9,7 @@ struct VertexInput
 struct VertexOutput
 {
 	float4 pos : SV_POSITION;
-	float3 colour : COLOR0;
+	ATTRIBUTE(float3, colour, NK::SHADER_ATTRIBUTE_LOCATION_COLOUR_0, COLOR0);
 };
 
 VertexOutput VSMain(VertexInput input)

@@ -129,15 +129,16 @@ namespace NK
 
 	void* VulkanBuffer::Map()
 	{
-		//todo: implement
-		return nullptr;
+		void* data;
+		vkMapMemory(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_memory, 0, m_size, 0, &data);
+		return data;
 	}
 
 
 
 	void VulkanBuffer::Unmap()
 	{
-		//todo: implement
+		vkUnmapMemory(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_memory);
 	}
 
 

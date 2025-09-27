@@ -48,6 +48,8 @@ namespace NK
 		BC7_RGBA_SRGB,
 
 		//Integer Formats
+		R8_UINT,
+		R16_UINT,
 		R32_UINT,
 	};	
 }
