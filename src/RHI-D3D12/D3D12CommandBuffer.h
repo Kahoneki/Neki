@@ -27,7 +27,7 @@ namespace NK
 		virtual void BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint) override;
 		virtual void SetViewport(glm::vec2 _pos, glm::vec2 _extent) override;
 		virtual void SetScissor(glm::ivec2 _pos, glm::ivec2 _extent) override;
-		virtual void Draw(std::uint32_t _vertexCount, std::uint32_t _instanceCount, std::uint32_t _firstVertex, std::uint32_t _firstInstance) override;
+		virtual void DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance) override;
 
 		virtual void CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) override;
 		virtual void UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer) override;

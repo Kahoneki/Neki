@@ -227,9 +227,9 @@ namespace NK
 
 
 
-	void D3D12CommandBuffer::Draw(std::uint32_t _vertexCount, std::uint32_t _instanceCount, std::uint32_t _firstVertex, std::uint32_t _firstInstance)
+	void D3D12CommandBuffer::DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance)
 	{
-		m_buffer->DrawInstanced(_vertexCount, _instanceCount, _firstVertex, _firstInstance);
+		m_buffer->DrawIndexedInstanced(_indexCount, _instanceCount, _firstIndex, 0, _firstInstance);
 	}
 
 

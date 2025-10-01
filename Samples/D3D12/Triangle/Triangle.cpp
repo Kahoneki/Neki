@@ -275,7 +275,7 @@ int main()
 		
 		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { 1280, 720 });
 		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { 1280, 720 });
-		commandBuffers[currentFrame]->Draw(3, 1, 0, 0);
+		commandBuffers[currentFrame]->DrawIndexed(3, 1, 0, 0);
 		commandBuffers[currentFrame]->EndRendering();
 
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);
