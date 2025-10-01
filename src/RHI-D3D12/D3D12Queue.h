@@ -7,7 +7,7 @@ namespace NK
 	class D3D12Queue final : public IQueue
 	{	
 	public:
-		explicit D3D12Queue(ILogger& _logger, IDevice& _device, const QueueDesc& _desc);
+		explicit D3D12Queue(ILogger& _logger, IDevice& _device, const QueueDesc& _desc, ICommandBuffer* _syncList);
 		virtual ~D3D12Queue() override;
 
 		virtual void Submit(ICommandBuffer* _cmdBuffer, ISemaphore* _waitSemaphore, ISemaphore* _signalSemaphore, IFence* _signalFence) override;
@@ -19,5 +19,6 @@ namespace NK
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue;
+		ICommandBuffer* m_syncList; //Used for WaitIdle()
 	};
 }

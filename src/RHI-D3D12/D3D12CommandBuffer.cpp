@@ -1,6 +1,5 @@
 #include "D3D12CommandBuffer.h"
 #include "D3D12CommandPool.h"
-#include "D3D12Device.h"
 #include <stdexcept>
 #ifdef ERROR
 	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR

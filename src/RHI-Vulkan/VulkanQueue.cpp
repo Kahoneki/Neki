@@ -30,17 +30,17 @@ namespace NK
 		VulkanDevice& vkDevice{ dynamic_cast<VulkanDevice&>(m_device) };
 		switch (m_type)
 		{
-		case QUEUE_TYPE::GRAPHICS:
+		case COMMAND_POOL_TYPE::GRAPHICS:
 		{
 			vkGetDeviceQueue(vkDevice.GetDevice(), vkDevice.GetGraphicsQueueFamilyIndex(), m_queueIndex, &m_queue);
 			break;
 		}
-		case QUEUE_TYPE::COMPUTE:
+		case COMMAND_POOL_TYPE::COMPUTE:
 		{
 			vkGetDeviceQueue(vkDevice.GetDevice(), vkDevice.GetComputeQueueFamilyIndex(), m_queueIndex, &m_queue);
 			break;
 		}
-		case QUEUE_TYPE::TRANSFER:
+		case COMMAND_POOL_TYPE::TRANSFER:
 		{
 			vkGetDeviceQueue(vkDevice.GetDevice(), vkDevice.GetTransferQueueFamilyIndex(), m_queueIndex, &m_queue);
 			break;
@@ -57,7 +57,7 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::BUFFER, "Shutting Down VulkanQueue\n");
 
-		
+
 		if (m_queueIndex != FreeListAllocator::INVALID_INDEX)
 		{
 			m_queueIndexAllocator.Free(m_queueIndex);

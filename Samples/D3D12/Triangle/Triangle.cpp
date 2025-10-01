@@ -47,12 +47,12 @@ int main()
 
 	//Graphics Queue
 	NK::QueueDesc graphicsQueueDesc{};
-	graphicsQueueDesc.type = NK::QUEUE_TYPE::GRAPHICS;
+	graphicsQueueDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
 	const NK::UniquePtr<NK::IQueue> graphicsQueue(device->CreateQueue(graphicsQueueDesc));
 
 	//Transfer Queue
 	NK::QueueDesc transferQueueDesc{};
-	transferQueueDesc.type = NK::QUEUE_TYPE::TRANSFER;
+	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
 	const NK::UniquePtr<NK::IQueue> transferQueue(device->CreateQueue(transferQueueDesc));
 
 	//Surface
@@ -137,14 +137,8 @@ int main()
 	transferCommandBuffer->CopyBuffer(vertStagingBuffer.get(), vertBuffer.get());
 	transferCommandBuffer->CopyBuffer(indexStagingBuffer.get(), indexBuffer.get());
 	transferCommandBuffer->End();
-	//todo: implement D3D12Queue::WaitIdle() so we don't need this fence
-	NK::FenceDesc bufferCopyFenceDesc{};
-	bufferCopyFenceDesc.initiallySignaled = false;
-	NK::UniquePtr<NK::IFence> bufferCopyFence{ device->CreateFence(bufferCopyFenceDesc) };
-	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, bufferCopyFence.get());
-	bufferCopyFence->Wait();
-	bufferCopyFence->Reset();
-
+	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
+	transferQueue->WaitIdle();
 
 
 	//Graphics Pipeline

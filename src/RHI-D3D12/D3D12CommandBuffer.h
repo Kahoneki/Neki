@@ -1,9 +1,11 @@
 #pragma once
-#include "RHI/ICommandBuffer.h"
+#include <RHI/ICommandBuffer.h>
 #include "D3D12Device.h"
 
 namespace NK
 {
+
+	class D3D12Device;
 
 	class D3D12CommandBuffer final : public ICommandBuffer
 	{

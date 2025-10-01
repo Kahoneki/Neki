@@ -6,16 +6,9 @@
 namespace NK
 {
 
-	enum class QUEUE_TYPE
-	{
-		GRAPHICS,
-		COMPUTE,
-		TRANSFER,
-	};
-
 	struct QueueDesc
 	{
-		QUEUE_TYPE type;
+		COMMAND_POOL_TYPE type;
 	};
 	
 	
@@ -36,7 +29,7 @@ namespace NK
 		ILogger& m_logger;
 		IDevice& m_device;
 		
-		QUEUE_TYPE m_type;
+		COMMAND_POOL_TYPE m_type;
 	};
 
 }

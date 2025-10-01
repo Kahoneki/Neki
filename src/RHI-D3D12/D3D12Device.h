@@ -8,6 +8,8 @@
 #ifdef CreateSemaphore
 	#undef CreateSemaphore
 #endif
+#include <RHI/ICommandPool.h>
+#include <RHI/ICommandBuffer.h>
 
 
 
@@ -48,6 +50,7 @@ namespace NK
 		void CreateDevice();
 		void CreateDescriptorHeaps();
 		void CreateRootSignature();
+		void CreateSyncLists();
 
 
 		const D3D_FEATURE_LEVEL m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
@@ -57,6 +60,12 @@ namespace NK
 		Microsoft::WRL::ComPtr<IDXGIFactory4> m_factory;
 		Microsoft::WRL::ComPtr<IDXGIAdapter1> m_adapter;
 		Microsoft::WRL::ComPtr<ID3D12Device> m_device;
+
+		//For passing to D3D12Queue for D3D12Queue::WaitIdle()
+		UniquePtr<ICommandPool> m_graphicsSyncListAllocator;
+		UniquePtr<ICommandPool> m_computeSyncListAllocator;
+		UniquePtr<ICommandPool> m_transferSyncListAllocator;
+		std::unordered_map<COMMAND_POOL_TYPE, UniquePtr<ICommandBuffer>> m_syncLists;
 
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_resourceDescriptorHeap;
 		UINT m_resourceDescriptorSize;

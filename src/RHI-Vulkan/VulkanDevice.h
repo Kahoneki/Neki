@@ -82,11 +82,11 @@ namespace NK
 		std::uint32_t m_transferQueueFamilyIndex{ UINT32_MAX };
 		UniquePtr<FreeListAllocator> m_transferQueueIndexAllocator;
 
-		std::unordered_map<QUEUE_TYPE, UniquePtr<FreeListAllocator>*> m_queueIndexAllocatorLookup
+		std::unordered_map<COMMAND_POOL_TYPE, UniquePtr<FreeListAllocator>*> m_queueIndexAllocatorLookup
 		{
-			{ QUEUE_TYPE::GRAPHICS, &m_graphicsQueueIndexAllocator },
-			{ QUEUE_TYPE::COMPUTE, &m_computeQueueIndexAllocator },
-			{ QUEUE_TYPE::TRANSFER, &m_transferQueueIndexAllocator },
+			{ COMMAND_POOL_TYPE::GRAPHICS, &m_graphicsQueueIndexAllocator },
+			{ COMMAND_POOL_TYPE::COMPUTE, &m_computeQueueIndexAllocator },
+			{ COMMAND_POOL_TYPE::TRANSFER, &m_transferQueueIndexAllocator },
 		};
 
 		inline static constexpr std::array<VkDescriptorType, 4> m_resourceTypes

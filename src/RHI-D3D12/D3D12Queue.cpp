@@ -12,8 +12,8 @@
 namespace NK
 {
 
-	D3D12Queue::D3D12Queue(ILogger& _logger, IDevice& _device, const QueueDesc& _desc)
-	: IQueue(_logger, _device, _desc)
+	D3D12Queue::D3D12Queue(ILogger& _logger, IDevice& _device, const QueueDesc& _desc, ICommandBuffer* _syncList)
+	: IQueue(_logger, _device, _desc), m_syncList(_syncList)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::QUEUE, "Initialising D3D12Queue\n");
@@ -23,9 +23,9 @@ namespace NK
 		D3D12_COMMAND_QUEUE_DESC desc{};
 		switch (m_type)
 		{
-		case QUEUE_TYPE::GRAPHICS:	desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT; break;
-		case QUEUE_TYPE::COMPUTE:	desc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE; break;
-		case QUEUE_TYPE::TRANSFER:	desc.Type = D3D12_COMMAND_LIST_TYPE_COPY; break;
+		case COMMAND_POOL_TYPE::GRAPHICS:	desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT; break;
+		case COMMAND_POOL_TYPE::COMPUTE:	desc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE; break;
+		case COMMAND_POOL_TYPE::TRANSFER:	desc.Type = D3D12_COMMAND_LIST_TYPE_COPY; break;
 		}
 		const HRESULT hr{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_queue)) };
 		if (SUCCEEDED(hr))
@@ -106,7 +106,13 @@ namespace NK
 
 	void D3D12Queue::WaitIdle()
 	{
-		//todo: implement
+		//Submit an empty submit on m_syncList that signals a fence on its completion, then wait for that fence to complete
+		NK::FenceDesc syncFenceDesc{};
+		syncFenceDesc.initiallySignaled = false;
+		NK::UniquePtr<NK::IFence> syncFence{ m_device.CreateFence(syncFenceDesc) };
+		Submit(m_syncList, nullptr, nullptr, syncFence.get());
+		syncFence->Wait();
+		syncFence->Reset();
 	}
 
 }
