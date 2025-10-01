@@ -242,7 +242,7 @@ namespace NK
 	void D3D12CommandBuffer::DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance)
 	{
 		//todo: figure out a way to tie this up in another method
-		m_buffer->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		m_buffer->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		m_buffer->DrawIndexedInstanced(_indexCount, _instanceCount, _firstIndex, 0, _firstInstance);
 	}
