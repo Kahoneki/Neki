@@ -1,9 +1,11 @@
 #pragma once
+#include <RHI/ICommandPool.h>
 #include "D3D12Device.h"
-#include "RHI/ICommandPool.h"
 
 namespace NK
 {
+	class D3D12Device;
+
 	//ID3D12CommandAllocator
 	class D3D12CommandPool final : public ICommandPool
 	{

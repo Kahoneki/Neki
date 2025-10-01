@@ -31,16 +31,35 @@ int main()
 	//Device
 	const NK::UniquePtr<NK::IDevice> device{ NK_NEW(NK::D3D12Device, *logger, *allocator) };
 
+	//Transfer Command Pool
+	NK::CommandPoolDesc transferCommandPoolDesc{};
+	transferCommandPoolDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
+	const NK::UniquePtr<NK::ICommandPool> transferCommandPool{ device->CreateCommandPool(transferCommandPoolDesc) };
+
+	//Graphics Command Pool
+	NK::CommandPoolDesc graphicsCommandPoolDesc{};
+	graphicsCommandPoolDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
+	const NK::UniquePtr<NK::ICommandPool> graphicsCommandPool{ device->CreateCommandPool(graphicsCommandPoolDesc) };
+
+	//Primary Level Command Buffer Description
+	NK::CommandBufferDesc primaryLevelCommandBufferDesc{};
+	primaryLevelCommandBufferDesc.level = NK::COMMAND_BUFFER_LEVEL::PRIMARY;
+
+	//Graphics Queue
+	NK::QueueDesc graphicsQueueDesc{};
+	graphicsQueueDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
+	const NK::UniquePtr<NK::IQueue> graphicsQueue(device->CreateQueue(graphicsQueueDesc));
+
+	//Transfer Queue
+	NK::QueueDesc transferQueueDesc{};
+	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
+	const NK::UniquePtr<NK::IQueue> transferQueue(device->CreateQueue(transferQueueDesc));
+
 	//Surface
 	NK::SurfaceDesc surfaceDesc{};
 	surfaceDesc.name = "Triangle Sample";
 	surfaceDesc.size = glm::ivec2(1280, 720);
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
-
-	//Queue
-	NK::QueueDesc queueDesc{};
-	queueDesc.type = NK::QUEUE_TYPE::GRAPHICS;
-	const NK::UniquePtr<NK::IQueue> graphicsQueue(device->CreateQueue(queueDesc));
 
 	//Swapchain
 	NK::SwapchainDesc swapchainDesc{};
@@ -61,15 +80,93 @@ int main()
 	fragShaderDesc.filepath = "Samples/Shaders/Triangle/Triangle_fs";
 	const NK::UniquePtr<NK::IShader> fragShader{ device->CreateShader(fragShaderDesc) };
 
+	//Transfer Command Buffer
+	const NK::UniquePtr<NK::ICommandBuffer> transferCommandBuffer{ transferCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc) };
 
-	//Graphics Pipeline
+	
+	//Vertex Buffer
 	struct Vertex
 	{
-		glm::vec3 pos;
+		glm::vec2 pos;
+		glm::vec3 colour;
 	};
-	//empty for now
+	const Vertex vertices[3]
+	{
+		Vertex(glm::vec2(0.0f, 0.5f), glm::vec3(1.0f, 0.0f, 0.0f)),  //Top center
+		Vertex(glm::vec2(0.5f, -0.5f),  glm::vec3(0.0f, 1.0f, 0.0f)), //Bottom right
+		Vertex(glm::vec2(-0.5f, -0.5f), glm::vec3(0.0f, 0.0f, 1.0f)) //Bottom left
+	};
+	
+	NK::BufferDesc vertStagingBufferDesc{};
+	vertStagingBufferDesc.size = sizeof(Vertex) * 3;
+	vertStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
+	vertStagingBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
+	const NK::UniquePtr<NK::IBuffer> vertStagingBuffer{ device->CreateBuffer(vertStagingBufferDesc) };
+	void* vertStagingBufferMap{ vertStagingBuffer->Map() };
+	memcpy(vertStagingBufferMap, vertices, sizeof(Vertex) * 3);
+	vertStagingBuffer->Unmap();
+
+	NK::BufferDesc vertBufferDesc{};
+	vertBufferDesc.size = sizeof(Vertex) * 3;
+	vertBufferDesc.type = NK::MEMORY_TYPE::DEVICE;
+	vertBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | NK::BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
+	const NK::UniquePtr<NK::IBuffer> vertBuffer{ device->CreateBuffer(vertBufferDesc) };
+
+
+	//Index Buffer
+	const std::uint32_t indices[3]{ 0, 1, 2 };
+	
+	NK::BufferDesc indexStagingBufferDesc{};
+	indexStagingBufferDesc.size = sizeof(std::uint32_t) * 3;
+	indexStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
+	indexStagingBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
+	const NK::UniquePtr<NK::IBuffer> indexStagingBuffer{ device->CreateBuffer(indexStagingBufferDesc) };
+	void* indexStagingBufferMap{ indexStagingBuffer->Map() };
+	memcpy(indexStagingBufferMap, indices, sizeof(std::uint32_t) * 3);
+	indexStagingBuffer->Unmap();
+
+	NK::BufferDesc indexBufferDesc{};
+	indexBufferDesc.size = sizeof(std::uint32_t) * 3;
+	indexBufferDesc.type = NK::MEMORY_TYPE::DEVICE;
+	indexBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | NK::BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT;
+	const NK::UniquePtr<NK::IBuffer> indexBuffer{ device->CreateBuffer(indexBufferDesc) };
+
+
+	//Copy Vertex and Index Buffers
+	transferCommandBuffer->Begin();
+	transferCommandBuffer->CopyBuffer(vertStagingBuffer.get(), vertBuffer.get());
+	transferCommandBuffer->CopyBuffer(indexStagingBuffer.get(), indexBuffer.get());
+	transferCommandBuffer->End();
+	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
+	transferQueue->WaitIdle();
+
+
+	//Graphics Pipeline
+
+	//Position attribute
 	std::vector<NK::VertexAttributeDesc> vertexAttributes;
+	NK::VertexAttributeDesc posAttribute{};
+	posAttribute.attribute = NK::SHADER_ATTRIBUTE::POSITION;
+	posAttribute.binding = 0;
+	posAttribute.format = NK::DATA_FORMAT::R32G32_SFLOAT;
+	posAttribute.offset = 0;
+	vertexAttributes.push_back(posAttribute);
+	NK::VertexAttributeDesc colourAttribute{};
+	colourAttribute.attribute = NK::SHADER_ATTRIBUTE::COLOUR_0;
+	colourAttribute.binding = 0;
+	colourAttribute.format = NK::DATA_FORMAT::R32G32B32_SFLOAT;
+	colourAttribute.offset = sizeof(glm::vec2);
+	vertexAttributes.push_back(colourAttribute);
+
+	//Vertex buffer binding
 	std::vector<NK::VertexBufferBindingDesc> bufferBindings;
+	NK::VertexBufferBindingDesc bufferBinding{};
+	bufferBinding.binding = 0;
+	bufferBinding.inputRate = NK::VERTEX_INPUT_RATE::VERTEX;
+	bufferBinding.stride = sizeof(Vertex);
+	bufferBindings.push_back(bufferBinding);
+
+	//Vertex input description
 	NK::VertexInputDesc vertexInputDesc{};
 	vertexInputDesc.attributeDescriptions = vertexAttributes;
 	vertexInputDesc.bufferBindingDescriptions = bufferBindings;
@@ -115,21 +212,14 @@ int main()
 	const NK::UniquePtr<NK::IPipeline> graphicsPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
 
 
-	//Command Pool
-	NK::CommandPoolDesc commandPoolDesc{};
-	commandPoolDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
-	const NK::UniquePtr<NK::ICommandPool> commandPool{ device->CreateCommandPool(commandPoolDesc) };
-
 	//Number of frames the CPU can get ahead of the GPU
 	constexpr std::uint32_t MAX_FRAMES_IN_FLIGHT{ 2 };
 
-	//Command Buffers
-	NK::CommandBufferDesc commandBufferDesc{};
-	commandBufferDesc.level = NK::COMMAND_BUFFER_LEVEL::PRIMARY;
+	//Graphics Command Buffers
 	std::vector<NK::UniquePtr<NK::ICommandBuffer>> commandBuffers(MAX_FRAMES_IN_FLIGHT);
 	for (std::size_t i{ 0 }; i<MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		commandBuffers[i] = commandPool->AllocateCommandBuffer(commandBufferDesc);
+		commandBuffers[i] = graphicsCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc);
 	}
 
 	//Semaphores
@@ -147,12 +237,12 @@ int main()
 
 
 	//Fences
-	NK::FenceDesc fenceDesc{};
-	fenceDesc.initiallySignaled = true;
+	NK::FenceDesc inFlightFenceDesc{};
+	inFlightFenceDesc.initiallySignaled = true;
 	std::vector<NK::UniquePtr<NK::IFence>> inFlightFences(MAX_FRAMES_IN_FLIGHT);
 	for (std::size_t i{ 0 }; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		inFlightFences[i] = device->CreateFence(fenceDesc);
+		inFlightFences[i] = device->CreateFence(inFlightFenceDesc);
 	}
 
 	//Tracks the current frame in range [0, MAX_FRAMES_IN_FLIGHT-1]
@@ -172,9 +262,14 @@ int main()
 
 		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
+		
+		std::size_t vertexBufferStride{ sizeof(Vertex) };
+		commandBuffers[currentFrame]->BindVertexBuffers(0, 1, vertBuffer.get(), &vertexBufferStride);
+		commandBuffers[currentFrame]->BindIndexBuffer(indexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
+		
 		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { 1280, 720 });
 		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { 1280, 720 });
-		commandBuffers[currentFrame]->Draw(3, 1, 0, 0);
+		commandBuffers[currentFrame]->DrawIndexed(3, 1, 0, 0);
 		commandBuffers[currentFrame]->EndRendering();
 
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);

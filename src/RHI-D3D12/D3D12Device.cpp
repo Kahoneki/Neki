@@ -1,5 +1,6 @@
 #include "D3D12Device.h"
 #include "D3D12Device.h"
+#include "D3D12Device.h"
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/FormatUtils.h>
 #include "D3D12CommandPool.h"
@@ -35,6 +36,7 @@ namespace NK
 		CreateDevice();
 		CreateDescriptorHeaps();
 		CreateRootSignature();
+		CreateSyncLists();
 
 		m_logger.Unindent();
 	}
@@ -118,7 +120,7 @@ namespace NK
 	
 	UniquePtr<IQueue> D3D12Device::CreateQueue(const QueueDesc& _desc)
 	{
-		return UniquePtr<IQueue>(NK_NEW(D3D12Queue, m_logger, *this, _desc));
+		return UniquePtr<IQueue>(NK_NEW(D3D12Queue, m_logger, *this, _desc, m_syncLists[_desc.type].get()));
 	}
 
 	
@@ -392,6 +394,33 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Root Signature creation unsuccessful\n");
 			throw std::runtime_error("");
 		}
+
+		m_logger.Unindent();
+	}
+
+
+
+	void D3D12Device::CreateSyncLists()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating Sync Lists\n");
+
+
+		CommandBufferDesc primaryLevelBufferDesc{};
+		primaryLevelBufferDesc.level = COMMAND_BUFFER_LEVEL::PRIMARY;
+
+		CommandPoolDesc poolDesc{};
+		poolDesc.type = COMMAND_POOL_TYPE::GRAPHICS;
+		m_graphicsSyncListAllocator = CreateCommandPool(poolDesc);
+		poolDesc.type = COMMAND_POOL_TYPE::COMPUTE;
+		m_computeSyncListAllocator = CreateCommandPool(poolDesc);
+		poolDesc.type = COMMAND_POOL_TYPE::TRANSFER;
+		m_transferSyncListAllocator = CreateCommandPool(poolDesc);
+
+		m_syncLists[COMMAND_POOL_TYPE::GRAPHICS] = m_graphicsSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
+		m_syncLists[COMMAND_POOL_TYPE::COMPUTE] = m_computeSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
+		m_syncLists[COMMAND_POOL_TYPE::TRANSFER] = m_transferSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
+
 
 		m_logger.Unindent();
 	}

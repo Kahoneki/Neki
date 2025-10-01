@@ -61,13 +61,16 @@ namespace NK
 
 	void* D3D12Buffer::Map()
 	{
-		return nullptr;
+		void* data;
+		m_buffer->Map(0, nullptr, &data);
+		return data;
 	}
 	
 	
 	
 	void D3D12Buffer::Unmap()
 	{
+		m_buffer->Unmap(0, nullptr);
 	}
 
 
@@ -76,7 +79,7 @@ namespace NK
 	{
 		D3D12_RESOURCE_FLAGS d3d12Flags{ D3D12_RESOURCE_FLAG_NONE };
 
-		if ((m_usage & BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT) != BUFFER_USAGE_FLAGS::NONE)	{ d3d12Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS; }
+		if ((m_usage & BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT) != BUFFER_USAGE_FLAGS::NONE) { d3d12Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS; }
 	
 		return d3d12Flags;
 	}

@@ -1,8 +1,10 @@
 #include "VulkanCommandBuffer.h"
 
-#include "VulkanCommandPool.h"
 #include <stdexcept>
+#include "VulkanCommandPool.h"
 
+#include <Core/Utils/EnumUtils.h>
+#include "VulkanBuffer.h"
 #include "VulkanPipeline.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
@@ -57,7 +59,7 @@ namespace NK
 
 	void VulkanCommandBuffer::Reset()
 	{
-		//todo: implement
+		vkResetCommandBuffer(m_buffer, 0);
 	}
 
 
@@ -163,6 +165,27 @@ namespace NK
 
 
 
+	void VulkanCommandBuffer::BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides)
+	{
+		std::vector<VkBuffer> vkBuffers(_bindingCount);
+		std::vector<VkDeviceSize> vkOffsets(_bindingCount);
+		for (std::size_t i{ 0 }; i<_bindingCount; ++i)
+		{	
+			vkBuffers[i] = dynamic_cast<VulkanBuffer*>(&(_buffers[i]))->GetBuffer();
+			vkOffsets[i] = 0;
+		}
+		vkCmdBindVertexBuffers(m_buffer, _firstBinding, _bindingCount, vkBuffers.data(), vkOffsets.data());
+	}
+
+
+
+	void VulkanCommandBuffer::BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format)
+	{
+		vkCmdBindIndexBuffer(m_buffer, dynamic_cast<VulkanBuffer*>(_buffer)->GetBuffer(), 0, GetVulkanIndexType(_format));
+	}
+
+
+
 	void VulkanCommandBuffer::BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint)
 	{
 		switch (_bindPoint)
@@ -198,9 +221,51 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::Draw(std::uint32_t _vertexCount, std::uint32_t _instanceCount, std::uint32_t _firstVertex, std::uint32_t _firstInstance)
+	void VulkanCommandBuffer::DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance)
 	{
-		vkCmdDraw(m_buffer, _vertexCount, _instanceCount, _firstVertex, _firstInstance);
+		vkCmdDrawIndexed(m_buffer, _indexCount, _instanceCount, _firstIndex, 0, _firstInstance);
+	}
+
+
+
+	void VulkanCommandBuffer::CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer)
+	{
+		//Input validation
+
+		//Ensure source buffer is transfer src capable
+		if (!EnumUtils::Contains(_srcBuffer->GetUsageFlags(), NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBuffer() - _srcBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure destination buffer is transfer dst capable
+		if (!EnumUtils::Contains(_dstBuffer->GetUsageFlags(), NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBuffer() - _dstBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure destination buffer is large enough to hold the contents of the source buffer
+		if (_dstBuffer->GetSize() < _srcBuffer->GetSize())
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBuffer() - _srcBuffer (size: " + std::to_string(_srcBuffer->GetSize()) + ") is too big for _dstBuffer (size:" + std::to_string(_dstBuffer->GetSize()) + "\n");
+			throw std::runtime_error("");
+		}
+		
+		//Enqueue the copy command
+		VkBufferCopy copyRegion{};
+		copyRegion.srcOffset = 0;
+		copyRegion.dstOffset = 0;
+		copyRegion.size = _srcBuffer->GetSize();
+		vkCmdCopyBuffer(m_buffer, dynamic_cast<VulkanBuffer*>(_srcBuffer)->GetBuffer(), dynamic_cast<VulkanBuffer*>(_dstBuffer)->GetBuffer(), 1, &copyRegion);
+	}
+
+
+
+	void VulkanCommandBuffer::UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer)
+	{
+		//Todo: implement
 	}
 
 
@@ -219,4 +284,22 @@ namespace NK
 		}
 		}
 	}
+
+
+
+	VkIndexType VulkanCommandBuffer::GetVulkanIndexType(DATA_FORMAT _format)
+	{
+		switch (_format)
+		{
+		case DATA_FORMAT::R8_UINT:	return VK_INDEX_TYPE_UINT8;
+		case DATA_FORMAT::R16_UINT:	return VK_INDEX_TYPE_UINT16;
+		case DATA_FORMAT::R32_UINT:	return VK_INDEX_TYPE_UINT32;
+		default:
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "Default case reached in GetVulkanIndexType() - _format = " + std::to_string(std::to_underlying(_format)) + "\n");
+			throw std::runtime_error("");
+		}
+		}
+	}
+	
 }

@@ -8,14 +8,14 @@ namespace NK
 	//For compatibility, this must be specified at creation and cannot be changed
 	enum class BUFFER_USAGE_FLAGS : std::uint32_t
 	{
-		NONE				= 1 << 0,
-		TRANSFER_SRC_BIT	= 1 << 1,
-		TRANSFER_DST_BIT	= 1 << 2,
-		UNIFORM_BUFFER_BIT	= 1 << 3,
-		STORAGE_BUFFER_BIT	= 1 << 4,
-		VERTEX_BUFFER_BIT	= 1 << 5,
-		INDEX_BUFFER_BIT	= 1 << 6,
-		INDIRECT_BUFFER_BIT	= 1 << 7,
+		NONE				= 0,
+		TRANSFER_SRC_BIT	= 1 << 0,
+		TRANSFER_DST_BIT	= 1 << 1,
+		UNIFORM_BUFFER_BIT	= 1 << 2,
+		STORAGE_BUFFER_BIT	= 1 << 3,
+		VERTEX_BUFFER_BIT	= 1 << 4,
+		INDEX_BUFFER_BIT	= 1 << 5,
+		INDIRECT_BUFFER_BIT	= 1 << 6,
 	};
 }
 
@@ -47,6 +47,10 @@ namespace NK
 
 		virtual void* Map() = 0;
 		virtual void Unmap() = 0;
+
+		[[nodiscard]] inline std::size_t GetSize() const { return m_size; }
+		[[nodiscard]] inline MEMORY_TYPE GetMemoryType() const { return m_memType; }
+		[[nodiscard]] inline BUFFER_USAGE_FLAGS GetUsageFlags() const { return m_usage; }
 
 
 	protected:

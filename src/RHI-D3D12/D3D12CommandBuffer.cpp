@@ -1,6 +1,5 @@
 #include "D3D12CommandBuffer.h"
 #include "D3D12CommandPool.h"
-#include "D3D12Device.h"
 #include <stdexcept>
 #ifdef ERROR
 	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
@@ -8,6 +7,8 @@
 #include "D3D12Texture.h"
 #include "D3D12TextureView.h"
 #include "D3D12Pipeline.h"
+#include "D3D12Buffer.h"
+#include <Core/Utils/EnumUtils.h>
 
 namespace NK
 {
@@ -161,6 +162,35 @@ namespace NK
 
 	
 	
+	void D3D12CommandBuffer::BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides)
+	{
+		//Create the views
+		std::vector<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews(_bindingCount);
+		for (std::size_t i{ 0 }; i < _bindingCount; ++i)
+		{
+			vertexBufferViews[i].BufferLocation = dynamic_cast<D3D12Buffer*>(&(_buffers[i]))->GetBuffer()->GetGPUVirtualAddress();
+			vertexBufferViews[i].SizeInBytes = _buffers[i].GetSize();
+			vertexBufferViews[i].StrideInBytes = _strides[i];
+		}
+
+		m_buffer->IASetVertexBuffers(_firstBinding, _bindingCount, vertexBufferViews.data());
+	}
+
+
+
+	void D3D12CommandBuffer::BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format)
+	{
+		//Create the view
+		D3D12_INDEX_BUFFER_VIEW indexBufferView{};
+		indexBufferView.BufferLocation = dynamic_cast<D3D12Buffer*>(_buffer)->GetBuffer()->GetGPUVirtualAddress();
+		indexBufferView.Format = D3D12Texture::GetDXGIFormat(_format);
+		indexBufferView.SizeInBytes = _buffer->GetSize();
+
+		m_buffer->IASetIndexBuffer(&indexBufferView);
+	}
+
+
+
 	void D3D12CommandBuffer::BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint)
 	{
 		m_buffer->SetPipelineState(dynamic_cast<D3D12Pipeline*>(_pipeline)->GetPipeline());
@@ -196,9 +226,48 @@ namespace NK
 
 
 
-	void D3D12CommandBuffer::Draw(std::uint32_t _vertexCount, std::uint32_t _instanceCount, std::uint32_t _firstVertex, std::uint32_t _firstInstance)
+	void D3D12CommandBuffer::DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance)
 	{
-		m_buffer->DrawInstanced(_vertexCount, _instanceCount, _firstVertex, _firstInstance);
+		m_buffer->DrawIndexedInstanced(_indexCount, _instanceCount, _firstIndex, 0, _firstInstance);
+	}
+
+
+
+	void D3D12CommandBuffer::CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer)
+	{
+		//Input validation
+
+		//Ensure source buffer is transfer src capable
+		if (!EnumUtils::Contains(_srcBuffer->GetUsageFlags(), NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBuffer() - _srcBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure destination buffer is transfer dst capable
+		if (!EnumUtils::Contains(_dstBuffer->GetUsageFlags(), NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBuffer() - _dstBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure destination buffer is large enough to hold the contents of the source buffer
+		if (_dstBuffer->GetSize() < _srcBuffer->GetSize())
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBuffer() - _srcBuffer (size: " + std::to_string(_srcBuffer->GetSize()) + ") is too big for _dstBuffer (size:" + std::to_string(_dstBuffer->GetSize()) + "\n");
+			throw std::runtime_error("");
+		}
+
+
+		//Enqueue the copy command
+		m_buffer->CopyBufferRegion(dynamic_cast<D3D12Buffer*>(_dstBuffer)->GetBuffer(), 0, dynamic_cast<D3D12Buffer*>(_srcBuffer)->GetBuffer(), 0, dynamic_cast<D3D12Buffer*>(_srcBuffer)->GetSize());
+	}
+
+
+
+	void D3D12CommandBuffer::UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer)
+	{
+		//Todo: implement
 	}
 
 

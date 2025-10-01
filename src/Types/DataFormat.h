@@ -23,6 +23,7 @@ namespace NK
 		//32-bit Colour Formats
 		R32_SFLOAT,
 		R32G32_SFLOAT,
+		R32G32B32_SFLOAT,
 		R32G32B32A32_SFLOAT,
 
 		//Packed Formats
@@ -47,6 +48,8 @@ namespace NK
 		BC7_RGBA_SRGB,
 
 		//Integer Formats
+		R8_UINT,
+		R16_UINT,
 		R32_UINT,
 	};	
 }
