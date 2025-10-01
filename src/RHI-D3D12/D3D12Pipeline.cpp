@@ -6,6 +6,7 @@
 #ifdef ERROR
 	#undef ERROR
 #endif
+#include "D3D12DescriptorSet.h"
 
 namespace NK
 {
@@ -52,7 +53,7 @@ namespace NK
 
 		//Create pipeline
 		D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
-		desc.pRootSignature = dynamic_cast<D3D12Device&>(m_device).GetRootSignature();
+		desc.pRootSignature = dynamic_cast<D3D12DescriptorSet*>(m_device.GetDescriptorSet())->GetRootSignature();
 		desc.CS = bytecode;
 		D3D12_CACHED_PIPELINE_STATE cachedPSO{};
 		cachedPSO.CachedBlobSizeInBytes = 0;
@@ -189,7 +190,7 @@ namespace NK
 		
 		//Create pipeline (todo: add tessellation support)
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
-		pipelineDesc.pRootSignature = dynamic_cast<D3D12Device&>(m_device).GetRootSignature();
+		pipelineDesc.pRootSignature = dynamic_cast<D3D12DescriptorSet*>(m_device.GetDescriptorSet())->GetRootSignature();
 		pipelineDesc.VS = vertBytecode;
 		pipelineDesc.PS = fragBytecode;
 		pipelineDesc.BlendState = blendDesc;

@@ -22,6 +22,7 @@
 #include "VulkanSwapchain.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
+#include "VulkanDescriptorSet.h"
 
 
 namespace NK
@@ -59,19 +60,14 @@ namespace NK
 			m_pipelineLayout = VK_NULL_HANDLE;
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Pipeline Layout Destroyed\n");
 		}
+
+		m_descriptorSet.reset();
 		
 		if (m_descriptorSetLayout != VK_NULL_HANDLE)
 		{
 			vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayout, m_allocator.GetVulkanCallbacks());
 			m_descriptorSetLayout = VK_NULL_HANDLE;
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Descriptor Set Layout Destroyed\n");
-		}
-
-		if (m_descriptorSet != VK_NULL_HANDLE)
-		{
-			vkFreeDescriptorSets(m_device, m_descriptorPool, 1, &m_descriptorSet);
-			m_descriptorSet = VK_NULL_HANDLE;
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Descriptor Set Destroyed\n");
 		}
 
 		if (m_descriptorPool != VK_NULL_HANDLE)
@@ -118,7 +114,7 @@ namespace NK
 
 	UniquePtr<IBufferView> VulkanDevice::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
 	{
-		return UniquePtr<IBufferView>(NK_NEW(VulkanBufferView, m_logger, *m_resourceIndexAllocator, *this, _buffer, _desc, m_descriptorSet));
+		return UniquePtr<IBufferView>(NK_NEW(VulkanBufferView, m_logger, *m_resourceIndexAllocator, *this, _buffer, _desc, dynamic_cast<VulkanDescriptorSet*>(m_descriptorSet.get())->GetDescriptorSet()));
 	}
 
 
@@ -132,7 +128,7 @@ namespace NK
 
 	UniquePtr<ITextureView> VulkanDevice::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
-		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, m_descriptorSet, m_resourceIndexAllocator.get()));
+		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, dynamic_cast<VulkanDescriptorSet*>(m_descriptorSet.get())->GetDescriptorSet(), m_resourceIndexAllocator.get()));
 	}
 
 
@@ -577,18 +573,22 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating descriptor set\n");
 
+
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		allocInfo.descriptorPool = m_descriptorPool;
 		allocInfo.descriptorSetCount = 1;
 		allocInfo.pSetLayouts = &m_descriptorSetLayout;
-		const VkResult result{ vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSet) };
+		VkDescriptorSet descriptorSet;
+		const VkResult result{ vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet) };
 		if (result != VK_SUCCESS)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set\n");
+		m_descriptorSet = UniquePtr<IDescriptorSet>(NK_NEW(VulkanDescriptorSet, *this, m_descriptorPool, descriptorSet));
+
 
 		m_logger.Unindent();
 	}
@@ -723,7 +723,7 @@ namespace NK
 		case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT:	layer = LOGGER_LAYER::VULKAN_PERFORMANCE; break;
 		default:												layer = LOGGER_LAYER::UNKNOWN; break;
 		}
-
+		
 		std::string msg{ _pCallbackData->pMessage };
 		if (msg.back() != '\n') { msg += '\n'; } //vulkan just like sometimes doesn't do this
 		device->m_logger.IndentLog(channel, layer, msg);

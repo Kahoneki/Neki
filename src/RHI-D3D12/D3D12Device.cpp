@@ -3,6 +3,7 @@
 #include "D3D12Device.h"
 #include "D3D12Device.h"
 #include "D3D12Device.h"
+#include "D3D12Device.h"
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/FormatUtils.h>
 #include <Core/Utils/EnumUtils.h>
@@ -18,6 +19,7 @@
 #include "D3D12Queue.h"
 #include "D3D12Fence.h"
 #include "D3D12Semaphore.h"
+#include "D3D12DescriptorSet.h"
 #include <stdexcept>
 #include <array>
 #ifdef ERROR
@@ -37,7 +39,7 @@ namespace NK
 		CreateFactory();
 		SelectAdapter();
 		CreateDevice();
-		RegisterCallback();
+		RegisterDebugCallback();
 		CreateDescriptorHeaps();
 		CreateRootSignature();
 		CreateSyncLists();
@@ -52,6 +54,8 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Shutting Down D3D12Device\n");
 		
+		UnregisterDebugCallback();
+
 		//ComPtrs are released automatically
 
 		m_logger.Unindent();
@@ -277,7 +281,7 @@ namespace NK
 
 
 
-	void D3D12Device::RegisterCallback()
+	void D3D12Device::RegisterDebugCallback()
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Registering Debug Layer Message Callback\n");
@@ -291,9 +295,8 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
-		DWORD callbackFuncUUID{ 0 };
-		infoQueue->RegisterMessageCallback(D3D12Device::DebugCallback, D3D12_MESSAGE_CALLBACK_FLAG_NONE, this, &callbackFuncUUID);
-		
+		infoQueue->RegisterMessageCallback(D3D12Device::DebugCallback, D3D12_MESSAGE_CALLBACK_FLAG_NONE, this, &m_debugCallbackFuncCookie);
+
 		infoQueue->Release();
 
 
@@ -413,7 +416,8 @@ namespace NK
 
 
 		//Create root signature
-		hr = m_device->CreateRootSignature(0, serialisedRootSig->GetBufferPointer(), serialisedRootSig->GetBufferSize(), IID_PPV_ARGS(&m_rootSig));
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig;
+		hr = m_device->CreateRootSignature(0, serialisedRootSig->GetBufferPointer(), serialisedRootSig->GetBufferSize(), IID_PPV_ARGS(&rootSig));
 		if (SUCCEEDED(hr))
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Root Signature creation successful.\n");
@@ -423,6 +427,7 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Root Signature creation unsuccessful\n");
 			throw std::runtime_error("");
 		}
+		m_descriptorSet = UniquePtr<IDescriptorSet>(NK_NEW(D3D12DescriptorSet, std::move(rootSig)));
 
 		m_logger.Unindent();
 	}
@@ -449,6 +454,30 @@ namespace NK
 		m_syncLists[COMMAND_POOL_TYPE::GRAPHICS] = m_graphicsSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
 		m_syncLists[COMMAND_POOL_TYPE::COMPUTE] = m_computeSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
 		m_syncLists[COMMAND_POOL_TYPE::TRANSFER] = m_transferSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
+
+
+		m_logger.Unindent();
+	}
+
+
+
+	void D3D12Device::UnregisterDebugCallback()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Unregistering Debug Layer Message Callback\n");
+
+
+		ID3D12InfoQueue1* infoQueue;
+		const HRESULT hr{ m_device->QueryInterface(IID_PPV_ARGS(&infoQueue)) };
+		if (FAILED(hr))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to query for info queue interface - is the debug layer enabled?\n");
+			throw std::runtime_error("");
+		}
+
+		infoQueue->UnregisterMessageCallback(m_debugCallbackFuncCookie);
+
+		infoQueue->Release();
 
 
 		m_logger.Unindent();

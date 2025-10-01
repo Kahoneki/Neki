@@ -93,7 +93,6 @@ namespace NK
 		VkMutableDescriptorTypeCreateInfoEXT m_mutableResourceTypeInfo{};
 		VkDescriptorPool m_descriptorPool{ VK_NULL_HANDLE };
 		VkDescriptorSetLayout m_descriptorSetLayout{ VK_NULL_HANDLE };
-		VkDescriptorSet m_descriptorSet{ VK_NULL_HANDLE };
 		VkPipelineLayout m_pipelineLayout{ VK_NULL_HANDLE };
 
 

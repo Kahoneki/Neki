@@ -8,6 +8,7 @@
 #include "VulkanPipeline.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
+#include "VulkanDescriptorSet.h"
 
 namespace NK
 {
@@ -221,6 +222,14 @@ namespace NK
 
 
 
+	void VulkanCommandBuffer::BindDescriptorSet(IDescriptorSet* _descriptorSet, PIPELINE_BIND_POINT _bindPoint)
+	{
+		VkDescriptorSet descriptorSet{ dynamic_cast<VulkanDescriptorSet*>(_descriptorSet)->GetDescriptorSet() };
+		vkCmdBindDescriptorSets(m_buffer, GetVulkanPipelineBindPoint(_bindPoint), dynamic_cast<VulkanDevice&>(m_device).GetPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
+	}
+
+
+
 	void VulkanCommandBuffer::DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance)
 	{
 		vkCmdDrawIndexed(m_buffer, _indexCount, _instanceCount, _firstIndex, 0, _firstInstance);
@@ -297,6 +306,20 @@ namespace NK
 		default:
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "Default case reached in GetVulkanIndexType() - _format = " + std::to_string(std::to_underlying(_format)) + "\n");
+			throw std::runtime_error("");
+		}
+		}
+	}
+
+	VkPipelineBindPoint VulkanCommandBuffer::GetVulkanPipelineBindPoint(PIPELINE_BIND_POINT _bindPoint)
+	{
+		switch (_bindPoint)
+		{
+		case PIPELINE_BIND_POINT::GRAPHICS:	return VK_PIPELINE_BIND_POINT_GRAPHICS;
+		case PIPELINE_BIND_POINT::COMPUTE:	return VK_PIPELINE_BIND_POINT_COMPUTE;
+		default:
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "Default case reached in GetVulkanPipelineBindPoint() - _bindPoint = " + std::to_string(std::to_underlying(_bindPoint)) + "\n");
 			throw std::runtime_error("");
 		}
 		}
