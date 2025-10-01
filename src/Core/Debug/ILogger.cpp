@@ -43,9 +43,23 @@ namespace NK
 	{
 		switch (_layer)
 		{
+		case LOGGER_LAYER::UNKNOWN:				return "[UNKNOWN]";
+
 		case LOGGER_LAYER::VULKAN_GENERAL:		return "[VULKAN GENERAL]";
 		case LOGGER_LAYER::VULKAN_VALIDATION:	return "[VULKAN VALIDATION]";
 		case LOGGER_LAYER::VULKAN_PERFORMANCE:	return "[VULKAN PERFORMANCE]";
+
+		case LOGGER_LAYER::D3D12_APP_DEFINED:	return "[D3D12 APP DEFINED]";
+		case LOGGER_LAYER::D3D12_MISC:			return "[D3D12 MISC]";
+		case LOGGER_LAYER::D3D12_INIT:			return "[D3D12 INIT]";
+		case LOGGER_LAYER::D3D12_CLEANUP:		return "[D3D12 CLEANUP]";
+		case LOGGER_LAYER::D3D12_COMPILATION:	return "[D3D12 COMPILATION]";
+		case LOGGER_LAYER::D3D12_STATE_CREATE:	return "[D3D12 STATE CREATE]";
+		case LOGGER_LAYER::D3D12_STATE_SET:		return "[D3D12 STATE SET]";
+		case LOGGER_LAYER::D3D12_STATE_GET:		return "[D3D12 STATE GET]";
+		case LOGGER_LAYER::D3D12_RES_MANIP:		return "[D3D12 RES MANIP]";
+		case LOGGER_LAYER::D3D12_EXECUTION:		return "[D3D12 EXECUTION]";
+		case LOGGER_LAYER::D3D12_SHADER:		return "[D3D12 SHADER]";
 
 		case LOGGER_LAYER::CONTEXT:				return "[CONTEXT]";
 		case LOGGER_LAYER::TRACKING_ALLOCATOR:	return "[TRACKING ALLOCATOR]";
@@ -69,7 +83,10 @@ namespace NK
 
 		case LOGGER_LAYER::APPLICATION:			return "[APPLICATION]";
 
-		default:								return "[UNDEFINED]";
+		default:
+		{
+			throw std::runtime_error("ILogger::LayerToString() returned default case - _layer = " + std::to_string(std::to_underlying(_layer)));
+		}
 		}
 	}
 

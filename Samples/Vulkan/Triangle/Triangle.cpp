@@ -252,19 +252,19 @@ int main()
 		inFlightFences[currentFrame]->Reset();
 
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphores[currentFrame].get(), nullptr) };
-		
-		glfwPollEvents();
 
+		glfwPollEvents();
 		commandBuffers[currentFrame]->Begin();
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
 		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
-		
+		commandBuffers[currentFrame]->BindDescriptorSet(device->GetDescriptorSet(), NK::PIPELINE_BIND_POINT::GRAPHICS);
+
 		std::size_t vertexBufferStride{ sizeof(Vertex) };
 		commandBuffers[currentFrame]->BindVertexBuffers(0, 1, vertBuffer.get(), &vertexBufferStride);
 		commandBuffers[currentFrame]->BindIndexBuffer(indexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
-		
+
 		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { 1280, 720 });
 		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { 1280, 720 });
 		commandBuffers[currentFrame]->DrawIndexed(3, 1, 0, 0);

@@ -39,7 +39,6 @@ namespace NK
 		[[nodiscard]] inline IDXGIFactory4* GetFactory() const { return m_factory.Get(); }
 		[[nodiscard]] inline IDXGIAdapter* GetAdapter() const { return m_adapter.Get(); }
 		[[nodiscard]] inline ID3D12Device* GetDevice()  const { return m_device.Get();  }
-		[[nodiscard]] inline ID3D12RootSignature* GetRootSignature() const { return m_rootSig.Get(); }
 
 
 	private:
@@ -48,13 +47,18 @@ namespace NK
 		void CreateFactory();
 		void SelectAdapter();
 		void CreateDevice();
+		void RegisterDebugCallback();
 		void CreateDescriptorHeaps();
 		void CreateRootSignature();
 		void CreateSyncLists();
 
+		//Shutdown sub-methods
+		void UnregisterDebugCallback();
+
+		static void DebugCallback(D3D12_MESSAGE_CATEGORY _category, D3D12_MESSAGE_SEVERITY _severity, D3D12_MESSAGE_ID _id, LPCSTR _pDescription, void* _pContext);
+
 
 		const D3D_FEATURE_LEVEL m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
-
 
 		//D3D12 handles
 		Microsoft::WRL::ComPtr<IDXGIFactory4> m_factory;
@@ -71,9 +75,9 @@ namespace NK
 		UINT m_resourceDescriptorSize;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
 		UINT m_samplerDescriptorSize;
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSig;
 
 
 		bool m_enableDebugLayer{ true };
+		DWORD m_debugCallbackFuncCookie;
 	};
 }

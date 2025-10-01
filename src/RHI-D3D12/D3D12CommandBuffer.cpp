@@ -9,6 +9,7 @@
 #include "D3D12Pipeline.h"
 #include "D3D12Buffer.h"
 #include <Core/Utils/EnumUtils.h>
+#include "D3D12DescriptorSet.h"
 
 namespace NK
 {
@@ -226,8 +227,23 @@ namespace NK
 
 
 
+	void D3D12CommandBuffer::BindDescriptorSet(IDescriptorSet* _descriptorSet, PIPELINE_BIND_POINT _bindPoint)
+	{
+		ID3D12RootSignature* rootSig{ dynamic_cast<D3D12DescriptorSet*>(_descriptorSet)->GetRootSignature() };
+		switch (_bindPoint)
+		{
+		case PIPELINE_BIND_POINT::GRAPHICS:	m_buffer->SetGraphicsRootSignature(rootSig); break;
+		case PIPELINE_BIND_POINT::COMPUTE:	m_buffer->SetComputeRootSignature(rootSig); break;
+		}
+	}
+
+
+
 	void D3D12CommandBuffer::DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance)
 	{
+		//todo: figure out a way to tie this up in another method
+		m_buffer->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
 		m_buffer->DrawIndexedInstanced(_indexCount, _instanceCount, _firstIndex, 0, _firstInstance);
 	}
 

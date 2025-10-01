@@ -3,6 +3,7 @@
 #include "Core/Memory/Allocation.h"
 #include "Core/Memory/IAllocator.h"
 #include "Core/Memory/FreeListAllocator.h"
+#include "IDescriptorSet.h"
 
 
 namespace NK
@@ -69,6 +70,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() = 0;
 
+		[[nodiscard]] inline IDescriptorSet* GetDescriptorSet() const { return m_descriptorSet.get(); }
+
 
 	protected:
 		explicit IDevice(ILogger& _logger, IAllocator& _allocator)
@@ -79,5 +82,6 @@ namespace NK
 		IAllocator& m_allocator;
 
 		UniquePtr<FreeListAllocator> m_resourceIndexAllocator;
+		UniquePtr<IDescriptorSet> m_descriptorSet;
 	};
 }
