@@ -1,8 +1,11 @@
 #include "D3D12Device.h"
 #include "D3D12Device.h"
 #include "D3D12Device.h"
+#include "D3D12Device.h"
+#include "D3D12Device.h"
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/FormatUtils.h>
+#include <Core/Utils/EnumUtils.h>
 #include "D3D12CommandPool.h"
 #include "D3D12Buffer.h"
 #include "D3D12BufferView.h"
@@ -34,6 +37,7 @@ namespace NK
 		CreateFactory();
 		SelectAdapter();
 		CreateDevice();
+		RegisterCallback();
 		CreateDescriptorHeaps();
 		CreateRootSignature();
 		CreateSyncLists();
@@ -270,6 +274,31 @@ namespace NK
 
 		m_logger.Unindent();
 	}
+
+
+
+	void D3D12Device::RegisterCallback()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Registering Debug Layer Message Callback\n");
+
+
+		ID3D12InfoQueue1* infoQueue;
+		const HRESULT hr{ m_device->QueryInterface(IID_PPV_ARGS(&infoQueue)) };
+		if (FAILED(hr))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to query for info queue interface - is the debug layer enabled?\n");
+			throw std::runtime_error("");
+		}
+
+		DWORD callbackFuncUUID{ 0 };
+		infoQueue->RegisterMessageCallback(D3D12Device::DebugCallback, D3D12_MESSAGE_CALLBACK_FLAG_NONE, this, &callbackFuncUUID);
+		
+		infoQueue->Release();
+
+
+		m_logger.Unindent();
+	}
 	
 	
 	
@@ -423,6 +452,68 @@ namespace NK
 
 
 		m_logger.Unindent();
+	}
+
+
+
+	void D3D12Device::DebugCallback(D3D12_MESSAGE_CATEGORY _category, D3D12_MESSAGE_SEVERITY _severity, D3D12_MESSAGE_ID _id, LPCSTR _pDescription, void* _pContext)
+	{
+		//pContext is the parent D3D12Device
+		const D3D12Device* device{ reinterpret_cast<const D3D12Device*>(_pContext) };
+
+		//Get channel
+		LOGGER_CHANNEL channel;
+		switch (_severity)
+		{
+		case D3D12_MESSAGE_SEVERITY_CORRUPTION:
+		case D3D12_MESSAGE_SEVERITY_ERROR:
+			channel = LOGGER_CHANNEL::ERROR;
+			break;
+		case D3D12_MESSAGE_SEVERITY_WARNING:
+			channel = LOGGER_CHANNEL::WARNING;
+			break;
+		case D3D12_MESSAGE_SEVERITY_INFO:
+		case D3D12_MESSAGE_SEVERITY_MESSAGE:
+			channel = LOGGER_CHANNEL::INFO;
+			break;
+		default:
+			channel = LOGGER_CHANNEL::NONE;
+			break;
+		}
+
+		//Get layer
+		LOGGER_LAYER layer;
+		switch (_category)
+		{
+		case D3D12_MESSAGE_CATEGORY_APPLICATION_DEFINED:	layer = LOGGER_LAYER::D3D12_APP_DEFINED; break;
+		case D3D12_MESSAGE_CATEGORY_MISCELLANEOUS:			layer = LOGGER_LAYER::D3D12_MISC; break;
+		case D3D12_MESSAGE_CATEGORY_INITIALIZATION:			layer = LOGGER_LAYER::D3D12_INIT; break;
+		case D3D12_MESSAGE_CATEGORY_CLEANUP:				layer = LOGGER_LAYER::D3D12_CLEANUP; break;
+		case D3D12_MESSAGE_CATEGORY_COMPILATION:			layer = LOGGER_LAYER::D3D12_COMPILATION; break;
+		case D3D12_MESSAGE_CATEGORY_STATE_CREATION:			layer = LOGGER_LAYER::D3D12_STATE_CREATE; break;
+		case D3D12_MESSAGE_CATEGORY_STATE_SETTING:			layer = LOGGER_LAYER::D3D12_STATE_SET; break;
+		case D3D12_MESSAGE_CATEGORY_STATE_GETTING:			layer = LOGGER_LAYER::D3D12_STATE_GET; break;
+		case D3D12_MESSAGE_CATEGORY_RESOURCE_MANIPULATION:	layer = LOGGER_LAYER::D3D12_RES_MANIP; break;
+		case D3D12_MESSAGE_CATEGORY_EXECUTION:				layer = LOGGER_LAYER::D3D12_EXECUTION; break;
+		case D3D12_MESSAGE_CATEGORY_SHADER:					layer = LOGGER_LAYER::D3D12_SHADER; break;
+		default:											layer = LOGGER_LAYER::UNKNOWN; break;
+		}
+
+		std::string msg{ std::to_string(std::to_underlying(_id)) + std::string(": ") + std::string(_pDescription)};
+		if (msg.back() != '\n') { msg += '\n'; } //dx12 just like sometimes doesn't do this
+		device->m_logger.IndentLog(channel, layer, msg);
+
+		if (channel == LOGGER_CHANNEL::ERROR)
+		{
+			if (EnumUtils::Contains(device->m_logger.GetLoggerConfig().GetChannelBitfieldForLayer(layer), LOGGER_CHANNEL::ERROR))
+			{
+				throw std::runtime_error("");
+			}
+			else
+			{
+				throw std::runtime_error("Error thrown from " + device->m_logger.LayerToString(layer) + " but ERROR channel for this layer was disabled - enable it to view the error.\n");
+			}
+		}
 	}
 
 }

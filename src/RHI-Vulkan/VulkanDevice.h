@@ -10,13 +10,6 @@
 
 namespace NK
 {
-	//Forward declarations
-	enum class QUEUE_TYPE;
-}
-
-
-namespace NK
-{
 	class VulkanDevice final : public IDevice
 	{
 	public:

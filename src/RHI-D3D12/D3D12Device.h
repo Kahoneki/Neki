@@ -48,13 +48,15 @@ namespace NK
 		void CreateFactory();
 		void SelectAdapter();
 		void CreateDevice();
+		void RegisterCallback();
 		void CreateDescriptorHeaps();
 		void CreateRootSignature();
 		void CreateSyncLists();
 
+		static void DebugCallback(D3D12_MESSAGE_CATEGORY _category, D3D12_MESSAGE_SEVERITY _severity, D3D12_MESSAGE_ID _id, LPCSTR _pDescription, void* _pContext);
+
 
 		const D3D_FEATURE_LEVEL m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
-
 
 		//D3D12 handles
 		Microsoft::WRL::ComPtr<IDXGIFactory4> m_factory;
