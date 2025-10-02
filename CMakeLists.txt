@@ -11,9 +11,9 @@ option(NEKI_BUILD_D3D12 "Enable the D3D12 RHI backend" OFF)
 
 #Define library target
 file(GLOB_RECURSE NEKI_COMMON_SOURCES
-    "src/Core/*.cpp"
-    "src/Platform/*.cpp"
-    "src/Graphics/*.cpp"
+        "src/Core/*.cpp"
+        "src/Platform/*.cpp"
+        "src/Graphics/*.cpp"
 )
 set(NEKI_SOURCES ${NEKI_COMMON_SOURCES})
 
@@ -138,7 +138,7 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
     else()
         set(SHADER_OUTPUT_PATH "${SHADER_NAME_WE}")
     endif()
-    
+
     set(SPV_OUTPUT "${PROJECT_BINARY_DIR}/${SHADER_OUTPUT_PATH}.spv")
     set(DXIL_OUTPUT "${PROJECT_BINARY_DIR}/${SHADER_OUTPUT_PATH}.dxil")
 
@@ -146,47 +146,47 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
     get_filename_component(OUTPUT_DIRECTORY ${SPV_OUTPUT} DIRECTORY)
     file(MAKE_DIRECTORY ${OUTPUT_DIRECTORY})
 
-    
+
     #Add include directory to shader files for the root directory of source tree
     set(SHADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/src")
-    
+
     set(LOCAL_SHADER_OUTPUTS "")
 
     if(NEKI_BUILD_VULKAN)
         add_custom_command(
-            OUTPUT ${SPV_OUTPUT}
-            COMMAND ${DXC_EXECUTABLE}
-                    ${SHADER_SOURCE}
-                    -I ${SHADER_INCLUDE_PATH}
-                    -T ${SHADER_TYPE}
-                    -E ${ENTRY_POINT}
-                    -spirv
-                    -Fo ${SPV_OUTPUT}
-            DEPENDS ${SHADER_SOURCE}
-            COMMENT "Compiling ${SHADER_SOURCE} to SPIR-V"
+                OUTPUT ${SPV_OUTPUT}
+                COMMAND ${DXC_EXECUTABLE}
+                ${SHADER_SOURCE}
+                -I ${SHADER_INCLUDE_PATH}
+                -T ${SHADER_TYPE}
+                -E ${ENTRY_POINT}
+                -spirv
+                -Fo ${SPV_OUTPUT}
+                DEPENDS ${SHADER_SOURCE}
+                COMMENT "Compiling ${SHADER_SOURCE} to SPIR-V"
         )
         list(APPEND LOCAL_SHADER_OUTPUTS ${SPV_OUTPUT})
     endif()
 
     if(NEKI_BUILD_D3D12)
         add_custom_command(
-            OUTPUT ${DXIL_OUTPUT}
-            COMMAND ${DXC_EXECUTABLE}
-                    ${SHADER_SOURCE}
-                    -I ${SHADER_INCLUDE_PATH}
-                    -T ${SHADER_TYPE}
-                    -E ${ENTRY_POINT}
-                    -Fo ${DXIL_OUTPUT}
-            DEPENDS ${SHADER_SOURCE}
-            COMMENT "Compiling ${SHADER_SOURCE} to DXIL"
+                OUTPUT ${DXIL_OUTPUT}
+                COMMAND ${DXC_EXECUTABLE}
+                ${SHADER_SOURCE}
+                -I ${SHADER_INCLUDE_PATH}
+                -T ${SHADER_TYPE}
+                -E ${ENTRY_POINT}
+                -Fo ${DXIL_OUTPUT}
+                DEPENDS ${SHADER_SOURCE}
+                COMMENT "Compiling ${SHADER_SOURCE} to DXIL"
         )
         list(APPEND LOCAL_SHADER_OUTPUTS ${DXIL_OUTPUT})
-     endif()
-    
-    
+    endif()
+
+
     #Append to output list
     set(${OUTPUT_LIST} ${LOCAL_SHADER_OUTPUTS} PARENT_SCOPE)
-    
+
 
 endfunction()
 
@@ -234,15 +234,6 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     )
 
 
-    message(STATUS "Shader include path: ${SHADER_INCLUDE_PATH}")
-message(STATUS "Looking for: ${CMAKE_SOURCE_DIR}/src/Types/ShaderAttribute.hlsli")
-if(EXISTS "${CMAKE_SOURCE_DIR}/src/Types/ShaderAttribute.hlsli")
-    message(STATUS "File found!")
-else()
-    message(STATUS "File NOT found!")
-endif()
-
-
 
     #Create executables
     if(NEKI_BUILD_VULKAN)
@@ -269,6 +260,13 @@ endif()
         target_include_directories(NKD3D12Sample_Triangle PUBLIC "${CMAKE_SOURCE_DIR}/src")
         target_link_libraries(NKD3D12Sample_Triangle PRIVATE Neki)
         add_dependencies(NKD3D12Sample_Triangle Shaders)
+    endif()
+
+    if(NEKI_BUILD_VULKAN)
+        add_executable(NKVulkanSample_Texture "Samples/Vulkan/Texture/Texture.cpp")
+        target_include_directories(NKVulkanSample_Texture PUBLIC "${CMAKE_SOURCE_DIR}/src")
+        target_link_libraries(NKVulkanSample_Texture PRIVATE Neki)
+        add_dependencies(NKVulkanSample_Texture Shaders)
     endif()
 
 endif()

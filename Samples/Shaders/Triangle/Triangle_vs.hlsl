@@ -13,18 +13,10 @@ struct VertexOutput
 };
 
 VertexOutput VSMain(VertexInput input)
-{
-	
-    float3 colours[3] =
-    {
-        float3(1.0, 0.0, 0.0),
-		float3(0.0, 1.0, 0.0),
-		float3(0.0, 0.0, 1.0)
-    };
-	
-    VertexOutput output;
-    output.pos = float4(input.pos, 0.0, 1.0);
+{	
+	VertexOutput output;
+	output.pos = float4(input.pos, 0.0, 1.0);
 	output.colour = input.colour;
 
-    return output;
+	return output;
 }
