@@ -53,6 +53,9 @@ int main()
 	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
 	const NK::UniquePtr<NK::IQueue> transferQueue(device->CreateQueue(transferQueueDesc));
 
+	//Transfer Command Buffer
+	const NK::UniquePtr<NK::ICommandBuffer> transferCommandBuffer{ transferCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc) };
+
 	//Surface
 	NK::SurfaceDesc surfaceDesc{};
 	surfaceDesc.name = "Triangle Sample";
@@ -65,6 +68,54 @@ int main()
 	swapchainDesc.numBuffers = 3;
 	swapchainDesc.presentQueue = graphicsQueue.get();
 	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
+
+	
+	//Texture
+	struct Pixel
+	{
+		std::uint8_t r;
+		std::uint8_t g;
+		std::uint8_t b;
+		std::uint8_t a;
+	};
+	Pixel textureData[2 * 2]
+	{
+		{255,0,0,255}, {0,255,0,255},
+		{0,0,255,255}, {255,255,255,255}
+	};
+
+	NK::BufferDesc textureStagingBufferDesc{};
+	textureStagingBufferDesc.size = sizeof(Pixel) * 4;
+	textureStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
+	textureStagingBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
+	const NK::UniquePtr<NK::IBuffer> textureStagingBuffer{ device->CreateBuffer(textureStagingBufferDesc) };
+	void* textureStagingBufferMap{ textureStagingBuffer->Map() };
+	memcpy(textureStagingBufferMap, textureData, sizeof(Pixel) * 4);
+	textureStagingBuffer->Unmap();
+	
+	NK::TextureDesc textureDesc{};
+	textureDesc.size = { 2, 2, 1 };
+	textureDesc.arrayTexture = false;
+	textureDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	textureDesc.format = NK::DATA_FORMAT::R8G8B8A8_UNORM;
+	textureDesc.usage = NK::TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT | NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
+	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(textureDesc) };
+
+	transferCommandBuffer->Begin();
+	transferCommandBuffer->TransitionBarrier(texture.get(), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::COPY_DEST);
+	transferCommandBuffer->CopyBufferToTexture(textureStagingBuffer.get(), texture.get());
+	transferCommandBuffer->End();
+	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
+	transferQueue->WaitIdle();
+
+	NK::TextureViewDesc textureViewDesc{};
+	textureViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	textureViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_UNORM;
+	textureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateTextureView(texture.get(), textureViewDesc) };
+	NK::ResourceIndex textureResourceIndex{ textureView->GetIndex() };
+	
+	
 
 	//Vertex Shader
 	NK::ShaderDesc vertShaderDesc{};
@@ -82,9 +133,6 @@ int main()
 	NK::RootSignatureDesc rootSigDesc{};
 	rootSigDesc.num32BitPushConstantValues = 1;
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
-
-	//Transfer Command Buffer
-	const NK::UniquePtr<NK::ICommandBuffer> transferCommandBuffer{ transferCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc) };
 
 	
 	//Vertex Buffer
@@ -138,8 +186,8 @@ int main()
 
 	//Copy Vertex and Index Buffers
 	transferCommandBuffer->Begin();
-	transferCommandBuffer->CopyBuffer(vertStagingBuffer.get(), vertBuffer.get());
-	transferCommandBuffer->CopyBuffer(indexStagingBuffer.get(), indexBuffer.get());
+	transferCommandBuffer->CopyBufferToBuffer(vertStagingBuffer.get(), vertBuffer.get());
+	transferCommandBuffer->CopyBufferToBuffer(indexStagingBuffer.get(), indexBuffer.get());
 	transferCommandBuffer->End();
 	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
 	transferQueue->WaitIdle();
@@ -227,6 +275,12 @@ int main()
 	{
 		commandBuffers[i] = graphicsCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc);
 	}
+	//Transition texture
+	commandBuffers[0]->Begin();
+	commandBuffers[0]->TransitionBarrier(texture.get(), NK::RESOURCE_STATE::COPY_DEST, NK::RESOURCE_STATE::SHADER_RESOURCE);
+	commandBuffers[0]->End();
+	graphicsQueue->Submit(commandBuffers[0].get(), nullptr, nullptr, nullptr);
+	graphicsQueue->WaitIdle();
 
 	//Semaphores
 	std::vector<NK::UniquePtr<NK::ISemaphore>> imageAvailableSemaphores(MAX_FRAMES_IN_FLIGHT);
@@ -268,8 +322,7 @@ int main()
 		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
-		float redVal{ 1.0f };
-		commandBuffers[currentFrame]->PushConstants(rootSig.get(), &redVal);
+		commandBuffers[currentFrame]->PushConstants(rootSig.get(), &textureResourceIndex);
 
 		std::size_t vertexBufferStride{ sizeof(Vertex) };
 		commandBuffers[currentFrame]->BindVertexBuffers(0, 1, vertBuffer.get(), &vertexBufferStride);

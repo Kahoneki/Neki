@@ -137,8 +137,8 @@ int main()
 
 	//Copy Vertex and Index Buffers
 	transferCommandBuffer->Begin();
-	transferCommandBuffer->CopyBuffer(vertStagingBuffer.get(), vertBuffer.get());
-	transferCommandBuffer->CopyBuffer(indexStagingBuffer.get(), indexBuffer.get());
+	transferCommandBuffer->CopyBufferToBuffer(vertStagingBuffer.get(), vertBuffer.get());
+	transferCommandBuffer->CopyBufferToBuffer(indexStagingBuffer.get(), indexBuffer.get());
 	transferCommandBuffer->End();
 	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
 	transferQueue->WaitIdle();

@@ -51,7 +51,9 @@ namespace NK
 		virtual void SetScissor(glm::ivec2 _pos, glm::ivec2 _extent) = 0;
 		virtual void DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance) = 0;
 
-		virtual void CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) = 0;
+		virtual void CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) = 0;
+		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture) = 0;
+
 		virtual void UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer) = 0;
 
 

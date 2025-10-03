@@ -7,12 +7,14 @@ struct VertexOutput
 };
 
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
+[[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
 
 PUSH_CONSTANTS_BLOCK(
-	float textureIndex;
+	uint textureIndex;
+	uint samplerIndex;
 );
 
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
-    return float4(vertexOutput.texCoord, 0.0f, 1.0f);
+    return g_textures[NonUniformResourceIndex(PC(textureIndex))].Sample(g_samplers[NonUniformResourceIndex(PC(samplerIndex))], vertexOutput.texCoord);
 }

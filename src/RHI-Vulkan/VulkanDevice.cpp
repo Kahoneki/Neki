@@ -428,6 +428,7 @@ namespace NK
 		features12.descriptorIndexing = VK_TRUE;
 		features12.descriptorBindingPartiallyBound = VK_TRUE; //Allow empty descriptor slots - don't crash when accessing
 		features12.runtimeDescriptorArray = VK_TRUE; //Enable variable-indexing
+		features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE; //Enable HLSL NonUniformResourceIndex keyword for non-uniform indexing
 		//Allow updates to the descriptor set while the queue is using it
 		features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
 		features12.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;

@@ -37,7 +37,8 @@ namespace NK
 		virtual void SetScissor(glm::ivec2 _pos, glm::ivec2 _extent) override;
 		virtual void DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance) override;
 
-		virtual void CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) override;
+		virtual void CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) override;
+		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture) override;
 		virtual void UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer) override;
 		
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
