@@ -1,4 +1,4 @@
-#include <Types/ShaderAttribute.hlsli>
+#include <Types/ShaderMacros.hlsli>
 
 struct VertexOutput
 {

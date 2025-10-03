@@ -31,9 +31,10 @@ namespace NK
 		virtual void BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides) override;
 		virtual void BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format) override;
 		virtual void BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint) override;
+		virtual void BindRootSignature(IRootSignature* _rootSignature, PIPELINE_BIND_POINT _bindPoint) override;
+		virtual void PushConstants(IRootSignature* _rootSignature, void* _data) override;
 		virtual void SetViewport(glm::vec2 _pos, glm::vec2 _extent) override;
 		virtual void SetScissor(glm::ivec2 _pos, glm::ivec2 _extent) override;
-		virtual void BindDescriptorSet(IDescriptorSet* _descriptorSet, PIPELINE_BIND_POINT _bindPoint) override;
 		virtual void DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance) override;
 
 		virtual void CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) override;

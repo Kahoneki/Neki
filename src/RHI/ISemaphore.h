@@ -4,7 +4,6 @@
 namespace NK
 {
 	
-	
 	class ISemaphore
 	{
 	public:

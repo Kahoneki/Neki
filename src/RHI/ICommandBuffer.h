@@ -4,6 +4,8 @@
 #include "Types/ResourceStates.h"
 #include <Types/DataFormat.h>
 
+#include "IRootSignature.h"
+
 namespace NK
 {
 	enum class COMMAND_BUFFER_LEVEL
@@ -43,9 +45,10 @@ namespace NK
 		virtual void BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides) = 0;
 		virtual void BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format) = 0;
 		virtual void BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint) = 0;
+		virtual void BindRootSignature(IRootSignature* _rootSignature, PIPELINE_BIND_POINT _bindPoint) = 0;
+		virtual void PushConstants(IRootSignature* _rootSignature, void* _data) = 0;
 		virtual void SetViewport(glm::vec2 _pos, glm::vec2 _extent) = 0;
 		virtual void SetScissor(glm::ivec2 _pos, glm::ivec2 _extent) = 0;
-		virtual void BindDescriptorSet(IDescriptorSet* _descriptorSet, PIPELINE_BIND_POINT _bindPoint) = 0;
 		virtual void DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance) = 0;
 
 		virtual void CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) = 0;
@@ -55,7 +58,6 @@ namespace NK
 	protected:
 		explicit ICommandBuffer(ILogger& _logger, IDevice& _device, ICommandPool& _pool, const CommandBufferDesc& _desc)
 		: m_logger(_logger), m_device(_device), m_pool(_pool), m_level(_desc.level) {}
-
 
 
 		//Dependency injections

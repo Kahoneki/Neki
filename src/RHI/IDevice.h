@@ -3,7 +3,6 @@
 #include "Core/Memory/Allocation.h"
 #include "Core/Memory/IAllocator.h"
 #include "Core/Memory/FreeListAllocator.h"
-#include "IDescriptorSet.h"
 
 
 namespace NK
@@ -30,6 +29,9 @@ namespace NK
 
 	class IShader;
 	struct ShaderDesc;
+
+	class IRootSignature;
+	struct RootSignatureDesc;
 
 	class IPipeline;
 	struct PipelineDesc;
@@ -65,12 +67,11 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<IRootSignature> CreateRootSignature(const RootSignatureDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() = 0;
-
-		[[nodiscard]] inline IDescriptorSet* GetDescriptorSet() const { return m_descriptorSet.get(); }
 
 
 	protected:
@@ -82,6 +83,5 @@ namespace NK
 		IAllocator& m_allocator;
 
 		UniquePtr<FreeListAllocator> m_resourceIndexAllocator;
-		UniquePtr<IDescriptorSet> m_descriptorSet;
 	};
 }

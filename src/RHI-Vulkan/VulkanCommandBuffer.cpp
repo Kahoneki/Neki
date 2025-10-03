@@ -6,9 +6,9 @@
 #include <Core/Utils/EnumUtils.h>
 #include "VulkanBuffer.h"
 #include "VulkanPipeline.h"
+#include "VulkanRootSignature.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
-#include "VulkanDescriptorSet.h"
 
 namespace NK
 {
@@ -198,6 +198,26 @@ namespace NK
 
 
 
+	void VulkanCommandBuffer::BindRootSignature(IRootSignature* _rootSignature, PIPELINE_BIND_POINT _bindPoint)
+	{
+		//Bind descriptor set
+		VulkanRootSignature* vkRootSig{ dynamic_cast<VulkanRootSignature*>(_rootSignature) };
+		VkPipelineBindPoint bindPoint{ _bindPoint == PIPELINE_BIND_POINT::GRAPHICS ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE };
+		VkDescriptorSet vkDescriptorSet{ vkRootSig->GetDescriptorSet() };
+		vkCmdBindDescriptorSets(m_buffer, bindPoint, vkRootSig->GetPipelineLayout(), 0, 1, &vkDescriptorSet, 0, nullptr);
+	}
+
+
+
+	void VulkanCommandBuffer::PushConstants(IRootSignature* _rootSignature, void* _data)
+	{
+		VulkanRootSignature* vkRootSig{ dynamic_cast<VulkanRootSignature*>(_rootSignature) };
+		//todo: replace VK_SHADER_STAGE_ALL with more precise user-defined parameter
+		vkCmdPushConstants(m_buffer, vkRootSig->GetPipelineLayout(), VK_SHADER_STAGE_ALL, 0, vkRootSig->GetProvidedNum32BitValues() * 4, _data);
+	}
+
+
+
 	void VulkanCommandBuffer::SetViewport(glm::vec2 _pos, glm::vec2 _extent)
 	{
 		VkViewport viewport{};
@@ -218,14 +238,6 @@ namespace NK
 		scissor.extent.width = _extent.x;
 		scissor.extent.height = _extent.y;
 		vkCmdSetScissor(m_buffer, 0, 1, &scissor);
-	}
-
-
-
-	void VulkanCommandBuffer::BindDescriptorSet(IDescriptorSet* _descriptorSet, PIPELINE_BIND_POINT _bindPoint)
-	{
-		VkDescriptorSet descriptorSet{ dynamic_cast<VulkanDescriptorSet*>(_descriptorSet)->GetDescriptorSet() };
-		vkCmdBindDescriptorSets(m_buffer, GetVulkanPipelineBindPoint(_bindPoint), dynamic_cast<VulkanDevice&>(m_device).GetPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
 	}
 
 
