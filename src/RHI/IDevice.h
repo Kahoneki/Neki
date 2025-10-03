@@ -18,6 +18,9 @@ namespace NK
 	class ITextureView;
 	struct TextureViewDesc;
 
+	class ISampler;
+	struct SamplerDesc;
+
 	class ICommandPool;
 	struct CommandPoolDesc;
 
@@ -46,6 +49,7 @@ namespace NK
 
 	
 	typedef std::uint32_t ResourceIndex;
+	typedef std::uint32_t SamplerIndex;
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
 	constexpr std::uint32_t MAX_BINDLESS_SAMPLERS{ 2048 };
 }
@@ -63,6 +67,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IBufferView> CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<ISampler> CreateSampler(const SamplerDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) = 0;
@@ -76,12 +81,14 @@ namespace NK
 
 	protected:
 		explicit IDevice(ILogger& _logger, IAllocator& _allocator)
-		: m_logger(_logger), m_allocator(_allocator), m_resourceIndexAllocator(NK_NEW(FreeListAllocator, MAX_BINDLESS_RESOURCES)) {}
+		: m_logger(_logger), m_allocator(_allocator),
+		m_resourceIndexAllocator(NK_NEW(FreeListAllocator, MAX_BINDLESS_RESOURCES)), m_samplerIndexAllocator(NK_NEW(FreeListAllocator, MAX_BINDLESS_SAMPLERS)) {}
 
 		//Dependency injections
 		ILogger& m_logger;
 		IAllocator& m_allocator;
 
 		UniquePtr<FreeListAllocator> m_resourceIndexAllocator;
+		UniquePtr<FreeListAllocator> m_samplerIndexAllocator;
 	};
 }

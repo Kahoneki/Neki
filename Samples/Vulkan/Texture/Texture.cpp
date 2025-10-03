@@ -6,11 +6,12 @@
 #include <Core/Utils/FormatUtils.h>
 #include <RHI-Vulkan/VulkanDevice.h>
 #include <RHI/IBuffer.h>
+#include <RHI/IPipeline.h>
+#include <RHI/ISampler.h>
 #include <RHI/IShader.h>
 #include <RHI/ISurface.h>
-#include <RHI/ITexture.h>
 #include <RHI/ISwapchain.h>
-#include "RHI/IPipeline.h"
+#include <RHI/ITexture.h>
 
 
 
@@ -58,7 +59,7 @@ int main()
 
 	//Surface
 	NK::SurfaceDesc surfaceDesc{};
-	surfaceDesc.name = "Triangle Sample";
+	surfaceDesc.name = "Texture Sample";
 	surfaceDesc.size = glm::ivec2(1280, 720);
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
 
@@ -108,13 +109,21 @@ int main()
 	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
 	transferQueue->WaitIdle();
 
+	
+	//Texture view
 	NK::TextureViewDesc textureViewDesc{};
 	textureViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	textureViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_UNORM;
 	textureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateTextureView(texture.get(), textureViewDesc) };
 	NK::ResourceIndex textureResourceIndex{ textureView->GetIndex() };
-	
+
+	//Sampler
+	NK::SamplerDesc samplerDesc{};
+	samplerDesc.minFilter = NK::FILTER_MODE::LINEAR;
+	samplerDesc.magFilter = NK::FILTER_MODE::LINEAR;
+	const NK::UniquePtr<NK::ISampler> sampler{ device->CreateSampler(samplerDesc) };
+	NK::SamplerIndex samplerIndex{ sampler->GetIndex() };
 	
 
 	//Vertex Shader
@@ -131,7 +140,7 @@ int main()
 
 	//Root Signature
 	NK::RootSignatureDesc rootSigDesc{};
-	rootSigDesc.num32BitPushConstantValues = 1;
+	rootSigDesc.num32BitPushConstantValues = 2;
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 
 	
@@ -322,7 +331,8 @@ int main()
 		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
-		commandBuffers[currentFrame]->PushConstants(rootSig.get(), &textureResourceIndex);
+		std::uint32_t pushConstants[]{ textureResourceIndex, samplerIndex };
+		commandBuffers[currentFrame]->PushConstants(rootSig.get(), pushConstants);
 
 		std::size_t vertexBufferStride{ sizeof(Vertex) };
 		commandBuffers[currentFrame]->BindVertexBuffers(0, 1, vertBuffer.get(), &vertexBufferStride);

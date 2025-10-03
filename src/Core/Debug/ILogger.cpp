@@ -71,6 +71,7 @@ namespace NK
 		case LOGGER_LAYER::BUFFER_VIEW:			return "[BUFFER VIEW]";
 		case LOGGER_LAYER::TEXTURE:				return "[TEXTURE]";
 		case LOGGER_LAYER::TEXTURE_VIEW:		return "[TEXTURE VIEW]";
+		case LOGGER_LAYER::SAMPLER:				return "[SAMPLER]";
 		case LOGGER_LAYER::SURFACE:				return "[SURFACE]";
 		case LOGGER_LAYER::SWAPCHAIN:			return "[SWAPCHAIN]";
 		case LOGGER_LAYER::SHADER:				return "[SHADER]";

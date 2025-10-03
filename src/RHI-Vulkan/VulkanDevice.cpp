@@ -17,6 +17,7 @@
 #include "VulkanPipeline.h"
 #include "VulkanQueue.h"
 #include "VulkanRootSignature.h"
+#include "VulkanSampler.h"
 #include "VulkanSemaphore.h"
 #include "VulkanShader.h"
 #include "VulkanSurface.h"
@@ -126,6 +127,13 @@ namespace NK
 	UniquePtr<ITextureView> VulkanDevice::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
 		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, m_globalDescriptorSet, m_resourceIndexAllocator.get()));
+	}
+
+
+
+	UniquePtr<ISampler> VulkanDevice::CreateSampler(const SamplerDesc& _desc)
+	{
+		return UniquePtr<ISampler>(NK_NEW(VulkanSampler, m_logger, m_allocator, *m_samplerIndexAllocator.get(), *this, _desc, m_globalDescriptorSet));
 	}
 
 
