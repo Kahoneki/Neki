@@ -2,8 +2,11 @@
 
 struct VertexOutput
 {
-	ATTRIBUTE(float4, pos, NK::SHADER_ATTRIBUTE_LOCATION_POSITION, SV_POSITION);
+	float4 pos : SV_POSITION;
+	float2 texCoord : TEXCOORD_0;
 };
+
+[[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
 
 PUSH_CONSTANTS_BLOCK(
 	float textureIndex;
@@ -11,5 +14,5 @@ PUSH_CONSTANTS_BLOCK(
 
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
-    return float4(PC(textureIndex), 0.0f, 0.0f, 1.0f);
+    return float4(vertexOutput.texCoord, 0.0f, 1.0f);
 }

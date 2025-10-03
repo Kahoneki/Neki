@@ -91,14 +91,14 @@ int main()
 	struct Vertex
 	{
 		glm::vec2 pos;
-		glm::vec3 colour;
+		glm::vec2 texCoord;
 	};
 	const Vertex vertices[4]
 	{
-		Vertex(glm::vec2(-0.5f, -0.5f)),	//Bottom left
-		Vertex(glm::vec2(-0.5f, 0.5f)),		//Top left
-		Vertex(glm::vec2(0.5f, -0.5f)),		//Bottom right
-		Vertex(glm::vec2(0.5f, 0.5f))		//Top right
+		Vertex(glm::vec2(-0.5f, -0.5f),	glm::vec2(0.0f, 0.0f)),	//Bottom left
+		Vertex(glm::vec2(-0.5f, 0.5f),	glm::vec2(0.0f, 1.0f)),	//Top left
+		Vertex(glm::vec2(0.5f, -0.5f),	glm::vec2(1.0f, 0.0f)),	//Bottom right
+		Vertex(glm::vec2(0.5f, 0.5f),	glm::vec2(1.0f, 1.0f))	//Top right
 	};
 	
 	NK::BufferDesc vertStagingBufferDesc{};
@@ -147,14 +147,21 @@ int main()
 
 	//Graphics Pipeline
 
-	//Position attribute
 	std::vector<NK::VertexAttributeDesc> vertexAttributes;
+	//Position attribute
 	NK::VertexAttributeDesc posAttribute{};
 	posAttribute.attribute = NK::SHADER_ATTRIBUTE::POSITION;
 	posAttribute.binding = 0;
 	posAttribute.format = NK::DATA_FORMAT::R32G32_SFLOAT;
 	posAttribute.offset = 0;
 	vertexAttributes.push_back(posAttribute);
+	//Texcoord attribute
+	NK::VertexAttributeDesc uvAttribute{};
+	uvAttribute.attribute = NK::SHADER_ATTRIBUTE::TEXCOORD_0;
+	uvAttribute.binding = 0;
+	uvAttribute.format = NK::DATA_FORMAT::R32G32_SFLOAT;
+	uvAttribute.offset = sizeof(glm::vec2);
+	vertexAttributes.push_back(uvAttribute);
 
 	//Vertex buffer binding
 	std::vector<NK::VertexBufferBindingDesc> bufferBindings;
