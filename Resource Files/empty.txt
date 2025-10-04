@@ -1,1 +1,0 @@
-exists to have Resource Files folder tracked in git

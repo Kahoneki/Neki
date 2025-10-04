@@ -13,6 +13,9 @@
 #include <RHI/ISwapchain.h>
 #include <RHI/ITexture.h>
 
+#include "Core/Utils/ImageLoader.h"
+#include "Graphics/GPUUploader.h"
+
 
 
 int main()
@@ -30,11 +33,6 @@ int main()
 	//Device
 	const NK::UniquePtr<NK::IDevice> device{ NK_NEW(NK::VulkanDevice, *logger, *allocator) };
 
-	//Transfer Command Pool
-	NK::CommandPoolDesc transferCommandPoolDesc{};
-	transferCommandPoolDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
-	const NK::UniquePtr<NK::ICommandPool> transferCommandPool{ device->CreateCommandPool(transferCommandPoolDesc) };
-
 	//Graphics Command Pool
 	NK::CommandPoolDesc graphicsCommandPoolDesc{};
 	graphicsCommandPoolDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
@@ -49,13 +47,8 @@ int main()
 	graphicsQueueDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
 	const NK::UniquePtr<NK::IQueue> graphicsQueue(device->CreateQueue(graphicsQueueDesc));
 
-	//Transfer Queue
-	NK::QueueDesc transferQueueDesc{};
-	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
-	const NK::UniquePtr<NK::IQueue> transferQueue(device->CreateQueue(transferQueueDesc));
-
-	//Transfer Command Buffer
-	const NK::UniquePtr<NK::ICommandBuffer> transferCommandBuffer{ transferCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc) };
+	//GPU Uploader
+	const NK::UniquePtr<NK::GPUUploader> gpuUploader{ device->CreateGPUUploader(1024 * 1024 * 512) };
 
 	//Surface
 	NK::SurfaceDesc surfaceDesc{};
@@ -72,56 +65,24 @@ int main()
 
 	
 	//Texture
-	struct Pixel
-	{
-		std::uint8_t r;
-		std::uint8_t g;
-		std::uint8_t b;
-		std::uint8_t a;
-	};
-	Pixel textureData[2 * 2]
-	{
-		{255,0,0,255}, {0,255,0,255},
-		{0,0,255,255}, {255,255,255,255}
-	};
-
-	NK::BufferDesc textureStagingBufferDesc{};
-	textureStagingBufferDesc.size = sizeof(Pixel) * 4;
-	textureStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
-	textureStagingBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
-	const NK::UniquePtr<NK::IBuffer> textureStagingBuffer{ device->CreateBuffer(textureStagingBufferDesc) };
-	void* textureStagingBufferMap{ textureStagingBuffer->Map() };
-	memcpy(textureStagingBufferMap, textureData, sizeof(Pixel) * 4);
-	textureStagingBuffer->Unmap();
-	
-	NK::TextureDesc textureDesc{};
-	textureDesc.size = { 2, 2, 1 };
-	textureDesc.arrayTexture = false;
-	textureDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
-	textureDesc.format = NK::DATA_FORMAT::R8G8B8A8_UNORM;
-	textureDesc.usage = NK::TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT | NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
-	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(textureDesc) };
-
-	transferCommandBuffer->Begin();
-	transferCommandBuffer->TransitionBarrier(texture.get(), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::COPY_DEST);
-	transferCommandBuffer->CopyBufferToTexture(textureStagingBuffer.get(), texture.get());
-	transferCommandBuffer->End();
-	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
-	transferQueue->WaitIdle();
+	NK::ImageData imageData{ NK::ImageLoader::LoadImage("Samples/Resource Files/NekiLogo.png", true, true) };
+	imageData.desc.usage |= NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
+	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(imageData.desc) };
+	gpuUploader->EnqueueTextureDataUpload(imageData.numBytes, imageData.data, texture.get(), NK::RESOURCE_STATE::UNDEFINED);
 
 	
 	//Texture view
 	NK::TextureViewDesc textureViewDesc{};
 	textureViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
-	textureViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_UNORM;
+	textureViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
 	textureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateTextureView(texture.get(), textureViewDesc) };
 	NK::ResourceIndex textureResourceIndex{ textureView->GetIndex() };
 
 	//Sampler
 	NK::SamplerDesc samplerDesc{};
-	samplerDesc.minFilter = NK::FILTER_MODE::LINEAR;
-	samplerDesc.magFilter = NK::FILTER_MODE::LINEAR;
+	samplerDesc.minFilter = NK::FILTER_MODE::NEAREST;
+	samplerDesc.magFilter = NK::FILTER_MODE::NEAREST;
 	const NK::UniquePtr<NK::ISampler> sampler{ device->CreateSampler(samplerDesc) };
 	NK::SamplerIndex samplerIndex{ sampler->GetIndex() };
 	
@@ -157,49 +118,27 @@ int main()
 		Vertex(glm::vec2(0.5f, -0.5f),	glm::vec2(1.0f, 0.0f)),	//Bottom right
 		Vertex(glm::vec2(0.5f, 0.5f),	glm::vec2(1.0f, 1.0f))	//Top right
 	};
-	
-	NK::BufferDesc vertStagingBufferDesc{};
-	vertStagingBufferDesc.size = sizeof(Vertex) * 4;
-	vertStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
-	vertStagingBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
-	const NK::UniquePtr<NK::IBuffer> vertStagingBuffer{ device->CreateBuffer(vertStagingBufferDesc) };
-	void* vertStagingBufferMap{ vertStagingBuffer->Map() };
-	memcpy(vertStagingBufferMap, vertices, sizeof(Vertex) * 4);
-	vertStagingBuffer->Unmap();
-
 	NK::BufferDesc vertBufferDesc{};
 	vertBufferDesc.size = sizeof(Vertex) * 4;
 	vertBufferDesc.type = NK::MEMORY_TYPE::DEVICE;
 	vertBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | NK::BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
 	const NK::UniquePtr<NK::IBuffer> vertBuffer{ device->CreateBuffer(vertBufferDesc) };
 
-
 	//Index Buffer
 	const std::uint32_t indices[6]{ 0, 1, 2, 2, 1, 3 };
-	
-	NK::BufferDesc indexStagingBufferDesc{};
-	indexStagingBufferDesc.size = sizeof(std::uint32_t) * 6;
-	indexStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
-	indexStagingBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
-	const NK::UniquePtr<NK::IBuffer> indexStagingBuffer{ device->CreateBuffer(indexStagingBufferDesc) };
-	void* indexStagingBufferMap{ indexStagingBuffer->Map() };
-	memcpy(indexStagingBufferMap, indices, sizeof(std::uint32_t) * 6);
-	indexStagingBuffer->Unmap();
-
 	NK::BufferDesc indexBufferDesc{};
 	indexBufferDesc.size = sizeof(std::uint32_t) * 6;
 	indexBufferDesc.type = NK::MEMORY_TYPE::DEVICE;
 	indexBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | NK::BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT;
 	const NK::UniquePtr<NK::IBuffer> indexBuffer{ device->CreateBuffer(indexBufferDesc) };
 
+	//Upload vertex and index buffers
+	gpuUploader->EnqueueBufferDataUpload(sizeof(Vertex) * 4, vertices, vertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(sizeof(std::uint32_t) * 6, indices, indexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
 
-	//Copy Vertex and Index Buffers
-	transferCommandBuffer->Begin();
-	transferCommandBuffer->CopyBufferToBuffer(vertStagingBuffer.get(), vertBuffer.get());
-	transferCommandBuffer->CopyBufferToBuffer(indexStagingBuffer.get(), indexBuffer.get());
-	transferCommandBuffer->End();
-	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
-	transferQueue->WaitIdle();
+	//Flush texture, vertex buffer, and index buffer
+	gpuUploader->Flush(true);
+	gpuUploader->Reset();
 	
 
 	//Graphics Pipeline
@@ -253,7 +192,13 @@ int main()
 
 	std::vector<NK::ColourBlendAttachmentDesc> colourBlendAttachments(1);
 	colourBlendAttachments[0].colourWriteMask = NK::COLOUR_ASPECT_FLAGS::R_BIT | NK::COLOUR_ASPECT_FLAGS::G_BIT | NK::COLOUR_ASPECT_FLAGS::B_BIT | NK::COLOUR_ASPECT_FLAGS::A_BIT;
-	colourBlendAttachments[0].blendEnable = false;
+	colourBlendAttachments[0].blendEnable = true;
+	colourBlendAttachments[0].srcColourBlendFactor = NK::BLEND_FACTOR::SRC_ALPHA;
+	colourBlendAttachments[0].dstColourBlendFactor = NK::BLEND_FACTOR::ONE_MINUS_SRC_ALPHA;
+	colourBlendAttachments[0].colourBlendOp = NK::BLEND_OP::ADD;
+	colourBlendAttachments[0].srcAlphaBlendFactor = NK::BLEND_FACTOR::ONE; //Keep source alpha
+	colourBlendAttachments[0].dstAlphaBlendFactor = NK::BLEND_FACTOR::ZERO; //Discard destination alpha
+	colourBlendAttachments[0].alphaBlendOp = NK::BLEND_OP::ADD;
 	NK::ColourBlendDesc colourBlendDesc{};
 	colourBlendDesc.logicOpEnable = false;
 	colourBlendDesc.attachments = colourBlendAttachments;

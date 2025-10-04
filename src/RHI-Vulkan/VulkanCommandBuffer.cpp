@@ -118,6 +118,28 @@ namespace NK
 
 
 
+	void VulkanCommandBuffer::TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
+	{
+		const BarrierInfo src{ GetVulkanBarrierInfo(_oldState) };
+		const BarrierInfo dst{ GetVulkanBarrierInfo(_newState) };
+
+		VkBufferMemoryBarrier barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.buffer = dynamic_cast<VulkanBuffer*>(_buffer)->GetBuffer();
+
+		barrier.offset = 0;
+		barrier.size = _buffer->GetSize();
+
+		barrier.srcAccessMask = src.accessMask;
+		barrier.dstAccessMask = dst.accessMask;
+
+		vkCmdPipelineBarrier(m_buffer, src.stageMask, dst.stageMask, 0, 0, nullptr, 1, &barrier, 0, nullptr);
+	}
+
+
+
 	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment)
 	{
 		//Colour attachments
@@ -251,7 +273,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer)
+	void VulkanCommandBuffer::CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer, std::size_t _srcOffset, std::size_t _dstOffset, std::size_t _size)
 	{
 		//Input validation
 
@@ -269,24 +291,31 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
-		//Ensure destination buffer is large enough to hold the contents of the source buffer
-		if (_dstBuffer->GetSize() < _srcBuffer->GetSize())
+		//Ensure source buffer with given offset and size doesn't exceed bounds of source buffer
+		if (_srcOffset + _size > _srcBuffer->GetSize())
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToBuffer() - _srcBuffer (size: " + std::to_string(_srcBuffer->GetSize()) + ") is too big for _dstBuffer (size:" + std::to_string(_dstBuffer->GetSize()) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToBuffer() - _srcOffset (" + std::to_string(_srcOffset) + ") + _size (" + std::to_string(_size) + ") > _srcBuffer.m_size (" + std::to_string(_srcBuffer->GetSize()) + ")\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure dest buffer with given offset and size doesn't exceed bounds of dest buffer
+		if (_dstOffset + _size > _dstBuffer->GetSize())
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToBuffer() - _dstOffset (" + std::to_string(_dstOffset) + ") + _size (" + std::to_string(_size) + ") > _dstBuffer.m_size (" + std::to_string(_dstBuffer->GetSize()) + ")\n");
 			throw std::runtime_error("");
 		}
 
 		//Enqueue the copy command
 		VkBufferCopy copyRegion{};
-		copyRegion.srcOffset = 0;
-		copyRegion.dstOffset = 0;
-		copyRegion.size = _srcBuffer->GetSize();
+		copyRegion.srcOffset = _srcOffset;
+		copyRegion.dstOffset = _dstOffset;
+		copyRegion.size = _size;
 		vkCmdCopyBuffer(m_buffer, dynamic_cast<VulkanBuffer*>(_srcBuffer)->GetBuffer(), dynamic_cast<VulkanBuffer*>(_dstBuffer)->GetBuffer(), 1, &copyRegion);
 	}
 
 
 
-	void VulkanCommandBuffer::CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture)
+	void VulkanCommandBuffer::CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _extent)
 	{
 		//Input validation
 
@@ -304,17 +333,27 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+		//Ensure destination region doesn't exceed destination texture's bounds
+		const glm::ivec3 textureSize = _dstTexture->GetSize();
+		if ((_dstOffset.x + _extent.x > textureSize.x) ||
+			(_dstOffset.y + _extent.y > textureSize.y) ||
+			(_dstOffset.z + _extent.z > textureSize.z))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToTexture() - Specified destination region is out of bounds for the texture.\n");
+			throw std::runtime_error("");
+		}
+
 		//Enqueue the copy command
 		VkBufferImageCopy copyRegion{};
-		copyRegion.bufferOffset = 0;
+		copyRegion.bufferOffset = _srcOffset;
 		copyRegion.bufferRowLength = 0;   //Tightly packed
 		copyRegion.bufferImageHeight = 0; //Tightly packed
 		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		copyRegion.imageSubresource.mipLevel = 0;
 		copyRegion.imageSubresource.baseArrayLayer = 0;
 		copyRegion.imageSubresource.layerCount = 1;
-		copyRegion.imageOffset = { 0, 0, 0 };
-		copyRegion.imageExtent = { static_cast<std::uint32_t>(_dstTexture->GetSize().x), static_cast<std::uint32_t>(_dstTexture->GetSize().y), static_cast<std::uint32_t>(_dstTexture->GetSize().z) };
+		copyRegion.imageOffset = { _dstOffset.x, _dstOffset.y, _dstOffset.z };
+		copyRegion.imageExtent = { static_cast<std::uint32_t>(_extent.x), static_cast<std::uint32_t>(_extent.y), static_cast<std::uint32_t>(_extent.z) };
 
 		vkCmdCopyBufferToImage(m_buffer, dynamic_cast<VulkanBuffer*>(_srcBuffer)->GetBuffer(), dynamic_cast<VulkanTexture*>(_dstTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 	}
@@ -332,15 +371,24 @@ namespace NK
 	{
 		switch (_state)
 		{
+		//Common States
 		case RESOURCE_STATE::UNDEFINED:			return { VK_IMAGE_LAYOUT_UNDEFINED, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
-			
-		case RESOURCE_STATE::SHADER_RESOURCE:	return { VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
-
-		case RESOURCE_STATE::RENDER_TARGET:		return { VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 		case RESOURCE_STATE::PRESENT:			return { VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT };
 
+		//Read-Only States
+		case RESOURCE_STATE::VERTEX_BUFFER:		return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT };
+		case RESOURCE_STATE::INDEX_BUFFER:		return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_INDEX_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT };
+		case RESOURCE_STATE::CONSTANT_BUFFER:	return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
+		case RESOURCE_STATE::INDIRECT_BUFFER:	return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_INDIRECT_COMMAND_READ_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT };
+		case RESOURCE_STATE::SHADER_RESOURCE:	return { VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
 		case RESOURCE_STATE::COPY_SOURCE:		return { VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
+		case RESOURCE_STATE::DEPTH_READ:		return { VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT };
+
+		//Read-Write States
+		case RESOURCE_STATE::RENDER_TARGET:		return { VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		case RESOURCE_STATE::UNORDERED_ACCESS:	return { VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT };
 		case RESOURCE_STATE::COPY_DEST:			return { VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
+		case RESOURCE_STATE::DEPTH_WRITE:		return { VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT };
 
 		default:
 		{

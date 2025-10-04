@@ -25,6 +25,7 @@ namespace NK
 		virtual void End() override;
 
 		virtual void TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
+		virtual void TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
 		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment) override;
 		virtual void EndRendering() override;
 
@@ -37,8 +38,8 @@ namespace NK
 		virtual void SetScissor(glm::ivec2 _pos, glm::ivec2 _extent) override;
 		virtual void DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance) override;
 
-		virtual void CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) override;
-		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture) override;
+		virtual void CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer, std::size_t _srcOffset, std::size_t _dstOffset, std::size_t _size) override;
+		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _extent) override;
 		virtual void UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer) override;
 		
 		//Vulkan internal API (for use by other RHI-Vulkan classes)

@@ -3,6 +3,7 @@
 #include "Core/Memory/Allocation.h"
 #include "Core/Memory/IAllocator.h"
 #include "Core/Memory/FreeListAllocator.h"
+#include "Graphics/GPUUploader.h"
 
 
 namespace NK
@@ -77,6 +78,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() = 0;
+
+		[[nodiscard]] UniquePtr<GPUUploader> CreateGPUUploader(std::size_t _stagingBufferSize) { return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _stagingBufferSize)); }
 
 
 	protected:

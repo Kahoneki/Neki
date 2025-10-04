@@ -112,10 +112,6 @@ FetchContent_MakeAvailable(assimp)
 target_link_libraries(Neki PRIVATE assimp)
 
 
-#Copy all Neki resource files to the output directory, maintaining subdirectory structure
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Resource Files/" DESTINATION "${CMAKE_BINARY_DIR}/Resource Files/")
-
-
 
 #Compiles a given HLSL shader source file to SPIR-V and/or DXIL
 #Usage:
@@ -201,6 +197,9 @@ endfunction()
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 
 
+    #Copy all resource files to the output directory, maintaining subdirectory structure
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Samples/Resource Files/" DESTINATION "${CMAKE_BINARY_DIR}/Samples/Resource Files/")
+    
 
     #Shader compilation
 

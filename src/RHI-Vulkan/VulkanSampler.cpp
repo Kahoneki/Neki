@@ -77,6 +77,32 @@ namespace NK
 
 
 
+	VulkanSampler::~VulkanSampler()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::SAMPLER, "Shutting Down VulkanSampler\n");
+
+		
+		if (m_samplerIndex != FreeListAllocator::INVALID_INDEX)
+		{
+			m_freeListAllocator.Free(m_samplerIndex);
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SAMPLER, "Sampler Index Freed\n");
+			m_samplerIndex = FreeListAllocator::INVALID_INDEX;
+		}
+		
+		if (m_sampler != VK_NULL_HANDLE)
+		{
+			vkDestroySampler(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_sampler, m_allocator.GetVulkanCallbacks());
+			m_sampler = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SAMPLER, "Sampler Destroyed\n");
+		}
+
+		
+		m_logger.Unindent();
+	}
+
+
+
 	VkFilter VulkanSampler::GetVulkanFilter(FILTER_MODE _filterMode)
 	{
 		switch (_filterMode)
@@ -121,32 +147,6 @@ namespace NK
 			throw std::runtime_error("Default case reached for VulkanSampler::GetVulkanAddressMode() - address mode = " + std::to_string(std::to_underlying(_addressMode)));
 		}
 		}
-	}
-
-
-
-	VulkanSampler::~VulkanSampler()
-	{
-		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::SAMPLER, "Shutting Down VulkanSampler\n");
-
-		
-		if (m_samplerIndex != FreeListAllocator::INVALID_INDEX)
-		{
-			m_freeListAllocator.Free(m_samplerIndex);
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SAMPLER, "Sampler Index Freed\n");
-			m_samplerIndex = FreeListAllocator::INVALID_INDEX;
-		}
-		
-		if (m_sampler != VK_NULL_HANDLE)
-		{
-			vkDestroySampler(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_sampler, m_allocator.GetVulkanCallbacks());
-			m_sampler = VK_NULL_HANDLE;
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SAMPLER, "Sampler Destroyed\n");
-		}
-
-		
-		m_logger.Unindent();
 	}
 	
 }
