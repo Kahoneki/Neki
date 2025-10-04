@@ -79,7 +79,10 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() = 0;
 
-		[[nodiscard]] UniquePtr<GPUUploader> CreateGPUUploader(std::size_t _stagingBufferSize) { return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _stagingBufferSize)); }
+		[[nodiscard]] UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc)
+		{
+			return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _desc));
+		}
 
 
 	protected:

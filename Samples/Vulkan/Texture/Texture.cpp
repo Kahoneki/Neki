@@ -47,8 +47,16 @@ int main()
 	graphicsQueueDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
 	const NK::UniquePtr<NK::IQueue> graphicsQueue(device->CreateQueue(graphicsQueueDesc));
 
+	//Transfer Queue
+	NK::QueueDesc transferQueueDesc{};
+	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
+	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
+
 	//GPU Uploader
-	const NK::UniquePtr<NK::GPUUploader> gpuUploader{ device->CreateGPUUploader(1024 * 1024 * 512) };
+	NK::GPUUploaderDesc gpuUploaderDesc{};
+	gpuUploaderDesc.stagingBufferSize = 1024 * 512 * 512; //512MiB
+	gpuUploaderDesc.transferQueue = transferQueue.get();
+	const NK::UniquePtr<NK::GPUUploader> gpuUploader{ device->CreateGPUUploader(gpuUploaderDesc) };
 
 	//Surface
 	NK::SurfaceDesc surfaceDesc{};
@@ -81,8 +89,8 @@ int main()
 
 	//Sampler
 	NK::SamplerDesc samplerDesc{};
-	samplerDesc.minFilter = NK::FILTER_MODE::NEAREST;
-	samplerDesc.magFilter = NK::FILTER_MODE::NEAREST;
+	samplerDesc.minFilter = NK::FILTER_MODE::LINEAR;
+	samplerDesc.magFilter = NK::FILTER_MODE::LINEAR;
 	const NK::UniquePtr<NK::ISampler> sampler{ device->CreateSampler(samplerDesc) };
 	NK::SamplerIndex samplerIndex{ sampler->GetIndex() };
 	
@@ -214,7 +222,7 @@ int main()
 	graphicsPipelineDesc.depthStencilDesc = depthStencilDesc;
 	graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
 	graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
-	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_UNORM };
+	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };
 	graphicsPipelineDesc.depthStencilAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
 
 	const NK::UniquePtr<NK::IPipeline> graphicsPipeline{ device->CreatePipeline(graphicsPipelineDesc) };

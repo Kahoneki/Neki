@@ -9,15 +9,21 @@
 namespace NK
 {
 
-	GPUUploader::GPUUploader(ILogger& _logger, IDevice& _device, std::size_t _stagingBufferSize)
-	: m_logger(_logger), m_device(_device), m_stagingBufferSize(_stagingBufferSize)
+	GPUUploader::GPUUploader(ILogger& _logger, IDevice& _device, const GPUUploaderDesc& _desc)
+	: m_logger(_logger), m_device(_device), m_stagingBufferSize(_desc.stagingBufferSize), m_queue(_desc.transferQueue)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::GPU_UPLOADER, "Initialising GPUUploader\n");
 
+		if (m_queue->GetType() != COMMAND_POOL_TYPE::TRANSFER)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "Provided _desc.transferQueue is not of type COMMAND_POOL_TYPE::TRANSFER as required. Type = " + std::to_string(std::to_underlying(m_queue->GetType())) + "\n");
+			throw std::runtime_error("");
+		}
+
 
 		BufferDesc stagingBufferDesc{};
-		stagingBufferDesc.size = _stagingBufferSize;
+		stagingBufferDesc.size = m_stagingBufferSize;
 		stagingBufferDesc.type = MEMORY_TYPE::HOST;
 		stagingBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
 		m_stagingBuffer = m_device.CreateBuffer(stagingBufferDesc);
@@ -30,10 +36,6 @@ namespace NK
 		CommandBufferDesc commandBufferDesc{};
 		commandBufferDesc.level = COMMAND_BUFFER_LEVEL::PRIMARY;
 		m_commandBuffer = m_commandPool->AllocateCommandBuffer(commandBufferDesc);
-
-		QueueDesc queueDesc{};
-		queueDesc.type = COMMAND_POOL_TYPE::TRANSFER;
-		m_queue = m_device.CreateQueue(queueDesc);
 
 		m_flushing = false;
 

@@ -29,11 +29,6 @@ int main()
 	//Device
 	const NK::UniquePtr<NK::IDevice> device{ NK_NEW(NK::VulkanDevice, *logger, *allocator) };
 
-	//Transfer Command Pool
-	NK::CommandPoolDesc transferCommandPoolDesc{};
-	transferCommandPoolDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
-	const NK::UniquePtr<NK::ICommandPool> transferCommandPool{ device->CreateCommandPool(transferCommandPoolDesc) };
-
 	//Graphics Command Pool
 	NK::CommandPoolDesc graphicsCommandPoolDesc{};
 	graphicsCommandPoolDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
@@ -51,7 +46,13 @@ int main()
 	//Transfer Queue
 	NK::QueueDesc transferQueueDesc{};
 	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
-	const NK::UniquePtr<NK::IQueue> transferQueue(device->CreateQueue(transferQueueDesc));
+	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
+
+	//GPU Uploader
+	NK::GPUUploaderDesc gpuUploaderDesc{};
+	gpuUploaderDesc.stagingBufferSize = 1024 * 512 * 512; //512MiB
+	gpuUploaderDesc.transferQueue = transferQueue.get();
+	const NK::UniquePtr<NK::GPUUploader> gpuUploader{ device->CreateGPUUploader(gpuUploaderDesc) };
 
 	//Surface
 	NK::SurfaceDesc surfaceDesc{};
@@ -82,9 +83,6 @@ int main()
 	NK::RootSignatureDesc rootSigDesc{};
 	rootSigDesc.num32BitPushConstantValues = 0;
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
-
-	//Transfer Command Buffer
-	const NK::UniquePtr<NK::ICommandBuffer> transferCommandBuffer{ transferCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc) };
 
 	
 	//Vertex Buffer
@@ -135,13 +133,13 @@ int main()
 	const NK::UniquePtr<NK::IBuffer> indexBuffer{ device->CreateBuffer(indexBufferDesc) };
 
 
-	//Copy Vertex and Index Buffers
-	transferCommandBuffer->Begin();
-	transferCommandBuffer->CopyBufferToBuffer(vertStagingBuffer.get(), vertBuffer.get());
-	transferCommandBuffer->CopyBufferToBuffer(indexStagingBuffer.get(), indexBuffer.get());
-	transferCommandBuffer->End();
-	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
-	transferQueue->WaitIdle();
+	//Upload vertex and index buffers
+	gpuUploader->EnqueueBufferDataUpload(sizeof(Vertex) * 3, vertices, vertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(sizeof(std::uint32_t) * 3, indices, indexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+
+	//Flush vertex buffer and index buffer uploads
+	gpuUploader->Flush(true);
+	gpuUploader->Reset();
 	
 
 	//Graphics Pipeline
@@ -210,7 +208,7 @@ int main()
 	graphicsPipelineDesc.depthStencilDesc = depthStencilDesc;
 	graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
 	graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
-	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_UNORM };
+	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };
 	graphicsPipelineDesc.depthStencilAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
 
 	const NK::UniquePtr<NK::IPipeline> graphicsPipeline{ device->CreatePipeline(graphicsPipelineDesc) };

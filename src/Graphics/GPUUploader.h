@@ -21,11 +21,23 @@ namespace NK
 		std::size_t offset;
 		std::size_t size;
 	};
+
+	struct GPUUploaderDesc
+	{
+		//Size of the staging buffer in bytes - if the staging buffer is filled without flushing, a blocking flush will be automatically issued
+		std::size_t stagingBufferSize;
+
+		//A non-owning copy of a transfer queue. The GPUUploader will use it when flushing commands, synchronisation should be handled externally by the caller
+		//When flushing, either set the _waitIdle parameter to true or use the returned fence to know when the GPUUploader is done using the queue
+		//Note: there is no logical impact (beyond performance) in submitting commands to the transfer queue while the GPUUploader is using it
+		IQueue* transferQueue;
+	};
+	
 	
 	class GPUUploader final
 	{
 	public:
-		GPUUploader(ILogger& _logger, IDevice& _device, std::size_t _stagingBufferSize);
+		GPUUploader(ILogger& _logger, IDevice& _device, const GPUUploaderDesc& _desc);
 		~GPUUploader();
 
 		//_dstBufferInitialState is the state of _dstBuffer
@@ -55,13 +67,13 @@ namespace NK
 		unsigned char* m_stagingBufferMap;
 		//There is one BufferSubregion for every resource in m_stagingBuffer
 		//Subregions are tightly packed so m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size will be the offset for new resources
-		//Gets cleared when Flush() is called
+		//Gets cleared when Reset() is called
 		std::vector<BufferSubregion> m_stagingBufferSubregions;
 		
 		UniquePtr<ICommandPool> m_commandPool;
 		UniquePtr<ICommandBuffer> m_commandBuffer;
 		
-		UniquePtr<IQueue> m_queue;
+		IQueue* m_queue;
 
 		bool m_flushing;
 	};
