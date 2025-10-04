@@ -1,6 +1,7 @@
 #include "GPUUploader.h"
 
 #include <cstring>
+#include <stdexcept>
 #include <RHI/IBuffer.h>
 #include <RHI/ICommandBuffer.h>
 #include <RHI/IQueue.h>
