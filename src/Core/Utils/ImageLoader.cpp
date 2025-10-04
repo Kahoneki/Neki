@@ -1,8 +1,8 @@
 #include "ImageLoader.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include <complex>
 #include <stb_image.h>
+#include <stdexcept>
 
 
 namespace NK

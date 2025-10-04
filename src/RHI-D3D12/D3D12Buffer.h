@@ -15,6 +15,7 @@ namespace NK
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline ID3D12Resource* GetBuffer() const { return m_buffer.Get(); }
+		[[nodiscard]] inline D3D12_RESOURCE_DESC GetResourceDesc() const { return m_resourceDesc; }
 
 
 	private:
@@ -23,5 +24,6 @@ namespace NK
 
 
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_buffer;
+		D3D12_RESOURCE_DESC m_resourceDesc;
 	};
 }

@@ -171,18 +171,15 @@ namespace NK
 		fenceDesc.initiallySignaled = false;
 		UniquePtr<IFence> fence{ m_device.CreateFence(fenceDesc) };
 		
-		m_queue->Submit(m_commandBuffer.get(), nullptr, nullptr, fence.get());
 		m_flushing = true;
+		m_queue->Submit(m_commandBuffer.get(), nullptr, nullptr, fence.get());
 
 		if (_waitIdle)
 		{
 			m_queue->WaitIdle();
-			return nullptr;
 		}
-		else
-		{
-			return std::move(fence);
-		}
+		
+		return std::move(fence);
 	}
 
 }

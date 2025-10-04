@@ -6,7 +6,7 @@
 namespace NK
 {
 
-	VulkanRootSignature::VulkanRootSignature(ILogger& _logger, IAllocator& _allocator, IDevice& _device, RootSignatureDesc _desc)
+	VulkanRootSignature::VulkanRootSignature(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const RootSignatureDesc& _desc)
 	: IRootSignature(_logger, _allocator, _device, _desc)
 	{
 		m_logger.Indent();
@@ -19,7 +19,7 @@ namespace NK
 		
 		//Create the pipeline layout
 		VkPushConstantRange pushConstantRange;
-		pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL;
+		pushConstantRange.stageFlags = static_cast<VkShaderStageFlags>(m_bindPoint == PIPELINE_BIND_POINT::GRAPHICS ? VK_SHADER_STAGE_ALL_GRAPHICS : VK_SHADER_STAGE_COMPUTE_BIT);
 		pushConstantRange.offset = 0;
 		pushConstantRange.size = std::max(m_providedNum32BitPushConstantValues, 128u); //128 is the minimum required by the spec
 		if (m_providedNum32BitPushConstantValues < 128u)

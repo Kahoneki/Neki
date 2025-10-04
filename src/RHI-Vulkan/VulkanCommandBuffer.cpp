@@ -237,7 +237,8 @@ namespace NK
 	{
 		VulkanRootSignature* vkRootSig{ dynamic_cast<VulkanRootSignature*>(_rootSignature) };
 		//todo: replace VK_SHADER_STAGE_ALL with more precise user-defined parameter
-		vkCmdPushConstants(m_buffer, vkRootSig->GetPipelineLayout(), VK_SHADER_STAGE_ALL, 0, vkRootSig->GetProvidedNum32BitValues() * 4, _data);
+		VkShaderStageFlags stage{ static_cast<VkShaderStageFlags>(vkRootSig->GetBindPoint()  == PIPELINE_BIND_POINT::GRAPHICS ? VK_SHADER_STAGE_ALL_GRAPHICS : VK_SHADER_STAGE_COMPUTE_BIT)};
+		vkCmdPushConstants(m_buffer, vkRootSig->GetPipelineLayout(), stage, 0, vkRootSig->GetProvidedNum32BitValues() * 4, _data);
 	}
 
 
@@ -315,7 +316,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _extent)
+	void VulkanCommandBuffer::CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent)
 	{
 		//Input validation
 
@@ -335,9 +336,9 @@ namespace NK
 
 		//Ensure destination region doesn't exceed destination texture's bounds
 		const glm::ivec3 textureSize = _dstTexture->GetSize();
-		if ((_dstOffset.x + _extent.x > textureSize.x) ||
-			(_dstOffset.y + _extent.y > textureSize.y) ||
-			(_dstOffset.z + _extent.z > textureSize.z))
+		if ((_dstOffset.x + _dstExtent.x > textureSize.x) ||
+			(_dstOffset.y + _dstExtent.y > textureSize.y) ||
+			(_dstOffset.z + _dstExtent.z > textureSize.z))
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToTexture() - Specified destination region is out of bounds for the texture.\n");
 			throw std::runtime_error("");
@@ -353,16 +354,9 @@ namespace NK
 		copyRegion.imageSubresource.baseArrayLayer = 0;
 		copyRegion.imageSubresource.layerCount = 1;
 		copyRegion.imageOffset = { _dstOffset.x, _dstOffset.y, _dstOffset.z };
-		copyRegion.imageExtent = { static_cast<std::uint32_t>(_extent.x), static_cast<std::uint32_t>(_extent.y), static_cast<std::uint32_t>(_extent.z) };
+		copyRegion.imageExtent = { static_cast<std::uint32_t>(_dstExtent.x), static_cast<std::uint32_t>(_dstExtent.y), static_cast<std::uint32_t>(_dstExtent.z) };
 
 		vkCmdCopyBufferToImage(m_buffer, dynamic_cast<VulkanBuffer*>(_srcBuffer)->GetBuffer(), dynamic_cast<VulkanTexture*>(_dstTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-	}
-
-
-
-	void VulkanCommandBuffer::UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer)
-	{
-		//Todo: implement
 	}
 
 

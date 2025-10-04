@@ -14,11 +14,6 @@ namespace NK
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline ID3D12PipelineState* GetPipeline() { return m_pipeline.Get(); }
 
-
-	private:
-		void CreateComputePipeline(IShader* _compShader);
-		void CreateGraphicsPipeline(IShader* _vertShader, IShader* _fragShader);
-		
 		[[nodiscard]] static std::pair<std::string, UINT> GetSemanticNameIndexPair(SHADER_ATTRIBUTE _attribute);
 		[[nodiscard]] static D3D12_CULL_MODE GetD3D12CullMode(CULL_MODE _mode);
 		[[nodiscard]] static D3D12_PRIMITIVE_TOPOLOGY_TYPE GetD3D12PrimitiveTopologyType(INPUT_TOPOLOGY _topology);
@@ -30,6 +25,11 @@ namespace NK
 		[[nodiscard]] static D3D12_BLEND GetD3D12BlendFactor(BLEND_FACTOR _factor);
 		[[nodiscard]] static D3D12_BLEND_OP GetD3D12BlendOp(BLEND_OP _op);
 		[[nodiscard]] static D3D12_LOGIC_OP GetD3D12LogicOp(LOGIC_OP _op);
+
+
+	private:
+		void CreateComputePipeline(IShader* _compShader);
+		void CreateGraphicsPipeline(IShader* _vertShader, IShader* _fragShader);
 
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipeline;

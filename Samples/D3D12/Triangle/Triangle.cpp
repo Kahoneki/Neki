@@ -1,3 +1,4 @@
+#include <cstring>
 #include <Core/RAIIContext.h>
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/Allocation.h>
@@ -11,7 +12,7 @@
 #include <RHI/ISwapchain.h>
 #include "RHI/IPipeline.h"
 #ifdef ERROR
-	#undef ERROR
+	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
 #endif
 
 
@@ -31,11 +32,6 @@ int main()
 	//Device
 	const NK::UniquePtr<NK::IDevice> device{ NK_NEW(NK::D3D12Device, *logger, *allocator) };
 
-	//Transfer Command Pool
-	NK::CommandPoolDesc transferCommandPoolDesc{};
-	transferCommandPoolDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
-	const NK::UniquePtr<NK::ICommandPool> transferCommandPool{ device->CreateCommandPool(transferCommandPoolDesc) };
-
 	//Graphics Command Pool
 	NK::CommandPoolDesc graphicsCommandPoolDesc{};
 	graphicsCommandPoolDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
@@ -53,7 +49,13 @@ int main()
 	//Transfer Queue
 	NK::QueueDesc transferQueueDesc{};
 	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
-	const NK::UniquePtr<NK::IQueue> transferQueue(device->CreateQueue(transferQueueDesc));
+	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
+
+	//GPU Uploader
+	NK::GPUUploaderDesc gpuUploaderDesc{};
+	gpuUploaderDesc.stagingBufferSize = 1024 * 512 * 512; //512MiB
+	gpuUploaderDesc.transferQueue = transferQueue.get();
+	const NK::UniquePtr<NK::GPUUploader> gpuUploader{ device->CreateGPUUploader(gpuUploaderDesc) };
 
 	//Surface
 	NK::SurfaceDesc surfaceDesc{};
@@ -80,10 +82,12 @@ int main()
 	fragShaderDesc.filepath = "Samples/Shaders/Triangle/Triangle_fs";
 	const NK::UniquePtr<NK::IShader> fragShader{ device->CreateShader(fragShaderDesc) };
 
-	//Transfer Command Buffer
-	const NK::UniquePtr<NK::ICommandBuffer> transferCommandBuffer{ transferCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc) };
+	//Root Signature
+	NK::RootSignatureDesc rootSigDesc{};
+	rootSigDesc.num32BitPushConstantValues = 0;
+	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 
-	
+
 	//Vertex Buffer
 	struct Vertex
 	{
@@ -92,11 +96,11 @@ int main()
 	};
 	const Vertex vertices[3]
 	{
-		Vertex(glm::vec2(0.0f, 0.5f), glm::vec3(1.0f, 0.0f, 0.0f)),  //Top center
+		Vertex(glm::vec2(0.0f, 0.5f),	glm::vec3(1.0f, 0.0f, 0.0f)), //Top center
 		Vertex(glm::vec2(0.5f, -0.5f),  glm::vec3(0.0f, 1.0f, 0.0f)), //Bottom right
-		Vertex(glm::vec2(-0.5f, -0.5f), glm::vec3(0.0f, 0.0f, 1.0f)) //Bottom left
+		Vertex(glm::vec2(-0.5f, -0.5f), glm::vec3(0.0f, 0.0f, 1.0f))  //Bottom left
 	};
-	
+
 	NK::BufferDesc vertStagingBufferDesc{};
 	vertStagingBufferDesc.size = sizeof(Vertex) * 3;
 	vertStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
@@ -115,7 +119,7 @@ int main()
 
 	//Index Buffer
 	const std::uint32_t indices[3]{ 0, 1, 2 };
-	
+
 	NK::BufferDesc indexStagingBufferDesc{};
 	indexStagingBufferDesc.size = sizeof(std::uint32_t) * 3;
 	indexStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
@@ -132,13 +136,13 @@ int main()
 	const NK::UniquePtr<NK::IBuffer> indexBuffer{ device->CreateBuffer(indexBufferDesc) };
 
 
-	//Copy Vertex and Index Buffers
-	transferCommandBuffer->Begin();
-	transferCommandBuffer->CopyBuffer(vertStagingBuffer.get(), vertBuffer.get());
-	transferCommandBuffer->CopyBuffer(indexStagingBuffer.get(), indexBuffer.get());
-	transferCommandBuffer->End();
-	transferQueue->Submit(transferCommandBuffer.get(), nullptr, nullptr, nullptr);
-	transferQueue->WaitIdle();
+	//Upload vertex and index buffers
+	gpuUploader->EnqueueBufferDataUpload(sizeof(Vertex) * 3, vertices, vertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(sizeof(std::uint32_t) * 3, indices, indexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+
+	//Flush vertex buffer and index buffer uploads
+	gpuUploader->Flush(true);
+	gpuUploader->Reset();
 
 
 	//Graphics Pipeline
@@ -200,13 +204,14 @@ int main()
 	graphicsPipelineDesc.type = NK::PIPELINE_TYPE::GRAPHICS;
 	graphicsPipelineDesc.vertexShader = vertShader.get();
 	graphicsPipelineDesc.fragmentShader = fragShader.get();
+	graphicsPipelineDesc.rootSignature = rootSig.get();
 	graphicsPipelineDesc.vertexInputDesc = vertexInputDesc;
 	graphicsPipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
 	graphicsPipelineDesc.rasteriserDesc = rasteriserDesc;
 	graphicsPipelineDesc.depthStencilDesc = depthStencilDesc;
 	graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
 	graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
-	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_UNORM };
+	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };
 	graphicsPipelineDesc.depthStencilAttachmentFormat = NK::DATA_FORMAT::UNDEFINED;
 
 	const NK::UniquePtr<NK::IPipeline> graphicsPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
@@ -217,7 +222,7 @@ int main()
 
 	//Graphics Command Buffers
 	std::vector<NK::UniquePtr<NK::ICommandBuffer>> commandBuffers(MAX_FRAMES_IN_FLIGHT);
-	for (std::size_t i{ 0 }; i<MAX_FRAMES_IN_FLIGHT; ++i)
+	for (std::size_t i{ 0 }; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
 		commandBuffers[i] = graphicsCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc);
 	}
@@ -228,7 +233,7 @@ int main()
 	{
 		imageAvailableSemaphores[i] = device->CreateSemaphore();
 	}
-	
+
 	std::vector<NK::UniquePtr<NK::ISemaphore>> renderFinishedSemaphores(swapchain->GetNumImages());
 	for (std::size_t i{ 0 }; i < swapchain->GetNumImages(); ++i)
 	{
@@ -247,26 +252,26 @@ int main()
 
 	//Tracks the current frame in range [0, MAX_FRAMES_IN_FLIGHT-1]
 	std::uint32_t currentFrame{ 0 };
-	
+
 	while (!surface->ShouldClose())
 	{
 		inFlightFences[currentFrame]->Wait();
 		inFlightFences[currentFrame]->Reset();
 
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphores[currentFrame].get(), nullptr) };
-		
+
 		glfwPollEvents();
 		commandBuffers[currentFrame]->Begin();
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
 		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
-		commandBuffers[currentFrame]->BindDescriptorSet(device->GetDescriptorSet(), NK::PIPELINE_BIND_POINT::GRAPHICS);
-		
+		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
+
 		std::size_t vertexBufferStride{ sizeof(Vertex) };
 		commandBuffers[currentFrame]->BindVertexBuffers(0, 1, vertBuffer.get(), &vertexBufferStride);
 		commandBuffers[currentFrame]->BindIndexBuffer(indexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
-		
+
 		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { 1280, 720 });
 		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { 1280, 720 });
 		commandBuffers[currentFrame]->DrawIndexed(3, 1, 0, 0);

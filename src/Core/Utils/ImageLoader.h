@@ -2,6 +2,9 @@
 #include <string>
 
 #include "RHI/ITexture.h"
+#ifdef LoadImage
+	#undef LoadImage //Conflicts with ImageLoader::LoadImage()
+#endif
 
 namespace NK
 {

@@ -89,7 +89,7 @@ namespace NK
 		swapchainDesc.BufferCount = m_numBuffers;
 		swapchainDesc.Width = m_surface->GetSize().x;
 		swapchainDesc.Height = m_surface->GetSize().y;
-		swapchainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		swapchainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //DXGI_SWAP_EFFECT_FLIP_DISCARD is incompatible with r8g8b8a8 unorm srgb, so just use srgb for the rtvs
 		swapchainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		swapchainDesc.SampleDesc.Count = 1;
@@ -165,7 +165,7 @@ namespace NK
 		{
 			TextureViewDesc desc{};
 			desc.dimension = TEXTURE_DIMENSION::DIM_2;
-			desc.format = DATA_FORMAT::R8G8B8A8_UNORM;
+			desc.format = DATA_FORMAT::R8G8B8A8_SRGB;
 			desc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
 
 			m_backBufferViews[i] = UniquePtr<ITextureView>(NK_NEW(D3D12TextureView, m_logger, m_allocator, m_device, m_backBuffers[i].get(), desc, m_rtvDescriptorHeap.Get(), m_rtvDescriptorSize, i));

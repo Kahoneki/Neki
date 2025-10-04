@@ -48,7 +48,7 @@ namespace NK
 		//Regardless of the initial state, the state after the texture data has been uploaded will be RESOURCE_STATE::COPY_DEST
 		void EnqueueTextureDataUpload(std::size_t _numBytes, const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState);
 
-		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and nullptr is returned
+		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and the returned fence will already be signalled
 		//
 		//If _waitIdle = false, the calling thread will not be blocked, instead a fence is returned that will be signalled when the flush is complete
 		//Once the flush has been complete, Reset() should be called.

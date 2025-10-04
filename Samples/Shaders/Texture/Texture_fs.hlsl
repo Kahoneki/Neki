@@ -3,7 +3,7 @@
 struct VertexOutput
 {
 	float4 pos : SV_POSITION;
-	float2 texCoord : TEXCOORD_0;
+	float2 texCoord : TEXCOORD0;
 };
 
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);

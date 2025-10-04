@@ -3,8 +3,6 @@
 #include "glm/vec2.hpp"
 #include "Types/ResourceStates.h"
 #include <Types/DataFormat.h>
-
-#include "IRootSignature.h"
 #include "glm/vec3.hpp"
 
 namespace NK
@@ -54,10 +52,8 @@ namespace NK
 		virtual void DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance) = 0;
 		
 		virtual void CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer, std::size_t _srcOffset, std::size_t _dstOffset, std::size_t _size) = 0;
-		//_srcOffset in bytes, _dstOffset in texels for XYZ, _extent in texels for XYZ
-		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _extent) = 0;
-
-		virtual void UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer) = 0;
+		//_srcOffset in bytes, _dstOffset in texels for XYZ, _dstExtent in texels for XYZ
+		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent) = 0;
 
 
 	protected:

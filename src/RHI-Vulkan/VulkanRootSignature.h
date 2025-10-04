@@ -6,7 +6,7 @@ namespace NK
 	class VulkanRootSignature final : public IRootSignature
 	{
 	public:
-		explicit VulkanRootSignature(ILogger& _logger, IAllocator& _allocator, IDevice& _device, RootSignatureDesc _desc);
+		explicit VulkanRootSignature(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const RootSignatureDesc& _desc);
 		virtual ~VulkanRootSignature() override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
