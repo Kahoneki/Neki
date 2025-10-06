@@ -10,16 +10,26 @@ namespace NK
 		PERSPECTIVE,
 	};
 
+	struct CameraShaderData
+	{
+		glm::mat4 viewMat;
+		glm::mat4 projMat;
+	};
+
 
 	class Camera
 	{
-		explicit Camera(glm::vec3 _pos, glm::vec3 _up, float _yaw, float _pitch, float _nearPlaneDist, float _farPlaneDist, float _fov, float _aspectRatio);
-
-		//Matrices are cached and only updated when necessary - virtually no overhead in calling these functions
-		[[nodiscard]] glm::mat4 GetViewMatrix();
-		[[nodiscard]] glm::mat4 GetProjectionMatrix(const PROJECTION_METHOD _method);
+	public:
+		//Neki is built on a left handed coordinate system (+X is right, +Y is up, +Z is forward)
+		//A yaw of 0 is equivalent to looking at the +X axis, increasing yaw will rotate the camera around the Y axis in an anti-clockwise direction measured in degrees
+		//E.g.: setting the yaw to +90 will have the camera look along +Z, +-180 will be -X, and -90 will be -Z
+		explicit Camera(glm::vec3 _pos, float _yaw, float _pitch, float _nearPlaneDist, float _farPlaneDist, float _fov, float _aspectRatio);
+		virtual ~Camera() = default;
 		
-		[[nodiscard]] inline glm::vec3 GetPosition() const { return m_pos; };
+		//Matrices are cached and only updated when necessary - virtually no overhead in calling this function
+		[[nodiscard]] CameraShaderData GetCameraShaderData(const PROJECTION_METHOD _method);
+		
+		[[nodiscard]] inline glm::vec3 GetPosition() const { return m_pos; }
 		[[nodiscard]] inline float GetYaw() const { return m_yaw; }
 		[[nodiscard]] inline float GetPitch() const { return m_pitch; }
 		[[nodiscard]] inline float GetNearPlaneDistance() const { return m_nearPlaneDist; }
@@ -41,6 +51,10 @@ namespace NK
 
 
 	protected:
+		//Will update matrices if they're dirty
+		[[nodiscard]] glm::mat4 GetViewMatrix();
+		[[nodiscard]] glm::mat4 GetProjectionMatrix(const PROJECTION_METHOD _method);
+		
 		//Updates m_up, m_forward, and m_right based on m_yaw and m_pitch
 		void UpdateCameraVectors();
 		
