@@ -137,8 +137,8 @@ int main()
 
 
 	//Upload vertex and index buffers
-	gpuUploader->EnqueueBufferDataUpload(sizeof(Vertex) * 3, vertices, vertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
-	gpuUploader->EnqueueBufferDataUpload(sizeof(std::uint32_t) * 3, indices, indexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(vertices, vertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(indices, indexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
 
 	//Flush vertex buffer and index buffer uploads
 	gpuUploader->Flush(true);
