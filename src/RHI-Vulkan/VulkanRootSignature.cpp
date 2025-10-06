@@ -21,12 +21,12 @@ namespace NK
 		VkPushConstantRange pushConstantRange;
 		pushConstantRange.stageFlags = static_cast<VkShaderStageFlags>(m_bindPoint == PIPELINE_BIND_POINT::GRAPHICS ? VK_SHADER_STAGE_ALL_GRAPHICS : VK_SHADER_STAGE_COMPUTE_BIT);
 		pushConstantRange.offset = 0;
-		pushConstantRange.size = std::max(m_providedNum32BitPushConstantValues, 128u); //128 is the minimum required by the spec
-		if (m_providedNum32BitPushConstantValues < 128u)
+		pushConstantRange.size = std::max(m_providedNum32BitPushConstantValues * 4, 128u); //128 bytes is the minimum required by the spec
+		if (m_providedNum32BitPushConstantValues * 4 < 128u)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::ROOT_SIGNATURE, "Push constant range size increased from " + std::to_string(m_providedNum32BitPushConstantValues) + " to 128 (minimum required by Vulkan) - this will not have an impact on your shader code.\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::ROOT_SIGNATURE, "Push constant range size increased from " + std::to_string(m_providedNum32BitPushConstantValues * 4) + " bytes to 128 bytes (minimum required by Vulkan) - this will not have an impact on your shader code.\n");
 		}
-		m_actualNum32BitPushConstantValues = pushConstantRange.size;
+		m_actualNum32BitPushConstantValues = pushConstantRange.size / 4;
 
 		VkPipelineLayoutCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

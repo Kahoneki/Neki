@@ -19,7 +19,9 @@ namespace NK
 		[[nodiscard]] inline ID3D12RootSignature* GetRootSignature() const { return m_rootSig.Get(); }
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetResourceDescriptorHeap() const { return m_resourceDescriptorHeap; }
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetSamplerDescriptorHeap() const { return m_samplerDescriptorHeap; }
-		[[nodiscard]] inline RootDescriptorTable GetResourceDescriptorTable() const { return m_resourceDescriptorTable; }
+		[[nodiscard]] inline RootDescriptorTable GetCBVDescriptorTable() const { return m_cbvDescriptorTable; }
+		[[nodiscard]] inline RootDescriptorTable GetSRVDescriptorTable() const { return m_srvDescriptorTable; }
+		[[nodiscard]] inline RootDescriptorTable GetUAVDescriptorTable() const { return m_uavDescriptorTable; }
 		[[nodiscard]] inline RootDescriptorTable GetSamplerDescriptorTable() const { return m_samplerDescriptorTable; }
 		
 
@@ -27,7 +29,9 @@ namespace NK
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSig;
 		ID3D12DescriptorHeap* m_resourceDescriptorHeap; //Owned by D3D12Device
 		ID3D12DescriptorHeap* m_samplerDescriptorHeap; //Owned by D3D12Device
-		RootDescriptorTable m_resourceDescriptorTable;
+		RootDescriptorTable m_cbvDescriptorTable;
+		RootDescriptorTable m_srvDescriptorTable;
+		RootDescriptorTable m_uavDescriptorTable;
 		RootDescriptorTable m_samplerDescriptorTable;
 	};
 }

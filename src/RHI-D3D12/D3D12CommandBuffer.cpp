@@ -245,7 +245,9 @@ namespace NK
 	{
 		D3D12RootSignature* d3d12RootSig{ dynamic_cast<D3D12RootSignature*>(_rootSignature) };
 		ID3D12DescriptorHeap* heaps[2]{ d3d12RootSig->GetResourceDescriptorHeap(), d3d12RootSig->GetSamplerDescriptorHeap() };
-		D3D12RootSignature::RootDescriptorTable resourceDescriptorTable{ d3d12RootSig->GetResourceDescriptorTable() };
+		D3D12RootSignature::RootDescriptorTable cbvDescriptorTable{ d3d12RootSig->GetCBVDescriptorTable() };
+		D3D12RootSignature::RootDescriptorTable srvDescriptorTable{ d3d12RootSig->GetSRVDescriptorTable() };
+		D3D12RootSignature::RootDescriptorTable uavDescriptorTable{ d3d12RootSig->GetUAVDescriptorTable() };
 		D3D12RootSignature::RootDescriptorTable samplerDescriptorTable{ d3d12RootSig->GetSamplerDescriptorTable() };
 
 		//Bind root signature
@@ -255,7 +257,9 @@ namespace NK
 		{
 			m_buffer->SetGraphicsRootSignature(d3d12RootSig->GetRootSignature());
 			m_buffer->SetDescriptorHeaps(2, heaps);
-			m_buffer->SetGraphicsRootDescriptorTable(resourceDescriptorTable.rootParamIndex, resourceDescriptorTable.gpuHandle);
+			m_buffer->SetGraphicsRootDescriptorTable(cbvDescriptorTable.rootParamIndex, cbvDescriptorTable.gpuHandle);
+			m_buffer->SetGraphicsRootDescriptorTable(srvDescriptorTable.rootParamIndex, srvDescriptorTable.gpuHandle);
+			m_buffer->SetGraphicsRootDescriptorTable(uavDescriptorTable.rootParamIndex, uavDescriptorTable.gpuHandle);
 			m_buffer->SetGraphicsRootDescriptorTable(samplerDescriptorTable.rootParamIndex, samplerDescriptorTable.gpuHandle);
 			break;
 		}
@@ -263,7 +267,9 @@ namespace NK
 		{
 			m_buffer->SetComputeRootSignature(d3d12RootSig->GetRootSignature());
 			m_buffer->SetDescriptorHeaps(2, heaps);
-			m_buffer->SetComputeRootDescriptorTable(resourceDescriptorTable.rootParamIndex, resourceDescriptorTable.gpuHandle);
+			m_buffer->SetComputeRootDescriptorTable(cbvDescriptorTable.rootParamIndex, cbvDescriptorTable.gpuHandle);
+			m_buffer->SetComputeRootDescriptorTable(srvDescriptorTable.rootParamIndex, srvDescriptorTable.gpuHandle);
+			m_buffer->SetComputeRootDescriptorTable(uavDescriptorTable.rootParamIndex, uavDescriptorTable.gpuHandle);
 			m_buffer->SetComputeRootDescriptorTable(samplerDescriptorTable.rootParamIndex, samplerDescriptorTable.gpuHandle);
 		}
 		}
@@ -276,8 +282,8 @@ namespace NK
 		D3D12RootSignature* d3d12RootSig{ dynamic_cast<D3D12RootSignature*>(_rootSignature) };
 		switch (d3d12RootSig->GetBindPoint())
 		{
-		case PIPELINE_BIND_POINT::GRAPHICS: m_buffer->SetGraphicsRoot32BitConstants(2, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
-		case PIPELINE_BIND_POINT::COMPUTE: m_buffer->SetComputeRoot32BitConstants(2, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
+		case PIPELINE_BIND_POINT::GRAPHICS: m_buffer->SetGraphicsRoot32BitConstants(4, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
+		case PIPELINE_BIND_POINT::COMPUTE: m_buffer->SetComputeRoot32BitConstants(4, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
 		}
 		
 	}

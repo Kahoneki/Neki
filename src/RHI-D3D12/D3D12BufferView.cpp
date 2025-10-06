@@ -45,15 +45,16 @@ namespace NK
 		case BUFFER_VIEW_TYPE::UNIFORM:
 		{
 			//d3d12 requires cbv size is a multiple of 256 bytes
+			std::size_t size{ _desc.size };
 			if (_desc.size % 256 != 0)
 			{
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "_desc.type = BUFFER_VIEW_TYPE::CONSTANT but _desc.size (" + FormatUtils::GetSizeString(_desc.size) + ") is not a multiple of 256 bytes as required by d3d12 for cbvs\n");
-				throw std::runtime_error("");
+				size = (size + 255) & ~255; //Round up to nearest multiple of 256
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::BUFFER_VIEW, "_desc.type = BUFFER_VIEW_TYPE::CONSTANT but _desc.size (" + FormatUtils::GetSizeString(_desc.size) + ") is not a multiple of 256B as required by D3D12 for CBVs. Rounding up to nearest multiple of 256B (" + FormatUtils::GetSizeString(size) + ")\n");
 			}
 
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{};
 			cbvDesc.BufferLocation = d3d12Buffer->GetBuffer()->GetGPUVirtualAddress() + _desc.offset;
-			cbvDesc.SizeInBytes = static_cast<UINT>(_desc.size);
+			cbvDesc.SizeInBytes = static_cast<UINT>(size);
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateConstantBufferView(&cbvDesc, addr);
 			break;
 		}

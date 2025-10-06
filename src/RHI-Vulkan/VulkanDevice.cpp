@@ -38,7 +38,7 @@ namespace NK
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Initialising VulkanDevice\n");
 
 		CreateInstance();
-		SetupDebugMessenger();
+		if (m_enableInstanceValidationLayers) { SetupDebugMessenger(); }
 		SelectPhysicalDevice();
 		CreateLogicalDevice();
 		CreateMutableResourceType();
@@ -129,6 +129,13 @@ namespace NK
 	UniquePtr<ITextureView> VulkanDevice::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
 		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, m_globalDescriptorSet, m_resourceIndexAllocator.get()));
+	}
+
+
+
+	UniquePtr<ITextureView> VulkanDevice::CreateDepthStencilView(ITexture* _texture, const TextureViewDesc& _desc)
+	{
+		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc));
 	}
 
 
