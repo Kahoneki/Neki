@@ -6,6 +6,7 @@
 #include "D3D12Device.h"
 #include "D3D12Device.h"
 #include "D3D12Device.h"
+#include "D3D12Device.h"
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/FormatUtils.h>
 #include <Core/Utils/EnumUtils.h>
@@ -159,6 +160,22 @@ namespace NK
 	UniquePtr<ISemaphore> D3D12Device::CreateSemaphore()
 	{
 		return UniquePtr<ISemaphore>(NK_NEW(D3D12Semaphore, m_logger, m_allocator, *this));
+	}
+
+
+
+	TextureCopyMemoryLayout D3D12Device::GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture)
+	{
+		D3D12_RESOURCE_DESC desc{ dynamic_cast<D3D12Texture*>(_texture)->GetResourceDesc()};
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
+		UINT64 totalBytes;
+		m_device->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, nullptr, nullptr, &totalBytes);
+
+		TextureCopyMemoryLayout memLayout{};
+		memLayout.totalBytes = totalBytes;
+		memLayout.rowPitch = footprint.Footprint.RowPitch;
+
+		return memLayout;
 	}
 
 

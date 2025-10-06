@@ -80,7 +80,7 @@ int main()
 	NK::ImageData imageData{ NK::ImageLoader::LoadImage("Samples/Resource Files/NekiLogo.png", true, true) };
 	imageData.desc.usage |= NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
 	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(imageData.desc) };
-	gpuUploader->EnqueueTextureDataUpload(imageData.numBytes, imageData.data, texture.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueTextureDataUpload(imageData.data, texture.get(), NK::RESOURCE_STATE::UNDEFINED);
 
 	
 	//Texture view
@@ -145,8 +145,8 @@ int main()
 	const NK::UniquePtr<NK::IBuffer> indexBuffer{ device->CreateBuffer(indexBufferDesc) };
 
 	//Upload vertex and index buffers
-	gpuUploader->EnqueueBufferDataUpload(sizeof(Vertex) * 4, vertices, vertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
-	gpuUploader->EnqueueBufferDataUpload(sizeof(std::uint32_t) * 6, indices, indexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(vertices, vertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(indices, indexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
 
 	//Flush texture, vertex buffer, and index buffer
 	gpuUploader->Flush(true);

@@ -42,11 +42,13 @@ namespace NK
 
 		//_dstBufferInitialState is the state of _dstBuffer
 		//Regardless of the initial state, the state after the buffer data has been uploaded will be RESOURCE_STATE::COPY_DEST
-		void EnqueueBufferDataUpload(std::size_t _numBytes, const void* _data, IBuffer* _dstBuffer, RESOURCE_STATE _dstBufferInitialState);
+		//The number of bytes in _data is expected to exactly match the size of the destination buffer
+		void EnqueueBufferDataUpload(const void* _data, IBuffer* _dstBuffer, RESOURCE_STATE _dstBufferInitialState);
 		
 		//_dstTextureInitialState is the state of _dstTexture
 		//Regardless of the initial state, the state after the texture data has been uploaded will be RESOURCE_STATE::COPY_DEST
-		void EnqueueTextureDataUpload(std::size_t _numBytes, const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState);
+		//The number of bytes in _data is expected to exactly match the size of the destination texture
+		void EnqueueTextureDataUpload(const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState);
 
 		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and the returned fence will already be signalled
 		//

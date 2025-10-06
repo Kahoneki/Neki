@@ -6,6 +6,7 @@
 #include <RHI/ICommandBuffer.h>
 #include <RHI/IQueue.h>
 #include <RHI/ITexture.h>
+#include <Core/Utils/RHIUtils.h>
 
 namespace NK
 {
@@ -73,7 +74,7 @@ namespace NK
 
 
 
-	void GPUUploader::EnqueueBufferDataUpload(std::size_t _numBytes, const void* _data, IBuffer* _dstBuffer, RESOURCE_STATE _dstBufferInitialState)
+	void GPUUploader::EnqueueBufferDataUpload(const void* _data, IBuffer* _dstBuffer, RESOURCE_STATE _dstBufferInitialState)
 	{
 		if (m_flushing)
 		{
@@ -83,7 +84,7 @@ namespace NK
 		
 		BufferSubregion subregion{};
 		subregion.offset = (m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size);
-		subregion.size = _numBytes;
+		subregion.size = _dstBuffer->GetSize();
 
 		if (subregion.offset + subregion.size > m_stagingBufferSize)
 		{
@@ -107,7 +108,7 @@ namespace NK
 
 
 
-	void GPUUploader::EnqueueTextureDataUpload(std::size_t _numBytes, const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState)
+	void GPUUploader::EnqueueTextureDataUpload(const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState)
 	{
 		if (m_flushing)
 		{
@@ -115,9 +116,11 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		
+		TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
+
 		BufferSubregion subregion{};
 		subregion.offset = (m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size);
-		subregion.size = _numBytes;
+		subregion.size = memLayout.totalBytes;
 
 		if (subregion.offset + subregion.size > m_stagingBufferSize)
 		{
@@ -128,7 +131,16 @@ namespace NK
 			subregion.offset = 0;
 		}
 		
-		memcpy(m_stagingBufferMap + subregion.offset, _data, subregion.size);
+		//memcpy data one row at a time, advancing ptr by memLayout.rowPitch after each row
+		const unsigned char* srcPtr{ static_cast<const unsigned char*>(_data) };
+		unsigned char* dstPtr{ m_stagingBufferMap + subregion.offset };
+		std::uint32_t bytesPerRow{ RHIUtils::GetFormatBytesPerPixel(_dstTexture->GetFormat()) * _dstTexture->GetSize().x };
+		for (std::size_t row{ 0 }; row < _dstTexture->GetSize().y; ++row)
+		{
+			memcpy(dstPtr, srcPtr, bytesPerRow);
+			srcPtr += bytesPerRow;
+			dstPtr += memLayout.rowPitch;
+		}
 		m_stagingBufferSubregions.push_back(subregion);
 
 		if (_dstTextureInitialState != RESOURCE_STATE::COPY_DEST)

@@ -32,6 +32,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() override;
 
+		[[nodiscard]] virtual TextureCopyMemoryLayout GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture) override;
+
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] inline VkInstance GetInstance() const { return m_instance; }
 		[[nodiscard]] inline VkDevice GetDevice() const { return m_device; }

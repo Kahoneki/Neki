@@ -53,6 +53,13 @@ namespace NK
 	typedef std::uint32_t SamplerIndex;
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
 	constexpr std::uint32_t MAX_BINDLESS_SAMPLERS{ 2048 };
+
+
+	struct TextureCopyMemoryLayout
+	{
+		std::uint32_t totalBytes;
+		std::uint32_t rowPitch;
+	};
 }
 
 
@@ -83,6 +90,10 @@ namespace NK
 		{
 			return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _desc));
 		}
+
+		//When copying data from a buffer to a texture, the buffer data needs to be in a specific layout that depends on the destination texture
+		//This function calculates it for you
+		[[nodiscard]] virtual TextureCopyMemoryLayout GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture) = 0;
 
 
 	protected:

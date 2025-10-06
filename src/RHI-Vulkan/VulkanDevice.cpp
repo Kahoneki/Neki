@@ -1,4 +1,5 @@
 #include "VulkanDevice.h"
+#include "VulkanDevice.h"
 
 #include <algorithm>
 #include <cstring>
@@ -9,6 +10,7 @@
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/EnumUtils.h>
+#include <Core/Utils/RHIUtils.h>
 
 #include "VulkanBuffer.h"
 #include "VulkanBufferView.h"
@@ -197,6 +199,19 @@ namespace NK
 	UniquePtr<ISemaphore> VulkanDevice::CreateSemaphore()
 	{
 		return UniquePtr<ISemaphore>(NK_NEW(VulkanSemaphore, m_logger, m_allocator, *this));
+	}
+
+
+
+	TextureCopyMemoryLayout VulkanDevice::GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture)
+	{
+		TextureCopyMemoryLayout memLayout{};
+		std::uint32_t bytesPerPixel{ RHIUtils::GetFormatBytesPerPixel(_texture->GetFormat()) };
+		std::uint32_t numPixels{ static_cast<std::uint32_t>(_texture->GetSize().x * _texture->GetSize().y * _texture->GetSize().z) };
+		memLayout.totalBytes = numPixels * bytesPerPixel;
+		memLayout.rowPitch = _texture->GetSize().x * bytesPerPixel;
+
+		return memLayout;
 	}
 
 
