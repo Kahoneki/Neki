@@ -15,18 +15,16 @@ namespace NK
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE_VIEW, "Creating Texture View\n");
 
 		
-		//This constructor logically requires shader-accessible view type
-		//Todo: maybe look into whether it makes sense to lift this requirement but for now I can't think of a scenario where it would make sense
-		if (_desc.type == TEXTURE_VIEW_TYPE::RENDER_TARGET || _desc.type == TEXTURE_VIEW_TYPE::DEPTH_STENCIL)
+		if (_desc.type == TEXTURE_VIEW_TYPE::RENDER_TARGET)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE_VIEW, "This constructor is only to be used for shader-accessible view types. This requirement will maybe be lifted in a future version - if there is a valid reason for needing this constructor in this instance, please make a GitHub issue on the topic.\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE_VIEW, "This constructor is only to be used for shader-accessible and depth-stencil view types. This requirement will maybe be lifted in a future version - if there is a valid reason for needing this constructor for an RTV in this instance, please make a GitHub issue on the topic.\n");
 			throw std::runtime_error("");
 		}
 
 
 		m_resourceIndex = m_resourceIndexAllocator->Allocate();
-		D3D12_CPU_DESCRIPTOR_HANDLE handle{ _descriptorHeap->GetCPUDescriptorHandleForHeapStart() };
-		handle.ptr += m_resourceIndex * _descriptorSize;
+		m_handle = _descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		m_handle.ptr += m_resourceIndex * _descriptorSize;
 
 
 		switch (_desc.type)
@@ -62,7 +60,7 @@ namespace NK
 
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
-			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateShaderResourceView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, handle);
+			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateShaderResourceView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
 
 			break;
 		}
@@ -93,7 +91,19 @@ namespace NK
 			}
 			}
 
-			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateUnorderedAccessView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), nullptr, &desc, handle);
+			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateUnorderedAccessView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), nullptr, &desc, m_handle);
+
+			break;
+		}
+		
+		//Depth-stencil view
+		case TEXTURE_VIEW_TYPE::DEPTH_STENCIL:
+		{
+			D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
+			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
+			desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d dsv?
+
+			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateDepthStencilView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
 
 			break;
 		}
@@ -130,24 +140,11 @@ namespace NK
 		{
 		case TEXTURE_VIEW_TYPE::RENDER_TARGET:
 		{
-			//Render-target view
 			D3D12_RENDER_TARGET_VIEW_DESC desc{};
 			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
 			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d rtv?
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateRenderTargetView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
-
-			break;
-		}
-
-		case TEXTURE_VIEW_TYPE::DEPTH_STENCIL:
-		{
-			//Depth-stencil view
-			D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
-			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
-			desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d dsv?
-
-			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateDepthStencilView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
 
 			break;
 		}

@@ -1,6 +1,7 @@
 #include "D3D12Buffer.h"
 #include <utility>
 #include <Core/Utils/EnumUtils.h>
+#include <Core/Utils/FormatUtils.h>
 #ifdef ERROR
 	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
 #endif
@@ -13,6 +14,17 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::BUFFER, "Initialising D3D12Buffer\n");
+
+
+		//D3D12 requires CBVs are multiples of 256B. For safety, if the usage flags contains uniform buffer bit, round up to nearest multiple of 256B
+		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT))
+		{
+			if (m_size % 256 != 0)
+			{
+				m_size = (m_size + 255) & ~255; //Round up to nearest multiple of 256
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::BUFFER, "_desc.usage contained NK::BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT, but _desc.size (" + FormatUtils::GetSizeString(_desc.size) + ") is not a multiple of 256B as required for CBVs in D3D12. For parity and safety, all uniform buffers are required to be multiples of 256B. Rounding up to nearest multiple of 256B (" + FormatUtils::GetSizeString(m_size) + ")\n");
+			}
+		}
 
 
 		//Define heap props

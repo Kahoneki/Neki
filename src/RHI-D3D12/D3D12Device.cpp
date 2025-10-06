@@ -1,12 +1,5 @@
 #include "D3D12Device.h"
-#include "D3D12Device.h"
-#include "D3D12Device.h"
-#include "D3D12Device.h"
-#include "D3D12Device.h"
-#include "D3D12Device.h"
-#include "D3D12Device.h"
-#include "D3D12Device.h"
-#include "D3D12Device.h"
+
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/FormatUtils.h>
 #include <Core/Utils/EnumUtils.h>
@@ -34,7 +27,7 @@ namespace NK
 {
 
 	NK::D3D12Device::D3D12Device(ILogger& _logger, IAllocator& _allocator)
-		: IDevice(_logger, _allocator)
+		: IDevice(_logger, _allocator), m_dsvIndexAllocator(NK_NEW(FreeListAllocator, MAX_DEPTH_STENCIL_VIEWS))
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Initialising D3D12Device\n");
@@ -90,6 +83,13 @@ namespace NK
 	UniquePtr<ITextureView> D3D12Device::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
 		return UniquePtr<ITextureView>(NK_NEW(D3D12TextureView, m_logger, m_allocator, *this, _texture, _desc, m_resourceDescriptorHeap.Get(), m_resourceDescriptorSize, m_resourceIndexAllocator.get()));
+	}
+
+
+
+	UniquePtr<ITextureView> D3D12Device::CreateDepthStencilView(ITexture* _texture, const TextureViewDesc& _desc)
+	{
+		return UniquePtr<ITextureView>(NK_NEW(D3D12TextureView, m_logger, m_allocator, *this, _texture, _desc, m_dsvDescriptorHeap.Get(), m_dsvDescriptorSize, m_dsvIndexAllocator.get()));
 	}
 
 
@@ -378,6 +378,24 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		m_samplerDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+
+
+		//----DSV HEAP----//
+		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
+		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE; //Doesn't need to be shader visible
+		dsvHeapDesc.NumDescriptors = MAX_DEPTH_STENCIL_VIEWS;
+		hr = m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvDescriptorHeap));
+		if (SUCCEEDED(hr))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "DSV Descriptor Heap created.\n");
+		}
+		else
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create DSV Descriptor Heap.\n");
+			throw std::runtime_error("");
+		}
+		m_samplerDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 
 

@@ -2,6 +2,7 @@
 #include "VulkanBuffer.h"
 #include "VulkanDevice.h"
 #include <stdexcept>
+#include <Core/Utils/FormatUtils.h>
 
 namespace NK
 {
@@ -33,9 +34,16 @@ namespace NK
 
 		//Convert rhi view type to vulkan descriptor type
 		VkDescriptorType descriptorType;
+		std::size_t size{ _desc.size };
 		switch (_desc.type)
 		{
 		case BUFFER_VIEW_TYPE::UNIFORM:
+			//Require cbv size is a multiple of 256 bytes for parity with d3d12
+			if (_desc.size % 256 != 0)
+			{
+				size = (size + 255) & ~255; //Round up to nearest multiple of 256
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::BUFFER_VIEW, "_desc.type = BUFFER_VIEW_TYPE::CONSTANT but _desc.size (" + FormatUtils::GetSizeString(_desc.size) + ") is not a multiple of 256B as required for CBVs for parity with D3D12. Rounding up to nearest multiple of 256B (" + FormatUtils::GetSizeString(size) + ")\n");
+			}
 			descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			break;
 
@@ -54,7 +62,7 @@ namespace NK
 		VkDescriptorBufferInfo bufferInfo{};
 		bufferInfo.buffer = vulkanBuffer->GetBuffer();
 		bufferInfo.offset = _desc.offset;
-		bufferInfo.range = _desc.size;
+		bufferInfo.range = size;
 
 
 		//Populate write info

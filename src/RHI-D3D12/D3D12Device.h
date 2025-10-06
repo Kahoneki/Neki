@@ -15,6 +15,9 @@
 
 namespace NK
 {
+	constexpr std::uint32_t MAX_DEPTH_STENCIL_VIEWS{ 2048 };
+
+
 	class D3D12Device final : public IDevice
 	{
 	public:
@@ -26,6 +29,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IBufferView> CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ITextureView> CreateDepthStencilView(ITexture* _texture, const TextureViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISampler> CreateSampler(const SamplerDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
@@ -82,6 +86,9 @@ namespace NK
 		UINT m_resourceDescriptorSize;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
 		UINT m_samplerDescriptorSize;
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_dsvDescriptorHeap;
+		UINT m_dsvDescriptorSize;
+		UniquePtr<FreeListAllocator> m_dsvIndexAllocator;
 
 
 		bool m_enableDebugLayer{ true };
