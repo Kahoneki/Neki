@@ -237,7 +237,7 @@ namespace NK
 	{
 		VulkanRootSignature* vkRootSig{ dynamic_cast<VulkanRootSignature*>(_rootSignature) };
 		//todo: replace VK_SHADER_STAGE_ALL with more precise user-defined parameter
-		VkShaderStageFlags stage{ static_cast<VkShaderStageFlags>(vkRootSig->GetBindPoint()  == PIPELINE_BIND_POINT::GRAPHICS ? VK_SHADER_STAGE_ALL_GRAPHICS : VK_SHADER_STAGE_COMPUTE_BIT)};
+		VkShaderStageFlags stage{ static_cast<VkShaderStageFlags>(vkRootSig->GetBindPoint() == PIPELINE_BIND_POINT::GRAPHICS ? VK_SHADER_STAGE_ALL_GRAPHICS : VK_SHADER_STAGE_COMPUTE_BIT)};
 		vkCmdPushConstants(m_buffer, vkRootSig->GetPipelineLayout(), stage, 0, vkRootSig->GetProvidedNum32BitValues() * 4, _data);
 	}
 

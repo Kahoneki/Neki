@@ -274,4 +274,11 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
         add_dependencies(NKD3D12Sample_Texture Shaders)
     endif()
 
+    if(NEKI_BUILD_VULKAN)
+        add_executable(NKVulkanSample_Cube "Samples/Vulkan/Cube/Cube.cpp")
+        target_include_directories(NKVulkanSample_Cube PUBLIC "${CMAKE_SOURCE_DIR}/src")
+        target_link_libraries(NKVulkanSample_Cube PRIVATE Neki)
+        add_dependencies(NKVulkanSample_Cube Shaders)
+    endif()
+
 endif()
