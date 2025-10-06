@@ -41,6 +41,27 @@ int main()
 	const NK::UniquePtr<NK::ICommandBuffer> commandBuffer{ pool->AllocateCommandBuffer(commandBufferDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 	
+	NK::QueueDesc graphicsQueueDesc{};
+	graphicsQueueDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
+	const NK::UniquePtr<NK::IQueue> graphicsQueue{ device->CreateQueue(graphicsQueueDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+	
+	NK::QueueDesc computeQueueDesc{};
+	computeQueueDesc.type = NK::COMMAND_POOL_TYPE::COMPUTE;
+	const NK::UniquePtr<NK::IQueue> computeQueue{ device->CreateQueue(computeQueueDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	NK::QueueDesc transferQueueDesc{};
+	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
+	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+	
+	NK::GPUUploaderDesc gpuUploaderDesc{};
+	gpuUploaderDesc.stagingBufferSize = 1024 * 512 * 512; //512MiB
+	gpuUploaderDesc.transferQueue = transferQueue.get();
+	const NK::UniquePtr<NK::GPUUploader> gpuUploader{ device->CreateGPUUploader(gpuUploaderDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+	
 	NK::BufferDesc bufferDesc{};
 	bufferDesc.size = 1024;
 	bufferDesc.type = NK::MEMORY_TYPE::DEVICE;
@@ -81,21 +102,25 @@ int main()
 
 	NK::ShaderDesc vertShaderDesc{};
 	vertShaderDesc.type = NK::SHADER_TYPE::VERTEX;
-	vertShaderDesc.filepath = "Samples/Shaders/Library_vs";
+	vertShaderDesc.filepath = "Samples/Shaders/Library/Library_vs";
 	const NK::UniquePtr<NK::IShader> vertShader{ device->CreateShader(vertShaderDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::ShaderDesc fragShaderDesc{};
 	fragShaderDesc.type = NK::SHADER_TYPE::FRAGMENT;
-	fragShaderDesc.filepath = "Samples/Shaders/Library_fs";
+	fragShaderDesc.filepath = "Samples/Shaders/Library/Library_fs";
 	const NK::UniquePtr<NK::IShader> fragShader{ device->CreateShader(fragShaderDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::ShaderDesc compShaderDesc{};
 	compShaderDesc.type = NK::SHADER_TYPE::COMPUTE;
-	compShaderDesc.filepath = "Samples/Shaders/Library_cs";
+	compShaderDesc.filepath = "Samples/Shaders/Library/Library_cs";
 	const NK::UniquePtr<NK::IShader> compShader{ device->CreateShader(compShaderDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+	
+	NK::RootSignatureDesc rootSigDesc{};
+	rootSigDesc.num32BitPushConstantValues = 0;
+	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 	
 
 	//Graphics Pipeline
@@ -143,6 +168,7 @@ int main()
 	graphicsPipelineDesc.type = NK::PIPELINE_TYPE::GRAPHICS;
 	graphicsPipelineDesc.vertexShader = vertShader.get();
 	graphicsPipelineDesc.fragmentShader = fragShader.get();
+	graphicsPipelineDesc.rootSignature = rootSig.get();
 	graphicsPipelineDesc.vertexInputDesc = vertexInputDesc;
 	graphicsPipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
 	graphicsPipelineDesc.rasteriserDesc = rasteriserDesc;
@@ -160,25 +186,8 @@ int main()
 	NK::PipelineDesc computePipelineDesc{};
 	computePipelineDesc.type = NK::PIPELINE_TYPE::COMPUTE;
 	computePipelineDesc.computeShader = compShader.get();
+	computePipelineDesc.rootSignature = rootSig.get();
 	const NK::UniquePtr<NK::IPipeline> computePipeline{ device->CreatePipeline(computePipelineDesc) };
-	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
-
-	//Graphics queue
-	NK::QueueDesc graphicsQueueDesc{};
-	graphicsQueueDesc.type = NK::QUEUE_TYPE::GRAPHICS;
-	const NK::UniquePtr<NK::IQueue> graphicsQueue{ device->CreateQueue(graphicsQueueDesc) };
-	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
-
-	//Compute queue
-	NK::QueueDesc computeQueueDesc{};
-	computeQueueDesc.type = NK::QUEUE_TYPE::COMPUTE;
-	const NK::UniquePtr<NK::IQueue> computeQueue{ device->CreateQueue(computeQueueDesc) };
-	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
-
-	//Transfer queue
-	NK::QueueDesc transferQueueDesc{};
-	transferQueueDesc.type = NK::QUEUE_TYPE::TRANSFER;
-	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	//Fence

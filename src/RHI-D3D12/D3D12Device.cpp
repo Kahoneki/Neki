@@ -4,6 +4,9 @@
 #include "D3D12Device.h"
 #include "D3D12Device.h"
 #include "D3D12Device.h"
+#include "D3D12Device.h"
+#include "D3D12Device.h"
+#include "D3D12Device.h"
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/FormatUtils.h>
 #include <Core/Utils/EnumUtils.h>
@@ -12,6 +15,7 @@
 #include "D3D12BufferView.h"
 #include "D3D12Texture.h"
 #include "D3D12TextureView.h"
+#include "D3D12Sampler.h"
 #include "D3D12Surface.h"
 #include "D3D12Swapchain.h"
 #include "D3D12Shader.h"
@@ -19,12 +23,12 @@
 #include "D3D12Queue.h"
 #include "D3D12Fence.h"
 #include "D3D12Semaphore.h"
-#include "D3D12DescriptorSet.h"
 #include <stdexcept>
 #include <array>
 #ifdef ERROR
 	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
 #endif
+#include "D3D12RootSignature.h"
 
 namespace NK
 {
@@ -41,7 +45,6 @@ namespace NK
 		CreateDevice();
 		RegisterDebugCallback();
 		CreateDescriptorHeaps();
-		CreateRootSignature();
 		CreateSyncLists();
 
 		m_logger.Unindent();
@@ -91,6 +94,13 @@ namespace NK
 
 
 
+	UniquePtr<ISampler> D3D12Device::CreateSampler(const SamplerDesc& _desc)
+	{
+		return UniquePtr<ISampler>(NK_NEW(D3D12Sampler, m_logger, m_allocator, *m_samplerIndexAllocator.get(), *this, _desc));
+	}
+
+
+
 	UniquePtr<ICommandPool> D3D12Device::CreateCommandPool(const CommandPoolDesc& _desc)
 	{
 		return UniquePtr<ICommandPool>(NK_NEW(D3D12CommandPool, m_logger, m_allocator, *this, _desc));
@@ -119,6 +129,13 @@ namespace NK
 
 
 
+	UniquePtr<IRootSignature> D3D12Device::CreateRootSignature(const RootSignatureDesc& _desc)
+	{
+		return UniquePtr<IRootSignature>(NK_NEW(D3D12RootSignature, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
 	UniquePtr<IPipeline> D3D12Device::CreatePipeline(const PipelineDesc& _desc)
 	{
 		return UniquePtr<IPipeline>(NK_NEW(D3D12Pipeline, m_logger, m_allocator, *this, _desc));
@@ -143,6 +160,22 @@ namespace NK
 	UniquePtr<ISemaphore> D3D12Device::CreateSemaphore()
 	{
 		return UniquePtr<ISemaphore>(NK_NEW(D3D12Semaphore, m_logger, m_allocator, *this));
+	}
+
+
+
+	TextureCopyMemoryLayout D3D12Device::GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture)
+	{
+		D3D12_RESOURCE_DESC desc{ dynamic_cast<D3D12Texture*>(_texture)->GetResourceDesc()};
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
+		UINT64 totalBytes;
+		m_device->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, nullptr, nullptr, &totalBytes);
+
+		TextureCopyMemoryLayout memLayout{};
+		memLayout.totalBytes = totalBytes;
+		memLayout.rowPitch = footprint.Footprint.RowPitch;
+
+		return memLayout;
 	}
 
 
@@ -347,87 +380,6 @@ namespace NK
 		m_samplerDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 
 
-
-		m_logger.Unindent();
-	}
-
-
-
-	void NK::D3D12Device::CreateRootSignature()
-	{
-		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating Root Signature\n");
-
-
-		std::array<D3D12_ROOT_PARAMETER1, 2> rootParams;
-
-		
-		//Root parameter 0: resources (cbvs, srvs, and uavs)
-		D3D12_DESCRIPTOR_RANGE1 resourceRange{};
-		resourceRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; //ew
-		resourceRange.NumDescriptors = -1; //unbounded - go until end of heap
-		resourceRange.BaseShaderRegister = 0; //resources start at t0
-		resourceRange.RegisterSpace = 0; //resource range in register space 0
-		resourceRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE; //hint that descriptors can change
-		resourceRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-		rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-		rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[0].DescriptorTable.pDescriptorRanges = &resourceRange;
-
-
-		//Root parameter 1: samplers
-		D3D12_DESCRIPTOR_RANGE1 samplerRange{};
-		samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-		samplerRange.NumDescriptors = -1; //unbounded - go until end of heap
-		samplerRange.BaseShaderRegister = 0; //resources start at s0
-		samplerRange.RegisterSpace = 0; //resource range in register space 0
-		samplerRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE; //samplers are usually a bit more static than resources
-		samplerRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-		rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-		rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[1].DescriptorTable.pDescriptorRanges = &samplerRange;
-
-
-		//Serialise root signature
-		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSigDesc{};
-		rootSigDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootSigDesc.Desc_1_1.NumParameters = static_cast<UINT>(rootParams.size());
-		rootSigDesc.Desc_1_1.pParameters = rootParams.data();
-		rootSigDesc.Desc_1_1.NumStaticSamplers = 0;
-		rootSigDesc.Desc_1_1.pStaticSamplers = nullptr;
-		rootSigDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-		ID3DBlob* serialisedRootSig;
-		ID3DBlob* errorStr;
-		HRESULT hr{ D3D12SerializeVersionedRootSignature(&rootSigDesc, &serialisedRootSig, &errorStr) };
-		if (SUCCEEDED(hr))
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Root Signature serialisation successful.\n");
-		}
-		else
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Root Signature serialisation unsuccessful - error blob: ");
-			m_logger.IndentRawLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, static_cast<const char*>(errorStr->GetBufferPointer()) + std::string("\n"));
-			throw std::runtime_error("");
-		}
-
-
-		//Create root signature
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig;
-		hr = m_device->CreateRootSignature(0, serialisedRootSig->GetBufferPointer(), serialisedRootSig->GetBufferSize(), IID_PPV_ARGS(&rootSig));
-		if (SUCCEEDED(hr))
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Root Signature creation successful.\n");
-		}
-		else
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Root Signature creation unsuccessful\n");
-			throw std::runtime_error("");
-		}
-		m_descriptorSet = UniquePtr<IDescriptorSet>(NK_NEW(D3D12DescriptorSet, std::move(rootSig)));
 
 		m_logger.Unindent();
 	}

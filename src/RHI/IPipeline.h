@@ -3,6 +3,7 @@
 #include <Types/DataFormat.h>
 #include <Types/ShaderAttribute.h>
 #include "IDevice.h"
+#include "IRootSignature.h"
 #include "IShader.h"
 
 namespace NK
@@ -249,6 +250,8 @@ namespace NK
 		IShader* computeShader;
 		IShader* vertexShader;
 		IShader* fragmentShader;
+
+		IRootSignature* rootSignature;
 		
 		VertexInputDesc vertexInputDesc;
 		InputAssemblyDesc inputAssemblyDesc;
@@ -267,11 +270,13 @@ namespace NK
 	public:
 		virtual ~IPipeline() = default;
 
+		[[nodiscard]] inline const IRootSignature* GetRootSignature() const { return m_rootSignature; }
+
 
 	protected:
 		IPipeline(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const PipelineDesc& _desc)
 		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
-		  m_type(_desc.type),
+		  m_type(_desc.type), m_rootSignature(_desc.rootSignature),
 		  m_vertexInputDesc(_desc.vertexInputDesc), m_inputAssemblyDesc(_desc.inputAssemblyDesc), m_rasteriserDesc(_desc.rasteriserDesc), m_depthStencilDesc(_desc.depthStencilDesc), m_multisamplingDesc(_desc.multisamplingDesc), m_colourBlendDesc(_desc.colourBlendDesc),
 		  m_colourAttachmentFormats(_desc.colourAttachmentFormats), m_depthStencilAttachmentFormat(_desc.depthStencilAttachmentFormat) {}
 
@@ -282,6 +287,8 @@ namespace NK
 		IDevice& m_device;
 
 		PIPELINE_TYPE m_type;
+
+		const IRootSignature* const m_rootSignature;
 		
 		VertexInputDesc m_vertexInputDesc;
 		InputAssemblyDesc m_inputAssemblyDesc;

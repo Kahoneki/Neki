@@ -21,19 +21,21 @@ namespace NK
 		virtual void End() override;
 
 		virtual void TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
+		virtual void TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
 		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment) override;
 		virtual void EndRendering() override;
 
 		virtual void BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides) override;
 		virtual void BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format) override;
 		virtual void BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint) override;
+		virtual void BindRootSignature(IRootSignature* _rootSignature, PIPELINE_BIND_POINT _bindPoint) override;
+		virtual void PushConstants(IRootSignature* _rootSignature, void* _data) override;
 		virtual void SetViewport(glm::vec2 _pos, glm::vec2 _extent) override;
 		virtual void SetScissor(glm::ivec2 _pos, glm::ivec2 _extent) override;
-		virtual void BindDescriptorSet(IDescriptorSet* _descriptorSet, PIPELINE_BIND_POINT _bindPoint) override;
 		virtual void DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance) override;
 
-		virtual void CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer) override;
-		virtual void UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer) override;
+		virtual void CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer, std::size_t _srcOffset, std::size_t _dstOffset, std::size_t _size) override;
+		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent) override;
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline ID3D12GraphicsCommandList* GetCommandList() const { return m_buffer.Get(); }

@@ -17,7 +17,6 @@ namespace NK
 		[[nodiscard]] static VkFormat GetVulkanFormat(DATA_FORMAT _format);
 		[[nodiscard]] static DATA_FORMAT GetRHIFormat(VkFormat _format);
 
-
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] VkImage GetTexture() const { return m_texture; }
 

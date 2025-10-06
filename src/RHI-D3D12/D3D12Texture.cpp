@@ -35,51 +35,49 @@ namespace NK
 
 
 		//Create texture
-		D3D12_RESOURCE_DESC textureDesc{};
-
 		switch (m_dimension)
 		{
 		case TEXTURE_DIMENSION::DIM_1:
 		{
-			textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE1D;
-			textureDesc.Width = m_size.x;
-			textureDesc.Height = 1; //Must be 1 for 1D textures
+			m_resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+			m_resourceDesc.Width = m_size.x;
+			m_resourceDesc.Height = 1; //Must be 1 for 1D textures
 
 			//If it's an array, the y component of size holds the array count
-			textureDesc.DepthOrArraySize = m_arrayTexture ? m_size.y : 1;
+			m_resourceDesc.DepthOrArraySize = m_arrayTexture ? m_size.y : 1;
 			break;
 		}
 
 		case TEXTURE_DIMENSION::DIM_2:
 		{
-			textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-			textureDesc.Width = m_size.x;
-			textureDesc.Height = m_size.y;
+			m_resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			m_resourceDesc.Width = m_size.x;
+			m_resourceDesc.Height = m_size.y;
 
 			//If it's an array, the z component of size holds the array count
-			textureDesc.DepthOrArraySize = m_arrayTexture ? m_size.z : 1;
+			m_resourceDesc.DepthOrArraySize = m_arrayTexture ? m_size.z : 1;
 			break;
 		}
 
 		case TEXTURE_DIMENSION::DIM_3:
 		{
-			textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-			textureDesc.Width = m_size.x;
-			textureDesc.Height = m_size.y;
-			textureDesc.DepthOrArraySize = m_size.z;
+			m_resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+			m_resourceDesc.Width = m_size.x;
+			m_resourceDesc.Height = m_size.y;
+			m_resourceDesc.DepthOrArraySize = m_size.z;
 			break;
 		}
 		}
-		textureDesc.Alignment = 0;
-		textureDesc.MipLevels = 1;
-		textureDesc.Format = GetDXGIFormat(m_format);
-		textureDesc.SampleDesc.Count = 1;
-		textureDesc.SampleDesc.Quality = 0;
-		textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-		textureDesc.Flags = GetCreationFlags();
+		m_resourceDesc.Alignment = 0;
+		m_resourceDesc.MipLevels = 1;
+		m_resourceDesc.Format = GetDXGIFormat(m_format);
+		m_resourceDesc.SampleDesc.Count = 1;
+		m_resourceDesc.SampleDesc.Quality = 0;
+		m_resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		m_resourceDesc.Flags = GetCreationFlags();
 
 
-		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &textureDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_texture)) };
+		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &m_resourceDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_texture)) };
 
 		if (SUCCEEDED(result))
 		{
@@ -112,11 +110,6 @@ namespace NK
 
 	D3D12_RESOURCE_STATES D3D12Texture::GetInitialState() const
 	{
-		if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT))
-		{
-			return D3D12_RESOURCE_STATE_COPY_DEST;
-		}
-
 		return D3D12_RESOURCE_STATE_COMMON;
 	}
 

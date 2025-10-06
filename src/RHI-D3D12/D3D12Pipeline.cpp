@@ -6,7 +6,7 @@
 #ifdef ERROR
 	#undef ERROR
 #endif
-#include "D3D12DescriptorSet.h"
+#include "D3D12RootSignature.h"
 
 namespace NK
 {
@@ -15,6 +15,14 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::PIPELINE, "Initialising D3D12Pipeline\n");
+
+
+		//Ensure root signature is provided
+		if (_desc.rootSignature == nullptr)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PIPELINE, "_desc.rootSignature was nullptr - a root signature is required!\n");
+			throw std::runtime_error("");
+		}
 
 
 		switch (m_type)
@@ -53,7 +61,7 @@ namespace NK
 
 		//Create pipeline
 		D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
-		desc.pRootSignature = dynamic_cast<D3D12DescriptorSet*>(m_device.GetDescriptorSet())->GetRootSignature();
+		desc.pRootSignature = dynamic_cast<const D3D12RootSignature* const>(m_rootSignature)->GetRootSignature();
 		desc.CS = bytecode;
 		D3D12_CACHED_PIPELINE_STATE cachedPSO{};
 		cachedPSO.CachedBlobSizeInBytes = 0;
@@ -190,7 +198,7 @@ namespace NK
 		
 		//Create pipeline (todo: add tessellation support)
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
-		pipelineDesc.pRootSignature = dynamic_cast<D3D12DescriptorSet*>(m_device.GetDescriptorSet())->GetRootSignature();
+		pipelineDesc.pRootSignature = dynamic_cast<const D3D12RootSignature* const>(m_rootSignature)->GetRootSignature();
 		pipelineDesc.VS = vertBytecode;
 		pipelineDesc.PS = fragBytecode;
 		pipelineDesc.BlendState = blendDesc;

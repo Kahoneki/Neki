@@ -1,4 +1,5 @@
 #include "VulkanDevice.h"
+#include "VulkanDevice.h"
 
 #include <algorithm>
 #include <cstring>
@@ -9,6 +10,7 @@
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/EnumUtils.h>
+#include <Core/Utils/RHIUtils.h>
 
 #include "VulkanBuffer.h"
 #include "VulkanBufferView.h"
@@ -16,13 +18,14 @@
 #include "VulkanFence.h"
 #include "VulkanPipeline.h"
 #include "VulkanQueue.h"
+#include "VulkanRootSignature.h"
+#include "VulkanSampler.h"
 #include "VulkanSemaphore.h"
 #include "VulkanShader.h"
 #include "VulkanSurface.h"
 #include "VulkanSwapchain.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
-#include "VulkanDescriptorSet.h"
 
 
 namespace NK
@@ -42,7 +45,6 @@ namespace NK
 		CreateDescriptorPool();
 		CreateDescriptorSetLayout();
 		CreateDescriptorSet();
-		CreatePipelineLayout();
 
 		m_logger.Unindent();
 	}
@@ -54,19 +56,17 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Shutting Down VulkanDevice\n");
 
-		if (m_pipelineLayout != VK_NULL_HANDLE)
+		if (m_globalDescriptorSet != VK_NULL_HANDLE)
 		{
-			vkDestroyPipelineLayout(m_device, m_pipelineLayout, m_allocator.GetVulkanCallbacks());
-			m_pipelineLayout = VK_NULL_HANDLE;
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Pipeline Layout Destroyed\n");
+			vkFreeDescriptorSets(m_device, m_descriptorPool, 1, &m_globalDescriptorSet);
+			m_globalDescriptorSet = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Global Descriptor Set Freed\n");
 		}
-
-		m_descriptorSet.reset();
 		
-		if (m_descriptorSetLayout != VK_NULL_HANDLE)
+		if (m_globalDescriptorSetLayout != VK_NULL_HANDLE)
 		{
-			vkDestroyDescriptorSetLayout(m_device, m_descriptorSetLayout, m_allocator.GetVulkanCallbacks());
-			m_descriptorSetLayout = VK_NULL_HANDLE;
+			vkDestroyDescriptorSetLayout(m_device, m_globalDescriptorSetLayout, m_allocator.GetVulkanCallbacks());
+			m_globalDescriptorSetLayout = VK_NULL_HANDLE;
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Descriptor Set Layout Destroyed\n");
 		}
 
@@ -114,7 +114,7 @@ namespace NK
 
 	UniquePtr<IBufferView> VulkanDevice::CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc)
 	{
-		return UniquePtr<IBufferView>(NK_NEW(VulkanBufferView, m_logger, *m_resourceIndexAllocator, *this, _buffer, _desc, dynamic_cast<VulkanDescriptorSet*>(m_descriptorSet.get())->GetDescriptorSet()));
+		return UniquePtr<IBufferView>(NK_NEW(VulkanBufferView, m_logger, *m_resourceIndexAllocator, *this, _buffer, _desc, m_globalDescriptorSet));
 	}
 
 
@@ -128,7 +128,14 @@ namespace NK
 
 	UniquePtr<ITextureView> VulkanDevice::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
-		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, dynamic_cast<VulkanDescriptorSet*>(m_descriptorSet.get())->GetDescriptorSet(), m_resourceIndexAllocator.get()));
+		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, m_globalDescriptorSet, m_resourceIndexAllocator.get()));
+	}
+
+
+
+	UniquePtr<ISampler> VulkanDevice::CreateSampler(const SamplerDesc& _desc)
+	{
+		return UniquePtr<ISampler>(NK_NEW(VulkanSampler, m_logger, m_allocator, *m_samplerIndexAllocator.get(), *this, _desc, m_globalDescriptorSet));
 	}
 
 
@@ -161,6 +168,13 @@ namespace NK
 
 
 
+	UniquePtr<IRootSignature> VulkanDevice::CreateRootSignature(const RootSignatureDesc& _desc)
+	{
+		return UniquePtr<IRootSignature>(NK_NEW(VulkanRootSignature, m_logger, m_allocator, *this, _desc));
+	}
+
+
+
 	UniquePtr<IPipeline> VulkanDevice::CreatePipeline(const PipelineDesc& _desc)
 	{
 		return UniquePtr<IPipeline>(NK_NEW(VulkanPipeline, m_logger, m_allocator, *this, _desc));
@@ -185,6 +199,19 @@ namespace NK
 	UniquePtr<ISemaphore> VulkanDevice::CreateSemaphore()
 	{
 		return UniquePtr<ISemaphore>(NK_NEW(VulkanSemaphore, m_logger, m_allocator, *this));
+	}
+
+
+
+	TextureCopyMemoryLayout VulkanDevice::GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture)
+	{
+		TextureCopyMemoryLayout memLayout{};
+		std::uint32_t bytesPerPixel{ RHIUtils::GetFormatBytesPerPixel(_texture->GetFormat()) };
+		std::uint32_t numPixels{ static_cast<std::uint32_t>(_texture->GetSize().x * _texture->GetSize().y * _texture->GetSize().z) };
+		memLayout.totalBytes = numPixels * bytesPerPixel;
+		memLayout.rowPitch = _texture->GetSize().x * bytesPerPixel;
+
+		return memLayout;
 	}
 
 
@@ -424,6 +451,7 @@ namespace NK
 		features12.descriptorIndexing = VK_TRUE;
 		features12.descriptorBindingPartiallyBound = VK_TRUE; //Allow empty descriptor slots - don't crash when accessing
 		features12.runtimeDescriptorArray = VK_TRUE; //Enable variable-indexing
+		features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE; //Enable HLSL NonUniformResourceIndex keyword for non-uniform indexing
 		//Allow updates to the descriptor set while the queue is using it
 		features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
 		features12.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
@@ -555,7 +583,7 @@ namespace NK
 		layoutInfo.bindingCount = bindings.size();
 		layoutInfo.pBindings = bindings.data();
 
-		const VkResult result{ vkCreateDescriptorSetLayout(m_device, &layoutInfo, m_allocator.GetVulkanCallbacks(), &m_descriptorSetLayout) };
+		const VkResult result{ vkCreateDescriptorSetLayout(m_device, &layoutInfo, m_allocator.GetVulkanCallbacks(), &m_globalDescriptorSetLayout) };
 		if (result != VK_SUCCESS)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set layout - result: " + std::to_string(result) + "\n");
@@ -578,53 +606,16 @@ namespace NK
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		allocInfo.descriptorPool = m_descriptorPool;
 		allocInfo.descriptorSetCount = 1;
-		allocInfo.pSetLayouts = &m_descriptorSetLayout;
-		VkDescriptorSet descriptorSet;
-		const VkResult result{ vkAllocateDescriptorSets(m_device, &allocInfo, &descriptorSet) };
+		allocInfo.pSetLayouts = &m_globalDescriptorSetLayout;
+		const VkResult result{ vkAllocateDescriptorSets(m_device, &allocInfo, &m_globalDescriptorSet) };
 		if (result != VK_SUCCESS)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create descriptor set - result: " + std::to_string(result) + "\n");
 			throw std::runtime_error("");
 		}
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created descriptor set\n");
-		m_descriptorSet = UniquePtr<IDescriptorSet>(NK_NEW(VulkanDescriptorSet, *this, m_descriptorPool, descriptorSet));
 
 
-		m_logger.Unindent();
-	}
-
-
-
-	void VulkanDevice::CreatePipelineLayout()
-	{
-		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating Pipeline Layout\n");
-		
-		
-		VkPushConstantRange pushConstantRange;
-		pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL;
-		pushConstantRange.offset = 0;
-		pushConstantRange.size = 128; //128 is the minimum required by the spec
-
-		VkPipelineLayoutCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		createInfo.setLayoutCount = 1;
-		createInfo.pSetLayouts = &m_descriptorSetLayout;
-		createInfo.pushConstantRangeCount = 1;
-		createInfo.pPushConstantRanges = &pushConstantRange;
-
-		const VkResult result = vkCreatePipelineLayout(m_device, &createInfo, m_allocator.GetVulkanCallbacks(), &m_pipelineLayout);
-		if (result == VK_SUCCESS)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Pipeline Layout creation successful.\n");
-		}
-		else
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Pipeline Layout creation unsuccessful.\n");
-			throw std::runtime_error("");
-		}
-
-		
 		m_logger.Unindent();
 	}
 

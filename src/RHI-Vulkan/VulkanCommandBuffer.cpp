@@ -6,9 +6,9 @@
 #include <Core/Utils/EnumUtils.h>
 #include "VulkanBuffer.h"
 #include "VulkanPipeline.h"
+#include "VulkanRootSignature.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
-#include "VulkanDescriptorSet.h"
 
 namespace NK
 {
@@ -35,7 +35,7 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "Initialisation unsuccessful. result = " + std::to_string(result) + '\n');
 			throw std::runtime_error("");
 		}
-		
+
 		m_logger.Unindent();
 	}
 
@@ -45,7 +45,7 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::COMMAND_BUFFER, "Shutting Down VulkanCommandBuffer\n");
-		
+
 		if (m_buffer != VK_NULL_HANDLE)
 		{
 			vkFreeCommandBuffers(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), dynamic_cast<VulkanCommandPool&>(m_pool).GetCommandPool(), 1, &m_buffer);
@@ -118,24 +118,46 @@ namespace NK
 
 
 
+	void VulkanCommandBuffer::TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
+	{
+		const BarrierInfo src{ GetVulkanBarrierInfo(_oldState) };
+		const BarrierInfo dst{ GetVulkanBarrierInfo(_newState) };
+
+		VkBufferMemoryBarrier barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.buffer = dynamic_cast<VulkanBuffer*>(_buffer)->GetBuffer();
+
+		barrier.offset = 0;
+		barrier.size = _buffer->GetSize();
+
+		barrier.srcAccessMask = src.accessMask;
+		barrier.dstAccessMask = dst.accessMask;
+
+		vkCmdPipelineBarrier(m_buffer, src.stageMask, dst.stageMask, 0, 0, nullptr, 1, &barrier, 0, nullptr);
+	}
+
+
+
 	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment)
 	{
 		//Colour attachments
 		std::vector<VkRenderingAttachmentInfo> colourAttachmentInfos(_numColourAttachments);
-		for (std::size_t i{ 0 }; i<_numColourAttachments; ++i)
+		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
 		{
 			colourAttachmentInfos[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 			colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[i]))->GetImageView();
 			colourAttachmentInfos[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			colourAttachmentInfos[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			colourAttachmentInfos[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			colourAttachmentInfos[i].clearValue.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+			colourAttachmentInfos[i].clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 		}
-		
-	    //Depth-stencil attachment
-	    VkRenderingAttachmentInfo depthStencilAttachmentInfo{};
-	    if (_depthStencilAttachment)
-	    {
+
+		//Depth-stencil attachment
+		VkRenderingAttachmentInfo depthStencilAttachmentInfo{};
+		if (_depthStencilAttachment)
+		{
 			depthStencilAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 			depthStencilAttachmentInfo.pNext = nullptr;
 			depthStencilAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_depthStencilAttachment)->GetImageView();
@@ -143,18 +165,18 @@ namespace NK
 			depthStencilAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			depthStencilAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			depthStencilAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
-	    }
+		}
 
-	    VkRenderingInfo renderingInfo{};
-	    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-	    renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[0]))->GetRenderArea(); 
-	    renderingInfo.layerCount = 1;
-	    renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
-	    renderingInfo.pColorAttachments = colourAttachmentInfos.data();
-	    renderingInfo.pDepthAttachment = _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr;
-	    renderingInfo.pStencilAttachment = _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr;
+		VkRenderingInfo renderingInfo{};
+		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[0]))->GetRenderArea();
+		renderingInfo.layerCount = 1;
+		renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
+		renderingInfo.pColorAttachments = colourAttachmentInfos.data();
+		renderingInfo.pDepthAttachment = _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr;
+		renderingInfo.pStencilAttachment = _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr;
 
-	    vkCmdBeginRendering(m_buffer, &renderingInfo);
+		vkCmdBeginRendering(m_buffer, &renderingInfo);
 	}
 
 
@@ -170,8 +192,8 @@ namespace NK
 	{
 		std::vector<VkBuffer> vkBuffers(_bindingCount);
 		std::vector<VkDeviceSize> vkOffsets(_bindingCount);
-		for (std::size_t i{ 0 }; i<_bindingCount; ++i)
-		{	
+		for (std::size_t i{ 0 }; i < _bindingCount; ++i)
+		{
 			vkBuffers[i] = dynamic_cast<VulkanBuffer*>(&(_buffers[i]))->GetBuffer();
 			vkOffsets[i] = 0;
 		}
@@ -191,9 +213,32 @@ namespace NK
 	{
 		switch (_bindPoint)
 		{
-		case PIPELINE_BIND_POINT::GRAPHICS: vkCmdBindPipeline(m_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, dynamic_cast<VulkanPipeline*>(_pipeline)->GetPipeline()); break;
-		case PIPELINE_BIND_POINT::COMPUTE: vkCmdBindPipeline(m_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, dynamic_cast<VulkanPipeline*>(_pipeline)->GetPipeline()); break;
+		case PIPELINE_BIND_POINT::GRAPHICS: vkCmdBindPipeline(m_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, dynamic_cast<VulkanPipeline*>(_pipeline)->GetPipeline());
+			break;
+		case PIPELINE_BIND_POINT::COMPUTE: vkCmdBindPipeline(m_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, dynamic_cast<VulkanPipeline*>(_pipeline)->GetPipeline());
+			break;
 		}
+	}
+
+
+
+	void VulkanCommandBuffer::BindRootSignature(IRootSignature* _rootSignature, PIPELINE_BIND_POINT _bindPoint)
+	{
+		//Bind descriptor set
+		VulkanRootSignature* vkRootSig{ dynamic_cast<VulkanRootSignature*>(_rootSignature) };
+		VkPipelineBindPoint bindPoint{ _bindPoint == PIPELINE_BIND_POINT::GRAPHICS ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE };
+		VkDescriptorSet vkDescriptorSet{ vkRootSig->GetDescriptorSet() };
+		vkCmdBindDescriptorSets(m_buffer, bindPoint, vkRootSig->GetPipelineLayout(), 0, 1, &vkDescriptorSet, 0, nullptr);
+	}
+
+
+
+	void VulkanCommandBuffer::PushConstants(IRootSignature* _rootSignature, void* _data)
+	{
+		VulkanRootSignature* vkRootSig{ dynamic_cast<VulkanRootSignature*>(_rootSignature) };
+		//todo: replace VK_SHADER_STAGE_ALL with more precise user-defined parameter
+		VkShaderStageFlags stage{ static_cast<VkShaderStageFlags>(vkRootSig->GetBindPoint()  == PIPELINE_BIND_POINT::GRAPHICS ? VK_SHADER_STAGE_ALL_GRAPHICS : VK_SHADER_STAGE_COMPUTE_BIT)};
+		vkCmdPushConstants(m_buffer, vkRootSig->GetPipelineLayout(), stage, 0, vkRootSig->GetProvidedNum32BitValues() * 4, _data);
 	}
 
 
@@ -222,14 +267,6 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::BindDescriptorSet(IDescriptorSet* _descriptorSet, PIPELINE_BIND_POINT _bindPoint)
-	{
-		VkDescriptorSet descriptorSet{ dynamic_cast<VulkanDescriptorSet*>(_descriptorSet)->GetDescriptorSet() };
-		vkCmdBindDescriptorSets(m_buffer, GetVulkanPipelineBindPoint(_bindPoint), dynamic_cast<VulkanDevice&>(m_device).GetPipelineLayout(), 0, 1, &descriptorSet, 0, nullptr);
-	}
-
-
-
 	void VulkanCommandBuffer::DrawIndexed(std::uint32_t _indexCount, std::uint32_t _instanceCount, std::uint32_t _firstIndex, std::uint32_t _firstInstance)
 	{
 		vkCmdDrawIndexed(m_buffer, _indexCount, _instanceCount, _firstIndex, 0, _firstInstance);
@@ -237,44 +274,89 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::CopyBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer)
+	void VulkanCommandBuffer::CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer, std::size_t _srcOffset, std::size_t _dstOffset, std::size_t _size)
 	{
 		//Input validation
 
 		//Ensure source buffer is transfer src capable
 		if (!EnumUtils::Contains(_srcBuffer->GetUsageFlags(), NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT))
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBuffer() - _srcBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToBuffer() - _srcBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT\n");
 			throw std::runtime_error("");
 		}
 
 		//Ensure destination buffer is transfer dst capable
 		if (!EnumUtils::Contains(_dstBuffer->GetUsageFlags(), NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT))
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBuffer() - _dstBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToBuffer() - _dstBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT\n");
 			throw std::runtime_error("");
 		}
 
-		//Ensure destination buffer is large enough to hold the contents of the source buffer
-		if (_dstBuffer->GetSize() < _srcBuffer->GetSize())
+		//Ensure source buffer with given offset and size doesn't exceed bounds of source buffer
+		if (_srcOffset + _size > _srcBuffer->GetSize())
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBuffer() - _srcBuffer (size: " + std::to_string(_srcBuffer->GetSize()) + ") is too big for _dstBuffer (size:" + std::to_string(_dstBuffer->GetSize()) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToBuffer() - _srcOffset (" + std::to_string(_srcOffset) + ") + _size (" + std::to_string(_size) + ") > _srcBuffer.m_size (" + std::to_string(_srcBuffer->GetSize()) + ")\n");
 			throw std::runtime_error("");
 		}
-		
+
+		//Ensure dest buffer with given offset and size doesn't exceed bounds of dest buffer
+		if (_dstOffset + _size > _dstBuffer->GetSize())
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToBuffer() - _dstOffset (" + std::to_string(_dstOffset) + ") + _size (" + std::to_string(_size) + ") > _dstBuffer.m_size (" + std::to_string(_dstBuffer->GetSize()) + ")\n");
+			throw std::runtime_error("");
+		}
+
 		//Enqueue the copy command
 		VkBufferCopy copyRegion{};
-		copyRegion.srcOffset = 0;
-		copyRegion.dstOffset = 0;
-		copyRegion.size = _srcBuffer->GetSize();
+		copyRegion.srcOffset = _srcOffset;
+		copyRegion.dstOffset = _dstOffset;
+		copyRegion.size = _size;
 		vkCmdCopyBuffer(m_buffer, dynamic_cast<VulkanBuffer*>(_srcBuffer)->GetBuffer(), dynamic_cast<VulkanBuffer*>(_dstBuffer)->GetBuffer(), 1, &copyRegion);
 	}
 
 
 
-	void VulkanCommandBuffer::UploadDataToDeviceBuffer(void* data, std::size_t size, IBuffer* _dstBuffer)
+	void VulkanCommandBuffer::CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent)
 	{
-		//Todo: implement
+		//Input validation
+
+		//Ensure source buffer is transfer src capable
+		if (!EnumUtils::Contains(_srcBuffer->GetUsageFlags(), NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToTexture() - _srcBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure destination texture is transfer dst capable
+		if (!EnumUtils::Contains(_dstTexture->GetUsageFlags(), NK::TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToTexture() - _dstTexture wasn't created with NK::TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure destination region doesn't exceed destination texture's bounds
+		const glm::ivec3 textureSize = _dstTexture->GetSize();
+		if ((_dstOffset.x + _dstExtent.x > textureSize.x) ||
+			(_dstOffset.y + _dstExtent.y > textureSize.y) ||
+			(_dstOffset.z + _dstExtent.z > textureSize.z))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToTexture() - Specified destination region is out of bounds for the texture.\n");
+			throw std::runtime_error("");
+		}
+
+		//Enqueue the copy command
+		VkBufferImageCopy copyRegion{};
+		copyRegion.bufferOffset = _srcOffset;
+		copyRegion.bufferRowLength = 0;   //Tightly packed
+		copyRegion.bufferImageHeight = 0; //Tightly packed
+		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.imageSubresource.mipLevel = 0;
+		copyRegion.imageSubresource.baseArrayLayer = 0;
+		copyRegion.imageSubresource.layerCount = 1;
+		copyRegion.imageOffset = { _dstOffset.x, _dstOffset.y, _dstOffset.z };
+		copyRegion.imageExtent = { static_cast<std::uint32_t>(_dstExtent.x), static_cast<std::uint32_t>(_dstExtent.y), static_cast<std::uint32_t>(_dstExtent.z) };
+
+		vkCmdCopyBufferToImage(m_buffer, dynamic_cast<VulkanBuffer*>(_srcBuffer)->GetBuffer(), dynamic_cast<VulkanTexture*>(_dstTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 	}
 
 
@@ -283,9 +365,25 @@ namespace NK
 	{
 		switch (_state)
 		{
+		//Common States
 		case RESOURCE_STATE::UNDEFINED:			return { VK_IMAGE_LAYOUT_UNDEFINED, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
-		case RESOURCE_STATE::RENDER_TARGET:		return { VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 		case RESOURCE_STATE::PRESENT:			return { VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT };
+
+		//Read-Only States
+		case RESOURCE_STATE::VERTEX_BUFFER:		return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT };
+		case RESOURCE_STATE::INDEX_BUFFER:		return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_INDEX_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT };
+		case RESOURCE_STATE::CONSTANT_BUFFER:	return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
+		case RESOURCE_STATE::INDIRECT_BUFFER:	return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_INDIRECT_COMMAND_READ_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT };
+		case RESOURCE_STATE::SHADER_RESOURCE:	return { VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
+		case RESOURCE_STATE::COPY_SOURCE:		return { VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
+		case RESOURCE_STATE::DEPTH_READ:		return { VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT };
+
+		//Read-Write States
+		case RESOURCE_STATE::RENDER_TARGET:		return { VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		case RESOURCE_STATE::UNORDERED_ACCESS:	return { VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT };
+		case RESOURCE_STATE::COPY_DEST:			return { VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
+		case RESOURCE_STATE::DEPTH_WRITE:		return { VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT };
+
 		default:
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "GetVulkanBarrierInfo() - provided _state (" + std::to_string(std::to_underlying(_state)) + ") is not yet handled.\n");
@@ -300,9 +398,9 @@ namespace NK
 	{
 		switch (_format)
 		{
-		case DATA_FORMAT::R8_UINT:	return VK_INDEX_TYPE_UINT8;
-		case DATA_FORMAT::R16_UINT:	return VK_INDEX_TYPE_UINT16;
-		case DATA_FORMAT::R32_UINT:	return VK_INDEX_TYPE_UINT32;
+		case DATA_FORMAT::R8_UINT: return VK_INDEX_TYPE_UINT8;
+		case DATA_FORMAT::R16_UINT: return VK_INDEX_TYPE_UINT16;
+		case DATA_FORMAT::R32_UINT: return VK_INDEX_TYPE_UINT32;
 		default:
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "Default case reached in GetVulkanIndexType() - _format = " + std::to_string(std::to_underlying(_format)) + "\n");
@@ -311,12 +409,14 @@ namespace NK
 		}
 	}
 
+
+
 	VkPipelineBindPoint VulkanCommandBuffer::GetVulkanPipelineBindPoint(PIPELINE_BIND_POINT _bindPoint)
 	{
 		switch (_bindPoint)
 		{
-		case PIPELINE_BIND_POINT::GRAPHICS:	return VK_PIPELINE_BIND_POINT_GRAPHICS;
-		case PIPELINE_BIND_POINT::COMPUTE:	return VK_PIPELINE_BIND_POINT_COMPUTE;
+		case PIPELINE_BIND_POINT::GRAPHICS: return VK_PIPELINE_BIND_POINT_GRAPHICS;
+		case PIPELINE_BIND_POINT::COMPUTE: return VK_PIPELINE_BIND_POINT_COMPUTE;
 		default:
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "Default case reached in GetVulkanPipelineBindPoint() - _bindPoint = " + std::to_string(std::to_underlying(_bindPoint)) + "\n");
@@ -324,5 +424,5 @@ namespace NK
 		}
 		}
 	}
-	
+
 }

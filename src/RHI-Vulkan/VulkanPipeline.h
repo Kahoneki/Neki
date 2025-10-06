@@ -12,14 +12,6 @@ namespace NK
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] inline VkPipeline GetPipeline() const { return m_pipeline; }
 
-
-	private:
-		void CreateShaderModules(IShader* _compute, IShader* _vertex, IShader* _fragment);
-		void CreateComputePipeline();
-		void CreateGraphicsPipeline();
-		
-		[[nodiscard]] VkShaderModule CreateShaderModule(IShader* _shader) const;
-
 		[[nodiscard]] static VkPrimitiveTopology GetVulkanTopology(INPUT_TOPOLOGY _topology);
 		[[nodiscard]] static VkCullModeFlags GetVulkanCullMode(CULL_MODE _mode);
 		[[nodiscard]] static VkFrontFace GetVulkanWindingDirection(WINDING_DIRECTION _direction);
@@ -32,6 +24,14 @@ namespace NK
 		[[nodiscard]] static VkBlendFactor GetVulkanBlendFactor(BLEND_FACTOR _factor);
 		[[nodiscard]] static VkBlendOp GetVulkanBlendOp(BLEND_OP _op);
 		[[nodiscard]] static VkLogicOp GetVulkanLogicOp(LOGIC_OP _op);
+
+
+	private:
+		void CreateShaderModules(IShader* _compute, IShader* _vertex, IShader* _fragment);
+		void CreateComputePipeline();
+		void CreateGraphicsPipeline();
+		
+		[[nodiscard]] VkShaderModule CreateShaderModule(IShader* _shader) const;
 		
 		
 		VkShaderModule m_computeShaderModule{ VK_NULL_HANDLE };

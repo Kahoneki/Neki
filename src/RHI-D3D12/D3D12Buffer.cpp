@@ -29,20 +29,22 @@ namespace NK
 
 
 		//Create buffer
-		D3D12_RESOURCE_DESC bufferDesc{};
-		bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		bufferDesc.Alignment = 0;
-		bufferDesc.Width = m_size;
-		bufferDesc.Height = 1;
-		bufferDesc.DepthOrArraySize = 1;
-		bufferDesc.MipLevels = 1;
-		bufferDesc.Format = DXGI_FORMAT_UNKNOWN;
-		bufferDesc.SampleDesc.Count = 1;
-		bufferDesc.SampleDesc.Quality = 0;
-		bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		bufferDesc.Flags = GetCreationFlags();
+		m_resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		m_resourceDesc.Alignment = 0;
+		m_resourceDesc.Width = m_size;
+		m_resourceDesc.Height = 1;
+		m_resourceDesc.DepthOrArraySize = 1;
+		m_resourceDesc.MipLevels = 1;
+		m_resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+		m_resourceDesc.SampleDesc.Count = 1;
+		m_resourceDesc.SampleDesc.Quality = 0;
+		m_resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		m_resourceDesc.Flags = GetCreationFlags();
 
-		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_buffer)) };
+		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &m_resourceDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_buffer)) };
+	
+
+		m_logger.Unindent();
 	}
 	
 	
@@ -91,10 +93,6 @@ namespace NK
 		if (m_memType == MEMORY_TYPE::HOST)
 		{
 			return D3D12_RESOURCE_STATE_GENERIC_READ;
-		}
-		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT))
-		{
-			return D3D12_RESOURCE_STATE_COPY_DEST;
 		}
 	
 		return D3D12_RESOURCE_STATE_COMMON;

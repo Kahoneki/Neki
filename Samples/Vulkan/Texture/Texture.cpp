@@ -6,11 +6,15 @@
 #include <Core/Utils/FormatUtils.h>
 #include <RHI-Vulkan/VulkanDevice.h>
 #include <RHI/IBuffer.h>
+#include <RHI/IPipeline.h>
+#include <RHI/ISampler.h>
 #include <RHI/IShader.h>
 #include <RHI/ISurface.h>
-#include <RHI/ITexture.h>
 #include <RHI/ISwapchain.h>
-#include "RHI/IPipeline.h"
+#include <RHI/ITexture.h>
+
+#include <Core/Utils/ImageLoader.h>
+#include <Graphics/GPUUploader.h>
 
 
 
@@ -56,7 +60,7 @@ int main()
 
 	//Surface
 	NK::SurfaceDesc surfaceDesc{};
-	surfaceDesc.name = "Triangle Sample";
+	surfaceDesc.name = "Texture Sample";
 	surfaceDesc.size = glm::ivec2(1280, 720);
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
 
@@ -67,21 +71,45 @@ int main()
 	swapchainDesc.presentQueue = graphicsQueue.get();
 	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
 
+	
+	//Texture
+	NK::ImageData imageData{ NK::ImageLoader::LoadImage("Samples/Resource Files/NekiLogo.png", true, true) };
+	imageData.desc.usage |= NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
+	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(imageData.desc) };
+	gpuUploader->EnqueueTextureDataUpload(imageData.data, texture.get(), NK::RESOURCE_STATE::UNDEFINED);
+
+	
+	//Texture view
+	NK::TextureViewDesc textureViewDesc{};
+	textureViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	textureViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
+	textureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateTextureView(texture.get(), textureViewDesc) };
+	NK::ResourceIndex textureResourceIndex{ textureView->GetIndex() };
+
+	//Sampler
+	NK::SamplerDesc samplerDesc{};
+	samplerDesc.minFilter = NK::FILTER_MODE::LINEAR;
+	samplerDesc.magFilter = NK::FILTER_MODE::LINEAR;
+	const NK::UniquePtr<NK::ISampler> sampler{ device->CreateSampler(samplerDesc) };
+	NK::SamplerIndex samplerIndex{ sampler->GetIndex() };
+	
+
 	//Vertex Shader
 	NK::ShaderDesc vertShaderDesc{};
 	vertShaderDesc.type = NK::SHADER_TYPE::VERTEX;
-	vertShaderDesc.filepath = "Samples/Shaders/Triangle/Triangle_vs";
+	vertShaderDesc.filepath = "Samples/Shaders/Texture/Texture_vs";
 	const NK::UniquePtr<NK::IShader> vertShader{ device->CreateShader(vertShaderDesc) };
 
 	//Fragment Shader
 	NK::ShaderDesc fragShaderDesc{};
 	fragShaderDesc.type = NK::SHADER_TYPE::FRAGMENT;
-	fragShaderDesc.filepath = "Samples/Shaders/Triangle/Triangle_fs";
+	fragShaderDesc.filepath = "Samples/Shaders/Texture/Texture_fs";
 	const NK::UniquePtr<NK::IShader> fragShader{ device->CreateShader(fragShaderDesc) };
 
 	//Root Signature
 	NK::RootSignatureDesc rootSigDesc{};
-	rootSigDesc.num32BitPushConstantValues = 0;
+	rootSigDesc.num32BitPushConstantValues = 2;
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 
 	
@@ -89,75 +117,55 @@ int main()
 	struct Vertex
 	{
 		glm::vec2 pos;
-		glm::vec3 colour;
+		glm::vec2 texCoord;
 	};
-	const Vertex vertices[3]
+	const Vertex vertices[4]
 	{
-		Vertex(glm::vec2(0.0f, 0.5f),	glm::vec3(1.0f, 0.0f, 0.0f)), //Top center
-		Vertex(glm::vec2(0.5f, -0.5f),  glm::vec3(0.0f, 1.0f, 0.0f)), //Bottom right
-		Vertex(glm::vec2(-0.5f, -0.5f), glm::vec3(0.0f, 0.0f, 1.0f))  //Bottom left
+		Vertex(glm::vec2(-0.5f, -0.5f),	glm::vec2(0.0f, 0.0f)),	//Bottom left
+		Vertex(glm::vec2(-0.5f, 0.5f),	glm::vec2(0.0f, 1.0f)),	//Top left
+		Vertex(glm::vec2(0.5f, -0.5f),	glm::vec2(1.0f, 0.0f)),	//Bottom right
+		Vertex(glm::vec2(0.5f, 0.5f),	glm::vec2(1.0f, 1.0f))	//Top right
 	};
-	
-	NK::BufferDesc vertStagingBufferDesc{};
-	vertStagingBufferDesc.size = sizeof(Vertex) * 3;
-	vertStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
-	vertStagingBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
-	const NK::UniquePtr<NK::IBuffer> vertStagingBuffer{ device->CreateBuffer(vertStagingBufferDesc) };
-	void* vertStagingBufferMap{ vertStagingBuffer->Map() };
-	memcpy(vertStagingBufferMap, vertices, sizeof(Vertex) * 3);
-	vertStagingBuffer->Unmap();
-
 	NK::BufferDesc vertBufferDesc{};
-	vertBufferDesc.size = sizeof(Vertex) * 3;
+	vertBufferDesc.size = sizeof(Vertex) * 4;
 	vertBufferDesc.type = NK::MEMORY_TYPE::DEVICE;
 	vertBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | NK::BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
 	const NK::UniquePtr<NK::IBuffer> vertBuffer{ device->CreateBuffer(vertBufferDesc) };
 
-
 	//Index Buffer
-	const std::uint32_t indices[3]{ 0, 1, 2 };
-	
-	NK::BufferDesc indexStagingBufferDesc{};
-	indexStagingBufferDesc.size = sizeof(std::uint32_t) * 3;
-	indexStagingBufferDesc.type = NK::MEMORY_TYPE::HOST;
-	indexStagingBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
-	const NK::UniquePtr<NK::IBuffer> indexStagingBuffer{ device->CreateBuffer(indexStagingBufferDesc) };
-	void* indexStagingBufferMap{ indexStagingBuffer->Map() };
-	memcpy(indexStagingBufferMap, indices, sizeof(std::uint32_t) * 3);
-	indexStagingBuffer->Unmap();
-
+	const std::uint32_t indices[6]{ 0, 1, 2, 2, 1, 3 };
 	NK::BufferDesc indexBufferDesc{};
-	indexBufferDesc.size = sizeof(std::uint32_t) * 3;
+	indexBufferDesc.size = sizeof(std::uint32_t) * 6;
 	indexBufferDesc.type = NK::MEMORY_TYPE::DEVICE;
 	indexBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | NK::BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT;
 	const NK::UniquePtr<NK::IBuffer> indexBuffer{ device->CreateBuffer(indexBufferDesc) };
 
-
 	//Upload vertex and index buffers
-	gpuUploader->EnqueueBufferDataUpload(sizeof(Vertex) * 3, vertices, vertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
-	gpuUploader->EnqueueBufferDataUpload(sizeof(std::uint32_t) * 3, indices, indexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(vertices, vertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(indices, indexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
 
-	//Flush vertex buffer and index buffer uploads
+	//Flush texture, vertex buffer, and index buffer
 	gpuUploader->Flush(true);
 	gpuUploader->Reset();
 	
 
 	//Graphics Pipeline
 
-	//Position attribute
 	std::vector<NK::VertexAttributeDesc> vertexAttributes;
+	//Position attribute
 	NK::VertexAttributeDesc posAttribute{};
 	posAttribute.attribute = NK::SHADER_ATTRIBUTE::POSITION;
 	posAttribute.binding = 0;
 	posAttribute.format = NK::DATA_FORMAT::R32G32_SFLOAT;
 	posAttribute.offset = 0;
 	vertexAttributes.push_back(posAttribute);
-	NK::VertexAttributeDesc colourAttribute{};
-	colourAttribute.attribute = NK::SHADER_ATTRIBUTE::COLOUR_0;
-	colourAttribute.binding = 0;
-	colourAttribute.format = NK::DATA_FORMAT::R32G32B32_SFLOAT;
-	colourAttribute.offset = sizeof(glm::vec2);
-	vertexAttributes.push_back(colourAttribute);
+	//Texcoord attribute
+	NK::VertexAttributeDesc uvAttribute{};
+	uvAttribute.attribute = NK::SHADER_ATTRIBUTE::TEXCOORD_0;
+	uvAttribute.binding = 0;
+	uvAttribute.format = NK::DATA_FORMAT::R32G32_SFLOAT;
+	uvAttribute.offset = sizeof(glm::vec2);
+	vertexAttributes.push_back(uvAttribute);
 
 	//Vertex buffer binding
 	std::vector<NK::VertexBufferBindingDesc> bufferBindings;
@@ -192,7 +200,13 @@ int main()
 
 	std::vector<NK::ColourBlendAttachmentDesc> colourBlendAttachments(1);
 	colourBlendAttachments[0].colourWriteMask = NK::COLOUR_ASPECT_FLAGS::R_BIT | NK::COLOUR_ASPECT_FLAGS::G_BIT | NK::COLOUR_ASPECT_FLAGS::B_BIT | NK::COLOUR_ASPECT_FLAGS::A_BIT;
-	colourBlendAttachments[0].blendEnable = false;
+	colourBlendAttachments[0].blendEnable = true;
+	colourBlendAttachments[0].srcColourBlendFactor = NK::BLEND_FACTOR::SRC_ALPHA;
+	colourBlendAttachments[0].dstColourBlendFactor = NK::BLEND_FACTOR::ONE_MINUS_SRC_ALPHA;
+	colourBlendAttachments[0].colourBlendOp = NK::BLEND_OP::ADD;
+	colourBlendAttachments[0].srcAlphaBlendFactor = NK::BLEND_FACTOR::ONE; //Keep source alpha
+	colourBlendAttachments[0].dstAlphaBlendFactor = NK::BLEND_FACTOR::ZERO; //Discard destination alpha
+	colourBlendAttachments[0].alphaBlendOp = NK::BLEND_OP::ADD;
 	NK::ColourBlendDesc colourBlendDesc{};
 	colourBlendDesc.logicOpEnable = false;
 	colourBlendDesc.attachments = colourBlendAttachments;
@@ -223,6 +237,12 @@ int main()
 	{
 		commandBuffers[i] = graphicsCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc);
 	}
+	//Transition texture
+	commandBuffers[0]->Begin();
+	commandBuffers[0]->TransitionBarrier(texture.get(), NK::RESOURCE_STATE::COPY_DEST, NK::RESOURCE_STATE::SHADER_RESOURCE);
+	commandBuffers[0]->End();
+	graphicsQueue->Submit(commandBuffers[0].get(), nullptr, nullptr, nullptr);
+	graphicsQueue->WaitIdle();
 
 	//Semaphores
 	std::vector<NK::UniquePtr<NK::ISemaphore>> imageAvailableSemaphores(MAX_FRAMES_IN_FLIGHT);
@@ -264,6 +284,8 @@ int main()
 		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
+		std::uint32_t pushConstants[]{ textureResourceIndex, samplerIndex };
+		commandBuffers[currentFrame]->PushConstants(rootSig.get(), pushConstants);
 
 		std::size_t vertexBufferStride{ sizeof(Vertex) };
 		commandBuffers[currentFrame]->BindVertexBuffers(0, 1, vertBuffer.get(), &vertexBufferStride);
@@ -271,7 +293,7 @@ int main()
 
 		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { 1280, 720 });
 		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { 1280, 720 });
-		commandBuffers[currentFrame]->DrawIndexed(3, 1, 0, 0);
+		commandBuffers[currentFrame]->DrawIndexed(6, 1, 0, 0);
 		commandBuffers[currentFrame]->EndRendering();
 
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);

@@ -50,6 +50,8 @@ namespace NK
 		virtual ~ITexture() = default;
 
 		[[nodiscard]] inline glm::ivec3 GetSize() const { return m_size; }
+		[[nodiscard]] inline DATA_FORMAT GetFormat() const { return m_format; }
+		[[nodiscard]] inline TEXTURE_USAGE_FLAGS GetUsageFlags() const { return m_usage; }
 
 
 	protected:

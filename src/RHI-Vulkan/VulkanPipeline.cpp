@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <Core/Utils/EnumUtils.h>
 #include "VulkanDevice.h"
+#include "VulkanRootSignature.h"
 #include "VulkanShader.h"
 #include "VulkanTexture.h"
 
@@ -13,6 +14,14 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::PIPELINE, "Initialising VulkanPipeline\n");
 
+
+		//Ensure root signature is provided
+		if (_desc.rootSignature == nullptr)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PIPELINE, "_desc.rootSignature was nullptr - a root signature is required!\n");
+			throw std::runtime_error("");
+		}
+		
 
 		CreateShaderModules(_desc.computeShader, _desc.vertexShader, _desc.fragmentShader);
 		switch (m_type)
@@ -129,7 +138,7 @@ namespace NK
 		VkComputePipelineCreateInfo pipelineInfo{};
 		pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 		pipelineInfo.stage = compShaderStageInfo;
-		pipelineInfo.layout = dynamic_cast<VulkanDevice&>(m_device).GetPipelineLayout();
+		pipelineInfo.layout = dynamic_cast<const VulkanRootSignature* const>(m_rootSignature)->GetPipelineLayout();
 		const VkResult result{ vkCreateComputePipelines(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, m_allocator.GetVulkanCallbacks(), &m_pipeline) };
 		if (result == VK_SUCCESS)
 		{
@@ -317,7 +326,7 @@ namespace NK
 		pipelineInfo.pDepthStencilState = &depthStencilInfo;
 		pipelineInfo.pColorBlendState = &colourBlending;
 		pipelineInfo.pDynamicState = &dynamicState;
-		pipelineInfo.layout = dynamic_cast<VulkanDevice&>(m_device).GetPipelineLayout();
+		pipelineInfo.layout = dynamic_cast<const VulkanRootSignature* const>(m_rootSignature)->GetPipelineLayout();
 		const VkResult result{ vkCreateGraphicsPipelines(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, m_allocator.GetVulkanCallbacks(), &m_pipeline) };
 		if (result == VK_SUCCESS)
 		{

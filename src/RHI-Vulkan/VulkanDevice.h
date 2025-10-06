@@ -21,14 +21,18 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IBufferView> CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ISampler> CreateSampler(const SamplerDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IRootSignature> CreateRootSignature(const RootSignatureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() override;
+
+		[[nodiscard]] virtual TextureCopyMemoryLayout GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture) override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] inline VkInstance GetInstance() const { return m_instance; }
@@ -37,7 +41,9 @@ namespace NK
 		[[nodiscard]] inline std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
-		[[nodiscard]] inline VkPipelineLayout GetPipelineLayout() const { return m_pipelineLayout; }
+		[[nodiscard]] inline VkDescriptorPool GetDescriptorPool() const { return m_descriptorPool; }
+		[[nodiscard]] inline VkDescriptorSetLayout GetGlobalDescriptorSetLayout() const { return m_globalDescriptorSetLayout; }
+		[[nodiscard]] inline VkDescriptorSet GetGlobalDescriptorSet() const { return m_globalDescriptorSet; }
 
 
 	private:
@@ -50,7 +56,6 @@ namespace NK
 		void CreateDescriptorPool();
 		void CreateDescriptorSetLayout();
 		void CreateDescriptorSet();
-		void CreatePipelineLayout();
 
 		//Utility functions
 		[[nodiscard]] bool ValidationLayersSupported() const;
@@ -92,8 +97,8 @@ namespace NK
 		VkMutableDescriptorTypeListEXT m_mutableResourceTypeList{};
 		VkMutableDescriptorTypeCreateInfoEXT m_mutableResourceTypeInfo{};
 		VkDescriptorPool m_descriptorPool{ VK_NULL_HANDLE };
-		VkDescriptorSetLayout m_descriptorSetLayout{ VK_NULL_HANDLE };
-		VkPipelineLayout m_pipelineLayout{ VK_NULL_HANDLE };
+		VkDescriptorSetLayout m_globalDescriptorSetLayout{ VK_NULL_HANDLE };
+		VkDescriptorSet m_globalDescriptorSet{ VK_NULL_HANDLE };
 
 
 		bool m_enableInstanceValidationLayers = true;
