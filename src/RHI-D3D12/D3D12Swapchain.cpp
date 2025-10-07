@@ -87,8 +87,8 @@ namespace NK
 		//Describe swapchain
 		DXGI_SWAP_CHAIN_DESC1 swapchainDesc{};
 		swapchainDesc.BufferCount = m_numBuffers;
-		swapchainDesc.Width = m_surface->GetSize().x;
-		swapchainDesc.Height = m_surface->GetSize().y;
+		swapchainDesc.Width = m_surface->GetWindow()->GetSize().x;
+		swapchainDesc.Height = m_surface->GetWindow()->GetSize().y;
 		swapchainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //DXGI_SWAP_EFFECT_FLIP_DISCARD is incompatible with r8g8b8a8 unorm srgb, so just use srgb for the rtvs
 		swapchainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -129,7 +129,7 @@ namespace NK
 			desc.format = DATA_FORMAT::R8G8B8A8_UNORM;
 			desc.arrayTexture = false;
 			desc.dimension = TEXTURE_DIMENSION::DIM_2;
-			desc.size = glm::ivec3(m_surface->GetSize().x, m_surface->GetSize().y, 1);
+			desc.size = glm::ivec3(m_surface->GetWindow()->GetSize().x, m_surface->GetWindow()->GetSize().y, 1);
 			desc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT;
 
 			m_backBuffers[i] = UniquePtr<ITexture>(NK_NEW(D3D12Texture, m_logger, m_allocator, m_device, desc, backBuffer.Get()));

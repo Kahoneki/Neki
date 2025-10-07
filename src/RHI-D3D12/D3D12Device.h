@@ -8,6 +8,9 @@
 #ifdef CreateSemaphore
 	#undef CreateSemaphore
 #endif
+#ifdef CreateWindow
+	#undef CreateWindow
+#endif
 #include <RHI/ICommandPool.h>
 #include <RHI/ICommandBuffer.h>
 
@@ -29,10 +32,10 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IBufferView> CreateBufferView(IBuffer* _buffer, const BufferViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateShaderResourceTextureView(ITexture* _texture, const TextureViewDesc& _desc) override;
-		[[nodiscard]] virtual UniquePtr<ITextureView> CreateDepthStencilView(ITexture* _texture, const TextureViewDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ITextureView> CreateDepthStencilTextureView(ITexture* _texture, const TextureViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISampler> CreateSampler(const SamplerDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
-		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(Window* _window) override;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IRootSignature> CreateRootSignature(const RootSignatureDesc& _desc) override;

@@ -97,10 +97,13 @@ int main()
 	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateShaderResourceTextureView(texture.get(), textureViewDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
-	NK::SurfaceDesc surfaceDesc{};
-	surfaceDesc.name = "Neki-Vulkan Library Sample";
-	surfaceDesc.size = glm::ivec2(1280, 720);
-	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
+	NK::WindowDesc windowDesc{};
+	windowDesc.name = "Library Sample";
+	windowDesc.size = glm::ivec2(1280, 720);
+	const NK::UniquePtr<NK::Window> window{ device->CreateWindow(windowDesc) };
+	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
+
+	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(window.get()) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::ShaderDesc vertShaderDesc{};

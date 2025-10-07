@@ -96,7 +96,8 @@ namespace NK
 			break;
 		}
 		
-		//Depth-stencil view
+		//Depth and Depth-stencil view
+		case TEXTURE_VIEW_TYPE::DEPTH:
 		case TEXTURE_VIEW_TYPE::DEPTH_STENCIL:
 		{
 			D3D12_DEPTH_STENCIL_VIEW_DESC desc{};

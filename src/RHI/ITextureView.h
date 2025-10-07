@@ -29,6 +29,7 @@ namespace NK
 		virtual ~ITextureView() = default;
 		[[nodiscard]] inline ResourceIndex GetIndex() const { return m_resourceIndex; }
 		[[nodiscard]] inline DATA_FORMAT GetFormat() const { return m_format; }
+		[[nodiscard]] inline TEXTURE_VIEW_TYPE GetType() const { return m_type; }
 
 
 	protected:

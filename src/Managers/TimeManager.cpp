@@ -1,6 +1,7 @@
 #include "TimeManager.h"
 
 #include <GLFW/glfw3.h>
+#include <iostream>
 
 namespace NK
 {
@@ -10,6 +11,8 @@ namespace NK
 		const double currentTime{ glfwGetTime() };
 		dt = currentTime - lastTime;
 		lastTime = currentTime;
+
+		std::cout << 1 / dt << '\n';
 	}
 	
 }

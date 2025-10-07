@@ -128,8 +128,65 @@ namespace NK
 
 
 
+	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
+	{
+		if (_depthAttachment && _stencilAttachment)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() called with valid _depthAttachment and _stencilAttachment. This is not supported in D3D12 - if you would like both a depth attachment and a stencil attachment, please combine them into one texture and use the other BeginRendering() function.\n");
+			throw std::runtime_error("");
+		}
+
+		//Colour attachments
+		std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> colourAttachmentInfos(_numColourAttachments);
+		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
+		{
+			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
+			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_colourAttachments[i].GetFormat());
+			beg.Clear.ClearValue.Color[0] = 0.0f;
+			beg.Clear.ClearValue.Color[1] = 0.0f;
+			beg.Clear.ClearValue.Color[2] = 0.0f;
+			beg.Clear.ClearValue.Color[3] = 1.0f;
+
+			colourAttachmentInfos[i].BeginningAccess = beg;
+			colourAttachmentInfos[i].EndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
+			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_colourAttachments[i]))->GetCPUDescriptorHandle();
+		}
+
+		//Depth-stencil attachment
+		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC depthStencilAttachmentInfo{};
+		if (_depthAttachment || _stencilAttachment)
+		{
+			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
+			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_depthAttachment ? _depthAttachment->GetFormat() : _stencilAttachment->GetFormat());
+			beg.Clear.ClearValue.DepthStencil.Depth = 1.0f;
+			beg.Clear.ClearValue.DepthStencil.Stencil = 0;
+
+			depthStencilAttachmentInfo.DepthBeginningAccess = beg;
+			depthStencilAttachmentInfo.StencilBeginningAccess = beg;
+			depthStencilAttachmentInfo.DepthEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
+			depthStencilAttachmentInfo.StencilEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
+			depthStencilAttachmentInfo.cpuDescriptor = dynamic_cast<D3D12TextureView*>(_depthAttachment ? _depthAttachment : _stencilAttachment)->GetCPUDescriptorHandle();
+		}
+
+		//todo: look into allow uav write flag?
+		m_buffer->BeginRenderPass(_numColourAttachments, colourAttachmentInfos.data(), (_depthAttachment || _stencilAttachment) ? &depthStencilAttachmentInfo : nullptr, D3D12_RENDER_PASS_FLAG_NONE);
+	}
+
+
+
 	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment)
 	{
+		if (_depthStencilAttachment)
+		{
+			if (_depthStencilAttachment->GetType() != TEXTURE_VIEW_TYPE::DEPTH_STENCIL)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() for combined depth-stencil attachments called but type of _depthStencilAttachment was not TEXTURE_VIEW_TYPE::DEPTH_STENCIL. If you are trying to use a standalone depth or stencil texture, use the other BeginRendering() function intended for this use.\n");
+				throw std::runtime_error("");
+			}
+		}
+
 		//Colour attachments
 		std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> colourAttachmentInfos(_numColourAttachments);
 		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)

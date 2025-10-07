@@ -80,14 +80,14 @@ namespace NK
 
 
 
-	UniquePtr<ITextureView> D3D12Device::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
+	UniquePtr<ITextureView> D3D12Device::CreateShaderResourceTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
 		return UniquePtr<ITextureView>(NK_NEW(D3D12TextureView, m_logger, m_allocator, *this, _texture, _desc, m_resourceDescriptorHeap.Get(), m_resourceDescriptorSize, m_resourceIndexAllocator.get()));
 	}
 
 
 
-	UniquePtr<ITextureView> D3D12Device::CreateDepthStencilView(ITexture* _texture, const TextureViewDesc& _desc)
+	UniquePtr<ITextureView> D3D12Device::CreateDepthStencilTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
 		return UniquePtr<ITextureView>(NK_NEW(D3D12TextureView, m_logger, m_allocator, *this, _texture, _desc, m_dsvDescriptorHeap.Get(), m_dsvDescriptorSize, m_dsvIndexAllocator.get()));
 	}
@@ -108,9 +108,9 @@ namespace NK
 
 
 
-	UniquePtr<ISurface> D3D12Device::CreateSurface(const SurfaceDesc& _desc)
+	UniquePtr<ISurface> D3D12Device::CreateSurface(Window* _window)
 	{
-		return UniquePtr<ISurface>(NK_NEW(D3D12Surface, m_logger, m_allocator, *this, _desc));
+		return UniquePtr<ISurface>(NK_NEW(D3D12Surface, m_logger, m_allocator, *this, _window));
 	}
 
 

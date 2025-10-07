@@ -20,6 +20,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/transform.hpp>
+#include <iostream>
 
 
 
@@ -297,7 +298,7 @@ int main()
 
 
 	//Number of frames the CPU can get ahead of the GPU
-	constexpr std::uint32_t MAX_FRAMES_IN_FLIGHT{ 2 };
+	constexpr std::uint32_t MAX_FRAMES_IN_FLIGHT{ 10 };
 
 	//Graphics Command Buffers
 	std::vector<NK::UniquePtr<NK::ICommandBuffer>> commandBuffers(MAX_FRAMES_IN_FLIGHT);
@@ -334,6 +335,8 @@ int main()
 	
 	while (!window->ShouldClose())
 	{
+		std::cout << currentFrame << ": ";
+
 		//Update managers
 		glfwPollEvents();
 		NK::TimeManager::Update();
@@ -403,7 +406,6 @@ int main()
 		graphicsQueue->Submit(commandBuffers[currentFrame].get(), imageAvailableSemaphores[currentFrame].get(), renderFinishedSemaphores[imageIndex].get(), inFlightFences[currentFrame].get());
 		swapchain->Present(renderFinishedSemaphores[imageIndex].get(), imageIndex);
 
-		
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
 	}
