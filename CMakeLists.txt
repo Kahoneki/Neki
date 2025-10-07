@@ -14,6 +14,7 @@ file(GLOB_RECURSE NEKI_COMMON_SOURCES
         "src/Core/*.cpp"
         "src/Platform/*.cpp"
         "src/Graphics/*.cpp"
+        "src/Managers/*.cpp"
 )
 set(NEKI_SOURCES ${NEKI_COMMON_SOURCES})
 

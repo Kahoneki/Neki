@@ -4,8 +4,13 @@
 #include <Core/Memory/Allocation.h>
 #include <Core/Memory/TrackingAllocator.h>
 #include <Core/Utils/FormatUtils.h>
+#include <Graphics/Camera/PlayerCamera.h>
+#include <Managers/InputManager.h>
+#include <Managers/TimeManager.h>
 #include <RHI-Vulkan/VulkanDevice.h>
 #include <RHI/IBuffer.h>
+#include <RHI/IBufferView.h>
+#include <RHI/IPipeline.h>
 #include <RHI/IShader.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
@@ -13,12 +18,8 @@
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
-#include "Graphics/Camera/Camera.h"
-
-#include "glm/gtx/string_cast.hpp"
-#include "glm/gtx/transform.hpp"
-#include "RHI/IBufferView.h"
-#include "RHI/IPipeline.h"
+#include <glm/gtx/string_cast.hpp>
+#include <glm/gtx/transform.hpp>
 
 
 
@@ -70,7 +71,6 @@ int main()
 	const NK::UniquePtr<NK::Window> window{ device->CreateWindow(windowDesc) };
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(window.get()) };
 
-
 	//Swapchain
 	NK::SwapchainDesc swapchainDesc{};
 	swapchainDesc.surface = surface.get();
@@ -79,27 +79,25 @@ int main()
 	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
 	
 	//Camera
-	NK::Camera camera{ NK::Camera(glm::vec3(0,0,-3), 90.0f, 0, 0.01f, 100.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y) };
-	camera.SetPosition(glm::vec3(-2, 0, -3));
+	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0,0,-3), 90.0f, 0, 0.01f, 100.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 30.0f, 0.05f) };
 	
 	//Camera Data Buffer
-	NK::CameraShaderData camShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
+	NK::CameraShaderData initialCamShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
 	NK::BufferDesc camDataBufferDesc{};
-	camDataBufferDesc.size = sizeof(camShaderData);
-	camDataBufferDesc.type = NK::MEMORY_TYPE::DEVICE;
+	camDataBufferDesc.size = sizeof(initialCamShaderData);
+	camDataBufferDesc.type = NK::MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
 	camDataBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | NK::BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
 	const NK::UniquePtr<NK::IBuffer> camDataBuffer{ device->CreateBuffer(camDataBufferDesc) };
-	gpuUploader->EnqueueBufferDataUpload(&camShaderData, camDataBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
-
+	void* camDataBufferMap{ camDataBuffer->Map() };
+	memcpy(camDataBufferMap, &initialCamShaderData, sizeof(initialCamShaderData));
 
 	//Camera Data Buffer View
 	NK::BufferViewDesc camDataBufferViewDesc{};
-	camDataBufferViewDesc.size = sizeof(camShaderData);
+	camDataBufferViewDesc.size = sizeof(initialCamShaderData);
 	camDataBufferViewDesc.offset = 0;
 	camDataBufferViewDesc.type = NK::BUFFER_VIEW_TYPE::UNIFORM;
 	const NK::UniquePtr<NK::IBufferView> camDataBufferView{ device->CreateBufferView(camDataBuffer.get(), camDataBufferViewDesc) };
 	NK::ResourceIndex camDataBufferIndex{ camDataBufferView->GetIndex() };
-	
 	
 	//Vertex Shader
 	NK::ShaderDesc vertShaderDesc{};
@@ -336,10 +334,21 @@ int main()
 	
 	while (!window->ShouldClose())
 	{
+		//Update managers
+		glfwPollEvents();
+		NK::TimeManager::Update();
+		NK::InputManager::Update(window.get());
+
+
+		//Update player camera
+		camera.Update(window.get());
+		NK::CameraShaderData camShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
+		memcpy(camDataBufferMap, &camShaderData, sizeof(camShaderData));
+
+		
+		//Begin rendering
 		inFlightFences[currentFrame]->Wait();
 		inFlightFences[currentFrame]->Reset();
-
-		glfwPollEvents();
 		
 		commandBuffers[currentFrame]->Begin();
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphores[currentFrame].get(), nullptr) };
@@ -355,6 +364,9 @@ int main()
 
 		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y });
 		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y });
+
+
+		//Drawing
 		
 		//Push constants
 		struct PushConstantData
@@ -379,16 +391,22 @@ int main()
 		pushConstantData.modelMat = glm::scale(pushConstantData.modelMat, glm::vec3(10,10,1));
 		commandBuffers[currentFrame]->PushConstants(rootSig.get(), &pushConstantData);
 		commandBuffers[currentFrame]->DrawIndexed(36, 1, 0, 0);
-		
+
+
+		//End rendering
 		commandBuffers[currentFrame]->EndRendering();
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);
 		commandBuffers[currentFrame]->End();
 
+
+		//Submit
 		graphicsQueue->Submit(commandBuffers[currentFrame].get(), imageAvailableSemaphores[currentFrame].get(), renderFinishedSemaphores[imageIndex].get(), inFlightFences[currentFrame].get());
 		swapchain->Present(renderFinishedSemaphores[imageIndex].get(), imageIndex);
 
+		
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
 	}
+	camDataBuffer->Unmap();
 	graphicsQueue->WaitIdle();
 }
