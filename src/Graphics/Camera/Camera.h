@@ -24,7 +24,7 @@ namespace NK
 		//A yaw of 0 is equivalent to looking at the +X axis, increasing yaw will rotate the camera around the Y axis in an anti-clockwise direction measured in degrees
 		//E.g.: setting the yaw to +90 will have the camera look along +Z, +-180 will be -X, and -90 will be -Z
 		explicit Camera(glm::vec3 _pos, float _yaw, float _pitch, float _nearPlaneDist, float _farPlaneDist, float _fov, float _aspectRatio);
-		virtual ~Camera() = default;
+		~Camera() = default;
 		
 		//Matrices are cached and only updated when necessary - virtually no overhead in calling this function
 		[[nodiscard]] CameraShaderData GetCameraShaderData(const PROJECTION_METHOD _method);

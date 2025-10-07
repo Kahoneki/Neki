@@ -68,6 +68,7 @@ namespace NK
 		SEMAPHORE,
 
 		GPU_UPLOADER,
+		WINDOW,
 		
 		APPLICATION,
 	};

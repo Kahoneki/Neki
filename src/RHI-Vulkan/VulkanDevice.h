@@ -24,7 +24,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateDepthStencilView(ITexture* _texture, const TextureViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISampler> CreateSampler(const SamplerDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
-		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(Window* _window) override;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IRootSignature> CreateRootSignature(const RootSignatureDesc& _desc) override;
@@ -88,6 +88,7 @@ namespace NK
 			{ COMMAND_POOL_TYPE::TRANSFER, &m_transferQueueIndexAllocator },
 		};
 
+		//Mutable type
 		inline static constexpr std::array<VkDescriptorType, 4> m_resourceTypes
 		{
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,

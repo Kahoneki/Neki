@@ -154,9 +154,9 @@ namespace NK
 
 
 
-	UniquePtr<ISurface> VulkanDevice::CreateSurface(const SurfaceDesc& _desc)
+	UniquePtr<ISurface> VulkanDevice::CreateSurface(Window* _window)
 	{
-		return UniquePtr<ISurface>(NK_NEW(VulkanSurface, m_logger, m_allocator, *this, _desc));
+		return UniquePtr<ISurface>(NK_NEW(VulkanSurface, m_logger, m_allocator, *this, _window));
 	}
 
 

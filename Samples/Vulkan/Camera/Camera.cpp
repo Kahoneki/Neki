@@ -62,12 +62,14 @@ int main()
 	gpuUploaderDesc.transferQueue = transferQueue.get();
 	const NK::UniquePtr<NK::GPUUploader> gpuUploader{ device->CreateGPUUploader(gpuUploaderDesc) };
 
-	//Surface
-	NK::SurfaceDesc surfaceDesc{};
-	surfaceDesc.name = "Camera Sample";
+	//Window and Surface
+	NK::WindowDesc windowDesc{};
+	windowDesc.name = "Cube Sample";
 	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1280, 720 };
-	surfaceDesc.size = glm::ivec2(SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y);
-	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(surfaceDesc) };
+	windowDesc.size = glm::ivec2(SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y);
+	const NK::UniquePtr<NK::Window> window{ device->CreateWindow(windowDesc) };
+	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(window.get()) };
+
 
 	//Swapchain
 	NK::SwapchainDesc swapchainDesc{};
@@ -332,7 +334,7 @@ int main()
 	//Tracks the current frame in range [0, MAX_FRAMES_IN_FLIGHT-1]
 	std::uint32_t currentFrame{ 0 };
 	
-	while (!surface->ShouldClose())
+	while (!window->ShouldClose())
 	{
 		inFlightFences[currentFrame]->Wait();
 		inFlightFences[currentFrame]->Reset();

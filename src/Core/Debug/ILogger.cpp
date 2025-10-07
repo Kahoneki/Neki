@@ -82,6 +82,7 @@ namespace NK
 		case LOGGER_LAYER::SEMAPHORE:			return "[SEMAPHORE]";
 
 		case LOGGER_LAYER::GPU_UPLOADER:		return "[GPU UPLOADER]";
+		case LOGGER_LAYER::WINDOW:				return "[WINDOW]";
 
 		case LOGGER_LAYER::APPLICATION:			return "[APPLICATION]";
 

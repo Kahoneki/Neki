@@ -139,8 +139,8 @@ namespace NK
 		}
 		else
 		{
-			m_extent.width = std::clamp(static_cast<std::uint32_t>(m_surface->GetSize().x), capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-			m_extent.height = std::clamp(static_cast<std::uint32_t>(m_surface->GetSize().y), capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+			m_extent.width = std::clamp(static_cast<std::uint32_t>(m_surface->GetWindow()->GetSize().x), capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+			m_extent.height = std::clamp(static_cast<std::uint32_t>(m_surface->GetWindow()->GetSize().y), capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 		}
 
 

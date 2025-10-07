@@ -1,9 +1,10 @@
 #pragma once
 #include "Core/Debug/ILogger.h"
 #include "Core/Memory/Allocation.h"
-#include "Core/Memory/IAllocator.h"
 #include "Core/Memory/FreeListAllocator.h"
+#include "Core/Memory/IAllocator.h"
 #include "Graphics/GPUUploader.h"
+#include "Graphics/Window.h"
 
 
 namespace NK
@@ -26,7 +27,6 @@ namespace NK
 	struct CommandPoolDesc;
 
 	class ISurface;
-	struct SurfaceDesc;
 
 	class ISwapchain;
 	struct SwapchainDesc;
@@ -78,7 +78,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateDepthStencilView(ITexture* _texture, const TextureViewDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISampler> CreateSampler(const SamplerDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) = 0;
-		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(const SurfaceDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(Window* _window) = 0;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IRootSignature> CreateRootSignature(const RootSignatureDesc& _desc) = 0;
@@ -87,10 +87,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() = 0;
 
-		[[nodiscard]] UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc)
-		{
-			return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _desc));
-		}
+		[[nodiscard]] UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc) { return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _desc)); }
+		[[nodiscard]] UniquePtr<Window> CreateWindow(const WindowDesc& _desc) const { return UniquePtr<Window>(NK_NEW(Window, m_logger, _desc)); }
 
 		//When copying data from a buffer to a texture, the buffer data needs to be in a specific layout that depends on the destination texture
 		//This function calculates it for you
