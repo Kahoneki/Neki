@@ -8,7 +8,7 @@ namespace NK
 		m_actionStatesLastUpdate = m_actionStates;
 
 		GLFWwindow* glfwWin{ _window->GetGLFWWindow() };
-		
+
 		m_actionStates[INPUT_ACTION::MOVE_FORWARDS]		= (glfwGetKey(glfwWin, GLFW_KEY_W) == GLFW_PRESS) ? KEY_INPUT_STATE::HELD : KEY_INPUT_STATE::NOT_HELD;
 		m_actionStates[INPUT_ACTION::MOVE_BACKWARDS]	= (glfwGetKey(glfwWin, GLFW_KEY_S) == GLFW_PRESS) ? KEY_INPUT_STATE::HELD : KEY_INPUT_STATE::NOT_HELD;
 		m_actionStates[INPUT_ACTION::MOVE_LEFT]			= (glfwGetKey(glfwWin, GLFW_KEY_A) == GLFW_PRESS) ? KEY_INPUT_STATE::HELD : KEY_INPUT_STATE::NOT_HELD;
@@ -28,5 +28,7 @@ namespace NK
 			glfwSetInputMode(glfwWin, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 			m_firstUpdate = false;
 		}
+
+		glfwSetWindowShouldClose(glfwWin, glfwGetKey(glfwWin, GLFW_KEY_ESCAPE) == GLFW_PRESS);
 	}
 }
