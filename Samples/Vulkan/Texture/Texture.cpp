@@ -85,7 +85,7 @@ int main()
 	textureViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	textureViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
 	textureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
-	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateTextureView(texture.get(), textureViewDesc) };
+	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateShaderResourceTextureView(texture.get(), textureViewDesc) };
 	NK::ResourceIndex textureResourceIndex{ textureView->GetIndex() };
 
 	//Sampler

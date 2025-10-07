@@ -65,7 +65,7 @@ int main()
 
 	//Window and Surface
 	NK::WindowDesc windowDesc{};
-	windowDesc.name = "Cube Sample";
+	windowDesc.name = "Camera Sample";
 	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1280, 720 };
 	windowDesc.size = glm::ivec2(SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y);
 	const NK::UniquePtr<NK::Window> window{ device->CreateWindow(windowDesc) };
@@ -292,8 +292,8 @@ int main()
 	NK::TextureViewDesc depthBufferViewDesc{};
 	depthBufferViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	depthBufferViewDesc.format = NK::DATA_FORMAT::D32_SFLOAT;
-	depthBufferViewDesc.type = NK::TEXTURE_VIEW_TYPE::DEPTH_STENCIL;
-	const NK::UniquePtr<NK::ITextureView> depthBufferView{ device->CreateDepthStencilView(depthBuffer.get(), depthBufferViewDesc) };
+	depthBufferViewDesc.type = NK::TEXTURE_VIEW_TYPE::DEPTH;
+	const NK::UniquePtr<NK::ITextureView> depthBufferView{ device->CreateDepthStencilTextureView(depthBuffer.get(), depthBufferViewDesc) };
 
 
 	//Number of frames the CPU can get ahead of the GPU
@@ -328,7 +328,7 @@ int main()
 	{
 		inFlightFences[i] = device->CreateFence(inFlightFenceDesc);
 	}
-
+	
 	//Tracks the current frame in range [0, MAX_FRAMES_IN_FLIGHT-1]
 	std::uint32_t currentFrame{ 0 };
 	
@@ -354,7 +354,7 @@ int main()
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphores[currentFrame].get(), nullptr) };
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
-		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), depthBufferView.get());
+		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), depthBufferView.get(), nullptr);
 		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 

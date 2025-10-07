@@ -308,7 +308,7 @@ namespace NK
 		renderingInfo.pColorAttachmentFormats = vulkanColourAttachmentFormats.data();
 		//Use same format for depth and stencil for parity with dx12
 		renderingInfo.depthAttachmentFormat = VulkanTexture::GetVulkanFormat(m_depthStencilAttachmentFormat);
-		renderingInfo.stencilAttachmentFormat = VulkanTexture::GetVulkanFormat(m_depthStencilAttachmentFormat);
+//		renderingInfo.stencilAttachmentFormat = VulkanTexture::GetVulkanFormat(m_depthStencilAttachmentFormat);
 
 
 		//Create pipeline (todo: add tessellation support)

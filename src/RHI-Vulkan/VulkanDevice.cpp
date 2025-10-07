@@ -126,14 +126,14 @@ namespace NK
 
 
 
-	UniquePtr<ITextureView> VulkanDevice::CreateTextureView(ITexture* _texture, const TextureViewDesc& _desc)
+	UniquePtr<ITextureView> VulkanDevice::CreateShaderResourceTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
 		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc, m_globalDescriptorSet, m_resourceIndexAllocator.get()));
 	}
 
 
 
-	UniquePtr<ITextureView> VulkanDevice::CreateDepthStencilView(ITexture* _texture, const TextureViewDesc& _desc)
+	UniquePtr<ITextureView> VulkanDevice::CreateDepthStencilTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
 		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc));
 	}

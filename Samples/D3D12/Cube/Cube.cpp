@@ -294,7 +294,7 @@ int main()
 	depthBufferViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	depthBufferViewDesc.format = NK::DATA_FORMAT::D32_SFLOAT;
 	depthBufferViewDesc.type = NK::TEXTURE_VIEW_TYPE::DEPTH_STENCIL;
-	const NK::UniquePtr<NK::ITextureView> depthBufferView{ device->CreateDepthStencilView(depthBuffer.get(), depthBufferViewDesc) };
+	const NK::UniquePtr<NK::ITextureView> depthBufferView{ device->CreateDepthStencilTextureView(depthBuffer.get(), depthBufferViewDesc) };
 
 
 	//Number of frames the CPU can get ahead of the GPU

@@ -6,6 +6,7 @@ namespace NK
 	enum class TEXTURE_VIEW_TYPE
 	{
 		RENDER_TARGET,
+		DEPTH,
 		DEPTH_STENCIL,
 		
 		SHADER_READ_ONLY,

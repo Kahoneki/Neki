@@ -102,9 +102,19 @@ namespace NK
 		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		barrier.image = dynamic_cast<VulkanTexture*>(_texture)->GetTexture();
 
-		//Currently only colour images are supported
-		//todo: add everything else
-		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		const DATA_FORMAT format = _texture->GetFormat();
+		if (format == DATA_FORMAT::D32_SFLOAT || format == DATA_FORMAT::D16_UNORM)
+		{
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		}
+		else if (format == DATA_FORMAT::D24_UNORM_S8_UINT)
+		{
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+		else
+		{
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		}
 		barrier.subresourceRange.baseMipLevel = 0;
 		barrier.subresourceRange.levelCount = 1;
 		barrier.subresourceRange.baseArrayLayer = 0;
@@ -136,6 +146,60 @@ namespace NK
 		barrier.dstAccessMask = dst.accessMask;
 
 		vkCmdPipelineBarrier(m_buffer, src.stageMask, dst.stageMask, 0, 0, nullptr, 1, &barrier, 0, nullptr);
+	}
+
+
+
+	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
+	{
+		//Colour attachments
+		std::vector<VkRenderingAttachmentInfo> colourAttachmentInfos(_numColourAttachments);
+		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
+		{
+			colourAttachmentInfos[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[i]))->GetImageView();
+			colourAttachmentInfos[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			colourAttachmentInfos[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			colourAttachmentInfos[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			colourAttachmentInfos[i].clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+		}
+
+		//Depth attachment
+		VkRenderingAttachmentInfo depthAttachmentInfo{};
+		if (_depthAttachment)
+		{
+			depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			depthAttachmentInfo.pNext = nullptr;
+			depthAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_depthAttachment)->GetImageView();
+			depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+			depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			depthAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
+		}
+
+		//Stencil attachment
+		VkRenderingAttachmentInfo stencilAttachmentInfo{};
+		if (_stencilAttachment)
+		{
+			stencilAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			stencilAttachmentInfo.pNext = nullptr;
+			stencilAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_stencilAttachment)->GetImageView();
+			stencilAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
+			stencilAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			stencilAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			stencilAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
+		}
+
+		VkRenderingInfo renderingInfo{};
+		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[0]))->GetRenderArea();
+		renderingInfo.layerCount = 1;
+		renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
+		renderingInfo.pColorAttachments = colourAttachmentInfos.data();
+		renderingInfo.pDepthAttachment = _depthAttachment ? &depthAttachmentInfo : nullptr;
+		renderingInfo.pStencilAttachment = _stencilAttachment ? &stencilAttachmentInfo : nullptr;
+
+		vkCmdBeginRendering(m_buffer, &renderingInfo);
 	}
 
 
@@ -250,6 +314,8 @@ namespace NK
 		viewport.y = _extent.y + _pos.y; //Add height extent offset to compensate for using -_extent.y for height
 		viewport.width = _extent.x;
 		viewport.height = -_extent.y; //Flip the viewport for parity with D3D12's +Y up coordinate system.
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
 		vkCmdSetViewport(m_buffer, 0, 1, &viewport);
 	}
 

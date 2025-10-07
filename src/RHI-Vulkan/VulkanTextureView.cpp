@@ -135,8 +135,17 @@ namespace NK
 		viewInfo.image = dynamic_cast<VulkanTexture*>(_texture)->GetTexture();
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; //todo: look into possible scenarios where you would want a non-2d rtv/dsv?
 		viewInfo.format = VulkanTexture::GetVulkanFormat(m_format);
-		viewInfo.subresourceRange.aspectMask = (m_type == TEXTURE_VIEW_TYPE::RENDER_TARGET ? VK_IMAGE_ASPECT_COLOR_BIT : (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT));
-
+		switch (m_type)
+		{
+		case TEXTURE_VIEW_TYPE::RENDER_TARGET:	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; break;
+		case TEXTURE_VIEW_TYPE::DEPTH:			viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; break;
+		case TEXTURE_VIEW_TYPE::DEPTH_STENCIL:	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT; break;
+		default:
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE_VIEW, "Default case reached for m_type switch case in VulkanTextureView constructor - this suggests an internal error rather than a user-caused one.\n");
+			throw std::runtime_error("");
+		}
+		}
 
 		//todo: add mip support
 		viewInfo.subresourceRange.baseMipLevel = 0;
