@@ -66,7 +66,7 @@ int main()
 	//Window and Surface
 	NK::WindowDesc windowDesc{};
 	windowDesc.name = "Model Sample";
-	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1920, 1080 };
+	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1280, 720 };
 	windowDesc.size = glm::ivec2(SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y);
 	const NK::UniquePtr<NK::Window> window{ device->CreateWindow(windowDesc) };
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(window.get()) };

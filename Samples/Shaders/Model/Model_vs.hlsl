@@ -45,6 +45,7 @@ VertexOutput VSMain(VertexInput input)
     VertexOutput output;
 	CamData camData = g_camData[NonUniformResourceIndex(PC(camDataBufferIndex))];
 
+    output.camPos = camData.pos;
 	output.texCoord = input.texCoord;
 	
 	float4 worldPos = mul(PC(modelMat), float4(input.pos, 1.0));
