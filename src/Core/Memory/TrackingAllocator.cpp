@@ -76,29 +76,37 @@ namespace NK
 
 
 
-	void* TrackingAllocator::Allocate(std::size_t _size, const char* _file, int _line)
+	void* TrackingAllocator::Allocate(std::size_t _size, const char* _file, int _line, bool _static)
 	{
 		if (m_verbose) { m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Application Allocation: " + std::string(_file) + " - line " + std::to_string(_line) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (implicitly aligned to " + FormatUtils::GetSizeString(m_defaultAlignment) + ")\n"); }
+		if (_static) { m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::TRACKING_ALLOCATOR, "TrackingAllocator::Allocate() - _static flag set to true which can be dangerous, was this intended?\n"); }
 		void* ptr{ AllocateAligned(_size, m_defaultAlignment) };
 
-		std::lock_guard<std::mutex> lock(m_allocationMapMtx);
-		m_allocationMap[ptr] = { _size, _file, _line };
+		if (!_static)
+		{
+			std::lock_guard<std::mutex> lock(m_allocationMapMtx);
+			m_allocationMap[ptr] = { _size, _file, _line };
+		}
 		
 		return ptr;
 	}
 
 
 
-	void* TrackingAllocator::Reallocate(void* _original, std::size_t _size, const char* _file, int _line)
+	void* TrackingAllocator::Reallocate(void* _original, std::size_t _size, const char* _file, int _line, bool _static)
 	{
 		m_logger.Indent();
 		
 		if (m_verbose) { m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Application Reallocation: " + std::string(_file) + " - line " + std::to_string(_line) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (implicitly aligned to " + FormatUtils::GetSizeString(m_defaultAlignment) + "). Freeing previous " + FormatUtils::GetSizeString(m_allocationMap[_original].size) + " from " + m_allocationMap[_original].file + "- line " + std::to_string(m_allocationMap[_original].line)); }
+		if (_static) { m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::TRACKING_ALLOCATOR, "TrackingAllocator::Reallocate() - _static flag set to true which can be dangerous, was this intended?\n"); }
 		void* ptr{ ReallocateAligned(_original, _size, m_defaultAlignment) };
 
-		std::lock_guard<std::mutex> lock(m_allocationMapMtx);
-		m_allocationMap[ptr] = { _size, _file, _line };
-		if (_original) { m_allocationMap.erase(_original); }
+		if (!_static)
+		{
+			std::lock_guard<std::mutex> lock(m_allocationMapMtx);
+			m_allocationMap[ptr] = { _size, _file, _line };
+			if (_original) { m_allocationMap.erase(_original); }
+		}
 
 		m_logger.Unindent();
 		
@@ -107,22 +115,29 @@ namespace NK
 
 
 
-	void TrackingAllocator::Free(void* _ptr)
+	void TrackingAllocator::Free(void* _ptr, bool _static)
 	{
 		m_logger.Indent();
 		
 		if (!m_allocationMap.contains(_ptr))
 		{
 			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "Free - _ptr does not point to memory allocated through this tracking allocator");
+			throw std::runtime_error("");
 		}
+		if (_static) { m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::TRACKING_ALLOCATOR, "TrackingAllocator::Free() - _static flag set to true which can be dangerous, was this intended?\n"); }
+
 		const std::string size{ FormatUtils::GetSizeString(m_allocationMap[_ptr].size) };
 		const std::string file{ m_allocationMap[_ptr].file };
 		const std::string line{ std::to_string(m_allocationMap[_ptr].line) };
 		if (m_verbose) { m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Application Free: " + file + " - line " + line + " --- Freeing " + size + " (implicitly aligned to " + FormatUtils::GetSizeString(m_defaultAlignment) + ")\n"); }
 
 		FreeAligned(_ptr);
-		std::lock_guard<std::mutex> lock(m_allocationMapMtx);
-		m_allocationMap.erase(_ptr);
+
+		if (!_static)
+		{
+			std::lock_guard<std::mutex> lock(m_allocationMapMtx);
+			m_allocationMap.erase(_ptr);
+		}
 
 		m_logger.Unindent();
 	}

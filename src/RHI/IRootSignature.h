@@ -1,8 +1,11 @@
 #pragma once
-#include "IDevice.h"
+#include <cstdint>
+#include <Core/Debug/ILogger.h>
+#include <Core/Memory/IAllocator.h>
 
 namespace NK
 {
+	class IDevice;
 	enum class PIPELINE_BIND_POINT;
 
 	struct RootSignatureDesc

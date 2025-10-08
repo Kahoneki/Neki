@@ -13,6 +13,7 @@ namespace NK
 	class ILogger;
 	class IDevice;
 	class IBuffer;
+	class IBufferView;
 	class ICommandPool;
 	class ICommandBuffer;
 	class IQueue;
@@ -52,14 +53,16 @@ namespace NK
 		RESOURCE_INDEX bufferIndex;
 
 		//This material will hence be valid for as long as its in scope
+		UniquePtr<IBuffer> materialBuffer;
+		UniquePtr<IBufferView> materialBufferView;
 		std::vector<UniquePtr<ITexture>> textures;
 		std::vector<UniquePtr<ITextureView>> textureViews;
 	};
 	
 	struct GPUModel
 	{
-		std::vector<GPUMesh> meshes;
-		std::vector<GPUMaterial> materials;
+		std::vector<UniquePtr<GPUMesh>> meshes;
+		std::vector<UniquePtr<GPUMaterial>> materials;
 	};
 	
 	
@@ -79,8 +82,8 @@ namespace NK
 		//The number of bytes in _data is expected to exactly match the size of the destination texture
 		void EnqueueTextureDataUpload(const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState);
 
-		//_cpuModel should be populated from ModelLoader::LoadModel(), _gpuModel should be empty
-		void EnqueueModelDataUpload(const CPUModel* _cpuModel, GPUModel* _gpuModel);
+		//_cpuModel should be populated from ModelLoader::LoadModel()
+		[[nodiscard]] UniquePtr<GPUModel> EnqueueModelDataUpload(const CPUModel* _cpuModel);
 
 		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and the returned fence will already be signalled
 		//

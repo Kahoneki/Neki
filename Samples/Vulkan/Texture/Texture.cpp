@@ -74,10 +74,10 @@ int main()
 
 	
 	//Texture
-	NK::ImageData* imageData{ NK::ImageLoader::LoadImage("Samples/Resource Files/NekiLogo.png", true, true) };
-	imageData->desc.usage |= NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
-	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(imageData->desc) };
-	gpuUploader->EnqueueTextureDataUpload(imageData->data, texture.get(), NK::RESOURCE_STATE::UNDEFINED);
+	NK::ImageData imageData{ NK::ImageLoader::LoadImage("Samples/Resource Files/NekiLogo.png", true, true) };
+	imageData.desc.usage |= NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
+	const NK::UniquePtr<NK::ITexture> texture{ device->CreateTexture(imageData.desc) };
+	gpuUploader->EnqueueTextureDataUpload(imageData.data, texture.get(), NK::RESOURCE_STATE::UNDEFINED);
 
 	
 	//Texture view

@@ -23,7 +23,6 @@
 #ifdef ERROR
 	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
 #endif
-#include <iostream>
 
 
 

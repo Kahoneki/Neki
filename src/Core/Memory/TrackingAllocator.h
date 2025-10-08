@@ -22,9 +22,9 @@ namespace NK
 	public:
 		explicit TrackingAllocator(ILogger& _logger, bool _verbose, bool _vulkanVerbose);
 		virtual ~TrackingAllocator() override;
-		virtual void* Allocate(std::size_t _size, const char* _file, int _line) override;
-		virtual void* Reallocate(void* _original, std::size_t _size, const char* _file, int _line) override;
-		virtual void Free(void* _ptr) override;
+		virtual void* Allocate(std::size_t _size, const char* _file, int _line, bool _static) override;
+		virtual void* Reallocate(void* _original, std::size_t _size, const char* _file, int _line, bool _static) override;
+		virtual void Free(void* _ptr, bool _static) override;
 
 		#if NEKI_VULKAN_SUPPORTED
 			[[nodiscard]] virtual inline const VkAllocationCallbacks* GetVulkanCallbacks() const override { return &m_vulkanCallbacks; }

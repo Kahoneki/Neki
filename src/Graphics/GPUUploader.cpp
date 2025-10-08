@@ -11,6 +11,8 @@
 #include <RHI/ITexture.h>
 #include <RHI/ITextureView.h>
 
+#include "RHI/IBufferView.h"
+
 
 namespace NK
 {
@@ -157,101 +159,141 @@ namespace NK
 
 
 
-	void GPUUploader::EnqueueModelDataUpload(const CPUModel* _cpuModel, GPUModel* _gpuModel)
+	UniquePtr<GPUModel> GPUUploader::EnqueueModelDataUpload(const CPUModel* _cpuModel)
 	{
+		UniquePtr<GPUModel> gpuModel{ NK_NEW(GPUModel) };
+		
 		//Load the mesh data
 		for (const CPUMesh& cpuMesh : _cpuModel->meshes)
 		{
-			GPUMesh gpuMesh;
+			UniquePtr<GPUMesh> gpuMesh{ NK_NEW(GPUMesh) };
 			
 			//Vertex buffer
 			BufferDesc vertexBufferDesc{};
 			vertexBufferDesc.size = sizeof(ModelVertex) * cpuMesh.vertices.size();
 			vertexBufferDesc.type = MEMORY_TYPE::DEVICE;
 			vertexBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
-			gpuMesh.vertexBuffer = m_device.CreateBuffer(vertexBufferDesc);
-			EnqueueBufferDataUpload(cpuMesh.vertices.data(), gpuMesh.vertexBuffer.get(), RESOURCE_STATE::UNDEFINED);
+			gpuMesh->vertexBuffer = m_device.CreateBuffer(vertexBufferDesc);
+			EnqueueBufferDataUpload(cpuMesh.vertices.data(), gpuMesh->vertexBuffer.get(), RESOURCE_STATE::UNDEFINED);
 
 			//Index buffer
 			BufferDesc indexBufferDesc{};
 			indexBufferDesc.size = sizeof(std::uint32_t) * cpuMesh.indices.size();
 			indexBufferDesc.type = MEMORY_TYPE::DEVICE;
 			indexBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT;
-			gpuMesh.indexBuffer = m_device.CreateBuffer(indexBufferDesc);
-			EnqueueBufferDataUpload(cpuMesh.indices.data(), gpuMesh.indexBuffer.get(), RESOURCE_STATE::UNDEFINED);
+			gpuMesh->indexBuffer = m_device.CreateBuffer(indexBufferDesc);
+			gpuMesh->indexCount = cpuMesh.indices.size();
+			EnqueueBufferDataUpload(cpuMesh.indices.data(), gpuMesh->indexBuffer.get(), RESOURCE_STATE::UNDEFINED);
 
 			//Material index
-			gpuMesh.materialIndex = cpuMesh.materialIndex;
+			gpuMesh->materialIndex = cpuMesh.materialIndex;
 
-			_gpuModel->meshes.push_back(std::move(gpuMesh));
+			gpuModel->meshes.push_back(std::move(gpuMesh));
 		}
 
 		//Load the material data
 		for (const CPUMaterial& cpuMaterial : _cpuModel->materials)
 		{
-			GPUMaterial gpuMaterial{};
-			gpuMaterial.lightingModel = cpuMaterial.lightingModel;
-			gpuMaterial.textures.resize(std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES));
-			gpuMaterial.textureViews.resize(std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES));
+			UniquePtr<GPUMaterial> gpuMaterial{ NK_NEW(GPUMaterial) };
+			gpuMaterial->lightingModel = cpuMaterial.lightingModel;
+			gpuMaterial->textures.resize(std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES));
+			gpuMaterial->textureViews.resize(std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES));
 
 			auto createTexture{ [&](const MODEL_TEXTURE_TYPE _textureType)
 			{
 				const std::size_t index{ std::to_underlying(_textureType) };
-				gpuMaterial.textures[index] = m_device.CreateTexture(cpuMaterial.allTextures[index]->desc);
-				EnqueueTextureDataUpload(cpuMaterial.allTextures[index]->data, gpuMaterial.textures[index].get(), RESOURCE_STATE::UNDEFINED);
+				gpuMaterial->textures[index] = m_device.CreateTexture(cpuMaterial.allTextures[index].desc);
+				EnqueueTextureDataUpload(cpuMaterial.allTextures[index].data, gpuMaterial->textures[index].get(), RESOURCE_STATE::UNDEFINED);
 
 				TextureViewDesc viewDesc{};
 				viewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 				viewDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-				viewDesc.format = gpuMaterial.textures[index]->GetFormat();
-				gpuMaterial.textureViews[index] = m_device.CreateShaderResourceTextureView(gpuMaterial.textures[index].get(), viewDesc);
-				gpuMaterial.bufferIndex = gpuMaterial.textureViews[index]->GetIndex();
+				viewDesc.format = gpuMaterial->textures[index]->GetFormat();
+				gpuMaterial->textureViews[index] = m_device.CreateShaderResourceTextureView(gpuMaterial->textures[index].get(), viewDesc);
 			} };
+
 			
-			switch (gpuMaterial.lightingModel)
+			switch (gpuMaterial->lightingModel)
 			{
 				
 			case LIGHTING_MODEL::BLINN_PHONG:
 			{
 				BlinnPhongMaterial material{ std::get<BlinnPhongMaterial>(cpuMaterial.shaderMaterialData) };
 				
-				if (material.hasDiffuse)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.diffuseIdx)); }
-				if (material.hasSpecular)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.specularIdx)); }
-				if (material.hasAmbient)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.ambientIdx)); }
-				if (material.hasEmissive)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.emissiveIdx)); }
-				if (material.hasNormal)				{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.normalIdx)); }
-				if (material.hasShininess)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.shininessIdx)); }
-				if (material.hasOpacity)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.opacityIdx)); }
-				if (material.hasHeight)				{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.heightIdx)); }
-				if (material.hasDisplacement)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.displacementIdx)); }
-				if (material.hasLightmap)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.lightmapIdx)); }
-				if (material.hasReflection)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.reflectionIdx)); }
+				if (material.hasDiffuse)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.diffuseIdx)); material.diffuseIdx = gpuMaterial->textureViews[material.diffuseIdx]->GetIndex(); }
+				if (material.hasSpecular)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.specularIdx)); material.specularIdx = gpuMaterial->textureViews[material.specularIdx]->GetIndex(); }
+				if (material.hasAmbient)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.ambientIdx)); material.ambientIdx = gpuMaterial->textureViews[material.ambientIdx]->GetIndex(); }
+				if (material.hasEmissive)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.emissiveIdx)); material.emissiveIdx = gpuMaterial->textureViews[material.emissiveIdx]->GetIndex(); }
+				if (material.hasNormal)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.normalIdx)); material.normalIdx = gpuMaterial->textureViews[material.normalIdx]->GetIndex(); }
+				if (material.hasShininess)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.shininessIdx)); material.shininessIdx = gpuMaterial->textureViews[material.shininessIdx]->GetIndex(); }
+				if (material.hasOpacity)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.opacityIdx)); material.opacityIdx = gpuMaterial->textureViews[material.opacityIdx]->GetIndex(); }
+				if (material.hasHeight)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.heightIdx)); material.heightIdx = gpuMaterial->textureViews[material.heightIdx]->GetIndex(); }
+				if (material.hasDisplacement)	{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.displacementIdx)); material.displacementIdx = gpuMaterial->textureViews[material.displacementIdx]->GetIndex(); }
+				if (material.hasLightmap)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.lightmapIdx)); material.lightmapIdx = gpuMaterial->textureViews[material.lightmapIdx]->GetIndex(); }
+				if (material.hasReflection)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.reflectionIdx)); material.reflectionIdx = gpuMaterial->textureViews[material.reflectionIdx]->GetIndex(); }
 
+				//Material buffer
+				BufferDesc materialBufferDesc{};
+				materialBufferDesc.size = sizeof(material);
+				materialBufferDesc.type = MEMORY_TYPE::DEVICE;
+				materialBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
+				gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
+				EnqueueBufferDataUpload(&material, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
+
+				//Material buffer view
+				BufferViewDesc materialBufferViewDesc{};
+				materialBufferViewDesc.size = sizeof(material);
+				materialBufferViewDesc.type = BUFFER_VIEW_TYPE::UNIFORM;
+				materialBufferViewDesc.offset = 0;
+				gpuMaterial->materialBufferView = m_device.CreateBufferView(gpuMaterial->materialBuffer.get(), materialBufferViewDesc);
+				gpuMaterial->bufferIndex = gpuMaterial->materialBufferView->GetIndex();
+				
 				break;
 			}
 			
 			case LIGHTING_MODEL::PHYSICALLY_BASED:
 			{
 				PBRMaterial material{ std::get<PBRMaterial>(cpuMaterial.shaderMaterialData) };
+				
+				if (material.hasBaseColour)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.baseColourIdx)); material.baseColourIdx = gpuMaterial->textureViews[material.baseColourIdx]->GetIndex(); }
+				if (material.hasMetalness)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.metalnessIdx)); material.metalnessIdx = gpuMaterial->textureViews[material.metalnessIdx]->GetIndex(); }
+				if (material.hasRoughness)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.roughnessIdx)); material.roughnessIdx = gpuMaterial->textureViews[material.roughnessIdx]->GetIndex(); }
+				if (material.hasSpecular)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.specularIdx)); material.specularIdx = gpuMaterial->textureViews[material.specularIdx]->GetIndex(); }
+				if (material.hasShininess)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.shininessIdx)); material.shininessIdx = gpuMaterial->textureViews[material.shininessIdx]->GetIndex(); }
+				if (material.hasNormal)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.normalIdx)); material.normalIdx = gpuMaterial->textureViews[material.normalIdx]->GetIndex(); }
+				if (material.hasAO)				{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.aoIdx)); material.aoIdx = gpuMaterial->textureViews[material.aoIdx]->GetIndex(); }
+				if (material.hasEmissive)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.emissiveIdx)); material.emissiveIdx = gpuMaterial->textureViews[material.emissiveIdx]->GetIndex(); }
+				if (material.hasOpacity)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.opacityIdx)); material.opacityIdx = gpuMaterial->textureViews[material.opacityIdx]->GetIndex(); }
+				if (material.hasHeight)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.heightIdx)); material.heightIdx = gpuMaterial->textureViews[material.heightIdx]->GetIndex(); }
+				if (material.hasDisplacement)	{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.displacementIdx)); material.displacementIdx = gpuMaterial->textureViews[material.displacementIdx]->GetIndex(); }
+				if (material.hasReflection)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.reflectionIdx)); material.reflectionIdx = gpuMaterial->textureViews[material.reflectionIdx]->GetIndex(); }
 
-				if (material.hasBaseColour)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.baseColourIdx)); }
-				if (material.hasMetalness)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.metalnessIdx)); }
-				if (material.hasRoughness)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.roughnessIdx)); }
-				if (material.hasSpecular)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.specularIdx)); }
-				if (material.hasShininess)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.shininessIdx)); }
-				if (material.hasNormal)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.normalIdx)); }
-				if (material.hasAO)				{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.aoIdx)); }
-				if (material.hasEmissive)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.emissiveIdx)); }
-				if (material.hasOpacity)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.opacityIdx)); }
-				if (material.hasHeight)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.heightIdx)); }
-				if (material.hasDisplacement)	{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.displacementIdx)); }
-				if (material.hasReflection)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.reflectionIdx)); }
+				//Material buffer
+				BufferDesc materialBufferDesc{};
+				materialBufferDesc.size = sizeof(material);
+				materialBufferDesc.type = MEMORY_TYPE::DEVICE;
+				materialBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
+				gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
+				EnqueueBufferDataUpload(&material, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
+
+				//Material buffer view
+				BufferViewDesc materialBufferViewDesc{};
+				materialBufferViewDesc.size = sizeof(material);
+				materialBufferViewDesc.type = BUFFER_VIEW_TYPE::UNIFORM;
+				materialBufferViewDesc.offset = 0;
+				gpuMaterial->materialBufferView = m_device.CreateBufferView(gpuMaterial->materialBuffer.get(), materialBufferViewDesc);
+				gpuMaterial->bufferIndex = gpuMaterial->materialBufferView->GetIndex();
 				
 				break;
 			}
 				
 			}
+			
+
+			gpuModel->materials.push_back(std::move(gpuMaterial));
 		}
+
+		return std::move(gpuModel);
 	}
 
 

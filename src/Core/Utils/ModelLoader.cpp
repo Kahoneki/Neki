@@ -72,14 +72,14 @@ namespace NK
 			load(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION);
 
 			//If NORMAL_CAMERA wasn't available, fall back to NORMAL
-			if (nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)] == nullptr)
+			if (nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)].data == nullptr)
 			{
 				load(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMALS);
 			}
 
 
 			//Determine lighting model
-			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return nekiMaterial.allTextures[std::to_underlying(_tex)] != nullptr; } };
+			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return nekiMaterial.allTextures[std::to_underlying(_tex)].data != nullptr; } };
 			const bool isPBR{	hasTex(MODEL_TEXTURE_TYPE::METALNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::ROUGHNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR)			||
@@ -96,7 +96,7 @@ namespace NK
 			{
 				nekiMaterial.shaderMaterialData = BlinnPhongMaterial{};
 				BlinnPhongMaterial& material{ std::get<BlinnPhongMaterial>(nekiMaterial.shaderMaterialData) };
-
+				
 				//Convenient workaround - see explanation in CPUMaterial declaration (ModelLoader.h)
 				material.diffuseIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::DIFFUSE);
 				material.specularIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::SPECULAR);
@@ -162,7 +162,7 @@ namespace NK
 			}
 			
 
-			model->materials.push_back(nekiMaterial);
+			model->materials[i] = nekiMaterial;
 		}
 		
 		//Add to cache
@@ -247,14 +247,15 @@ namespace NK
 
 
 
-	ImageData* ModelLoader::LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture)
+	ImageData ModelLoader::LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture)
 	{
 		const aiTextureType assimpType{ static_cast<aiTextureType>(_assimpType) };
 		
-		if (_material->GetTextureCount(assimpType) == 0) { return nullptr; }
+		if (_material->GetTextureCount(assimpType) == 0)
+		{
+			return {};
+		}
 
-		ImageData* imageData{};
-		
 		//Load first texture of type (multiple textures of same type for same material is not currently supported by Neki)
 		aiString filename;
 		_material->GetTexture(assimpType, 0, &filename);
@@ -273,8 +274,72 @@ namespace NK
 			default: return false;
 			}
 		};
-		imageData = ImageLoader::LoadImage(filepath, _flipTexture, isColour());
-		
+
+		ImageData imageData{ ImageLoader::LoadImage(filepath, _flipTexture, isColour()) };
+		imageData.desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
 		return imageData;
 	}
+
+
+
+	VertexInputDesc ModelLoader::GetModelVertexInputDescription()
+	{
+		std::vector<VertexAttributeDesc> vertexAttributes;
+		
+		//Position attribute
+		VertexAttributeDesc posAttribute{};
+		posAttribute.attribute = SHADER_ATTRIBUTE::POSITION;
+		posAttribute.binding = 0;
+		posAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		posAttribute.offset = offsetof(ModelVertex, position);
+		vertexAttributes.push_back(posAttribute);
+
+		//Normal attribute
+		VertexAttributeDesc normAttribute{};
+		normAttribute.attribute = SHADER_ATTRIBUTE::NORMAL;
+		normAttribute.binding = 0;
+		normAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		normAttribute.offset = offsetof(ModelVertex, normal);
+		vertexAttributes.push_back(normAttribute);
+
+		//Texcoord attribute
+		VertexAttributeDesc uvAttribute{};
+		uvAttribute.attribute = SHADER_ATTRIBUTE::TEXCOORD_0;
+		uvAttribute.binding = 0;
+		uvAttribute.format = DATA_FORMAT::R32G32_SFLOAT;
+		uvAttribute.offset = offsetof(ModelVertex, texCoord);
+		vertexAttributes.push_back(uvAttribute);
+
+		//Tangent attribute
+		VertexAttributeDesc tanAttribute{};
+		tanAttribute.attribute = SHADER_ATTRIBUTE::TANGENT;
+		tanAttribute.binding = 0;
+		tanAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		tanAttribute.offset = offsetof(ModelVertex, tangent);
+		vertexAttributes.push_back(tanAttribute);
+
+		//Bitangent attribute
+		VertexAttributeDesc bitanAttribute{};
+		bitanAttribute.attribute = SHADER_ATTRIBUTE::BITANGENT;
+		bitanAttribute.binding = 0;
+		bitanAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		bitanAttribute.offset = offsetof(ModelVertex, bitangent);
+		vertexAttributes.push_back(bitanAttribute);
+
+		//Vertex buffer binding
+		std::vector<VertexBufferBindingDesc> bufferBindings;
+		VertexBufferBindingDesc bufferBinding{};
+		bufferBinding.binding = 0;
+		bufferBinding.inputRate = NK::VERTEX_INPUT_RATE::VERTEX;
+		bufferBinding.stride = sizeof(ModelVertex);
+		bufferBindings.push_back(bufferBinding);
+
+		//Vertex input description
+		VertexInputDesc vertexInputDesc{};
+		vertexInputDesc.attributeDescriptions = vertexAttributes;
+		vertexInputDesc.bufferBindingDescriptions = bufferBindings;
+
+		return vertexInputDesc;
+	}
+	
 }
