@@ -78,6 +78,7 @@ namespace NK
 		CameraShaderData camData{};
 		camData.viewMat = GetViewMatrix();
 		camData.projMat = GetProjectionMatrix(_method);
+		camData.pos = glm::vec4(GetPosition(), 0.0);
 		return camData;
 	}
 

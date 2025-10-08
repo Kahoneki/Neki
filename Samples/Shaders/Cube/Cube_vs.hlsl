@@ -37,6 +37,7 @@ VertexOutput VSMain(VertexInput input)
 	float4x4 mvp = mul(camData.projMat, mul(camData.viewMat, PC(modelMat)));
 	output.pos = mul(mvp, float4(input.pos, 1.0));
 	
+	//Pass through unchanged
 	output.colour = input.colour;
 
     return output;

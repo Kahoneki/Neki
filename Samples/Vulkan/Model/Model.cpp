@@ -66,7 +66,7 @@ int main()
 	//Window and Surface
 	NK::WindowDesc windowDesc{};
 	windowDesc.name = "Model Sample";
-	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1280, 720 };
+	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1920, 1080 };
 	windowDesc.size = glm::ivec2(SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y);
 	const NK::UniquePtr<NK::Window> window{ device->CreateWindow(windowDesc) };
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(window.get()) };
@@ -77,10 +77,10 @@ int main()
 	swapchainDesc.numBuffers = 3;
 	swapchainDesc.presentQueue = graphicsQueue.get();
 	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
-	
+
 	//Camera
-	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0,0,-3), 90.0f, 0, 0.01f, 100.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 30.0f, 0.05f) };
-	
+	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0, 0, 3), 0, 0, 0.01f, 100.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 30.0f, 0.05f) };
+
 	//Camera Data Buffer
 	NK::CameraShaderData initialCamShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
 	NK::BufferDesc camDataBufferDesc{};
@@ -98,14 +98,14 @@ int main()
 	camDataBufferViewDesc.type = NK::BUFFER_VIEW_TYPE::UNIFORM;
 	const NK::UniquePtr<NK::IBufferView> camDataBufferView{ device->CreateBufferView(camDataBuffer.get(), camDataBufferViewDesc) };
 	NK::ResourceIndex camDataBufferIndex{ camDataBufferView->GetIndex() };
-	
+
 	//Vertex Shader
 	NK::ShaderDesc vertShaderDesc{};
 	vertShaderDesc.type = NK::SHADER_TYPE::VERTEX;
 	vertShaderDesc.filepath = "Samples/Shaders/Model/Model_vs";
 	const NK::UniquePtr<NK::IShader> vertShader{ device->CreateShader(vertShaderDesc) };
 
-	
+
 	//Fragment Shaders
 	NK::ShaderDesc blinnPhongFragShaderDesc{};
 	blinnPhongFragShaderDesc.type = NK::SHADER_TYPE::FRAGMENT;
@@ -116,21 +116,26 @@ int main()
 	pbrFragShaderDesc.type = NK::SHADER_TYPE::FRAGMENT;
 	pbrFragShaderDesc.filepath = "Samples/Shaders/Model/ModelPBR_fs";
 	const NK::UniquePtr<NK::IShader> pbrFragShader{ device->CreateShader(pbrFragShaderDesc) };
-	
+
 
 	//Root Signature
 	NK::RootSignatureDesc rootSigDesc{};
 	rootSigDesc.num32BitPushConstantValues = 16 + 1 + 1 + 1; //model matrix + cam data buffer index + material buffer index + sampler index
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 
-	
+
 	//Model
 	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf", false, true) };
 	const NK::UniquePtr<NK::GPUModel> model{ gpuUploader->EnqueueModelDataUpload(modelData) };
-	
+
 	//Flush gpu uploader uploads
 	gpuUploader->Flush(true);
 	gpuUploader->Reset();
+
+	//Model model matrix (like... the... model matrix of the... model)
+	glm::mat4 modelModelMatrix{ glm::mat4(1.0f) };
+	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(30.0f), glm::vec3(0, -1, 0));
+	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(70.0f), glm::vec3(1, 0, 0));
 
 	//Sampler
 	NK::SamplerDesc samplerDesc{};
@@ -138,7 +143,7 @@ int main()
 	samplerDesc.magFilter = NK::FILTER_MODE::LINEAR;
 	const NK::UniquePtr<NK::ISampler> sampler{ device->CreateSampler(samplerDesc) };
 	NK::SamplerIndex samplerIndex{ sampler->GetIndex() };
-	
+
 
 	//Graphics Pipeline
 
@@ -212,7 +217,7 @@ int main()
 
 	//Graphics Command Buffers
 	std::vector<NK::UniquePtr<NK::ICommandBuffer>> commandBuffers(MAX_FRAMES_IN_FLIGHT);
-	for (std::size_t i{ 0 }; i<MAX_FRAMES_IN_FLIGHT; ++i)
+	for (std::size_t i{ 0 }; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
 		commandBuffers[i] = graphicsCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc);
 	}
@@ -223,7 +228,7 @@ int main()
 	{
 		imageAvailableSemaphores[i] = device->CreateSemaphore();
 	}
-	
+
 	std::vector<NK::UniquePtr<NK::ISemaphore>> renderFinishedSemaphores(swapchain->GetNumImages());
 	for (std::size_t i{ 0 }; i < swapchain->GetNumImages(); ++i)
 	{
@@ -239,10 +244,10 @@ int main()
 	{
 		inFlightFences[i] = device->CreateFence(inFlightFenceDesc);
 	}
-	
+
 	//Tracks the current frame in range [0, MAX_FRAMES_IN_FLIGHT-1]
 	std::uint32_t currentFrame{ 0 };
-	
+
 	while (!window->ShouldClose())
 	{
 		//Update managers
@@ -256,18 +261,18 @@ int main()
 		NK::CameraShaderData camShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
 		memcpy(camDataBufferMap, &camShaderData, sizeof(camShaderData));
 
-		
+
 		//Begin rendering
 		inFlightFences[currentFrame]->Wait();
 		inFlightFences[currentFrame]->Reset();
-		
+
 		commandBuffers[currentFrame]->Begin();
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphores[currentFrame].get(), nullptr) };
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
 		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), depthBufferView.get(), nullptr);
 		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
-		
+
 		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y });
 		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y });
 
@@ -281,22 +286,24 @@ int main()
 			NK::SamplerIndex samplerIndex;
 		};
 		std::size_t vertexBufferStride{ sizeof(NK::ModelVertex) };
-		
-		for (std::size_t i{ 0 }; i<model->meshes.size(); ++i)
+
+		for (std::size_t i{ 0 }; i < model->meshes.size(); ++i)
 		{
 			NK::IPipeline* pipeline{ model->materials[0]->lightingModel == NK::LIGHTING_MODEL::BLINN_PHONG ? blinnPhongPipeline.get() : pbrPipeline.get() };
 			commandBuffers[currentFrame]->BindPipeline(pipeline, NK::PIPELINE_BIND_POINT::GRAPHICS);
-	
+
 			commandBuffers[currentFrame]->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &vertexBufferStride);
 			commandBuffers[currentFrame]->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
 
 			PushConstantData pushConstantData{};
-			pushConstantData.modelMat = glm::mat4(1.0f);
+			float speed{ 50.0f };
+			modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())), glm::vec3(0, 0, 1));
+			pushConstantData.modelMat = modelModelMatrix;
 			pushConstantData.camDataBufferIndex = camDataBufferIndex;
 			pushConstantData.materialBufferIndex = model->materials[model->meshes[i]->materialIndex]->bufferIndex;
 			pushConstantData.samplerIndex = samplerIndex;
 			commandBuffers[currentFrame]->PushConstants(rootSig.get(), &pushConstantData);
-			
+
 			commandBuffers[currentFrame]->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
 		}
 
