@@ -11,8 +11,6 @@ namespace NK
 		const double currentTime{ glfwGetTime() };
 		dt = currentTime - lastTime;
 		lastTime = currentTime;
-
-		std::cout << 1 / dt << '\n';
 	}
 	
 }

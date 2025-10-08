@@ -335,8 +335,6 @@ int main()
 	
 	while (!window->ShouldClose())
 	{
-		std::cout << currentFrame << ": ";
-
 		//Update managers
 		glfwPollEvents();
 		NK::TimeManager::Update();
