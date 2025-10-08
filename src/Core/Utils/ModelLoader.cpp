@@ -5,6 +5,8 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+#include "ImageLoader.h"
+
 namespace NK
 {
 
@@ -47,9 +49,9 @@ namespace NK
 			aiMaterial* assimpMaterial{ scene->mMaterials[i] };
 			CPUMaterial nekiMaterial{};
 
-			auto load{ [&](const MODEL_TEXTURE_TYPE dst, const aiTextureType src)
+			auto load{ [&](const MODEL_TEXTURE_TYPE _dst, const aiTextureType _src)
 			{
-				nekiMaterial.allTextures[std::to_underlying(dst)] = LoadMaterialTextures(assimpMaterial, static_cast<aiTextureTypeOverload>(src), dst, modelDirectory, _flipTextures);
+				nekiMaterial.allTextures[std::to_underlying(_dst)] = LoadMaterialTexture(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory, _flipTextures);
 			}};
 			
 			load(MODEL_TEXTURE_TYPE::DIFFUSE          , aiTextureType_DIFFUSE);
@@ -63,29 +65,102 @@ namespace NK
 			load(MODEL_TEXTURE_TYPE::DISPLACEMENT     , aiTextureType_DISPLACEMENT);
 			load(MODEL_TEXTURE_TYPE::LIGHTMAP         , aiTextureType_LIGHTMAP);
 			load(MODEL_TEXTURE_TYPE::REFLECTION       , aiTextureType_REFLECTION);
-			load(MODEL_TEXTURE_TYPE::BASE_COLOR       , aiTextureType_BASE_COLOR);
+			load(MODEL_TEXTURE_TYPE::BASE_COLOUR       , aiTextureType_BASE_COLOR);
 			load(MODEL_TEXTURE_TYPE::METALNESS        , aiTextureType_METALNESS);
 			load(MODEL_TEXTURE_TYPE::ROUGHNESS        , aiTextureType_DIFFUSE_ROUGHNESS);
-			load(MODEL_TEXTURE_TYPE::EMISSION_COLOR   , aiTextureType_EMISSION_COLOR);
+			load(MODEL_TEXTURE_TYPE::EMISSION_COLOUR   , aiTextureType_EMISSION_COLOR);
 			load(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION);
 
 			//If NORMAL_CAMERA wasn't available, fall back to NORMAL
-			if (nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)].textures.empty())
+			if (nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)] == nullptr)
 			{
 				load(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMALS);
 			}
 
-			//If BASE_COLOUR wasn't available, fall back to DIFFUSE
-			if (nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::BASE_COLOR)].textures.empty())
+
+			//Determine lighting model
+			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return nekiMaterial.allTextures[std::to_underlying(_tex)] != nullptr; } };
+			const bool isPBR{	hasTex(MODEL_TEXTURE_TYPE::METALNESS)			||
+								hasTex(MODEL_TEXTURE_TYPE::ROUGHNESS)			||
+								hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR)			||
+								hasTex(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION)	||
+								hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) };
+
+			nekiMaterial.lightingModel = isPBR ? LIGHTING_MODEL::PHYSICALLY_BASED : LIGHTING_MODEL::BLINN_PHONG;
+
+
+			//Populate shader material data
+			switch (nekiMaterial.lightingModel)
 			{
-				load(MODEL_TEXTURE_TYPE::BASE_COLOR, aiTextureType_DIFFUSE);
+			case LIGHTING_MODEL::BLINN_PHONG:
+			{
+				nekiMaterial.shaderMaterialData = BlinnPhongMaterial{};
+				BlinnPhongMaterial& material{ std::get<BlinnPhongMaterial>(nekiMaterial.shaderMaterialData) };
+
+				//Convenient workaround - see explanation in CPUMaterial declaration (ModelLoader.h)
+				material.diffuseIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::DIFFUSE);
+				material.specularIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::SPECULAR);
+				material.ambientIdx			= hasTex(MODEL_TEXTURE_TYPE::AMBIENT) ? static_cast<int>(MODEL_TEXTURE_TYPE::AMBIENT) : hasTex(MODEL_TEXTURE_TYPE::LIGHTMAP) ? static_cast<int>(MODEL_TEXTURE_TYPE::LIGHTMAP) : static_cast<int>(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION);
+				material.emissiveIdx		= hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) ? static_cast<int>(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) : static_cast<int>(MODEL_TEXTURE_TYPE::EMISSIVE);
+				material.normalIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::NORMAL);
+				material.shininessIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::SHININESS);
+				material.opacityIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::OPACITY);
+				material.heightIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::HEIGHT);
+				material.displacementIdx	= static_cast<int>(MODEL_TEXTURE_TYPE::DISPLACEMENT);
+				material.lightmapIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::LIGHTMAP);
+				material.reflectionIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::REFLECTION);
+				
+				material.hasDiffuse			= hasTex(MODEL_TEXTURE_TYPE::DIFFUSE) ? 1 : 0;
+				material.hasSpecular		= hasTex(MODEL_TEXTURE_TYPE::SPECULAR) ? 1 : 0;
+				material.hasAmbient			= hasTex(MODEL_TEXTURE_TYPE::AMBIENT) || hasTex(MODEL_TEXTURE_TYPE::LIGHTMAP) || hasTex(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION) ? 1 : 0;
+				material.hasEmissive		= hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) || hasTex(MODEL_TEXTURE_TYPE::EMISSIVE) ? 1 : 0;
+				material.hasNormal			= hasTex(MODEL_TEXTURE_TYPE::NORMAL) ? 1 : 0;
+				material.hasShininess		= hasTex(MODEL_TEXTURE_TYPE::SHININESS) ? 1 : 0;
+				material.hasOpacity			= hasTex(MODEL_TEXTURE_TYPE::OPACITY) ? 1 : 0;
+				material.hasHeight			= hasTex(MODEL_TEXTURE_TYPE::HEIGHT) ? 1 : 0;
+				material.hasDisplacement	= hasTex(MODEL_TEXTURE_TYPE::DISPLACEMENT) ? 1 : 0;
+				material.hasLightmap		= hasTex(MODEL_TEXTURE_TYPE::LIGHTMAP) ? 1 : 0;
+				material.hasReflection		= hasTex(MODEL_TEXTURE_TYPE::REFLECTION) ? 1 : 0;
+				
+				break;
 			}
 
-			//If ROUGHNESS wasn't available, fall back to SHININESS
-			if (nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::SHININESS)].textures.empty())
+			case LIGHTING_MODEL::PHYSICALLY_BASED:
 			{
-				load(MODEL_TEXTURE_TYPE::ROUGHNESS, aiTextureType_SHININESS);
+				nekiMaterial.shaderMaterialData = PBRMaterial{};
+				PBRMaterial& material{ std::get<PBRMaterial>(nekiMaterial.shaderMaterialData) };
+
+				//Convenient workaround - see explanation in CPUMaterial declaration (ModelLoader.h)
+				material.baseColourIdx		= hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR) ? static_cast<int>(MODEL_TEXTURE_TYPE::BASE_COLOUR) : static_cast<int>(MODEL_TEXTURE_TYPE::DIFFUSE);
+				material.metalnessIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::METALNESS);
+				material.roughnessIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::ROUGHNESS);
+				material.specularIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::SPECULAR);
+				material.shininessIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::SHININESS);
+				material.normalIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::NORMAL);
+				material.aoIdx				= hasTex(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION) ? static_cast<int>(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION) : hasTex(MODEL_TEXTURE_TYPE::LIGHTMAP) ? static_cast<int>(MODEL_TEXTURE_TYPE::LIGHTMAP) : static_cast<int>(MODEL_TEXTURE_TYPE::AMBIENT);
+				material.emissiveIdx		= hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) ? static_cast<int>(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) : static_cast<int>(MODEL_TEXTURE_TYPE::EMISSIVE);
+				material.opacityIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::OPACITY);
+				material.heightIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::HEIGHT);
+				material.displacementIdx	= static_cast<int>(MODEL_TEXTURE_TYPE::DISPLACEMENT);
+				material.reflectionIdx		= static_cast<int>(MODEL_TEXTURE_TYPE::REFLECTION);
+				
+				material.hasBaseColour		= hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR) || hasTex(MODEL_TEXTURE_TYPE::DIFFUSE) ? 1 : 0;
+				material.hasMetalness		= hasTex(MODEL_TEXTURE_TYPE::METALNESS) ? 1 : 0;
+				material.hasRoughness		= hasTex(MODEL_TEXTURE_TYPE::ROUGHNESS) ? 1 : 0;
+				material.hasSpecular		= hasTex(MODEL_TEXTURE_TYPE::SPECULAR) ? 1 : 0;
+				material.hasShininess		= hasTex(MODEL_TEXTURE_TYPE::SHININESS) ? 1 : 0;
+				material.hasNormal			= hasTex(MODEL_TEXTURE_TYPE::NORMAL) ? 1 : 0;
+				material.hasAO				= hasTex(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION) || hasTex(MODEL_TEXTURE_TYPE::LIGHTMAP) || hasTex(MODEL_TEXTURE_TYPE::AMBIENT) ? 1 : 0;
+				material.hasEmissive		= hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR)	|| hasTex(MODEL_TEXTURE_TYPE::EMISSIVE) ? 1 : 0;
+				material.hasOpacity			= hasTex(MODEL_TEXTURE_TYPE::OPACITY) ? 1 : 0;
+				material.hasHeight			= hasTex(MODEL_TEXTURE_TYPE::HEIGHT) ? 1 : 0;
+				material.hasDisplacement	= hasTex(MODEL_TEXTURE_TYPE::DISPLACEMENT) ? 1 : 0;
+				material.hasReflection		= hasTex(MODEL_TEXTURE_TYPE::REFLECTION) ? 1 : 0;
+				
+				break;
 			}
+			}
+			
 
 			model->materials.push_back(nekiMaterial);
 		}
@@ -172,39 +247,34 @@ namespace NK
 
 
 
-	TexturesOfType ModelLoader::LoadMaterialTextures(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTextures)
+	ImageData* ModelLoader::LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture)
 	{
 		const aiTextureType assimpType{ static_cast<aiTextureType>(_assimpType) };
 		
-		//Loop through all textures of type _assimpType for _material and load image data
-		TexturesOfType textureInfo{};
-		textureInfo.type = _nekiType;
-		textureInfo.textures.resize(_material->GetTextureCount(assimpType));
-		for (std::size_t i{ 0 }; i < textureInfo.textures.size(); ++i)
+		if (_material->GetTextureCount(assimpType) == 0) { return nullptr; }
+
+		ImageData* imageData{};
+		
+		//Load first texture of type (multiple textures of same type for same material is not currently supported by Neki)
+		aiString filename;
+		_material->GetTexture(assimpType, 0, &filename);
+		const std::string filepath{ _directory + "/" + filename.C_Str() };
+		auto isColour = [&]()
 		{
-			//Get file name of texture
-			aiString filename;
-			_material->GetTexture(assimpType, i, &filename);
-
-			//Load image
-			const std::string filepath{ _directory + "/" + filename.C_Str() };
-			auto isColour = [&]()
-			{
-				switch (_nekiType) {
-				case MODEL_TEXTURE_TYPE::DIFFUSE:
-				case MODEL_TEXTURE_TYPE::SPECULAR:
-				case MODEL_TEXTURE_TYPE::AMBIENT:
-				case MODEL_TEXTURE_TYPE::EMISSIVE:
-				case MODEL_TEXTURE_TYPE::EMISSION_COLOR:
-				case MODEL_TEXTURE_TYPE::BASE_COLOR:
-				case MODEL_TEXTURE_TYPE::REFLECTION:
-					return true;
-				default: return false;
-				}
-			};
-			textureInfo.textures[i] = ImageLoader::LoadImage(filepath, _flipTextures, isColour());
-		}
-		return textureInfo;
+			switch (_nekiType) {
+			case MODEL_TEXTURE_TYPE::DIFFUSE:
+			case MODEL_TEXTURE_TYPE::SPECULAR:
+			case MODEL_TEXTURE_TYPE::AMBIENT:
+			case MODEL_TEXTURE_TYPE::EMISSIVE:
+			case MODEL_TEXTURE_TYPE::EMISSION_COLOUR:
+			case MODEL_TEXTURE_TYPE::BASE_COLOUR:
+			case MODEL_TEXTURE_TYPE::REFLECTION:
+				return true;
+			default: return false;
+			}
+		};
+		imageData = ImageLoader::LoadImage(filepath, _flipTexture, isColour());
+		
+		return imageData;
 	}
-
 }

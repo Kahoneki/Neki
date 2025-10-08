@@ -2,7 +2,10 @@
 #include <cstddef>
 #include <vector>
 
+#include <RHI/ITextureView.h>
+
 #include "Core/Memory/Allocation.h"
+#include "Core/Utils/ModelLoader.h"
 #include "Types/ResourceStates.h"
 
 namespace NK
@@ -15,6 +18,7 @@ namespace NK
 	class IQueue;
 	class ITexture;
 	class IFence;
+	typedef std::uint32_t RESOURCE_INDEX; //Todo: this is a duplicate definition
 	
 	struct BufferSubregion
 	{
@@ -31,6 +35,31 @@ namespace NK
 		//When flushing, either set the _waitIdle parameter to true or use the returned fence to know when the GPUUploader is done using the queue
 		//Note: there is no logical impact (beyond performance) in submitting commands to the transfer queue while the GPUUploader is using it
 		IQueue* transferQueue;
+	};
+
+	
+	struct GPUMesh
+	{
+		UniquePtr<IBuffer> vertexBuffer;
+		UniquePtr<IBuffer> indexBuffer;
+		std::uint32_t indexCount;
+		std::size_t materialIndex; //Index into parent GPUModel's materials vector
+	};
+
+	struct GPUMaterial
+	{
+		LIGHTING_MODEL lightingModel;
+		RESOURCE_INDEX bufferIndex;
+
+		//This material will hence be valid for as long as its in scope
+		std::vector<UniquePtr<ITexture>> textures;
+		std::vector<UniquePtr<ITextureView>> textureViews;
+	};
+	
+	struct GPUModel
+	{
+		std::vector<GPUMesh> meshes;
+		std::vector<GPUMaterial> materials;
 	};
 	
 	
@@ -49,6 +78,9 @@ namespace NK
 		//Regardless of the initial state, the state after the texture data has been uploaded will be RESOURCE_STATE::COPY_DEST
 		//The number of bytes in _data is expected to exactly match the size of the destination texture
 		void EnqueueTextureDataUpload(const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState);
+
+		//_cpuModel should be populated from ModelLoader::LoadModel(), _gpuModel should be empty
+		void EnqueueModelDataUpload(const CPUModel* _cpuModel, GPUModel* _gpuModel);
 
 		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and the returned fence will already be signalled
 		//

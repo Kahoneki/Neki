@@ -1,12 +1,16 @@
 #include "GPUUploader.h"
 
 #include <cstring>
+#include <ranges>
 #include <stdexcept>
+#include <Core/Utils/ImageLoader.h>
+#include <Core/Utils/RHIUtils.h>
 #include <RHI/IBuffer.h>
 #include <RHI/ICommandBuffer.h>
 #include <RHI/IQueue.h>
 #include <RHI/ITexture.h>
-#include <Core/Utils/RHIUtils.h>
+#include <RHI/ITextureView.h>
+
 
 namespace NK
 {
@@ -149,6 +153,105 @@ namespace NK
 		}
 
 		m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset, { 0, 0, 0 }, _dstTexture->GetSize());
+	}
+
+
+
+	void GPUUploader::EnqueueModelDataUpload(const CPUModel* _cpuModel, GPUModel* _gpuModel)
+	{
+		//Load the mesh data
+		for (const CPUMesh& cpuMesh : _cpuModel->meshes)
+		{
+			GPUMesh gpuMesh;
+			
+			//Vertex buffer
+			BufferDesc vertexBufferDesc{};
+			vertexBufferDesc.size = sizeof(ModelVertex) * cpuMesh.vertices.size();
+			vertexBufferDesc.type = MEMORY_TYPE::DEVICE;
+			vertexBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
+			gpuMesh.vertexBuffer = m_device.CreateBuffer(vertexBufferDesc);
+			EnqueueBufferDataUpload(cpuMesh.vertices.data(), gpuMesh.vertexBuffer.get(), RESOURCE_STATE::UNDEFINED);
+
+			//Index buffer
+			BufferDesc indexBufferDesc{};
+			indexBufferDesc.size = sizeof(std::uint32_t) * cpuMesh.indices.size();
+			indexBufferDesc.type = MEMORY_TYPE::DEVICE;
+			indexBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT;
+			gpuMesh.indexBuffer = m_device.CreateBuffer(indexBufferDesc);
+			EnqueueBufferDataUpload(cpuMesh.indices.data(), gpuMesh.indexBuffer.get(), RESOURCE_STATE::UNDEFINED);
+
+			//Material index
+			gpuMesh.materialIndex = cpuMesh.materialIndex;
+
+			_gpuModel->meshes.push_back(std::move(gpuMesh));
+		}
+
+		//Load the material data
+		for (const CPUMaterial& cpuMaterial : _cpuModel->materials)
+		{
+			GPUMaterial gpuMaterial{};
+			gpuMaterial.lightingModel = cpuMaterial.lightingModel;
+			gpuMaterial.textures.resize(std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES));
+			gpuMaterial.textureViews.resize(std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES));
+
+			auto createTexture{ [&](const MODEL_TEXTURE_TYPE _textureType)
+			{
+				const std::size_t index{ std::to_underlying(_textureType) };
+				gpuMaterial.textures[index] = m_device.CreateTexture(cpuMaterial.allTextures[index]->desc);
+				EnqueueTextureDataUpload(cpuMaterial.allTextures[index]->data, gpuMaterial.textures[index].get(), RESOURCE_STATE::UNDEFINED);
+
+				TextureViewDesc viewDesc{};
+				viewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+				viewDesc.dimension = TEXTURE_DIMENSION::DIM_2;
+				viewDesc.format = gpuMaterial.textures[index]->GetFormat();
+				gpuMaterial.textureViews[index] = m_device.CreateShaderResourceTextureView(gpuMaterial.textures[index].get(), viewDesc);
+				gpuMaterial.bufferIndex = gpuMaterial.textureViews[index]->GetIndex();
+			} };
+			
+			switch (gpuMaterial.lightingModel)
+			{
+				
+			case LIGHTING_MODEL::BLINN_PHONG:
+			{
+				BlinnPhongMaterial material{ std::get<BlinnPhongMaterial>(cpuMaterial.shaderMaterialData) };
+				
+				if (material.hasDiffuse)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.diffuseIdx)); }
+				if (material.hasSpecular)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.specularIdx)); }
+				if (material.hasAmbient)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.ambientIdx)); }
+				if (material.hasEmissive)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.emissiveIdx)); }
+				if (material.hasNormal)				{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.normalIdx)); }
+				if (material.hasShininess)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.shininessIdx)); }
+				if (material.hasOpacity)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.opacityIdx)); }
+				if (material.hasHeight)				{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.heightIdx)); }
+				if (material.hasDisplacement)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.displacementIdx)); }
+				if (material.hasLightmap)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.lightmapIdx)); }
+				if (material.hasReflection)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.reflectionIdx)); }
+
+				break;
+			}
+			
+			case LIGHTING_MODEL::PHYSICALLY_BASED:
+			{
+				PBRMaterial material{ std::get<PBRMaterial>(cpuMaterial.shaderMaterialData) };
+
+				if (material.hasBaseColour)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.baseColourIdx)); }
+				if (material.hasMetalness)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.metalnessIdx)); }
+				if (material.hasRoughness)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.roughnessIdx)); }
+				if (material.hasSpecular)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.specularIdx)); }
+				if (material.hasShininess)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.shininessIdx)); }
+				if (material.hasNormal)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.normalIdx)); }
+				if (material.hasAO)				{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.aoIdx)); }
+				if (material.hasEmissive)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.emissiveIdx)); }
+				if (material.hasOpacity)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.opacityIdx)); }
+				if (material.hasHeight)			{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.heightIdx)); }
+				if (material.hasDisplacement)	{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.displacementIdx)); }
+				if (material.hasReflection)		{ createTexture(static_cast<MODEL_TEXTURE_TYPE>(material.reflectionIdx)); }
+				
+				break;
+			}
+				
+			}
+		}
 	}
 
 

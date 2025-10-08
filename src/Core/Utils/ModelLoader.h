@@ -1,6 +1,14 @@
 #pragma once
-#include "ImageLoader.h"
 #include <array>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <variant>
+#include <vector>
+#include <Core/Memory/Allocation.h>
+#include <glm/glm.hpp>
+
+#include "Types/Materials.h"
 
 //Forward declaration for Assimp types to avoid including Assimp headers in public Neki library
 struct aiNode;
@@ -10,6 +18,8 @@ struct aiMaterial;
 
 namespace NK
 {
+
+	struct ImageData;
 	
 	enum class MODEL_TEXTURE_TYPE : std::size_t
 	{
@@ -30,10 +40,10 @@ namespace NK
 		DISPLACEMENT		= 8,	//S						//S								//S
 		LIGHTMAP			= 9,	//S						//Y (AO)						//Y (AO)
 		REFLECTION			= 10,	//S (static env-map)	//S (optional env-map)			//S (optional env-map)
-		BASE_COLOR			= 11,	//N						//S (preferred over DIFFUSE)	//Y
+		BASE_COLOUR			= 11,	//N						//S (preferred over DIFFUSE)	//Y
 		METALNESS			= 12,	//N						//N								//Y
 		ROUGHNESS			= 13,	//N						//N								//Y
-		EMISSION_COLOR		= 14,	//Y						//Y								//Y
+		EMISSION_COLOUR		= 14,	//Y						//Y								//Y
 		AMBIENT_OCCLUSION	= 15,	//S						//Y								//Y
 
 		NUM_MODEL_TEXTURE_TYPES = 16,
@@ -59,19 +69,24 @@ namespace NK
 	enum class LIGHTING_MODEL
 	{
 		BLINN_PHONG,
-		PBR_SPEC_GLOSS,
-		PBR_METAL_ROUGH,
-	};
-	
-	struct TexturesOfType
-	{
-		MODEL_TEXTURE_TYPE type;
-		std::vector<ImageData*> textures; //Textures of this type
+		PHYSICALLY_BASED,
 	};
 	
 	struct CPUMaterial
 	{
-		std::array<TexturesOfType, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //Every texture for every texture type for this material
+		LIGHTING_MODEL lightingModel;
+		std::array<ImageData*, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //Every texture for every texture type for this material (limited to 1 texture per texture type per material)
+
+		//There's a bit of translation going on here to communicate to the GPUUploader
+		//The bool flags in the material type will be populated by ModelLoader with the actual correct values that will end up going to the GPU
+		//The index members in the material type will be populated with MODEL_TEXTURE_TYPE values, representing the texture type the GPUUploader class should populate the texture slot with
+		//
+		//This is a convenient workaround for the fact that there isn't a 1-to-1 mapping between the MODEL_TEXTURE_TYPE enum and the texture types represented in the material types
+		//For example, BlinnPhongMaterial has `hasEmissive` and `emissiveIdx` members, but if the material provides both an EMISSIVE and EMISSION_COLOUR type, which one should these fields refer to?
+		//In the specific case above, it will favour EMISSION_COLOUR - this decision will be specific to each texture type that has this problem
+		//This choice is decided by the ModelLoader which then passes on this information the GPUUploader by populating the emissiveIdx field with MODEL_TEXTURE_TYPE::EMISSIVE or EMISSION_COLOUR so the GPU knows which texture to pull.
+		//The GPUUploader, will update these values with the indices it allocates when creating the GPUMaterial
+		std::variant<BlinnPhongMaterial, PBRMaterial> shaderMaterialData;
 	};
 	
 	struct CPUModel
@@ -98,7 +113,7 @@ namespace NK
 		//Translate an Assimp mesh to an NK::Mesh
 		static CPUMesh ProcessMesh(aiMesh* _mesh, const aiScene* _scene, const std::string& _directory);
 
-		static TexturesOfType LoadMaterialTextures(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTextures);
+		static ImageData* LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture);
 		
 		
 		//To avoid unnecessary duplicate loads
