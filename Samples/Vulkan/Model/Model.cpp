@@ -127,7 +127,7 @@ int main()
 
 	
 	//Model
-	NK::CPUModel* modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf", false, true) };
+	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf", false, true) };
 	const NK::UniquePtr<NK::GPUModel> model{ gpuUploader->EnqueueModelDataUpload(modelData) };
 	
 	//Flush gpu uploader uploads

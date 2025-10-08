@@ -75,7 +75,7 @@ namespace NK
 	struct CPUMaterial
 	{
 		LIGHTING_MODEL lightingModel;
-		std::array<ImageData, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //Every texture for every texture type for this material (limited to 1 texture per texture type per material)
+		std::array<ImageData*, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //Every texture for every texture type for this material (limited to 1 texture per texture type per material)
 
 		//There's a bit of translation going on here to communicate to the GPUUploader
 		//The bool flags in the material type will be populated by ModelLoader with the actual correct values that will end up going to the GPU
@@ -103,7 +103,7 @@ namespace NK
 	class ModelLoader final
 	{
 	public:
-		[[nodiscard]] static CPUModel* LoadModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures);
+		[[nodiscard]] static const CPUModel* const LoadModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures);
 
 		[[nodiscard]] static VertexInputDesc GetModelVertexInputDescription();
 
@@ -115,11 +115,11 @@ namespace NK
 		//Translate an Assimp mesh to an NK::Mesh
 		static CPUMesh ProcessMesh(aiMesh* _mesh, const aiScene* _scene, const std::string& _directory);
 
-		static ImageData LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture);
+		static ImageData* LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture);
 		
 		
 		//To avoid unnecessary duplicate loads
-		static std::unordered_map<std::string, UniquePtr<CPUModel>> m_filepathToModelDataCache;
+		static std::unordered_map<std::string, CPUModel> m_filepathToModelDataCache;
 	};
 	
 }

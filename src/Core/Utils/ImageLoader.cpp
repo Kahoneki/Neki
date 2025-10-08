@@ -12,13 +12,13 @@ namespace NK
 
 
 
-	ImageData ImageLoader::LoadImage(const std::string& _filepath, bool _flipImage, bool _srgb)
+	ImageData* const ImageLoader::LoadImage(const std::string& _filepath, bool _flipImage, bool _srgb)
 	{
 		const std::unordered_map<std::string, ImageData>::iterator it{ m_filepathToImageDataCache.find(_filepath) };
 		if (it != m_filepathToImageDataCache.end())
 		{
 			//Image has already been loaded, pull from cache
-			return it->second;
+			return &(it->second);
 		}
 
 		//Load image data
@@ -37,26 +37,26 @@ namespace NK
 		//Add to cache
 		m_filepathToImageDataCache[_filepath] = imageData;
 		
-		return m_filepathToImageDataCache[_filepath];
+		return &(m_filepathToImageDataCache[_filepath]);
 	}
 
 
 
-	void ImageLoader::FreeImage(ImageData& _imageData)
+	void ImageLoader::FreeImage(ImageData* _imageData)
 	{
-		if (!_imageData.data) { throw std::runtime_error("ImageLoader::FreeImage() - Attempted to free uninitialised / already freed image."); }
+		if (!_imageData || !_imageData->data) { throw std::runtime_error("ImageLoader::FreeImage() - Attempted to free uninitialised / already freed image."); }
 
 		//Remove from cache
 		for (std::unordered_map<std::string, ImageData>::iterator it{ m_filepathToImageDataCache.begin() }; it != m_filepathToImageDataCache.end(); ++it)
 		{
-			if (it->second.data == _imageData.data)
+			if (&(it->second) == _imageData)
 			{
 				m_filepathToImageDataCache.erase(it->first);
 				break;
 			}
 		}
 
-		stbi_image_free(_imageData.data);
+		stbi_image_free(_imageData->data);
 	}
 
 }

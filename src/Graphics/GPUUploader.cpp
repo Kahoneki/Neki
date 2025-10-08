@@ -202,8 +202,8 @@ namespace NK
 			auto createTexture{ [&](const MODEL_TEXTURE_TYPE _textureType)
 			{
 				const std::size_t index{ std::to_underlying(_textureType) };
-				gpuMaterial->textures[index] = m_device.CreateTexture(cpuMaterial.allTextures[index].desc);
-				EnqueueTextureDataUpload(cpuMaterial.allTextures[index].data, gpuMaterial->textures[index].get(), RESOURCE_STATE::UNDEFINED);
+				gpuMaterial->textures[index] = m_device.CreateTexture(cpuMaterial.allTextures[index]->desc);
+				EnqueueTextureDataUpload(cpuMaterial.allTextures[index]->data, gpuMaterial->textures[index].get(), RESOURCE_STATE::UNDEFINED);
 
 				TextureViewDesc viewDesc{};
 				viewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;

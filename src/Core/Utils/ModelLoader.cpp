@@ -10,17 +10,17 @@
 namespace NK
 {
 
-	std::unordered_map<std::string, UniquePtr<CPUModel>> ModelLoader::m_filepathToModelDataCache;
+	std::unordered_map<std::string, CPUModel> ModelLoader::m_filepathToModelDataCache;
 
 
 
-	CPUModel* ModelLoader::LoadModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures)
+	const CPUModel* const ModelLoader::LoadModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures)
 	{
-		const std::unordered_map<std::string, UniquePtr<CPUModel>>::iterator it{ m_filepathToModelDataCache.find(_filepath) };
+		const std::unordered_map<std::string, CPUModel>::iterator it{ m_filepathToModelDataCache.find(_filepath) };
 		if (it != m_filepathToModelDataCache.end())
 		{
 			//Model has already been loaded, pull from cache
-			return it->second.get();
+			return &(it->second);
 		}
 		
 		Assimp::Importer importer{};
@@ -38,12 +38,12 @@ namespace NK
 			throw std::runtime_error("ModelLoader::LoadModel() - Failed to load model (" + _filepath + ") - " + std::string(importer.GetErrorString()));
 		}
 
-		UniquePtr<CPUModel> model{ NK_NEW(CPUModel) };
+		CPUModel model{};
 		std::string modelDirectory{ _filepath.substr(0, _filepath.find_last_of('/')) };
-		ProcessNode(scene->mRootNode, scene, *model, modelDirectory);
+		ProcessNode(scene->mRootNode, scene, model, modelDirectory);
 
 		//Load scene materials
-		model->materials.resize(scene->mNumMaterials);
+		model.materials.resize(scene->mNumMaterials);
 		for (std::size_t i{ 0 }; i < scene->mNumMaterials; ++i)
 		{
 			aiMaterial* assimpMaterial{ scene->mMaterials[i] };
@@ -72,14 +72,14 @@ namespace NK
 			load(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION);
 
 			//If NORMAL_CAMERA wasn't available, fall back to NORMAL
-			if (nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)].data == nullptr)
+			if (nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)] == nullptr)
 			{
 				load(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMALS);
 			}
 
 
 			//Determine lighting model
-			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return nekiMaterial.allTextures[std::to_underlying(_tex)].data != nullptr; } };
+			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return nekiMaterial.allTextures[std::to_underlying(_tex)] != nullptr; } };
 			const bool isPBR{	hasTex(MODEL_TEXTURE_TYPE::METALNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::ROUGHNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR)			||
@@ -162,13 +162,13 @@ namespace NK
 			}
 			
 
-			model->materials[i] = nekiMaterial;
+			model.materials[i] = nekiMaterial;
 		}
 		
 		//Add to cache
-		m_filepathToModelDataCache[_filepath] = std::move(model);
+		m_filepathToModelDataCache[_filepath] = model;
 		
-		return m_filepathToModelDataCache[_filepath].get();
+		return &(m_filepathToModelDataCache[_filepath]);
 	}
 
 
@@ -247,7 +247,7 @@ namespace NK
 
 
 
-	ImageData ModelLoader::LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture)
+	ImageData* ModelLoader::LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture)
 	{
 		const aiTextureType assimpType{ static_cast<aiTextureType>(_assimpType) };
 		
@@ -275,8 +275,8 @@ namespace NK
 			}
 		};
 
-		ImageData imageData{ ImageLoader::LoadImage(filepath, _flipTexture, isColour()) };
-		imageData.desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
+		ImageData* const imageData{ ImageLoader::LoadImage(filepath, _flipTexture, isColour()) };
+		imageData->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
 		return imageData;
 	}
 
