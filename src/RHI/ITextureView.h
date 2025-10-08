@@ -1,8 +1,11 @@
 #pragma once
 #include "ITexture.h"
+#include <Core/Memory/FreeListAllocator.h>
 
 namespace NK
 {
+	typedef std::uint32_t ResourceIndex; //todo: redefinition
+	
 	enum class TEXTURE_VIEW_TYPE
 	{
 		RENDER_TARGET,

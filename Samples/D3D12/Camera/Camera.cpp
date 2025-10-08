@@ -23,7 +23,6 @@
 #ifdef ERROR
 	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
 #endif
-#include <iostream>
 
 
 
@@ -345,8 +344,6 @@ int main()
 	
 	while (!window->ShouldClose())
 	{
-		std::cout << currentFrame << ": ";
-
 		//Update managers
 		glfwPollEvents();
 		NK::TimeManager::Update();

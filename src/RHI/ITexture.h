@@ -2,10 +2,12 @@
 #include <Core/Debug/ILogger.h>
 #include <glm/glm.hpp>
 #include <Types/DataFormat.h>
-#include "IDevice.h"
+#include <Core/Memory/IAllocator.h>
 
 namespace NK
 {
+	class IDevice;
+	
 	enum class TEXTURE_USAGE_FLAGS : std::uint32_t
 	{
 		NONE                     = 1 << 0,

@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include "Debug/ConsoleLogger.h"
 #include "Memory/TrackingAllocator.h"
+#include "Utils/ImageLoader.h"
 
 namespace NK
 {
@@ -32,7 +33,7 @@ namespace NK
 		}
 
 		glfwInit();
-		m_logger->IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::CONTEXT, "GLFW initialised\n");
+		m_logger->IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::CONTEXT, "GLFW Initialised\n");
 		
 		m_logger->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::CONTEXT, "Context Initialised\n");
 	}
@@ -43,12 +44,11 @@ namespace NK
 	{
 		m_logger->Indent();
 		m_logger->Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::CONTEXT, "Shutting Down Context\n");
-
-		delete m_allocator;
-
+		
 		glfwTerminate();
 		m_logger->IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::CONTEXT, "GLFW Terminated\n");
 		
+		delete m_allocator;
 		m_logger->Unindent();
 		delete m_logger;
 

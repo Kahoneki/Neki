@@ -2,7 +2,6 @@
 #include <Core/Memory/IAllocator.h>
 #include <Types/DataFormat.h>
 #include <Types/ShaderAttribute.h>
-#include "IDevice.h"
 #include "IRootSignature.h"
 #include "IShader.h"
 
