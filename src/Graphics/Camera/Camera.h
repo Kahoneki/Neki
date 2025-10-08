@@ -14,6 +14,7 @@ namespace NK
 	{
 		glm::mat4 viewMat;
 		glm::mat4 projMat;
+		glm::vec4 pos;
 	};
 
 
