@@ -244,6 +244,8 @@ namespace NK
 		case SHADER_ATTRIBUTE::POSITION:	return std::make_pair<std::string, UINT>("POSITION", 0);
 		case SHADER_ATTRIBUTE::NORMAL:		return std::make_pair<std::string, UINT>("NORMAL", 0);
 		case SHADER_ATTRIBUTE::TEXCOORD_0:	return std::make_pair<std::string, UINT>("TEXCOORD", 0);
+		case SHADER_ATTRIBUTE::TANGENT:		return std::make_pair<std::string, UINT>("TANGENT", 0);
+		case SHADER_ATTRIBUTE::BITANGENT:	return std::make_pair<std::string, UINT>("BITANGENT", 0);
 		case SHADER_ATTRIBUTE::COLOUR_0:	return std::make_pair<std::string, UINT>("COLOR", 0);
 		default:
 		{

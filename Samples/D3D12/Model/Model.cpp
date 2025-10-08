@@ -7,7 +7,7 @@
 #include <Graphics/Camera/PlayerCamera.h>
 #include <Managers/InputManager.h>
 #include <Managers/TimeManager.h>
-#include <RHI-Vulkan/VulkanDevice.h>
+#include <RHI-D3D12/D3D12Device.h>
 #include <RHI/IBuffer.h>
 #include <RHI/IBufferView.h>
 #include <RHI/IPipeline.h>
@@ -21,6 +21,10 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/transform.hpp>
+#ifdef ERROR
+	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
+#endif
+
 
 
 
@@ -37,7 +41,7 @@ int main()
 	logger->Unindent();
 
 	//Device
-	const NK::UniquePtr<NK::IDevice> device{ NK_NEW(NK::VulkanDevice, *logger, *allocator) };
+	const NK::UniquePtr<NK::IDevice> device{ NK_NEW(NK::D3D12Device, *logger, *allocator) };
 
 	//Graphics Command Pool
 	NK::CommandPoolDesc graphicsCommandPoolDesc{};
@@ -240,6 +244,13 @@ int main()
 	{
 		inFlightFences[i] = device->CreateFence(inFlightFenceDesc);
 	}
+
+	//Transition depth buffer into depth-write state
+	commandBuffers[0]->Begin();
+	commandBuffers[0]->TransitionBarrier(depthBuffer.get(), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::DEPTH_WRITE);
+	commandBuffers[0]->End();
+	graphicsQueue->Submit(commandBuffers[0].get(), nullptr, nullptr, nullptr);
+	graphicsQueue->WaitIdle();
 	
 	//Tracks the current frame in range [0, MAX_FRAMES_IN_FLIGHT-1]
 	std::uint32_t currentFrame{ 0 };
