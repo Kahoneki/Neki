@@ -6,8 +6,7 @@ struct VertexInput
 	ATTRIBUTE(float3, pos, NK::SHADER_ATTRIBUTE_LOCATION_POSITION, POSITION);
 	ATTRIBUTE(float3, normal, NK::SHADER_ATTRIBUTE_LOCATION_NORMAL, NORMAL);
 	ATTRIBUTE(float2, texCoord, NK::SHADER_ATTRIBUTE_LOCATION_TEXCOORD_0, TEXCOORD0);
-	ATTRIBUTE(float3, tangent, NK::SHADER_ATTRIBUTE_LOCATION_TANGENT, TANGENT);
-	ATTRIBUTE(float3, bitangent, NK::SHADER_ATTRIBUTE_LOCATION_BITANGENT, BITANGENT);
+	ATTRIBUTE(float4, tangent, NK::SHADER_ATTRIBUTE_LOCATION_TANGENT, TANGENT);
 };
 
 struct VertexOutput
@@ -18,6 +17,7 @@ struct VertexOutput
 	float3 worldNormal : WORLD_NORMAL;
 	float3 camPos : CAM_POS;
 	float3x3 TBN : TBN;	
+	float3 bitangent : BITANGENT;
 };
 
 
@@ -33,6 +33,7 @@ struct CamData
 
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
+	float4x4 inverseModelMat;
 	uint camDataBufferIndex;
 	uint materialBufferIndex;
 	uint samplerIndex;
@@ -50,11 +51,20 @@ VertexOutput VSMain(VertexInput input)
 	output.fragPos = float3(worldPos.xyz);
 	output.pos = mul(camData.projMat, mul(camData.viewMat, worldPos));
 
-	float3 T = normalize(float3(mul(PC(modelMat), float4(input.tangent, 1.0)).xyz));
-	float3 B = normalize(float3(mul(PC(modelMat), float4(input.bitangent, 1.0)).xyz));
-	float3 N = normalize(float3(mul(PC(modelMat), float4(input.normal, 1.0)).xyz));
-	output.TBN = float3x3(T,B,N);
-	
+	float3 T_os = float3(input.tangent.x, input.tangent.yz);
+    float  sign = input.tangent.w;
+    float3 N_os = float3(input.normal.x, input.normal.yz);
+	//T_os = normalize(T_os - N_os * dot(N_os, T_os));
+    
+    float3 B_os = cross(T_os, N_os) * sign;
+    
+    float3 T = normalize( mul(PC(modelMat), float4(T_os, 0.0)).xyz );
+    float3 N = normalize( mul(PC(modelMat), float4(N_os, 0.0)).xyz );
+    float3 B = normalize( mul(PC(modelMat), float4(B_os, 0.0)).xyz );
+
+    output.TBN = transpose(float3x3(T, B, N));
+    output.bitangent = B;
+
 	output.worldNormal = N;
 
     return output;

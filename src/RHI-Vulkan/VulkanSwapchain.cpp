@@ -130,7 +130,7 @@ namespace NK
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SWAPCHAIN, "Ideal swapchain image format (R8G8B8A8_SRGB with SRGB-nonlinear colour space) unavailable, falling back to format " + std::to_string(surfaceFormat.format) + " with colour space " + std::to_string(surfaceFormat.colorSpace) + "\n");
 		}
-		m_format = surfaceFormat.format;
+		m_format = VK_FORMAT_R8G8B8A8_UNORM;
 
 
 		//Get swapchain extent

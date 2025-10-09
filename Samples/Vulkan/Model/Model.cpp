@@ -26,9 +26,9 @@
 int main()
 {
 	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
-	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+//	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+//	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+//	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	NK::RAIIContext context{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE };
 	NK::ILogger* logger{ NK::Context::GetLogger() };
 	NK::IAllocator* allocator{ NK::Context::GetAllocator() };
@@ -120,12 +120,12 @@ int main()
 
 	//Root Signature
 	NK::RootSignatureDesc rootSigDesc{};
-	rootSigDesc.num32BitPushConstantValues = 16 + 1 + 1 + 1; //model matrix + cam data buffer index + material buffer index + sampler index
+	rootSigDesc.num32BitPushConstantValues = 16 + 16 + 1 + 1 + 1; //model matrix + inverse model matrix + cam data buffer index + material buffer index + sampler index
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 
 
 	//Model
-	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf", false, true) };
+	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf", true, true) };
 	const NK::UniquePtr<NK::GPUModel> model{ gpuUploader->EnqueueModelDataUpload(modelData) };
 
 	//Flush gpu uploader uploads
@@ -134,9 +134,11 @@ int main()
 
 	//Model model matrix (like... the... model matrix of the... model)
 	glm::mat4 modelModelMatrix{ glm::mat4(1.0f) };
+//	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
 	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(30.0f), glm::vec3(0, -1, 0));
 	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(70.0f), glm::vec3(1, 0, 0));
-
+	
 	//Sampler
 	NK::SamplerDesc samplerDesc{};
 	samplerDesc.minFilter = NK::FILTER_MODE::LINEAR;
@@ -186,7 +188,7 @@ int main()
 	graphicsPipelineDesc.depthStencilDesc = depthStencilDesc;
 	graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
 	graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
-	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };
+	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_UNORM };
 	graphicsPipelineDesc.depthStencilAttachmentFormat = NK::DATA_FORMAT::D32_SFLOAT;
 
 	const NK::UniquePtr<NK::IPipeline> blinnPhongPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
@@ -281,6 +283,7 @@ int main()
 		struct PushConstantData
 		{
 			glm::mat4 modelMat;
+			glm::mat4 inverseModelMat;
 			NK::ResourceIndex camDataBufferIndex;
 			NK::ResourceIndex materialBufferIndex;
 			NK::SamplerIndex samplerIndex;
@@ -298,7 +301,9 @@ int main()
 			PushConstantData pushConstantData{};
 			float speed{ 50.0f };
 			modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())), glm::vec3(0, 0, 1));
+//			modelModelMatrix = glm::translate(modelModelMatrix, glm::vec3(0, 0, speed * static_cast<float>(NK::TimeManager::GetDeltaTime())));
 			pushConstantData.modelMat = modelModelMatrix;
+			pushConstantData.inverseModelMat = glm::inverse(modelModelMatrix);
 			pushConstantData.camDataBufferIndex = camDataBufferIndex;
 			pushConstantData.materialBufferIndex = model->materials[model->meshes[i]->materialIndex]->bufferIndex;
 			pushConstantData.samplerIndex = samplerIndex;

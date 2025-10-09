@@ -1,6 +1,8 @@
 #include <Types/ShaderMacros.hlsli>
 #include <Types/Materials.h>
 
+#pragma enable_dxc_extensions
+
 struct VertexOutput
 {
 	float4 pos : SV_POSITION;
@@ -9,6 +11,7 @@ struct VertexOutput
 	float3 worldNormal : WORLD_NORMAL;
 	float3 camPos : CAM_POS;
 	float3x3 TBN : TBN;
+	float3 bitangent : BITANGENT;
 };
 
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
@@ -17,6 +20,7 @@ struct VertexOutput
 
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
+	float4x4 inverseModelMat;
 	uint camDataBufferIndex;
 	uint materialBufferIndex;
 	uint samplerIndex;
@@ -70,7 +74,7 @@ float3 FresnelSchlick(float _cosTheta, float3 _F0)
 }
 
 
-
+[shader("pixel")]
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
 	NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
@@ -97,8 +101,8 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
     //Calculate incoming radiance
     float3 lightPos = float3(2,-2,2);
-//    vec3 radiantFlux = float3(23.47, 21.31, 20.79);
-    float3 radiantFlux = float3(10.0, 2.0, 10.0);
+    float3 radiantFlux = float3(23.47, 21.31, 20.79);
+    //float3 radiantFlux = float3(10.0, 2.0, 10.0);
     float distance2 = dot(vertexOutput.fragPos - lightPos, vertexOutput.fragPos - lightPos);
     float attenuation = 1.0 / distance2;
     float3 incomingRadiance = radiantFlux * attenuation;
@@ -132,5 +136,11 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
     float3 colour = ambient + emissive + outgoingRadiance;
-    return float4(colour, 1.0);
+return float4(colour, 1.0);
+	
+
+
+
+	//DEBUG VISUALISATION
+	return float4(normal * 0.5f + 0.5f, 1.0);
 }

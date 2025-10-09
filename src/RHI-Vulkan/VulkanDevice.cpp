@@ -246,9 +246,19 @@ namespace NK
 		//Get required extensions
 		const std::vector<const char*> extensions{ GetRequiredExtensions() };
 
+		VkValidationFeaturesEXT valFeatures{};
+		valFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+		valFeatures.enabledValidationFeatureCount = 1;
+
+		VkValidationFeatureEnableEXT enables[] = {
+			VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT
+		};
+		valFeatures.pEnabledValidationFeatures = enables;
+		
 		//Setup instance creation info
 		VkInstanceCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		createInfo.pNext = &valFeatures;
 		createInfo.pApplicationInfo = &appInfo;
 		createInfo.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
 		createInfo.ppEnabledExtensionNames = extensions.data();
@@ -260,6 +270,7 @@ namespace NK
 			createInfo.enabledLayerCount = static_cast<std::uint32_t>(m_instanceValidationLayers.size());
 			createInfo.ppEnabledLayerNames = m_instanceValidationLayers.data();
 			PopulateDebugMessengerCreateInfo(debugCreateInfo);
+			debugCreateInfo.pNext = &valFeatures;
 			createInfo.pNext = &debugCreateInfo;
 		}
 		else
