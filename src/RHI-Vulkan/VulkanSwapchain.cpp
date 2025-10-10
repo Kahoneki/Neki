@@ -247,7 +247,7 @@ namespace NK
 		for (std::size_t i{ 0 }; i < m_backBuffers.size(); ++i)
 		{
 			TextureViewDesc desc{};
-			desc.dimension = TEXTURE_DIMENSION::DIM_2;
+			desc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
 			desc.format = VulkanTexture::GetRHIFormat(m_format);
 			desc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
 

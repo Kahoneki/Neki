@@ -15,13 +15,27 @@ namespace NK
 		SHADER_READ_ONLY,
 		SHADER_READ_WRITE,
 	};
+
+	enum class TEXTURE_VIEW_DIMENSION
+	{
+		DIM_1,
+		DIM_2,
+		DIM_3,
+
+		DIM_CUBE,
+
+		DIM_1D_ARRAY,
+		DIM_2D_ARRAY,
+		DIM_CUBE_ARRAY,
+	};
 	
 	struct TextureViewDesc
 	{
 		TEXTURE_VIEW_TYPE type;
-		TEXTURE_DIMENSION dimension;
+		TEXTURE_VIEW_DIMENSION dimension;
 		DATA_FORMAT format;
-		//todo: add array support
+		std::uint32_t baseArrayLayer;
+		std::uint32_t arrayLayerCount;
 		//todo: add mip support
 	};
 
@@ -40,10 +54,10 @@ namespace NK
 		//If creating a texture view of a shader-accessible texture view (SHADER_READ_ONLY or SHADER_READ_WRITE), pass in a free list allocator for bindless resource allocation
 		//Otherwise, just set _freeListAllocator to nullptr
 		explicit ITextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc, FreeListAllocator* _freeListAllocator, bool _freeListAllocated)
-		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
+		: m_logger(_logger), m_allocator(_allocator), m_resourceIndexAllocator(_freeListAllocator), m_device(_device),
 		  m_parentTexture(_texture),
-		  m_type(_desc.type), m_dimension(_desc.dimension), m_format(_desc.format),
-		  m_resourceIndexAllocator(_freeListAllocator), m_freeListAllocated(_freeListAllocated) {}
+		  m_type(_desc.type), m_dimension(_desc.dimension), m_format(_desc.format), m_baseArrayLayer(_desc.baseArrayLayer), m_arrayLayerCount(_desc.arrayLayerCount),
+		  m_freeListAllocated(_freeListAllocated) {}
 		
 		
 		//Dependency injections
@@ -54,10 +68,14 @@ namespace NK
 
 		const ITexture* const m_parentTexture;
 		
+		TEXTURE_VIEW_TYPE m_type;
+		TEXTURE_VIEW_DIMENSION m_dimension;
+		DATA_FORMAT m_format;
+		std::uint32_t m_baseArrayLayer;
+		std::uint32_t m_arrayLayerCount;
+		
 		bool m_freeListAllocated; //True if m_resourceIndex was allocated from a free list allocator
 		ResourceIndex m_resourceIndex{ FreeListAllocator::INVALID_INDEX };
-		TEXTURE_VIEW_TYPE m_type;
-		TEXTURE_DIMENSION m_dimension;
-		DATA_FORMAT m_format;
+		
 	};
 }
