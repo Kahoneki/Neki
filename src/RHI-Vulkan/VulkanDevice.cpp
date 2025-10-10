@@ -134,6 +134,25 @@ namespace NK
 
 	UniquePtr<ITextureView> VulkanDevice::CreateDepthStencilTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
+		//Function identical to CreateRenderTargetView() - perform validation
+		if (_desc.type == TEXTURE_VIEW_TYPE::RENDER_TARGET)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "CreateDepthStencilTextureView() called with _desc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET - did you mean to call CreateRenderTargetTextureView()?\n");
+			throw std::runtime_error("");
+		}
+		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc));
+	}
+
+
+
+	UniquePtr<ITextureView> VulkanDevice::CreateRenderTargetTextureView(ITexture* _texture, const TextureViewDesc& _desc)
+	{
+		//Function identical to CreateDepthStencilTextureView() - perform validation
+		if (_desc.type == TEXTURE_VIEW_TYPE::DEPTH || _desc.type == TEXTURE_VIEW_TYPE::DEPTH_STENCIL)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "CreateRenderTargetTextureView() called with _desc.type = TEXTURE_VIEW_TYPE::" + std::string(_desc.type == TEXTURE_VIEW_TYPE::DEPTH ? "DEPTH" : "DEPTH_STENCIL") + " - did you mean to call CreateDepthStencilTextureView()?\n");
+			throw std::runtime_error("");
+		}
 		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc));
 	}
 

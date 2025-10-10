@@ -25,6 +25,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ITexture> CreateTexture(const TextureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateShaderResourceTextureView(ITexture* _texture, const TextureViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateDepthStencilTextureView(ITexture* _texture, const TextureViewDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<ITextureView> CreateRenderTargetTextureView(ITexture* _texture, const TextureViewDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISampler> CreateSampler(const SamplerDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(Window* _window) override;

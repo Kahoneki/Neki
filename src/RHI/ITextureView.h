@@ -25,6 +25,7 @@ namespace NK
 		[[nodiscard]] inline ResourceIndex GetIndex() const { return m_resourceIndex; }
 		[[nodiscard]] inline DATA_FORMAT GetFormat() const { return m_format; }
 		[[nodiscard]] inline TEXTURE_VIEW_TYPE GetType() const { return m_type; }
+		[[nodiscard]] inline const ITexture* GetParentTexture() const { return m_parentTexture; }
 
 
 	protected:
@@ -32,6 +33,7 @@ namespace NK
 		//Otherwise, just set _freeListAllocator to nullptr
 		explicit ITextureView(ILogger& _logger, IAllocator& _allocator, IDevice& _device, ITexture* _texture, const TextureViewDesc& _desc, FreeListAllocator* _freeListAllocator, bool _freeListAllocated)
 		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
+		  m_parentTexture(_texture),
 		  m_type(_desc.type), m_dimension(_desc.dimension), m_format(_desc.format),
 		  m_resourceIndexAllocator(_freeListAllocator), m_freeListAllocated(_freeListAllocated) {}
 		
@@ -41,6 +43,8 @@ namespace NK
 		IAllocator& m_allocator;
 		FreeListAllocator* m_resourceIndexAllocator;
 		IDevice& m_device;
+
+		const ITexture* const m_parentTexture;
 		
 		bool m_freeListAllocated; //True if m_resourceIndex was allocated from a free list allocator
 		ResourceIndex m_resourceIndex{ FreeListAllocator::INVALID_INDEX };

@@ -12,7 +12,32 @@ namespace NK
 		explicit VulkanCommandBuffer(ILogger& _logger, IDevice& _device, ICommandPool& _pool, const CommandBufferDesc& _desc);
 		virtual ~VulkanCommandBuffer() override;
 
-		//todo: add command buffer methods here
+		/**
+		 * @brief A detailed description of what this group of functions does.
+		 *
+		 * This comment will be applied to both functionA and functionB. This method
+		 * is ideal for documenting function overloads where the core purpose is the same.
+		 * @param value An integer value to process.
+		 */
+		void functionA(int value);
+
+		/**
+		 * @copydoc functionA
+		 */
+		void functionB(double value);
+		
+		/**
+ * @brief Calculates the dot product of this vector with another.
+ *
+ * The dot product is a scalar value representing the geometric projection
+ * of one vector onto another. It is calculated as:
+ * `(this->x * other.x) + (this->y * other.y)`.
+ *
+ * @param other The constant reference to the other Vector2D.
+ * @return The resulting scalar (double) dot product.
+ * @see normalize()
+ * @note This method does not modify the state of either vector object.
+ */
 		virtual void Reset() override;
 
 		virtual void Begin() override;
@@ -21,8 +46,9 @@ namespace NK
 
 		virtual void TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
 		virtual void TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
-		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment) override;
-		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment) override;
+		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment) override;
+		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment) override;
+		virtual void BlitTexture(ITexture* _srcTexture, TEXTURE_ASPECT _srcAspect, ITexture* _dstTexture, TEXTURE_ASPECT _dstAspect) override;
 		virtual void EndRendering() override;
 
 		virtual void BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides) override;

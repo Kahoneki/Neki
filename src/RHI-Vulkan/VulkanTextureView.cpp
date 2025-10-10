@@ -146,7 +146,7 @@ namespace NK
 		case TEXTURE_VIEW_TYPE::DEPTH_STENCIL:	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT; break;
 		default:
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE_VIEW, "Default case reached for m_type switch case in VulkanTextureView constructor - this suggests an internal error rather than a user-caused one.\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE_VIEW, "Default case reached for m_type switch case in VulkanTextureView constructor - this suggests an internal error rather than a user-caused one. Please make a GitHub issue on the topic.\n");
 			throw std::runtime_error("");
 		}
 		}

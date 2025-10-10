@@ -25,10 +25,22 @@
 
 int main()
 {
+
+	//----SETTINGS----//
+	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1920, 1080 };
+	constexpr bool enableMSAA{ true };
+	constexpr bool enableSSAA{ false };
+	constexpr NK::SAMPLE_COUNT msaaSampleCount{ NK::SAMPLE_COUNT::BIT_8 };
+	constexpr std::uint32_t ssaaMultiplier{ 4u }; //8x SSAA
+	//----------------//
+
+	
+	constexpr glm::ivec2 SUPERSAMPLE_RESOLUTION{ SCREEN_DIMENSIONS * glm::ivec2(ssaaMultiplier, ssaaMultiplier) };
+	
 	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
-//	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
-//	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
-//	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	NK::RAIIContext context{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE };
 	NK::ILogger* logger{ NK::Context::GetLogger() };
 	NK::IAllocator* allocator{ NK::Context::GetAllocator() };
@@ -66,8 +78,7 @@ int main()
 	//Window and Surface
 	NK::WindowDesc windowDesc{};
 	windowDesc.name = "Model Sample";
-	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1280, 720 };
-	windowDesc.size = glm::ivec2(SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y);
+	windowDesc.size = SCREEN_DIMENSIONS;
 	const NK::UniquePtr<NK::Window> window{ device->CreateWindow(windowDesc) };
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(window.get()) };
 
@@ -132,12 +143,20 @@ int main()
 	gpuUploader->Flush(true);
 	gpuUploader->Reset();
 
+	
 	//Model model matrix (like... the... model matrix of the... model)
 	glm::mat4 modelModelMatrix{ glm::mat4(1.0f) };
+
+	//Kaju
+//	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(180.0f), glm::vec3(0, 1, 0));
 //	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+//	modelModelMatrix = glm::scale(modelModelMatrix, glm::vec3(0.1f));
+
+	//Damaged Helmet
 	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
 	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(30.0f), glm::vec3(0, -1, 0));
 	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(70.0f), glm::vec3(1, 0, 0));
+	
 	
 	//Sampler
 	NK::SamplerDesc samplerDesc{};
@@ -166,7 +185,7 @@ int main()
 	depthStencilDesc.stencilTestEnable = false;
 
 	NK::MultisamplingDesc multisamplingDesc{};
-	multisamplingDesc.sampleCount = NK::SAMPLE_COUNT::BIT_1;
+	multisamplingDesc.sampleCount = enableMSAA ? msaaSampleCount : NK::SAMPLE_COUNT::BIT_1;
 	multisamplingDesc.sampleMask = UINT32_MAX;
 	multisamplingDesc.alphaToCoverageEnable = false;
 
@@ -188,25 +207,43 @@ int main()
 	graphicsPipelineDesc.depthStencilDesc = depthStencilDesc;
 	graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
 	graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
-	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_UNORM };
+	graphicsPipelineDesc.colourAttachmentFormats = { NK::DATA_FORMAT::R8G8B8A8_SRGB };
 	graphicsPipelineDesc.depthStencilAttachmentFormat = NK::DATA_FORMAT::D32_SFLOAT;
 
 	const NK::UniquePtr<NK::IPipeline> blinnPhongPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
 
 	graphicsPipelineDesc.fragmentShader = pbrFragShader.get();
 	const NK::UniquePtr<NK::IPipeline> pbrPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
+	
 
+	//Render Target
+	NK::TextureDesc renderTargetDesc{};
+	renderTargetDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	renderTargetDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
+	renderTargetDesc.size = enableSSAA ? glm::ivec3(SUPERSAMPLE_RESOLUTION, 1) : glm::ivec3(SCREEN_DIMENSIONS, 1);
+	renderTargetDesc.usage = NK::TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | NK::TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT; //Needs TRANSFER_SRC_BIT for supersampling algorithm
+	renderTargetDesc.arrayTexture = false;
+	renderTargetDesc.sampleCount = enableMSAA ? msaaSampleCount : NK::SAMPLE_COUNT::BIT_1;
+	const NK::UniquePtr<NK::ITexture> renderTarget{ device->CreateTexture(renderTargetDesc) };
+
+	//Render Target View
+	NK::TextureViewDesc renderTargetViewDesc{};
+	renderTargetViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	renderTargetViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
+	renderTargetViewDesc.type = NK::TEXTURE_VIEW_TYPE::RENDER_TARGET;
+	const NK::UniquePtr<NK::ITextureView> renderTargetView{ device->CreateRenderTargetTextureView(renderTarget.get(), renderTargetViewDesc) };
 
 	//Depth Buffer
 	NK::TextureDesc depthBufferDesc{};
 	depthBufferDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	depthBufferDesc.format = NK::DATA_FORMAT::D32_SFLOAT;
-	depthBufferDesc.size = glm::ivec3(SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y, 1);
+	depthBufferDesc.size = enableSSAA ? glm::ivec3(SUPERSAMPLE_RESOLUTION, 1) : glm::ivec3(SCREEN_DIMENSIONS, 1);
 	depthBufferDesc.usage = NK::TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT;
 	depthBufferDesc.arrayTexture = false;
+	depthBufferDesc.sampleCount = enableMSAA ? msaaSampleCount : NK::SAMPLE_COUNT::BIT_1;
 	const NK::UniquePtr<NK::ITexture> depthBuffer{ device->CreateTexture(depthBufferDesc) };
 
-	//Depth Buffer View
+	//Supersample Depth Buffer View
 	NK::TextureViewDesc depthBufferViewDesc{};
 	depthBufferViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	depthBufferViewDesc.format = NK::DATA_FORMAT::D32_SFLOAT;
@@ -215,7 +252,7 @@ int main()
 
 
 	//Number of frames the CPU can get ahead of the GPU
-	constexpr std::uint32_t MAX_FRAMES_IN_FLIGHT{ 10 };
+	constexpr std::uint32_t MAX_FRAMES_IN_FLIGHT{ 3 };
 
 	//Graphics Command Buffers
 	std::vector<NK::UniquePtr<NK::ICommandBuffer>> commandBuffers(MAX_FRAMES_IN_FLIGHT);
@@ -252,6 +289,7 @@ int main()
 
 	while (!window->ShouldClose())
 	{
+		
 		//Update managers
 		glfwPollEvents();
 		NK::TimeManager::Update();
@@ -270,13 +308,19 @@ int main()
 
 		commandBuffers[currentFrame]->Begin();
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphores[currentFrame].get(), nullptr) };
+
+		if constexpr (enableMSAA || enableSSAA)
+		{
+			commandBuffers[currentFrame]->TransitionBarrier(renderTarget.get(), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
+		}
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
-
-		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), depthBufferView.get(), nullptr);
+		commandBuffers[currentFrame]->TransitionBarrier(depthBuffer.get(), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::DEPTH_WRITE);
+		
+		commandBuffers[currentFrame]->BeginRendering(1, enableMSAA ? renderTargetView.get() : nullptr, enableSSAA ? renderTargetView.get() : swapchain->GetImageView(imageIndex), depthBufferView.get(), nullptr);
 		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
-
-		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y });
-		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y });
+		
+		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { enableSSAA ? SUPERSAMPLE_RESOLUTION : SCREEN_DIMENSIONS });
+		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { enableSSAA ? SUPERSAMPLE_RESOLUTION : SCREEN_DIMENSIONS });
 
 
 		//Drawing
@@ -299,9 +343,11 @@ int main()
 			commandBuffers[currentFrame]->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
 
 			PushConstantData pushConstantData{};
+
+			//Damaged Helmet
 			float speed{ 50.0f };
 			modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())), glm::vec3(0, 0, 1));
-//			modelModelMatrix = glm::translate(modelModelMatrix, glm::vec3(0, 0, speed * static_cast<float>(NK::TimeManager::GetDeltaTime())));
+
 			pushConstantData.modelMat = modelModelMatrix;
 			pushConstantData.inverseModelMat = glm::inverse(modelModelMatrix);
 			pushConstantData.camDataBufferIndex = camDataBufferIndex;
@@ -312,10 +358,23 @@ int main()
 			commandBuffers[currentFrame]->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
 		}
 
-
-		//End rendering
+		
 		commandBuffers[currentFrame]->EndRendering();
-		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);
+
+		if (enableSSAA)
+		{
+			//Downscaling pass
+			commandBuffers[currentFrame]->TransitionBarrier(renderTarget.get(), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::COPY_SOURCE);
+			commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::COPY_DEST);
+			commandBuffers[currentFrame]->BlitTexture(renderTarget.get(), NK::TEXTURE_ASPECT::COLOUR, swapchain->GetImage(imageIndex), NK::TEXTURE_ASPECT::COLOUR);
+			commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::COPY_DEST, NK::RESOURCE_STATE::PRESENT);
+		}
+		else
+		{
+			commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);
+		}
+		
+		//Present
 		commandBuffers[currentFrame]->End();
 
 

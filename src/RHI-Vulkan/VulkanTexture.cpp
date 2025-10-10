@@ -61,7 +61,7 @@ namespace NK
 		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		imageInfo.usage = VulkanUtils::GetVulkanImageUsageFlags(m_usage);
 		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.samples = GetVulkanSampleCount(m_sampleCount);
 		VkResult result{ vkCreateImage(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), &imageInfo, m_allocator.GetVulkanCallbacks(), &m_texture) };
 		if (result == VK_SUCCESS)
 		{
