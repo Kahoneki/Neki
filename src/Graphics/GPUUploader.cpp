@@ -115,6 +115,21 @@ namespace NK
 
 
 
+	void GPUUploader::EnqueueArrayTextureDataUpload(void* const* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState)
+	{
+		if (m_flushing)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "EnqueueArrayTextureDataUploaded() called while m_flushing was true. Did you forget to call Reset()?\n");
+			throw std::runtime_error("");
+		}
+
+		TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
+
+		
+	}
+
+
+
 	void GPUUploader::EnqueueTextureDataUpload(const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState)
 	{
 		if (m_flushing)
@@ -208,7 +223,7 @@ namespace NK
 
 				TextureViewDesc viewDesc{};
 				viewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
-				viewDesc.dimension = TEXTURE_DIMENSION::DIM_2;
+				viewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
 				viewDesc.format = gpuMaterial->textures[index]->GetFormat();
 				gpuMaterial->textureViews[index] = m_device.CreateShaderResourceTextureView(gpuMaterial->textures[index].get(), viewDesc);
 			} };

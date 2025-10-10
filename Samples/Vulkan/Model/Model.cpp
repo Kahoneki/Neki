@@ -133,7 +133,33 @@ int main()
 	NK::RootSignatureDesc rootSigDesc{};
 	rootSigDesc.num32BitPushConstantValues = 16 + 16 + 1 + 1 + 1; //model matrix + inverse model matrix + cam data buffer index + material buffer index + sampler index
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
-
+	
+	//Skybox Texture
+	void* skyboxImageData[6]
+	{
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/right.jpg", true, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/left.jpg", true, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/top.jpg", true, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/bottom.jpg", true, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/front.jpg", true, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/back.jpg", true, true)->data
+	};
+	NK::TextureDesc skyboxTextureDesc{ NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/right.jpg", true, true)->desc }; //cached, very inexpensive load
+	skyboxTextureDesc.usage |= NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
+	skyboxTextureDesc.arrayTexture = true;
+	skyboxTextureDesc.size.z = 6;
+	const NK::UniquePtr<NK::ITexture> skyboxTexture{ device->CreateTexture(skyboxTextureDesc) };
+	gpuUploader->EnqueueTextureDataUpload(skyboxImageData, skyboxTexture.get(), NK::RESOURCE_STATE::UNDEFINED);
+	
+	//Skybox Texture View
+	NK::TextureViewDesc skyboxTextureViewDesc{};
+	skyboxTextureViewDesc.dimension = NK::TEXTURE_VIEW_DIMENSION::DIM_CUBE;
+	skyboxTextureViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
+	skyboxTextureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+	skyboxTextureViewDesc.baseArrayLayer = 0;
+	skyboxTextureViewDesc.arrayLayerCount = 6;
+	const NK::UniquePtr<NK::ITextureView> skyboxTextureView{ device->CreateShaderResourceTextureView(skyboxTexture.get(), skyboxTextureViewDesc) };
+	NK::ResourceIndex skyboxTextureResourceIndex{ skyboxTextureView->GetIndex() };
 
 	//Model
 	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf", true, true) };
@@ -228,7 +254,7 @@ int main()
 
 	//Render Target View
 	NK::TextureViewDesc renderTargetViewDesc{};
-	renderTargetViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	renderTargetViewDesc.dimension = NK::TEXTURE_VIEW_DIMENSION::DIM_2;
 	renderTargetViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
 	renderTargetViewDesc.type = NK::TEXTURE_VIEW_TYPE::RENDER_TARGET;
 	const NK::UniquePtr<NK::ITextureView> renderTargetView{ device->CreateRenderTargetTextureView(renderTarget.get(), renderTargetViewDesc) };
@@ -245,7 +271,7 @@ int main()
 
 	//Supersample Depth Buffer View
 	NK::TextureViewDesc depthBufferViewDesc{};
-	depthBufferViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	depthBufferViewDesc.dimension = NK::TEXTURE_VIEW_DIMENSION::DIM_2;
 	depthBufferViewDesc.format = NK::DATA_FORMAT::D32_SFLOAT;
 	depthBufferViewDesc.type = NK::TEXTURE_VIEW_TYPE::DEPTH;
 	const NK::UniquePtr<NK::ITextureView> depthBufferView{ device->CreateDepthStencilTextureView(depthBuffer.get(), depthBufferViewDesc) };

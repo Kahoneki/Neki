@@ -45,9 +45,8 @@ namespace NK
 		viewInfo.subresourceRange.baseMipLevel = 0;
 		viewInfo.subresourceRange.levelCount = 1;
 
-		//todo: add array support
-		viewInfo.subresourceRange.baseArrayLayer = 0;
-		viewInfo.subresourceRange.layerCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = m_baseArrayLayer;
+		viewInfo.subresourceRange.layerCount = m_arrayLayerCount;
 
 		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -106,7 +105,7 @@ namespace NK
 
 
 		//Populate m_renderArea if _texture is 2D
-		if (m_dimension == TEXTURE_DIMENSION::DIM_2)
+		if (m_dimension == TEXTURE_VIEW_DIMENSION::DIM_2)
 		{
 			m_renderArea.offset = { 0, 0 };
 			m_renderArea.extent = { static_cast<std::uint32_t>(_texture->GetSize().x), static_cast<std::uint32_t>(_texture->GetSize().y) };
@@ -177,7 +176,7 @@ namespace NK
 
 
 		//Populate m_renderArea if _texture is 2D
-		if (m_dimension == TEXTURE_DIMENSION::DIM_2)
+		if (m_dimension == TEXTURE_VIEW_DIMENSION::DIM_2)
 		{
 			m_renderArea.offset = { 0, 0 };
 			m_renderArea.extent = { static_cast<std::uint32_t>(_texture->GetSize().x), static_cast<std::uint32_t>(_texture->GetSize().y) };
@@ -212,5 +211,26 @@ namespace NK
 
 		m_logger.Unindent();
 	}
-	
+
+
+
+	VkImageViewType VulkanTextureView::GetVulkanImageViewType(TEXTURE_VIEW_DIMENSION _dimension)
+	{
+		switch (_dimension)
+		{
+		case TEXTURE_VIEW_DIMENSION::DIM_1:				return VK_IMAGE_VIEW_TYPE_1D;
+		case TEXTURE_VIEW_DIMENSION::DIM_2:				return VK_IMAGE_VIEW_TYPE_2D;
+		case TEXTURE_VIEW_DIMENSION::DIM_3:				return VK_IMAGE_VIEW_TYPE_3D;
+		case TEXTURE_VIEW_DIMENSION::DIM_CUBE:			return VK_IMAGE_VIEW_TYPE_CUBE;
+		case TEXTURE_VIEW_DIMENSION::DIM_1D_ARRAY:		return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
+		case TEXTURE_VIEW_DIMENSION::DIM_2D_ARRAY:		return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+		case TEXTURE_VIEW_DIMENSION::DIM_CUBE_ARRAY:	return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+
+		default:
+		{
+			throw std::runtime_error("GetVulkanImageViewType() default case reached. Dimension = " + std::to_string(std::to_underlying(_dimension)));
+		}
+		}
+	}
+
 }

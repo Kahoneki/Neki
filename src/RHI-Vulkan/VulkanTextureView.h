@@ -22,6 +22,8 @@ namespace NK
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] inline VkImageView GetImageView() const { return m_imageView; }
 		[[nodiscard]] inline VkRect2D GetRenderArea() const { return m_renderArea; }
+		
+		[[nodiscard]] static VkImageViewType GetVulkanImageViewType(TEXTURE_VIEW_DIMENSION _dimension);
 
 
 	private:
