@@ -56,7 +56,7 @@ namespace NK
 		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		imageInfo.usage = GetVulkanUsageFlags(m_usage);
 		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.samples = GetVulkanSampleCount(m_sampleCount);
 		VkResult result{ vkCreateImage(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), &imageInfo, m_allocator.GetVulkanCallbacks(), &m_texture) };
 		if (result == VK_SUCCESS)
 		{
@@ -302,6 +302,26 @@ namespace NK
 		default:
 		{
 			throw std::runtime_error("GetTextureFormat() default case reached. Format = " + std::to_string(std::to_underlying(_format)));
+		}
+		}
+	}
+
+
+	
+	VkSampleCountFlagBits VulkanTexture::GetVulkanSampleCount(SAMPLE_COUNT _count)
+	{
+		switch (_count)
+		{
+		case SAMPLE_COUNT::BIT_1:		return VK_SAMPLE_COUNT_1_BIT;
+		case SAMPLE_COUNT::BIT_2:		return VK_SAMPLE_COUNT_2_BIT;
+		case SAMPLE_COUNT::BIT_4:		return VK_SAMPLE_COUNT_4_BIT;
+		case SAMPLE_COUNT::BIT_8:		return VK_SAMPLE_COUNT_8_BIT;
+		case SAMPLE_COUNT::BIT_16:		return VK_SAMPLE_COUNT_16_BIT;
+		case SAMPLE_COUNT::BIT_32:		return VK_SAMPLE_COUNT_32_BIT;
+
+		default:
+		{
+			throw std::runtime_error("GetVulkanSampleCount() default case reached. Count = " + std::to_string(std::to_underlying(_count)));
 		}
 		}
 	}

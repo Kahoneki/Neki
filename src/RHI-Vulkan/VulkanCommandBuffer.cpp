@@ -150,7 +150,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
+	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
 	{
 		if (_depthAttachment && _stencilAttachment)
 		{
@@ -163,11 +163,24 @@ namespace NK
 		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
 		{
 			colourAttachmentInfos[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-			colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[i]))->GetImageView();
 			colourAttachmentInfos[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			if (_multisampleColourAttachments)
+			{
+				//Multisampling enabled, render into _multisampleColourAttachments and resolve into _outputColourAttachments
+				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_multisampleColourAttachments[i]))->GetImageView();
+				colourAttachmentInfos[i].resolveImageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
+				colourAttachmentInfos[i].resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				colourAttachmentInfos[i].resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+			}
+			else
+			{
+				//Multisampling disabled, ignore _multisampleColourAttachments and just render straight into _outputColourAttachments
+				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
+			}
+
 			colourAttachmentInfos[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			colourAttachmentInfos[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			colourAttachmentInfos[i].clearValue.color = { { 0.2f, 0.2f, 0.2f, 1.0f } };
+			colourAttachmentInfos[i].clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 		}
 
 		//Depth attachment
@@ -198,7 +211,7 @@ namespace NK
 
 		VkRenderingInfo renderingInfo{};
 		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-		renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[0]))->GetRenderArea();
+		renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[0]))->GetRenderArea();
 		renderingInfo.layerCount = 1;
 		renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
 		renderingInfo.pColorAttachments = colourAttachmentInfos.data();
@@ -210,7 +223,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment)
+	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment)
 	{
 		if (_depthStencilAttachment)
 		{
@@ -226,8 +239,21 @@ namespace NK
 		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
 		{
 			colourAttachmentInfos[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-			colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[i]))->GetImageView();
 			colourAttachmentInfos[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			if (_multisampleColourAttachments)
+			{
+				//Multisampling enabled, render into _multisampleColourAttachments and resolve into _outputColourAttachments
+				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_multisampleColourAttachments[i]))->GetImageView();
+				colourAttachmentInfos[i].resolveImageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
+				colourAttachmentInfos[i].resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				colourAttachmentInfos[i].resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+			}
+			else
+			{
+				//Multisampling disabled, ignore _multisampleColourAttachments and just render straight into _outputColourAttachments
+				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
+			}
+
 			colourAttachmentInfos[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			colourAttachmentInfos[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			colourAttachmentInfos[i].clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
@@ -248,7 +274,7 @@ namespace NK
 
 		VkRenderingInfo renderingInfo{};
 		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-		renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_colourAttachments[0]))->GetRenderArea();
+		renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[0]))->GetRenderArea();
 		renderingInfo.layerCount = 1;
 		renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
 		renderingInfo.pColorAttachments = colourAttachmentInfos.data();
@@ -256,6 +282,28 @@ namespace NK
 		renderingInfo.pStencilAttachment = _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr;
 
 		vkCmdBeginRendering(m_buffer, &renderingInfo);
+	}
+
+
+
+	void VulkanCommandBuffer::BlitTexture(ITexture* _srcTexture, TEXTURE_ASPECT _srcAspect, ITexture* _dstTexture, TEXTURE_ASPECT _dstAspect)
+	{
+		const glm::ivec3 srcSize{ _srcTexture->GetSize() };
+		const glm::ivec3 dstSize{ _dstTexture->GetSize() };
+
+		VkImageBlit blitRegion{};
+
+		blitRegion.srcSubresource.aspectMask = GetVulkanImageAspectFlags(_srcAspect);
+		blitRegion.srcSubresource.layerCount = 1;
+		blitRegion.srcOffsets[0] = { 0, 0, 0 };
+		blitRegion.srcOffsets[1] = { srcSize.x, srcSize.y, srcSize.z };
+
+		blitRegion.dstSubresource.aspectMask = GetVulkanImageAspectFlags(_dstAspect);
+		blitRegion.dstSubresource.layerCount = 1;
+		blitRegion.dstOffsets[0] = { 0, 0, 0 };
+		blitRegion.dstOffsets[1] = { dstSize.x, dstSize.y, dstSize.z };
+
+		vkCmdBlitImage(m_buffer, dynamic_cast<VulkanTexture*>(_srcTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dynamic_cast<VulkanTexture*>(_dstTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blitRegion, VK_FILTER_LINEAR);
 	}
 
 
@@ -316,7 +364,7 @@ namespace NK
 	{
 		VulkanRootSignature* vkRootSig{ dynamic_cast<VulkanRootSignature*>(_rootSignature) };
 		//todo: replace VK_SHADER_STAGE_ALL with more precise user-defined parameter
-		VkShaderStageFlags stage{ static_cast<VkShaderStageFlags>(vkRootSig->GetBindPoint() == PIPELINE_BIND_POINT::GRAPHICS ? VK_SHADER_STAGE_ALL_GRAPHICS : VK_SHADER_STAGE_COMPUTE_BIT)};
+		VkShaderStageFlags stage{ static_cast<VkShaderStageFlags>(vkRootSig->GetBindPoint() == PIPELINE_BIND_POINT::GRAPHICS ? VK_SHADER_STAGE_ALL_GRAPHICS : VK_SHADER_STAGE_COMPUTE_BIT) };
 		vkCmdPushConstants(m_buffer, vkRootSig->GetPipelineLayout(), stage, 0, vkRootSig->GetProvidedNum32BitValues() * 4, _data);
 	}
 
@@ -418,8 +466,8 @@ namespace NK
 		//Ensure destination region doesn't exceed destination texture's bounds
 		const glm::ivec3 textureSize = _dstTexture->GetSize();
 		if ((_dstOffset.x + _dstExtent.x > textureSize.x) ||
-			(_dstOffset.y + _dstExtent.y > textureSize.y) ||
-			(_dstOffset.z + _dstExtent.z > textureSize.z))
+		    (_dstOffset.y + _dstExtent.y > textureSize.y) ||
+		    (_dstOffset.z + _dstExtent.z > textureSize.z))
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToTexture() - Specified destination region is out of bounds for the texture.\n");
 			throw std::runtime_error("");
@@ -447,23 +495,23 @@ namespace NK
 		switch (_state)
 		{
 		//Common States
-		case RESOURCE_STATE::UNDEFINED:			return { VK_IMAGE_LAYOUT_UNDEFINED, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
-		case RESOURCE_STATE::PRESENT:			return { VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT };
+		case RESOURCE_STATE::UNDEFINED: return { VK_IMAGE_LAYOUT_UNDEFINED, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
+		case RESOURCE_STATE::PRESENT: return { VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT };
 
 		//Read-Only States
-		case RESOURCE_STATE::VERTEX_BUFFER:		return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT };
-		case RESOURCE_STATE::INDEX_BUFFER:		return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_INDEX_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT };
-		case RESOURCE_STATE::CONSTANT_BUFFER:	return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
-		case RESOURCE_STATE::INDIRECT_BUFFER:	return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_INDIRECT_COMMAND_READ_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT };
-		case RESOURCE_STATE::SHADER_RESOURCE:	return { VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
-		case RESOURCE_STATE::COPY_SOURCE:		return { VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
-		case RESOURCE_STATE::DEPTH_READ:		return { VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT };
+		case RESOURCE_STATE::VERTEX_BUFFER: return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT };
+		case RESOURCE_STATE::INDEX_BUFFER: return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_INDEX_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT };
+		case RESOURCE_STATE::CONSTANT_BUFFER: return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
+		case RESOURCE_STATE::INDIRECT_BUFFER: return { VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_INDIRECT_COMMAND_READ_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT };
+		case RESOURCE_STATE::SHADER_RESOURCE: return { VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
+		case RESOURCE_STATE::COPY_SOURCE: return { VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
+		case RESOURCE_STATE::DEPTH_READ: return { VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT };
 
 		//Read-Write States
-		case RESOURCE_STATE::RENDER_TARGET:		return { VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		case RESOURCE_STATE::UNORDERED_ACCESS:	return { VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT };
-		case RESOURCE_STATE::COPY_DEST:			return { VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
-		case RESOURCE_STATE::DEPTH_WRITE:		return { VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT };
+		case RESOURCE_STATE::RENDER_TARGET: return { VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		case RESOURCE_STATE::UNORDERED_ACCESS: return { VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT };
+		case RESOURCE_STATE::COPY_DEST: return { VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
+		case RESOURCE_STATE::DEPTH_WRITE: return { VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT };
 
 		default:
 		{
@@ -504,6 +552,27 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		}
+	}
+
+
+
+	VkImageAspectFlags VulkanCommandBuffer::GetVulkanImageAspectFlags(TEXTURE_ASPECT _aspect)
+	{
+		VkImageAspectFlags vkFlags{ 0 };
+
+		switch (_aspect)
+		{
+		case TEXTURE_ASPECT::COLOUR: return vkFlags |= VK_IMAGE_ASPECT_COLOR_BIT;
+		case TEXTURE_ASPECT::DEPTH: return vkFlags |= VK_IMAGE_ASPECT_DEPTH_BIT;
+		case TEXTURE_ASPECT::STENCIL: return vkFlags |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		case TEXTURE_ASPECT::DEPTH_STENCIL: return vkFlags |= VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		default:
+		{
+			throw std::runtime_error("GetVulkanImageAspectFlags() default case reached. _aspect = " + std::to_string(std::to_underlying(_aspect)));
+		}
+		}
+
+		return vkFlags;
 	}
 
 }

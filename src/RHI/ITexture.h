@@ -4,6 +4,8 @@
 #include <Types/DataFormat.h>
 #include <Core/Memory/IAllocator.h>
 
+#include "IPipeline.h"
+
 namespace NK
 {
 	class IDevice;
@@ -43,6 +45,8 @@ namespace NK
 		TEXTURE_USAGE_FLAGS usage;
 		DATA_FORMAT format;
 		TEXTURE_DIMENSION dimension; //Dimensionality of the image. If arrayTexture = true, this should be the dimensionality of the composing images (i.e.: max = TEXTURE_DIMENSION::DIM_2)
+
+		SAMPLE_COUNT sampleCount{ SAMPLE_COUNT::BIT_1 }; //If sampleCount > SAMPLE_COUNT::BIT_1, multisampling will be enabled
 	};
 
 
@@ -54,12 +58,13 @@ namespace NK
 		[[nodiscard]] inline glm::ivec3 GetSize() const { return m_size; }
 		[[nodiscard]] inline DATA_FORMAT GetFormat() const { return m_format; }
 		[[nodiscard]] inline TEXTURE_USAGE_FLAGS GetUsageFlags() const { return m_usage; }
+		[[nodiscard]] inline SAMPLE_COUNT GetSampleCount() const { return m_sampleCount; }
 
 
 	protected:
 		explicit ITexture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc, bool _isOwned)
 		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
-		  m_size(_desc.size), m_arrayTexture(_desc.arrayTexture), m_usage(_desc.usage), m_format(_desc.format), m_dimension(_desc.dimension),
+		  m_size(_desc.size), m_arrayTexture(_desc.arrayTexture), m_usage(_desc.usage), m_format(_desc.format), m_dimension(_desc.dimension), m_sampleCount(_desc.sampleCount),
 		  m_isOwned(_isOwned) {}
 
 
@@ -74,6 +79,7 @@ namespace NK
 		TEXTURE_USAGE_FLAGS m_usage;
 		DATA_FORMAT m_format;
 		TEXTURE_DIMENSION m_dimension;
+		SAMPLE_COUNT m_sampleCount;
 
 		//True if the lifetime of the texture is to be managed by this class (i.e. if the implemented derived constructor is called)
 		//False is the lifetime of the texture is to be managed elsewhere (i.e. if the implemented wrapper constructor is called)

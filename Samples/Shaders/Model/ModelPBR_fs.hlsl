@@ -100,10 +100,17 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
     //Calculate incoming radiance
-    float3 lightPos = float3(2,-2,2);
-    float3 radiantFlux = float3(23.47, 21.31, 20.79);
-    //float3 radiantFlux = float3(10.0, 2.0, 10.0);
-    float distance2 = dot(vertexOutput.fragPos - lightPos, vertexOutput.fragPos - lightPos);
+
+	//Kaju
+    //float3 lightPos = float3(1,6,6);
+    //float3 radiantFlux = float3(23.47, 21.31, 20.79) * 40;
+
+	//Damaged Helmet
+	float3 lightPos = float3(2,-2,2);
+	//float3 radiantFlux = float3(23.47, 21.31, 20.79);
+	float3 radiantFlux = float3(8, 4, 12);
+
+	float distance2 = dot(vertexOutput.fragPos - lightPos, vertexOutput.fragPos - lightPos);
     float attenuation = 1.0 / distance2;
     float3 incomingRadiance = radiantFlux * attenuation;
 
@@ -131,16 +138,16 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
     //Ambient
-    float ambientStrength = 0.005;
-    float3 ambient = ambientStrength * albedo * ao;
+	
+	//Kaju
+    //float ambientStrength = 0.5;
+	
+	//Damaged Helmet	
+	float ambientStrength = 0.005;    
+	
+	float3 ambient = ambientStrength * albedo * ao;
 
 
     float3 colour = ambient + emissive + outgoingRadiance;
-return float4(colour, 1.0);
-	
-
-
-
-	//DEBUG VISUALISATION
-	return float4(normal * 0.5f + 0.5f, 1.0);
+	return float4(colour, 1.0);
 }

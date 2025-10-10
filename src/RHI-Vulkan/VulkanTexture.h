@@ -16,6 +16,7 @@ namespace NK
 		[[nodiscard]] static TEXTURE_USAGE_FLAGS GetRHIUsageFlags(VkImageUsageFlags _flags);
 		[[nodiscard]] static VkFormat GetVulkanFormat(DATA_FORMAT _format);
 		[[nodiscard]] static DATA_FORMAT GetRHIFormat(VkFormat _format);
+		[[nodiscard]] static VkSampleCountFlagBits GetVulkanSampleCount(SAMPLE_COUNT _count);
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] VkImage GetTexture() const { return m_texture; }
