@@ -123,9 +123,69 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
-		TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
+		const TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
 
-		
+		BufferSubregion subregion{};
+		subregion.offset = (m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size);
+		subregion.size = memLayout.totalBytes;
+
+		if (subregion.offset + subregion.size > m_stagingBufferSize)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::GPU_UPLOADER, "EnqueueArrayTextureDataUpload() exceeded m_stagingBufferSize - flushing staging buffer with _waitIdle = true.\n");
+			Flush(true);
+			Reset();
+
+			subregion.offset = 0;
+		}
+
+		//memcpy data one row at a time, advancing ptr by memLayout.rowPitch after each row
+		unsigned char* dstPtr{ m_stagingBufferMap + subregion.offset };
+		std::size_t numRows{};
+		std::size_t numTextures{};
+		glm::ivec3 copyDstExtent{};
+		switch (_dstTexture->GetDimension())
+		{
+		case TEXTURE_DIMENSION::DIM_1:
+		{
+			numRows = 1;
+			numTextures = _dstTexture->GetSize().y;
+			copyDstExtent = glm::ivec3(_dstTexture->GetSize().x, 1, 1);
+			break;
+		}
+		case TEXTURE_DIMENSION::DIM_2:
+		{
+			numRows = _dstTexture->GetSize().y;
+			numTextures = _dstTexture->GetSize().z;
+			copyDstExtent = glm::ivec3(_dstTexture->GetSize().x, _dstTexture->GetSize().y, 1);
+			break;
+		}
+		case TEXTURE_DIMENSION::DIM_3:
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "EnqueueArrayTextureDataUpload() - Dimension of underlying texture elements in array texture is TEXTURE_DIMENSION::DIM_3 - this should not be possible and indicates an internal error with the engine itself. Please make a GitHub issue on the topic.\n");
+			throw std::runtime_error("");
+		}
+		}
+
+		//Loop through every texture in the array
+		for (std::size_t texture{ 0 }; texture < numTextures; ++texture)
+		{
+			const unsigned char* currentTextureSrcPtr{ static_cast<const unsigned char*>(_data[texture]) };
+			//Loop through every row in the texture
+			for (std::size_t row{ 0 }; row < numRows; ++row)
+			{
+				memcpy(dstPtr, currentTextureSrcPtr, memLayout.rowPitch);
+				currentTextureSrcPtr += memLayout.rowPitch;
+				dstPtr += memLayout.rowPitch;
+			}
+		}
+		m_stagingBufferSubregions.push_back(subregion);
+
+		if (_dstTextureInitialState != RESOURCE_STATE::COPY_DEST)
+		{
+			m_commandBuffer->TransitionBarrier(_dstTexture, _dstTextureInitialState, RESOURCE_STATE::COPY_DEST);
+		}
+
+		m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset, { 0, 0, 0 }, copyDstExtent);
 	}
 
 
@@ -138,7 +198,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		
-		TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
+		const TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
 
 		BufferSubregion subregion{};
 		subregion.offset = (m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size);
@@ -156,11 +216,30 @@ namespace NK
 		//memcpy data one row at a time, advancing ptr by memLayout.rowPitch after each row
 		const unsigned char* srcPtr{ static_cast<const unsigned char*>(_data) };
 		unsigned char* dstPtr{ m_stagingBufferMap + subregion.offset };
-		std::uint32_t bytesPerRow{ RHIUtils::GetFormatBytesPerPixel(_dstTexture->GetFormat()) * _dstTexture->GetSize().x };
-		for (std::size_t row{ 0 }; row < _dstTexture->GetSize().y; ++row)
+		std::size_t numRows{};
+		switch (_dstTexture->GetDimension())
 		{
-			memcpy(dstPtr, srcPtr, bytesPerRow);
-			srcPtr += bytesPerRow;
+		case TEXTURE_DIMENSION::DIM_1:
+		{
+			numRows = 1;
+			break;
+		}
+		case TEXTURE_DIMENSION::DIM_2:
+		{
+			numRows = _dstTexture->GetSize().y;
+			break;
+		}
+		case TEXTURE_DIMENSION::DIM_3:
+		{
+			numRows = _dstTexture->GetSize().z;
+			break;
+		}
+		}
+		
+		for (std::size_t row{ 0 }; row < numRows; ++row)
+		{
+			memcpy(dstPtr, srcPtr, memLayout.rowPitch);
+			srcPtr += memLayout.rowPitch;
 			dstPtr += memLayout.rowPitch;
 		}
 		m_stagingBufferSubregions.push_back(subregion);

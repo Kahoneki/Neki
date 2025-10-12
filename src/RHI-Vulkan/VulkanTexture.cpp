@@ -33,7 +33,7 @@ namespace NK
 		VkImageCreateInfo imageInfo{};
 		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageInfo.pNext = nullptr;
-		imageInfo.flags = 0;
+		imageInfo.flags = m_cubeMap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
 
 		switch (m_dimension)
 		{

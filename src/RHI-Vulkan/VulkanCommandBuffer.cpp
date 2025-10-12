@@ -122,7 +122,7 @@ namespace NK
 		barrier.subresourceRange.baseMipLevel = 0;
 		barrier.subresourceRange.levelCount = 1;
 		barrier.subresourceRange.baseArrayLayer = 0;
-		barrier.subresourceRange.layerCount = 1;
+		barrier.subresourceRange.layerCount = _texture->IsArrayTexture() ? (_texture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _texture->GetSize().y : _texture->GetSize().z) : 1;;
 
 		barrier.srcAccessMask = src.accessMask;
 		barrier.dstAccessMask = dst.accessMask;
@@ -485,7 +485,7 @@ namespace NK
 		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		copyRegion.imageSubresource.mipLevel = 0;
 		copyRegion.imageSubresource.baseArrayLayer = 0;
-		copyRegion.imageSubresource.layerCount = 1;
+		copyRegion.imageSubresource.layerCount = _dstTexture->IsArrayTexture() ? (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _dstTexture->GetSize().y : _dstTexture->GetSize().z) : 1;
 		copyRegion.imageOffset = { _dstOffset.x, _dstOffset.y, _dstOffset.z };
 		copyRegion.imageExtent = { static_cast<std::uint32_t>(_dstExtent.x), static_cast<std::uint32_t>(_dstExtent.y), static_cast<std::uint32_t>(_dstExtent.z) };
 

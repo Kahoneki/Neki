@@ -28,10 +28,10 @@ int main()
 
 	//----SETTINGS----//
 	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1920, 1080 };
-	constexpr bool enableMSAA{ true };
-	constexpr bool enableSSAA{ false };
+	constexpr bool enableMSAA{ false };
+	constexpr bool enableSSAA{ true };
 	constexpr NK::SAMPLE_COUNT msaaSampleCount{ NK::SAMPLE_COUNT::BIT_8 };
-	constexpr std::uint32_t ssaaMultiplier{ 4u }; //8x SSAA
+	constexpr std::uint32_t ssaaMultiplier{ 4u }; //16x SSAA
 	//----------------//
 
 	
@@ -90,7 +90,7 @@ int main()
 	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
 
 	//Camera
-	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0, 0, 3), 0, 0, 0.01f, 100.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 30.0f, 0.05f) };
+	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 30.0f, 0.05f) };
 
 	//Camera Data Buffer
 	NK::CameraShaderData initialCamShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
@@ -110,46 +110,51 @@ int main()
 	const NK::UniquePtr<NK::IBufferView> camDataBufferView{ device->CreateBufferView(camDataBuffer.get(), camDataBufferViewDesc) };
 	NK::ResourceIndex camDataBufferIndex{ camDataBufferView->GetIndex() };
 
-	//Vertex Shader
+	//Vertex Shaders
 	NK::ShaderDesc vertShaderDesc{};
 	vertShaderDesc.type = NK::SHADER_TYPE::VERTEX;
 	vertShaderDesc.filepath = "Samples/Shaders/Model/Model_vs";
 	const NK::UniquePtr<NK::IShader> vertShader{ device->CreateShader(vertShaderDesc) };
 
+	vertShaderDesc.filepath = "Samples/Shaders/Model/Skybox_vs";
+	const NK::UniquePtr<NK::IShader> skyboxVertShader{ device->CreateShader(vertShaderDesc) };
+
 
 	//Fragment Shaders
-	NK::ShaderDesc blinnPhongFragShaderDesc{};
-	blinnPhongFragShaderDesc.type = NK::SHADER_TYPE::FRAGMENT;
-	blinnPhongFragShaderDesc.filepath = "Samples/Shaders/Model/ModelBlinnPhong_fs";
-	const NK::UniquePtr<NK::IShader> blinnPhongFragShader{ device->CreateShader(blinnPhongFragShaderDesc) };
+	NK::ShaderDesc fragShaderDesc{};
+	fragShaderDesc.type = NK::SHADER_TYPE::FRAGMENT;
+	fragShaderDesc.filepath = "Samples/Shaders/Model/ModelBlinnPhong_fs";
+	const NK::UniquePtr<NK::IShader> blinnPhongFragShader{ device->CreateShader(fragShaderDesc) };
 
-	NK::ShaderDesc pbrFragShaderDesc{};
-	pbrFragShaderDesc.type = NK::SHADER_TYPE::FRAGMENT;
-	pbrFragShaderDesc.filepath = "Samples/Shaders/Model/ModelPBR_fs";
-	const NK::UniquePtr<NK::IShader> pbrFragShader{ device->CreateShader(pbrFragShaderDesc) };
+	fragShaderDesc.filepath = "Samples/Shaders/Model/ModelPBR_fs";
+	const NK::UniquePtr<NK::IShader> pbrFragShader{ device->CreateShader(fragShaderDesc) };
+
+	fragShaderDesc.filepath = "Samples/Shaders/Model/Skybox_fs";
+	const NK::UniquePtr<NK::IShader> skyboxFragShader{ device->CreateShader(fragShaderDesc) };
 
 
 	//Root Signature
 	NK::RootSignatureDesc rootSigDesc{};
-	rootSigDesc.num32BitPushConstantValues = 16 + 16 + 1 + 1 + 1; //model matrix + inverse model matrix + cam data buffer index + material buffer index + sampler index
+	rootSigDesc.num32BitPushConstantValues = 16 + 16 + 1 + 1 + 1 + 1; //model matrix + inverse model matrix + cam data buffer index + skybox cubemap index + material buffer index + sampler index
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 	
 	//Skybox Texture
 	void* skyboxImageData[6]
 	{
-		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/right.jpg", true, true)->data,
-		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/left.jpg", true, true)->data,
-		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/top.jpg", true, true)->data,
-		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/bottom.jpg", true, true)->data,
-		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/front.jpg", true, true)->data,
-		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/back.jpg", true, true)->data
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/right.jpg", false, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/left.jpg", false, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/top.jpg", false, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/bottom.jpg", false, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/front.jpg", false, true)->data,
+		NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/back.jpg", false, true)->data
 	};
 	NK::TextureDesc skyboxTextureDesc{ NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/right.jpg", true, true)->desc }; //cached, very inexpensive load
 	skyboxTextureDesc.usage |= NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
 	skyboxTextureDesc.arrayTexture = true;
 	skyboxTextureDesc.size.z = 6;
+	skyboxTextureDesc.cubemap = true;
 	const NK::UniquePtr<NK::ITexture> skyboxTexture{ device->CreateTexture(skyboxTextureDesc) };
-	gpuUploader->EnqueueTextureDataUpload(skyboxImageData, skyboxTexture.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueArrayTextureDataUpload(skyboxImageData, skyboxTexture.get(), NK::RESOURCE_STATE::UNDEFINED);
 	
 	//Skybox Texture View
 	NK::TextureViewDesc skyboxTextureViewDesc{};
@@ -165,6 +170,66 @@ int main()
 	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf", true, true) };
 	const NK::UniquePtr<NK::GPUModel> model{ gpuUploader->EnqueueModelDataUpload(modelData) };
 
+
+	//Skybox cube
+	//Vertex Buffer
+	constexpr glm::vec3 vertices[8] =
+	{
+		glm::vec3(-1.0f, -1.0f,  1.0f), //0: Front-Left-Bottom
+		glm::vec3( 1.0f, -1.0f,  1.0f), //1: Front-Right-Bottom
+		glm::vec3( 1.0f,  1.0f,  1.0f), //2: Front-Right-Top
+		glm::vec3(-1.0f,  1.0f,  1.0f), //3: Front-Left-Top
+		glm::vec3(-1.0f, -1.0f, -1.0f), //4: Back-Left-Bottom
+		glm::vec3( 1.0f, -1.0f, -1.0f), //5: Back-Right-Bottom
+		glm::vec3( 1.0f,  1.0f, -1.0f), //6: Back-Right-Top
+		glm::vec3(-1.0f,  1.0f, -1.0f)  //7: Back-Left-Top
+	};
+
+	NK::BufferDesc skyboxVertBufferDesc{};
+	skyboxVertBufferDesc.size = sizeof(glm::vec3) * 8;
+	skyboxVertBufferDesc.type = NK::MEMORY_TYPE::DEVICE;
+	skyboxVertBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | NK::BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
+	const NK::UniquePtr<NK::IBuffer> skyboxVertBuffer{ device->CreateBuffer(skyboxVertBufferDesc) };
+
+	//Index Buffer
+	const std::uint32_t indices[36] =
+	{
+		//Front face
+		0, 1, 2,
+		2, 3, 0,
+
+		//Right face
+		1, 5, 6,
+		6, 2, 1,
+
+		//Back face
+		7, 6, 5,
+		5, 4, 7,
+
+		//Left face
+		4, 0, 3,
+		3, 7, 4,
+
+		//Top face
+		3, 2, 6,
+		6, 7, 3,
+
+		//Bottom face
+		4, 5, 1,
+		1, 0, 4
+	};
+
+	NK::BufferDesc indexBufferDesc{};
+	indexBufferDesc.size = sizeof(std::uint32_t) * 36;
+	indexBufferDesc.type = NK::MEMORY_TYPE::DEVICE;
+	indexBufferDesc.usage = NK::BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | NK::BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT;
+	const NK::UniquePtr<NK::IBuffer> skyboxIndexBuffer{ device->CreateBuffer(indexBufferDesc) };
+	
+	//Upload vertex and index buffers
+	gpuUploader->EnqueueBufferDataUpload(vertices, skyboxVertBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	gpuUploader->EnqueueBufferDataUpload(indices, skyboxIndexBuffer.get(), NK::RESOURCE_STATE::UNDEFINED);
+	
+	
 	//Flush gpu uploader uploads
 	gpuUploader->Flush(true);
 	gpuUploader->Reset();
@@ -240,6 +305,31 @@ int main()
 
 	graphicsPipelineDesc.fragmentShader = pbrFragShader.get();
 	const NK::UniquePtr<NK::IPipeline> pbrPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
+
+	//Skybox pipeline
+	std::vector<NK::VertexAttributeDesc> vertexAttributes;
+	NK::VertexAttributeDesc posAttribute{};
+	posAttribute.attribute = NK::SHADER_ATTRIBUTE::POSITION;
+	posAttribute.binding = 0;
+	posAttribute.format = NK::DATA_FORMAT::R32G32B32_SFLOAT;
+	posAttribute.offset = 0;
+	vertexAttributes.push_back(posAttribute);
+	std::vector<NK::VertexBufferBindingDesc> bufferBindings;
+	NK::VertexBufferBindingDesc bufferBinding{};
+	bufferBinding.binding = 0;
+	bufferBinding.inputRate = NK::VERTEX_INPUT_RATE::VERTEX;
+	bufferBinding.stride = sizeof(glm::vec3);
+	bufferBindings.push_back(bufferBinding);
+	NK::VertexInputDesc skyboxVertexInputDesc{};
+	skyboxVertexInputDesc.attributeDescriptions = vertexAttributes;
+	skyboxVertexInputDesc.bufferBindingDescriptions = bufferBindings;
+	graphicsPipelineDesc.vertexInputDesc = skyboxVertexInputDesc;
+	graphicsPipelineDesc.rasteriserDesc.cullMode = NK::CULL_MODE::FRONT;
+	graphicsPipelineDesc.depthStencilDesc.depthCompareOp = NK::COMPARE_OP::LESS_OR_EQUAL;
+	graphicsPipelineDesc.vertexShader = skyboxVertShader.get();
+	graphicsPipelineDesc.fragmentShader = skyboxFragShader.get();
+	const NK::UniquePtr<NK::IPipeline> skyboxPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
+	
 	
 
 	//Render Target
@@ -355,31 +445,44 @@ int main()
 			glm::mat4 modelMat;
 			glm::mat4 inverseModelMat;
 			NK::ResourceIndex camDataBufferIndex;
+			NK::ResourceIndex skyboxCubemapIndex;
 			NK::ResourceIndex materialBufferIndex;
 			NK::SamplerIndex samplerIndex;
 		};
-		std::size_t vertexBufferStride{ sizeof(NK::ModelVertex) };
+		std::size_t skyboxVertexBufferStride{ sizeof(glm::vec3) };
+		std::size_t modelVertexBufferStride{ sizeof(NK::ModelVertex) };
 
 		for (std::size_t i{ 0 }; i < model->meshes.size(); ++i)
 		{
-			NK::IPipeline* pipeline{ model->materials[0]->lightingModel == NK::LIGHTING_MODEL::BLINN_PHONG ? blinnPhongPipeline.get() : pbrPipeline.get() };
-			commandBuffers[currentFrame]->BindPipeline(pipeline, NK::PIPELINE_BIND_POINT::GRAPHICS);
-
-			commandBuffers[currentFrame]->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &vertexBufferStride);
-			commandBuffers[currentFrame]->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
-
+			//Push constants (unchanging between skybox and model draw calls)
 			PushConstantData pushConstantData{};
-
-			//Damaged Helmet
-			float speed{ 50.0f };
-			modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())), glm::vec3(0, 0, 1));
-
+			
 			pushConstantData.modelMat = modelModelMatrix;
 			pushConstantData.inverseModelMat = glm::inverse(modelModelMatrix);
 			pushConstantData.camDataBufferIndex = camDataBufferIndex;
+			pushConstantData.skyboxCubemapIndex = skyboxTextureResourceIndex;
 			pushConstantData.materialBufferIndex = model->materials[model->meshes[i]->materialIndex]->bufferIndex;
 			pushConstantData.samplerIndex = samplerIndex;
+
 			commandBuffers[currentFrame]->PushConstants(rootSig.get(), &pushConstantData);
+
+			
+			//Skybox
+			commandBuffers[currentFrame]->BindPipeline(skyboxPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
+			commandBuffers[currentFrame]->BindVertexBuffers(0, 1, skyboxVertBuffer.get(), &skyboxVertexBufferStride);
+			commandBuffers[currentFrame]->BindIndexBuffer(skyboxIndexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
+			
+			commandBuffers[currentFrame]->DrawIndexed(36, 1, 0, 0);
+			
+			
+			//Model
+			NK::IPipeline* pipeline{ model->materials[0]->lightingModel == NK::LIGHTING_MODEL::BLINN_PHONG ? blinnPhongPipeline.get() : pbrPipeline.get() };
+			commandBuffers[currentFrame]->BindPipeline(pipeline, NK::PIPELINE_BIND_POINT::GRAPHICS);
+			commandBuffers[currentFrame]->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
+			commandBuffers[currentFrame]->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
+
+			float speed{ 50.0f };
+			modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())), glm::vec3(0, 0, 1));
 
 			commandBuffers[currentFrame]->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
 		}

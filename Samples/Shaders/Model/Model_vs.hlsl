@@ -35,6 +35,7 @@ PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
 	float4x4 inverseModelMat;
 	uint camDataBufferIndex;
+	uint skyboxCubemapIndex;
 	uint materialBufferIndex;
 	uint samplerIndex;
 );
@@ -45,7 +46,7 @@ VertexOutput VSMain(VertexInput input)
     VertexOutput output;
 	CamData camData = g_camData[NonUniformResourceIndex(PC(camDataBufferIndex))];
 
-    output.camPos = camData.pos;
+    output.camPos = camData.pos.xyz;
 	output.texCoord = input.texCoord;
 	
 	float4 worldPos = mul(PC(modelMat), float4(input.pos, 1.0));
@@ -60,8 +61,8 @@ VertexOutput VSMain(VertexInput input)
     float3 B_os = cross(T_os, N_os) * sign;
     
     float3 T = normalize( mul(PC(modelMat), float4(T_os, 0.0)).xyz );
-    float3 N = normalize( mul(PC(modelMat), float4(N_os, 0.0)).xyz );
     float3 B = normalize( mul(PC(modelMat), float4(B_os, 0.0)).xyz );
+    float3 N = normalize( mul(PC(modelMat), float4(N_os, 0.0)).xyz );
 
     output.TBN = transpose(float3x3(T, B, N));
     output.bitangent = B;

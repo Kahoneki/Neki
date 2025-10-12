@@ -14,7 +14,7 @@ namespace NK
 		TEXTURE_VIEW_DIMENSION dimension;
 		DATA_FORMAT format;
 		std::uint32_t baseArrayLayer;
-		std::uint32_t arrayLayerCount;
+		std::uint32_t arrayLayerCount{ 1u };
 		//todo: add mip support
 	};
 

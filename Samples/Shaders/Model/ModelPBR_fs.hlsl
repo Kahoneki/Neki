@@ -15,6 +15,7 @@ struct VertexOutput
 };
 
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
+[[vk::binding(0,0)]] TextureCube g_skyboxes[] : register(t0, space0);
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
 [[vk::binding(0,0)]] ConstantBuffer<NK::PBRMaterial> g_materials[] : register(b0, space0);
 
@@ -22,6 +23,7 @@ PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
 	float4x4 inverseModelMat;
 	uint camDataBufferIndex;
+	uint skyboxCubemapIndex;
 	uint materialBufferIndex;
 	uint samplerIndex;
 );
@@ -105,10 +107,9 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
     //float3 lightPos = float3(1,6,6);
     //float3 radiantFlux = float3(23.47, 21.31, 20.79) * 40;
 
-	//Damaged Helmet
-	float3 lightPos = float3(2,-2,2);
-	//float3 radiantFlux = float3(23.47, 21.31, 20.79);
-	float3 radiantFlux = float3(8, 4, 12);
+	float3 lightPos = float3(2,2,2);
+	float3 radiantFlux = float3(23.47, 21.31, 20.79);
+	//float3 radiantFlux = float3(8, 4, 12);
 
 	float distance2 = dot(vertexOutput.fragPos - lightPos, vertexOutput.fragPos - lightPos);
     float attenuation = 1.0 / distance2;
@@ -138,14 +139,17 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
     //Ambient
-	
+	float3 reflectionDir = reflect(-viewDir, normal);
+	float4 skyboxSample = g_skyboxes[NonUniformResourceIndex(PC(skyboxCubemapIndex))].Sample(sampler, reflectionDir);
+	float3 ambient = skyboxSample.rgb * albedo * ao;
+
 	//Kaju
     //float ambientStrength = 0.5;
 	
 	//Damaged Helmet	
-	float ambientStrength = 0.005;    
+	//float ambientStrength = 0.005;
 	
-	float3 ambient = ambientStrength * albedo * ao;
+	//float3 ambient = ambientStrength * albedo * ao;
 
 
     float3 colour = ambient + emissive + outgoingRadiance;

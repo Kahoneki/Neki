@@ -231,8 +231,8 @@ namespace NK
 	TextureCopyMemoryLayout VulkanDevice::GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture)
 	{
 		TextureCopyMemoryLayout memLayout{};
-		std::uint32_t bytesPerPixel{ RHIUtils::GetFormatBytesPerPixel(_texture->GetFormat()) };
-		std::uint32_t numPixels{ static_cast<std::uint32_t>(_texture->GetSize().x * _texture->GetSize().y * _texture->GetSize().z) };
+		const std::uint32_t bytesPerPixel{ RHIUtils::GetFormatBytesPerPixel(_texture->GetFormat()) };
+		const std::uint32_t numPixels{ static_cast<std::uint32_t>(_texture->GetSize().x * _texture->GetSize().y * _texture->GetSize().z) };
 		memLayout.totalBytes = numPixels * bytesPerPixel;
 		memLayout.rowPitch = _texture->GetSize().x * bytesPerPixel;
 
