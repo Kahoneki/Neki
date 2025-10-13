@@ -24,6 +24,17 @@
 
 int main()
 {
+	//----SETTINGS----//
+	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1920, 1080 };
+	constexpr bool enableMSAA{ false };
+	constexpr bool enableSSAA{ false };
+	constexpr NK::SAMPLE_COUNT msaaSampleCount{ NK::SAMPLE_COUNT::BIT_8 };
+	constexpr std::uint32_t ssaaMultiplier{ 4u }; //8x SSAA
+	//----------------//
+
+
+	constexpr glm::ivec2 SUPERSAMPLE_RESOLUTION{ SCREEN_DIMENSIONS * glm::ivec2(ssaaMultiplier, ssaaMultiplier) };
+
 	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
@@ -65,8 +76,7 @@ int main()
 	//Window and Surface
 	NK::WindowDesc windowDesc{};
 	windowDesc.name = "Model Sample";
-	constexpr glm::ivec2 SCREEN_DIMENSIONS{ 1280, 720 };
-	windowDesc.size = glm::ivec2(SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y);
+	windowDesc.size = SCREEN_DIMENSIONS;
 	const NK::UniquePtr<NK::Window> window{ device->CreateWindow(windowDesc) };
 	const NK::UniquePtr<NK::ISurface> surface{ device->CreateSurface(window.get()) };
 
@@ -76,9 +86,9 @@ int main()
 	swapchainDesc.numBuffers = 3;
 	swapchainDesc.presentQueue = graphicsQueue.get();
 	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
-	
+
 	//Camera
-	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0, 0, 3), 0, 0, 0.01f, 100.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 30.0f, 0.05f) };
+	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0, 0, 3), 0, 0, 0.1f, 1000.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 30.0f, 0.05f) };
 
 	//Camera Data Buffer
 	NK::CameraShaderData initialCamShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
@@ -119,22 +129,58 @@ int main()
 
 	//Root Signature
 	NK::RootSignatureDesc rootSigDesc{};
-	rootSigDesc.num32BitPushConstantValues = 16 + 1 + 1 + 1; //model matrix + cam data buffer index + material buffer index + sampler index
+	rootSigDesc.num32BitPushConstantValues = 16 + 16 + 1 + 1 + 1; //model matrix + inverse model matrix + cam data buffer index + material buffer index + sampler index
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 
+	////Skybox Texture
+	//void* skyboxImageData[6]
+	//{
+	//	NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/right.jpg", true, true)->data,
+	//	NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/left.jpg", true, true)->data,
+	//	NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/top.jpg", true, true)->data,
+	//	NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/bottom.jpg", true, true)->data,
+	//	NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/front.jpg", true, true)->data,
+	//	NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/back.jpg", true, true)->data
+	//};
+	//NK::TextureDesc skyboxTextureDesc{ NK::ImageLoader::LoadImage("Samples/Resource Files/skybox/right.jpg", true, true)->desc }; //cached, very inexpensive load
+	//skyboxTextureDesc.usage |= NK::TEXTURE_USAGE_FLAGS::READ_ONLY;
+	//skyboxTextureDesc.arrayTexture = true;
+	//skyboxTextureDesc.size.z = 6;
+	//const NK::UniquePtr<NK::ITexture> skyboxTexture{ device->CreateTexture(skyboxTextureDesc) };
+	//gpuUploader->EnqueueTextureDataUpload(skyboxImageData, skyboxTexture.get(), NK::RESOURCE_STATE::UNDEFINED);
+
+	////Skybox Texture View
+	//NK::TextureViewDesc skyboxTextureViewDesc{};
+	//skyboxTextureViewDesc.dimension = NK::TEXTURE_VIEW_DIMENSION::DIM_CUBE;
+	//skyboxTextureViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
+	//skyboxTextureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+	//skyboxTextureViewDesc.baseArrayLayer = 0;
+	//skyboxTextureViewDesc.arrayLayerCount = 6;
+	//const NK::UniquePtr<NK::ITextureView> skyboxTextureView{ device->CreateShaderResourceTextureView(skyboxTexture.get(), skyboxTextureViewDesc) };
+	//NK::ResourceIndex skyboxTextureResourceIndex{ skyboxTextureView->GetIndex() };
 
 	//Model
-	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf", false, true) };
+	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/sponza/scene.gltf", true, true) };
 	const NK::UniquePtr<NK::GPUModel> model{ gpuUploader->EnqueueModelDataUpload(modelData) };
 
 	//Flush gpu uploader uploads
 	gpuUploader->Flush(true);
 	gpuUploader->Reset();
 
+
 	//Model model matrix (like... the... model matrix of the... model)
 	glm::mat4 modelModelMatrix{ glm::mat4(1.0f) };
-	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(30.0f), glm::vec3(0, -1, 0));
-	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(70.0f), glm::vec3(1, 0, 0));
+
+	//Kaju
+	//modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(180.0f), glm::vec3(0, 1, 0));
+	//modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+	modelModelMatrix = glm::scale(modelModelMatrix, glm::vec3(0.1f));
+
+	//Damaged Helmet
+	//modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
+	//modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(30.0f), glm::vec3(0, -1, 0));
+	//modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(70.0f), glm::vec3(1, 0, 0));
+
 
 	//Sampler
 	NK::SamplerDesc samplerDesc{};
@@ -142,7 +188,7 @@ int main()
 	samplerDesc.magFilter = NK::FILTER_MODE::LINEAR;
 	const NK::UniquePtr<NK::ISampler> sampler{ device->CreateSampler(samplerDesc) };
 	NK::SamplerIndex samplerIndex{ sampler->GetIndex() };
-	
+
 
 	//Graphics Pipeline
 
@@ -163,7 +209,7 @@ int main()
 	depthStencilDesc.stencilTestEnable = false;
 
 	NK::MultisamplingDesc multisamplingDesc{};
-	multisamplingDesc.sampleCount = NK::SAMPLE_COUNT::BIT_1;
+	multisamplingDesc.sampleCount = enableMSAA ? msaaSampleCount : NK::SAMPLE_COUNT::BIT_1;
 	multisamplingDesc.sampleMask = UINT32_MAX;
 	multisamplingDesc.alphaToCoverageEnable = false;
 
@@ -194,29 +240,47 @@ int main()
 	const NK::UniquePtr<NK::IPipeline> pbrPipeline{ device->CreatePipeline(graphicsPipelineDesc) };
 
 
+	//Render Target
+	NK::TextureDesc renderTargetDesc{};
+	renderTargetDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	renderTargetDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
+	renderTargetDesc.size = enableSSAA ? glm::ivec3(SUPERSAMPLE_RESOLUTION, 1) : glm::ivec3(SCREEN_DIMENSIONS, 1);
+	renderTargetDesc.usage = NK::TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | NK::TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT; //Needs TRANSFER_SRC_BIT for supersampling algorithm
+	renderTargetDesc.arrayTexture = false;
+	renderTargetDesc.sampleCount = enableMSAA ? msaaSampleCount : NK::SAMPLE_COUNT::BIT_1;
+	const NK::UniquePtr<NK::ITexture> renderTarget{ device->CreateTexture(renderTargetDesc) };
+
+	//Render Target View
+	NK::TextureViewDesc renderTargetViewDesc{};
+	renderTargetViewDesc.dimension = NK::TEXTURE_VIEW_DIMENSION::DIM_2;
+	renderTargetViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
+	renderTargetViewDesc.type = NK::TEXTURE_VIEW_TYPE::RENDER_TARGET;
+	const NK::UniquePtr<NK::ITextureView> renderTargetView{ device->CreateRenderTargetTextureView(renderTarget.get(), renderTargetViewDesc) };
+
 	//Depth Buffer
 	NK::TextureDesc depthBufferDesc{};
 	depthBufferDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
 	depthBufferDesc.format = NK::DATA_FORMAT::D32_SFLOAT;
-	depthBufferDesc.size = glm::ivec3(SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y, 1);
+	depthBufferDesc.size = enableSSAA ? glm::ivec3(SUPERSAMPLE_RESOLUTION, 1) : glm::ivec3(SCREEN_DIMENSIONS, 1);
 	depthBufferDesc.usage = NK::TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT;
 	depthBufferDesc.arrayTexture = false;
+	depthBufferDesc.sampleCount = enableMSAA ? msaaSampleCount : NK::SAMPLE_COUNT::BIT_1;
 	const NK::UniquePtr<NK::ITexture> depthBuffer{ device->CreateTexture(depthBufferDesc) };
 
-	//Depth Buffer View
+	//Supersample Depth Buffer View
 	NK::TextureViewDesc depthBufferViewDesc{};
-	depthBufferViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	depthBufferViewDesc.dimension = NK::TEXTURE_VIEW_DIMENSION::DIM_2;
 	depthBufferViewDesc.format = NK::DATA_FORMAT::D32_SFLOAT;
 	depthBufferViewDesc.type = NK::TEXTURE_VIEW_TYPE::DEPTH;
 	const NK::UniquePtr<NK::ITextureView> depthBufferView{ device->CreateDepthStencilTextureView(depthBuffer.get(), depthBufferViewDesc) };
 
 
 	//Number of frames the CPU can get ahead of the GPU
-	constexpr std::uint32_t MAX_FRAMES_IN_FLIGHT{ 10 };
+	constexpr std::uint32_t MAX_FRAMES_IN_FLIGHT{ 3 };
 
 	//Graphics Command Buffers
 	std::vector<NK::UniquePtr<NK::ICommandBuffer>> commandBuffers(MAX_FRAMES_IN_FLIGHT);
-	for (std::size_t i{ 0 }; i<MAX_FRAMES_IN_FLIGHT; ++i)
+	for (std::size_t i{ 0 }; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
 		commandBuffers[i] = graphicsCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc);
 	}
@@ -227,7 +291,7 @@ int main()
 	{
 		imageAvailableSemaphores[i] = device->CreateSemaphore();
 	}
-	
+
 	std::vector<NK::UniquePtr<NK::ISemaphore>> renderFinishedSemaphores(swapchain->GetNumImages());
 	for (std::size_t i{ 0 }; i < swapchain->GetNumImages(); ++i)
 	{
@@ -256,6 +320,7 @@ int main()
 	
 	while (!window->ShouldClose())
 	{
+		logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "draw\n");
 		//Update managers
 		glfwPollEvents();
 		NK::TimeManager::Update();
@@ -274,19 +339,26 @@ int main()
 
 		commandBuffers[currentFrame]->Begin();
 		std::uint32_t imageIndex{ swapchain->AcquireNextImageIndex(imageAvailableSemaphores[currentFrame].get(), nullptr) };
-		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
-		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), depthBufferView.get(), nullptr);
+		if constexpr (enableMSAA || enableSSAA)
+		{
+			commandBuffers[currentFrame]->TransitionBarrier(renderTarget.get(), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
+		}
+		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
+		//commandBuffers[currentFrame]->TransitionBarrier(depthBuffer.get(), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::DEPTH_WRITE);
+
+		commandBuffers[currentFrame]->BeginRendering(1, enableMSAA ? renderTargetView.get() : nullptr, enableSSAA ? renderTargetView.get() : swapchain->GetImageView(imageIndex), depthBufferView.get(), nullptr);
 		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 
-		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y });
-		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { SCREEN_DIMENSIONS.x, SCREEN_DIMENSIONS.y });
+		commandBuffers[currentFrame]->SetViewport({ 0, 0 }, { enableSSAA ? SUPERSAMPLE_RESOLUTION : SCREEN_DIMENSIONS });
+		commandBuffers[currentFrame]->SetScissor({ 0, 0 }, { enableSSAA ? SUPERSAMPLE_RESOLUTION : SCREEN_DIMENSIONS });
 
 
 		//Drawing
 		struct PushConstantData
 		{
 			glm::mat4 modelMat;
+			glm::mat4 inverseModelMat;
 			NK::ResourceIndex camDataBufferIndex;
 			NK::ResourceIndex materialBufferIndex;
 			NK::SamplerIndex samplerIndex;
@@ -302,9 +374,13 @@ int main()
 			commandBuffers[currentFrame]->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
 
 			PushConstantData pushConstantData{};
-			float speed{ 50.0f };
-			modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())), glm::vec3(0, 0, 1));
+
+			//Damaged Helmet
+			//float speed{ 50.0f };
+			//modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())), glm::vec3(0, 0, 1));
+
 			pushConstantData.modelMat = modelModelMatrix;
+			pushConstantData.inverseModelMat = glm::inverse(modelModelMatrix);
 			pushConstantData.camDataBufferIndex = camDataBufferIndex;
 			pushConstantData.materialBufferIndex = model->materials[model->meshes[i]->materialIndex]->bufferIndex;
 			pushConstantData.samplerIndex = samplerIndex;
@@ -314,9 +390,22 @@ int main()
 		}
 
 
-		//End rendering
 		commandBuffers[currentFrame]->EndRendering();
-		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);
+
+		if (enableSSAA)
+		{
+			//Downscaling pass
+			commandBuffers[currentFrame]->TransitionBarrier(renderTarget.get(), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::COPY_SOURCE);
+			commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::COPY_DEST);
+			commandBuffers[currentFrame]->BlitTexture(renderTarget.get(), NK::TEXTURE_ASPECT::COLOUR, swapchain->GetImage(imageIndex), NK::TEXTURE_ASPECT::COLOUR);
+			commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::COPY_DEST, NK::RESOURCE_STATE::PRESENT);
+		}
+		else
+		{
+			commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::RENDER_TARGET, NK::RESOURCE_STATE::PRESENT);
+		}
+
+		//Present
 		commandBuffers[currentFrame]->End();
 
 

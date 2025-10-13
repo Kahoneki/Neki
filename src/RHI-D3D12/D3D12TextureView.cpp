@@ -14,13 +14,6 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::TEXTURE_VIEW, "Creating Texture View\n");
 
-		
-		if (_desc.type == TEXTURE_VIEW_TYPE::RENDER_TARGET)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE_VIEW, "This constructor is only to be used for shader-accessible and depth-stencil view types. This requirement will maybe be lifted in a future version - if there is a valid reason for needing this constructor for an RTV in this instance, please make a GitHub issue on the topic.\n");
-			throw std::runtime_error("");
-		}
-
 
 		m_resourceIndex = m_resourceIndexAllocator->Allocate();
 		m_handle = _descriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -38,19 +31,19 @@ namespace NK
 			//todo: add array support
 			switch (m_dimension)
 			{
-			case TEXTURE_DIMENSION::DIM_1:
+			case TEXTURE_VIEW_DIMENSION::DIM_1:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D;
 				desc.Texture1D.MipLevels = 1;
 				break;
 			}
-			case TEXTURE_DIMENSION::DIM_2:
+			case TEXTURE_VIEW_DIMENSION::DIM_2:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 				desc.Texture2D.MipLevels = 1;
 				break;
 			}
-			case TEXTURE_DIMENSION::DIM_3:
+			case TEXTURE_VIEW_DIMENSION::DIM_3:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
 				desc.Texture3D.MipLevels = 1;
@@ -74,17 +67,17 @@ namespace NK
 			//todo: add array support
 			switch (m_dimension)
 			{
-			case TEXTURE_DIMENSION::DIM_1:
+			case TEXTURE_VIEW_DIMENSION::DIM_1:
 			{
 				desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
 				break;
 			}
-			case TEXTURE_DIMENSION::DIM_2:
+			case TEXTURE_VIEW_DIMENSION::DIM_2:
 			{
 				desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 				break;
 			}
-			case TEXTURE_DIMENSION::DIM_3:
+			case TEXTURE_VIEW_DIMENSION::DIM_3:
 			{
 				desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
 				break;
@@ -105,6 +98,18 @@ namespace NK
 			desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d dsv?
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateDepthStencilView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
+
+			break;
+		}
+
+		//Render target view
+		case TEXTURE_VIEW_TYPE::RENDER_TARGET:
+		{
+			D3D12_RENDER_TARGET_VIEW_DESC desc{};
+			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
+			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d rtv?
+
+			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateRenderTargetView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
 
 			break;
 		}
