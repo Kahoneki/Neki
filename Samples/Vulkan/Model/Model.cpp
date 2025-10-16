@@ -135,7 +135,7 @@ int main()
 
 	//Root Signature
 	NK::RootSignatureDesc rootSigDesc{};
-	rootSigDesc.num32BitPushConstantValues = 16 + 16 + 1 + 1 + 1 + 1 + 1; //model matrix + inverse model matrix + cam data buffer index + skybox cubemap index + material buffer index + sampler index
+	rootSigDesc.num32BitPushConstantValues = 16 + 1 + 1 + 1 + 1 + 1; //model matrix + cam data buffer index + skybox cubemap index + material buffer index + sampler index
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 	
 	//Skybox Texture
@@ -443,7 +443,6 @@ int main()
 		struct PushConstantData
 		{
 			glm::mat4 modelMat;
-			glm::mat4 inverseModelMat;
 			NK::ResourceIndex camDataBufferIndex;
 			NK::ResourceIndex skyboxCubemapIndex;
 			NK::ResourceIndex materialBufferIndex;
@@ -458,7 +457,6 @@ int main()
 			PushConstantData pushConstantData{};
 			
 			pushConstantData.modelMat = modelModelMatrix;
-			pushConstantData.inverseModelMat = glm::inverse(modelModelMatrix);
 			pushConstantData.camDataBufferIndex = camDataBufferIndex;
 			pushConstantData.skyboxCubemapIndex = skyboxTextureResourceIndex;
 			pushConstantData.materialBufferIndex = model->materials[model->meshes[i]->materialIndex]->bufferIndex;

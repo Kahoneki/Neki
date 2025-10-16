@@ -14,7 +14,6 @@ struct VertexOutput
 
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
-	float4x4 inverseModelMat;
 	uint camDataBufferIndex;
 	uint skyboxCubemapIndex;
 	uint materialBufferIndex;

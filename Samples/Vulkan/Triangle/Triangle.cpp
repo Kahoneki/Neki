@@ -262,7 +262,7 @@ int main()
 		commandBuffers[currentFrame]->Begin();
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
-		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
+		commandBuffers[currentFrame]->BeginRendering(1, nullptr, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 

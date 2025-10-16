@@ -28,15 +28,7 @@ namespace NK
 		VkImageViewCreateInfo viewInfo{};
 		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		viewInfo.image = dynamic_cast<VulkanTexture*>(_texture)->GetTexture();
-
-		//todo: add array support
-		switch (m_dimension)
-		{
-		case TEXTURE_DIMENSION::DIM_1:	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_1D; break;
-		case TEXTURE_DIMENSION::DIM_2:	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; break;
-		case TEXTURE_DIMENSION::DIM_3:	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_3D; break;
-		}
-		
+		viewInfo.viewType = VulkanUtils::GetVulkanImageViewType(m_dimension);
 		viewInfo.format = VulkanUtils::GetVulkanFormat(m_format);
 		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 

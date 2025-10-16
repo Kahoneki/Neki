@@ -297,12 +297,12 @@ namespace NK
 
 		VkImageBlit blitRegion{};
 
-		blitRegion.srcSubresource.aspectMask = GetVulkanImageAspectFlags(_srcAspect);
+		blitRegion.srcSubresource.aspectMask = VulkanUtils::GetVulkanImageAspectFlags(_srcAspect);
 		blitRegion.srcSubresource.layerCount = 1;
 		blitRegion.srcOffsets[0] = { 0, 0, 0 };
 		blitRegion.srcOffsets[1] = { srcSize.x, srcSize.y, srcSize.z };
 
-		blitRegion.dstSubresource.aspectMask = GetVulkanImageAspectFlags(_dstAspect);
+		blitRegion.dstSubresource.aspectMask = VulkanUtils::GetVulkanImageAspectFlags(_dstAspect);
 		blitRegion.dstSubresource.layerCount = 1;
 		blitRegion.dstOffsets[0] = { 0, 0, 0 };
 		blitRegion.dstOffsets[1] = { dstSize.x, dstSize.y, dstSize.z };

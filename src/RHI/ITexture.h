@@ -4,6 +4,7 @@
 #include <Core/Memory/IAllocator.h>
 #include <Types/NekiTypes.h>
 
+#include <stdexcept>
 #include <glm/glm.hpp>
 
 

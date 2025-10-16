@@ -82,7 +82,7 @@ int main()
 	
 	//Texture view
 	NK::TextureViewDesc textureViewDesc{};
-	textureViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	textureViewDesc.dimension = NK::TEXTURE_VIEW_DIMENSION::DIM_2;
 	textureViewDesc.format = NK::DATA_FORMAT::R8G8B8A8_SRGB;
 	textureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateShaderResourceTextureView(texture.get(), textureViewDesc) };
@@ -282,7 +282,7 @@ int main()
 		commandBuffers[currentFrame]->Begin();
 		commandBuffers[currentFrame]->TransitionBarrier(swapchain->GetImage(imageIndex), NK::RESOURCE_STATE::UNDEFINED, NK::RESOURCE_STATE::RENDER_TARGET);
 
-		commandBuffers[currentFrame]->BeginRendering(1, swapchain->GetImageView(imageIndex), nullptr);
+		commandBuffers[currentFrame]->BeginRendering(1, nullptr, swapchain->GetImageView(imageIndex), nullptr);
 		commandBuffers[currentFrame]->BindPipeline(graphicsPipeline.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 		commandBuffers[currentFrame]->BindRootSignature(rootSig.get(), NK::PIPELINE_BIND_POINT::GRAPHICS);
 		std::uint32_t pushConstants[]{ textureResourceIndex, samplerIndex };

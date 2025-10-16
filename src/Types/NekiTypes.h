@@ -516,6 +516,26 @@ namespace NK
 	{
 		glm::mat4 viewMat;
 		glm::mat4 projMat;
+		glm::vec4 pos;
+	};
+
+	enum class TEXTURE_VIEW_DIMENSION
+	{
+		DIM_1,
+		DIM_2,
+		DIM_3,
+		DIM_CUBE,
+		DIM_1D_ARRAY,
+		DIM_2D_ARRAY,
+		DIM_CUBE_ARRAY,
+	};
+
+	enum class TEXTURE_ASPECT
+	{
+		COLOUR,
+		DEPTH,
+		STENCIL,
+		DEPTH_STENCIL,
 	};
 
 }
