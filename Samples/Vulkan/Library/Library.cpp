@@ -89,7 +89,7 @@ int main()
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::TextureViewDesc textureViewDesc{};
-	textureViewDesc.dimension = NK::TEXTURE_DIMENSION::DIM_2;
+	textureViewDesc.dimension = NK::TEXTURE_VIEW_DIMENSION::DIM_2;
 	textureViewDesc.format = textureDesc.format;
 	textureViewDesc.type = NK::TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 	const NK::UniquePtr<NK::ITextureView> textureView{ device->CreateShaderResourceTextureView(texture.get(), textureViewDesc) };

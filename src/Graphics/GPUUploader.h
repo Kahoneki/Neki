@@ -78,6 +78,13 @@ namespace NK
 		//Regardless of the initial state, the state after the buffer data has been uploaded will be RESOURCE_STATE::COPY_DEST
 		//The number of bytes in _data is expected to exactly match the size of the destination buffer
 		void EnqueueBufferDataUpload(const void* _data, IBuffer* _dstBuffer, RESOURCE_STATE _dstBufferInitialState);
+
+		//_dstTextureInitialState is the state of _dstTexture
+		//Regardless of the initial state, the state after the texture data has been uploaded will be RESOURCE_STATE::COPY_DEST
+		//_data is a const array of void pointers, each item in the array should be the data for a layer in the array texture
+		//The number of bytes in each element of _data is expected to exactly match the size of the destination texture's layers
+		//The number of elements in _data is expected to exactly match the number of array layers in the destination texture
+		void EnqueueArrayTextureDataUpload(void* const* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState);
 		
 		//_dstTextureInitialState is the state of _dstTexture
 		//Regardless of the initial state, the state after the texture data has been uploaded will be RESOURCE_STATE::COPY_DEST
@@ -90,6 +97,7 @@ namespace NK
 		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and the returned fence will already be signalled
 		//
 		//If _waitIdle = false, the calling thread will not be blocked, instead a fence is returned that will be signalled when the flush is complete
+		//
 		//Once the flush has been complete, Reset() should be called.
 		UniquePtr<IFence> Flush(bool _waitIdle);
 

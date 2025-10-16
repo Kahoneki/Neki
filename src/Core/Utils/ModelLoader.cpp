@@ -30,6 +30,7 @@ namespace NK
 		                                        aiProcess_GenSmoothNormals |	//Generate smooth normals if they don't exist
 		                                        /*aiProcess_FlipUVs |*/			//Flip UVs to match Vulkan's top left texcoord system
 		                                        aiProcess_CalcTangentSpace |	//Calculate tangents and bitangents (required for TBN in normal mapping)
+		                                        aiProcess_MakeLeftHanded |
 		                                        (_flipFaceWinding ? aiProcess_FlipWindingOrder : 0)
 		                                       ) };
 
@@ -66,10 +67,10 @@ namespace NK
 			load(MODEL_TEXTURE_TYPE::DISPLACEMENT     , aiTextureType_DISPLACEMENT);
 			load(MODEL_TEXTURE_TYPE::LIGHTMAP         , aiTextureType_LIGHTMAP);
 			load(MODEL_TEXTURE_TYPE::REFLECTION       , aiTextureType_REFLECTION);
-			load(MODEL_TEXTURE_TYPE::BASE_COLOUR       , aiTextureType_BASE_COLOR);
+			load(MODEL_TEXTURE_TYPE::BASE_COLOUR      , aiTextureType_BASE_COLOR);
 			load(MODEL_TEXTURE_TYPE::METALNESS        , aiTextureType_METALNESS);
 			load(MODEL_TEXTURE_TYPE::ROUGHNESS        , aiTextureType_DIFFUSE_ROUGHNESS);
-			load(MODEL_TEXTURE_TYPE::EMISSION_COLOUR   , aiTextureType_EMISSION_COLOR);
+			load(MODEL_TEXTURE_TYPE::EMISSION_COLOUR  , aiTextureType_EMISSION_COLOR);
 			load(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION);
 
 			//If NORMAL_CAMERA wasn't available, fall back to NORMAL
@@ -220,8 +221,13 @@ namespace NK
 			//Tangent and Bitangent
 			if (_mesh->HasTangentsAndBitangents())
 			{
-				vertex.tangent = { _mesh->mTangents[i].x, _mesh->mTangents[i].y, _mesh->mTangents[i].z };
-				vertex.bitangent = { _mesh->mBitangents[i].x, _mesh->mBitangents[i].y, _mesh->mBitangents[i].z };
+				glm::vec3 n(_mesh->mNormals[i].x, _mesh->mNormals[i].y, _mesh->mNormals[i].z);
+				glm::vec3 t(_mesh->mTangents[i].x, _mesh->mTangents[i].y, _mesh->mTangents[i].z);
+				glm::vec3 b(_mesh->mBitangents[i].x, _mesh->mBitangents[i].y, _mesh->mBitangents[i].z);
+
+				float sign{ glm::dot(glm::cross(n, t), b) < 0.0f ? -1.0f : 1.0f };
+				
+				vertex.tangent   = { t.x, t.y, t.z, sign };
 			}
 
 			nekiMesh.vertices.push_back(vertex);
@@ -315,23 +321,15 @@ namespace NK
 		VertexAttributeDesc tanAttribute{};
 		tanAttribute.attribute = SHADER_ATTRIBUTE::TANGENT;
 		tanAttribute.binding = 0;
-		tanAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		tanAttribute.format = DATA_FORMAT::R32G32B32A32_SFLOAT;
 		tanAttribute.offset = offsetof(ModelVertex, tangent);
 		vertexAttributes.push_back(tanAttribute);
-
-		//Bitangent attribute
-		VertexAttributeDesc bitanAttribute{};
-		bitanAttribute.attribute = SHADER_ATTRIBUTE::BITANGENT;
-		bitanAttribute.binding = 0;
-		bitanAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
-		bitanAttribute.offset = offsetof(ModelVertex, bitangent);
-		vertexAttributes.push_back(bitanAttribute);
 
 		//Vertex buffer binding
 		std::vector<VertexBufferBindingDesc> bufferBindings;
 		VertexBufferBindingDesc bufferBinding{};
 		bufferBinding.binding = 0;
-		bufferBinding.inputRate = NK::VERTEX_INPUT_RATE::VERTEX;
+		bufferBinding.inputRate = VERTEX_INPUT_RATE::VERTEX;
 		bufferBinding.stride = sizeof(ModelVertex);
 		bufferBindings.push_back(bufferBinding);
 

@@ -163,7 +163,7 @@ namespace NK
 		for (std::uint32_t i{ 0 }; i < m_numBuffers; ++i)
 		{
 			TextureViewDesc desc{};
-			desc.dimension = TEXTURE_DIMENSION::DIM_2;
+			desc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
 			desc.format = DATA_FORMAT::R8G8B8A8_SRGB;
 			desc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
 

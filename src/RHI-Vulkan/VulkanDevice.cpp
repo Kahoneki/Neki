@@ -134,6 +134,25 @@ namespace NK
 
 	UniquePtr<ITextureView> VulkanDevice::CreateDepthStencilTextureView(ITexture* _texture, const TextureViewDesc& _desc)
 	{
+		//Function identical to CreateRenderTargetView() - perform validation
+		if (_desc.type == TEXTURE_VIEW_TYPE::RENDER_TARGET)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "CreateDepthStencilTextureView() called with _desc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET - did you mean to call CreateRenderTargetTextureView()?\n");
+			throw std::runtime_error("");
+		}
+		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc));
+	}
+
+
+
+	UniquePtr<ITextureView> VulkanDevice::CreateRenderTargetTextureView(ITexture* _texture, const TextureViewDesc& _desc)
+	{
+		//Function identical to CreateDepthStencilTextureView() - perform validation
+		if (_desc.type == TEXTURE_VIEW_TYPE::DEPTH || _desc.type == TEXTURE_VIEW_TYPE::DEPTH_STENCIL)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "CreateRenderTargetTextureView() called with _desc.type = TEXTURE_VIEW_TYPE::" + std::string(_desc.type == TEXTURE_VIEW_TYPE::DEPTH ? "DEPTH" : "DEPTH_STENCIL") + " - did you mean to call CreateDepthStencilTextureView()?\n");
+			throw std::runtime_error("");
+		}
 		return UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, *this, _texture, _desc));
 	}
 
@@ -212,8 +231,8 @@ namespace NK
 	TextureCopyMemoryLayout VulkanDevice::GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture)
 	{
 		TextureCopyMemoryLayout memLayout{};
-		std::uint32_t bytesPerPixel{ RHIUtils::GetFormatBytesPerPixel(_texture->GetFormat()) };
-		std::uint32_t numPixels{ static_cast<std::uint32_t>(_texture->GetSize().x * _texture->GetSize().y * _texture->GetSize().z) };
+		const std::uint32_t bytesPerPixel{ RHIUtils::GetFormatBytesPerPixel(_texture->GetFormat()) };
+		const std::uint32_t numPixels{ static_cast<std::uint32_t>(_texture->GetSize().x * _texture->GetSize().y * _texture->GetSize().z) };
 		memLayout.totalBytes = numPixels * bytesPerPixel;
 		memLayout.rowPitch = _texture->GetSize().x * bytesPerPixel;
 
@@ -246,9 +265,19 @@ namespace NK
 		//Get required extensions
 		const std::vector<const char*> extensions{ GetRequiredExtensions() };
 
+		VkValidationFeaturesEXT valFeatures{};
+		valFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+		valFeatures.enabledValidationFeatureCount = 1;
+
+		VkValidationFeatureEnableEXT enables[] = {
+			VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT
+		};
+		valFeatures.pEnabledValidationFeatures = enables;
+		
 		//Setup instance creation info
 		VkInstanceCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		createInfo.pNext = &valFeatures;
 		createInfo.pApplicationInfo = &appInfo;
 		createInfo.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
 		createInfo.ppEnabledExtensionNames = extensions.data();
@@ -260,6 +289,7 @@ namespace NK
 			createInfo.enabledLayerCount = static_cast<std::uint32_t>(m_instanceValidationLayers.size());
 			createInfo.ppEnabledLayerNames = m_instanceValidationLayers.data();
 			PopulateDebugMessengerCreateInfo(debugCreateInfo);
+			debugCreateInfo.pNext = &valFeatures;
 			createInfo.pNext = &debugCreateInfo;
 		}
 		else

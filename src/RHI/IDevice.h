@@ -67,6 +67,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateShaderResourceTextureView(ITexture* _texture, const TextureViewDesc& _desc) = 0;
 		//Can be used to create depth texture views, stencil texture views, or depth-stencil texture views
 		[[nodiscard]] virtual UniquePtr<ITextureView> CreateDepthStencilTextureView(ITexture* _texture, const TextureViewDesc& _desc) = 0;
+		//Can be used to create render target views
+		[[nodiscard]] virtual UniquePtr<ITextureView> CreateRenderTargetTextureView(ITexture* _texture, const TextureViewDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISampler> CreateSampler(const SamplerDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(Window* _window) = 0;

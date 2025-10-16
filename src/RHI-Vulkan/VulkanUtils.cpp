@@ -820,5 +820,88 @@ namespace NK
 		}
 		}
 	}
+
+
+
+	VkImageViewType VulkanUtils::GetVulkanImageViewType(const TEXTURE_VIEW_DIMENSION _dimension)
+	{
+		switch (_dimension)
+		{
+		case TEXTURE_VIEW_DIMENSION::DIM_1:				return VK_IMAGE_VIEW_TYPE_1D;
+		case TEXTURE_VIEW_DIMENSION::DIM_2:				return VK_IMAGE_VIEW_TYPE_2D;
+		case TEXTURE_VIEW_DIMENSION::DIM_3:				return VK_IMAGE_VIEW_TYPE_3D;
+		case TEXTURE_VIEW_DIMENSION::DIM_CUBE:			return VK_IMAGE_VIEW_TYPE_CUBE;
+		case TEXTURE_VIEW_DIMENSION::DIM_1D_ARRAY:		return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
+		case TEXTURE_VIEW_DIMENSION::DIM_2D_ARRAY:		return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+		case TEXTURE_VIEW_DIMENSION::DIM_CUBE_ARRAY:	return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+
+		default:
+		{
+			throw std::invalid_argument("GetVulkanImageViewType() default case reached. Dimension = " + std::to_string(std::to_underlying(_dimension)));
+		}
+		}
+	}
+
+
+
+	TEXTURE_VIEW_DIMENSION VulkanUtils::GetRHIImageViewDimension(const VkImageViewType _type)
+	{
+		switch (_type)
+		{
+		case VK_IMAGE_VIEW_TYPE_1D:         return TEXTURE_VIEW_DIMENSION::DIM_1;
+		case VK_IMAGE_VIEW_TYPE_2D:         return TEXTURE_VIEW_DIMENSION::DIM_2;
+		case VK_IMAGE_VIEW_TYPE_3D:         return TEXTURE_VIEW_DIMENSION::DIM_3;
+		case VK_IMAGE_VIEW_TYPE_CUBE:       return TEXTURE_VIEW_DIMENSION::DIM_CUBE;
+		case VK_IMAGE_VIEW_TYPE_1D_ARRAY:   return TEXTURE_VIEW_DIMENSION::DIM_1D_ARRAY;
+		case VK_IMAGE_VIEW_TYPE_2D_ARRAY:   return TEXTURE_VIEW_DIMENSION::DIM_2D_ARRAY;
+		case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY: return TEXTURE_VIEW_DIMENSION::DIM_CUBE_ARRAY;
+
+		default:
+		{
+			throw std::invalid_argument("GetRHIImageViewDimension() default case reached. Type = " + std::to_string(std::to_underlying(_type)));
+		}
+		}
+	}
+
+	
+
+	VkImageAspectFlags VulkanUtils::GetVulkanImageAspectFlags(const TEXTURE_ASPECT _aspect)
+	{
+		switch (_aspect)
+		{
+		case TEXTURE_ASPECT::COLOUR:        return VK_IMAGE_ASPECT_COLOR_BIT;
+		case TEXTURE_ASPECT::DEPTH:         return VK_IMAGE_ASPECT_DEPTH_BIT;
+		case TEXTURE_ASPECT::STENCIL:       return VK_IMAGE_ASPECT_STENCIL_BIT;
+		case TEXTURE_ASPECT::DEPTH_STENCIL: return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		default:
+		{
+			throw std::invalid_argument("GetVulkanImageAspectFlags() default case reached. Aspect = " + std::to_string(std::to_underlying(_aspect)));
+		}
+		}
+	}
+
+
+	
+	TEXTURE_ASPECT VulkanUtils::GetRHIImageAspect(const VkImageAspectFlags _flags)
+	{
+		if (_flags == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
+		{
+			return TEXTURE_ASPECT::DEPTH_STENCIL;
+		}
+		if (_flags == VK_IMAGE_ASPECT_DEPTH_BIT)
+		{
+			return TEXTURE_ASPECT::DEPTH;
+		}
+		if (_flags == VK_IMAGE_ASPECT_STENCIL_BIT)
+		{
+			return TEXTURE_ASPECT::STENCIL;
+		}
+		if (_flags == VK_IMAGE_ASPECT_COLOR_BIT)
+		{
+			return TEXTURE_ASPECT::COLOUR;
+		}
+
+		throw std::invalid_argument("GetRHIImageAspect() invalid or unhandled flags provided. Flags = " + std::to_string(_flags));
+	}
 	
 }

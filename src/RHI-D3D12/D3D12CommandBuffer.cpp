@@ -129,7 +129,7 @@ namespace NK
 
 
 
-	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
+	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
 	{
 		if (_depthAttachment && _stencilAttachment)
 		{
@@ -137,13 +137,15 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+		//todo: implement msaa
+
 		//Colour attachments
 		std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> colourAttachmentInfos(_numColourAttachments);
 		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
 		{
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
-			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_colourAttachments[i].GetFormat());
+			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_outputColourAttachments[i].GetFormat());
 			beg.Clear.ClearValue.Color[0] = 0.0f;
 			beg.Clear.ClearValue.Color[1] = 0.0f;
 			beg.Clear.ClearValue.Color[2] = 0.0f;
@@ -151,7 +153,7 @@ namespace NK
 
 			colourAttachmentInfos[i].BeginningAccess = beg;
 			colourAttachmentInfos[i].EndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
-			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_colourAttachments[i]))->GetCPUDescriptorHandle();
+			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_outputColourAttachments[i]))->GetCPUDescriptorHandle();
 		}
 
 		//Depth-stencil attachment
@@ -177,7 +179,7 @@ namespace NK
 
 
 
-	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _colourAttachments, ITextureView* _depthStencilAttachment)
+	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment)
 	{
 		if (_depthStencilAttachment)
 		{
@@ -194,7 +196,7 @@ namespace NK
 		{
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
-			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_colourAttachments[i].GetFormat());
+			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_outputColourAttachments[i].GetFormat());
 			beg.Clear.ClearValue.Color[0] = 0.0f;
 			beg.Clear.ClearValue.Color[1] = 0.0f;
 			beg.Clear.ClearValue.Color[2] = 0.0f;
@@ -202,7 +204,7 @@ namespace NK
 			
 			colourAttachmentInfos[i].BeginningAccess = beg;
 			colourAttachmentInfos[i].EndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
-			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_colourAttachments[i]))->GetCPUDescriptorHandle();
+			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_outputColourAttachments[i]))->GetCPUDescriptorHandle();
 		}
 
 		//Depth-stencil attachment
@@ -224,6 +226,13 @@ namespace NK
 
 		//todo: look into allow uav write flag?
 		m_buffer->BeginRenderPass(_numColourAttachments, colourAttachmentInfos.data(), _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr, D3D12_RENDER_PASS_FLAG_NONE);
+	}
+
+
+
+	void D3D12CommandBuffer::BlitTexture(ITexture* _srcTexture, TEXTURE_ASPECT _srcAspect, ITexture* _dstTexture, TEXTURE_ASPECT _dstAspect)
+	{
+		//todo: implement
 	}
 
 

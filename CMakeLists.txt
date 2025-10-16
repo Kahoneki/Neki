@@ -159,6 +159,7 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
                 -T ${SHADER_TYPE}
                 -E ${ENTRY_POINT}
                 -spirv
+                -fspv-debug=vulkan-with-source
                 -Fo ${SPV_OUTPUT}
                 DEPENDS ${SHADER_SOURCE}
                 COMMENT "Compiling ${SHADER_SOURCE} to SPIR-V"
