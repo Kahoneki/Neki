@@ -90,7 +90,7 @@ int main()
 	const NK::UniquePtr<NK::ISwapchain> swapchain{ device->CreateSwapchain(swapchainDesc) };
 
 	//Camera
-	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 30.0f, 0.05f) };
+	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0, 0, 3), -90.0f, 0, 0.1f, 5000.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 300.0f, 0.05f) };
 
 	//Camera Data Buffer
 	NK::CameraShaderData initialCamShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
@@ -135,7 +135,7 @@ int main()
 
 	//Root Signature
 	NK::RootSignatureDesc rootSigDesc{};
-	rootSigDesc.num32BitPushConstantValues = 16 + 16 + 1 + 1 + 1 + 1; //model matrix + inverse model matrix + cam data buffer index + skybox cubemap index + material buffer index + sampler index
+	rootSigDesc.num32BitPushConstantValues = 16 + 16 + 1 + 1 + 1 + 1 + 1; //model matrix + inverse model matrix + cam data buffer index + skybox cubemap index + material buffer index + sampler index
 	const NK::UniquePtr<NK::IRootSignature> rootSig{ device->CreateRootSignature(rootSigDesc) };
 	
 	//Skybox Texture
@@ -167,7 +167,7 @@ int main()
 	NK::ResourceIndex skyboxTextureResourceIndex{ skyboxTextureView->GetIndex() };
 
 	//Model
-	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf", true, true) };
+	const NK::CPUModel* const modelData{ NK::ModelLoader::LoadModel("Samples/Resource Files/Sponza/Sponza.gltf", true, true) };
 	const NK::UniquePtr<NK::GPUModel> model{ gpuUploader->EnqueueModelDataUpload(modelData) };
 
 
@@ -244,9 +244,9 @@ int main()
 //	modelModelMatrix = glm::scale(modelModelMatrix, glm::vec3(0.1f));
 
 	//Damaged Helmet
-	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
-	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(30.0f), glm::vec3(0, -1, 0));
-	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(70.0f), glm::vec3(1, 0, 0));
+//	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(180.0f), glm::vec3(0, 0, 1));
+//	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(30.0f), glm::vec3(0, -1, 0));
+//	modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(70.0f), glm::vec3(1, 0, 0));
 	
 	
 	//Sampler
@@ -481,8 +481,8 @@ int main()
 			commandBuffers[currentFrame]->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
 			commandBuffers[currentFrame]->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), NK::DATA_FORMAT::R32_UINT);
 
-			float speed{ 50.0f };
-			modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())), glm::vec3(0, 0, 1));
+//			float speed{ 50.0f };
+//			modelModelMatrix = glm::rotate(modelModelMatrix, glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())), glm::vec3(0, 0, 1));
 
 			commandBuffers[currentFrame]->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
 		}
