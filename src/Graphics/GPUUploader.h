@@ -1,15 +1,17 @@
 #pragma once
+
+#include <Core/Memory/Allocation.h>
+#include <Core/Utils/ModelLoader.h>
+#include <RHI/ITextureView.h>
+#include <Types/NekiTypes.h>
+
 #include <cstddef>
 #include <vector>
 
-#include <RHI/ITextureView.h>
-
-#include "Core/Memory/Allocation.h"
-#include "Core/Utils/ModelLoader.h"
-#include "Types/ResourceStates.h"
 
 namespace NK
 {
+	
 	class ILogger;
 	class IDevice;
 	class IBuffer;
@@ -114,4 +116,5 @@ namespace NK
 
 		bool m_flushing;
 	};
+	
 }

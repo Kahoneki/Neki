@@ -1,10 +1,11 @@
 #include "Camera.h"
 
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
-#include <string>
+
 
 namespace NK
 {
@@ -96,4 +97,5 @@ namespace NK
 		m_right = glm::normalize(glm::cross(worldUp, m_forward));
 		m_up = glm::normalize(glm::cross(m_forward, m_right)); 
 	}
+	
 }

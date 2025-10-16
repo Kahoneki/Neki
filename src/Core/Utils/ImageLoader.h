@@ -1,14 +1,18 @@
 #pragma once
-#include <string>
 
 #include <Core/Memory/Allocation.h>
 #include <RHI/ITexture.h>
+
+#include <string>
+
 #ifdef LoadImage
 	#undef LoadImage //Conflicts with ImageLoader::LoadImage()
 #endif
 
+
 namespace NK
 {
+	
 	struct ImageData
 	{
 		unsigned char* data;
@@ -32,4 +36,5 @@ namespace NK
 		//To avoid unnecessary duplicate loads
 		static std::unordered_map<std::string, ImageData> m_filepathToImageDataCache;
 	};
+	
 }

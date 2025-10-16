@@ -1,9 +1,12 @@
 #include "ConsoleLogger.h"
+
 #include <iomanip>
 #include <iostream>
 
+
 namespace NK
 {
+
 	void ConsoleLogger::LogRawLogImpl(LOGGER_CHANNEL _channel, LOGGER_LAYER _layer, const std::string& _message, std::int32_t _indentationValue, bool _formatted) const
 	{
 		//Check if channel is enabled for the specified layer
@@ -61,4 +64,5 @@ namespace NK
 		}
 		stream << indentedMessage << COLOUR_RESET;
 	}
+	
 }

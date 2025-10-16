@@ -1,15 +1,17 @@
 #include "D3D12Pipeline.h"
-#include <Core/Utils/EnumUtils.h>
+
+#include "D3D12RootSignature.h"
 #include "D3D12Shader.h"
 #include "D3D12Texture.h"
+
+#include <Core/Utils/EnumUtils.h>
+
 #include <stdexcept>
-#ifdef ERROR
-	#undef ERROR
-#endif
-#include "D3D12RootSignature.h"
+
 
 namespace NK
 {
+	
 	D3D12Pipeline::D3D12Pipeline(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const PipelineDesc& _desc)
 		: IPipeline(_logger, _allocator, _device, _desc)
 	{

@@ -1,5 +1,7 @@
 #pragma once
+
 #include "IDevice.h"
+
 
 namespace NK
 {

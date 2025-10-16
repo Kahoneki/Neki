@@ -1,6 +1,15 @@
 #pragma once
-#include <string>
+
 #include "LoggerConfig.h"
+
+#include <Types/NekiTypes.h>
+
+#include <string>
+
+#if defined(ERROR)
+	#undef ERROR //Error is used for LOGGER_CHANNEL::ERROR
+#endif
+
 
 namespace NK
 {

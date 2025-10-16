@@ -1,6 +1,10 @@
 #include "VulkanTextureView.h"
+
 #include "VulkanTexture.h"
+#include "VulkanUtils.h"
+
 #include <stdexcept>
+
 
 namespace NK
 {
@@ -33,7 +37,7 @@ namespace NK
 		case TEXTURE_DIMENSION::DIM_3:	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_3D; break;
 		}
 		
-		viewInfo.format = VulkanTexture::GetVulkanFormat(m_format);
+		viewInfo.format = VulkanUtils::GetVulkanFormat(m_format);
 		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
 		
@@ -134,7 +138,7 @@ namespace NK
 		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		viewInfo.image = dynamic_cast<VulkanTexture*>(_texture)->GetTexture();
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; //todo: look into possible scenarios where you would want a non-2d rtv/dsv?
-		viewInfo.format = VulkanTexture::GetVulkanFormat(m_format);
+		viewInfo.format = VulkanUtils::GetVulkanFormat(m_format);
 		switch (m_type)
 		{
 		case TEXTURE_VIEW_TYPE::RENDER_TARGET:	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; break;

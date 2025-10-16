@@ -1,9 +1,13 @@
 #pragma once
-#include "RHI/ITexture.h"
+
 #include "D3D12Device.h"
+
+#include <RHI/ITexture.h>
+
 
 namespace NK
 {
+
 	class D3D12Texture final : public ITexture
 	{
 	public:
@@ -27,4 +31,5 @@ namespace NK
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_texture;
 		D3D12_RESOURCE_DESC m_resourceDesc;
 	};
+
 }

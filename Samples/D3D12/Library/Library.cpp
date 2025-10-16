@@ -14,9 +14,6 @@
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
 #include <RHI/ITexture.h>
-#ifdef ERROR
-	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
-#endif
 
 
 int main()
@@ -35,7 +32,7 @@ int main()
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::CommandPoolDesc poolDesc{};
-	poolDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
+	poolDesc.type = NK::COMMAND_TYPE::GRAPHICS;
 	const NK::UniquePtr<NK::ICommandPool> pool{ device->CreateCommandPool(poolDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
@@ -45,17 +42,17 @@ int main()
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::QueueDesc graphicsQueueDesc{};
-	graphicsQueueDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
+	graphicsQueueDesc.type = NK::COMMAND_TYPE::GRAPHICS;
 	const NK::UniquePtr<NK::IQueue> graphicsQueue{ device->CreateQueue(graphicsQueueDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::QueueDesc computeQueueDesc{};
-	computeQueueDesc.type = NK::COMMAND_POOL_TYPE::COMPUTE;
+	computeQueueDesc.type = NK::COMMAND_TYPE::COMPUTE;
 	const NK::UniquePtr<NK::IQueue> computeQueue{ device->CreateQueue(computeQueueDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 
 	NK::QueueDesc transferQueueDesc{};
-	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
+	transferQueueDesc.type = NK::COMMAND_TYPE::TRANSFER;
 	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
 	logger->Log(NK::LOGGER_CHANNEL::INFO, NK::LOGGER_LAYER::APPLICATION, "Total memory allocated: " + NK::FormatUtils::GetSizeString(dynamic_cast<NK::TrackingAllocator*>(allocator)->GetTotalMemoryAllocated()) + "\n\n");
 

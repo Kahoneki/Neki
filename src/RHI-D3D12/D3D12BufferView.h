@@ -1,6 +1,8 @@
 #pragma once
-#include <RHI/IBufferView.h>
+
 #include "D3D12Device.h"
+
+#include <RHI/IBufferView.h>
 
 
 namespace NK

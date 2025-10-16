@@ -1,10 +1,10 @@
 #include "D3D12Texture.h"
-#include "Core/Utils/EnumUtils.h"
-#include "Core/Utils/FormatUtils.h"
+
+#include <Core/Utils/EnumUtils.h>
+#include <Core/Utils/FormatUtils.h>
+
 #include <stdexcept>
-#ifdef ERROR
-	#undef ERROR
-#endif
+
 
 namespace NK
 {
@@ -204,4 +204,5 @@ namespace NK
 		}
 		}
 	}
+
 }

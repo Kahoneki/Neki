@@ -1,11 +1,14 @@
 #include "VulkanQueue.h"
-#include <stdexcept>
-#include <Core/Utils/FormatUtils.h>
 
 #include "VulkanCommandBuffer.h"
 #include "VulkanDevice.h"
 #include "VulkanFence.h"
 #include "VulkanSemaphore.h"
+
+#include <Core/Utils/FormatUtils.h>
+
+#include <stdexcept>
+
 
 namespace NK
 {
@@ -30,17 +33,17 @@ namespace NK
 		VulkanDevice& vkDevice{ dynamic_cast<VulkanDevice&>(m_device) };
 		switch (m_type)
 		{
-		case COMMAND_POOL_TYPE::GRAPHICS:
+		case COMMAND_TYPE::GRAPHICS:
 		{
 			vkGetDeviceQueue(vkDevice.GetDevice(), vkDevice.GetGraphicsQueueFamilyIndex(), m_queueIndex, &m_queue);
 			break;
 		}
-		case COMMAND_POOL_TYPE::COMPUTE:
+		case COMMAND_TYPE::COMPUTE:
 		{
 			vkGetDeviceQueue(vkDevice.GetDevice(), vkDevice.GetComputeQueueFamilyIndex(), m_queueIndex, &m_queue);
 			break;
 		}
-		case COMMAND_POOL_TYPE::TRANSFER:
+		case COMMAND_TYPE::TRANSFER:
 		{
 			vkGetDeviceQueue(vkDevice.GetDevice(), vkDevice.GetTransferQueueFamilyIndex(), m_queueIndex, &m_queue);
 			break;

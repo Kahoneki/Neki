@@ -1,6 +1,9 @@
 #pragma once
-#include <RHI/ICommandBuffer.h>
+
 #include "D3D12Device.h"
+
+#include <RHI/ICommandBuffer.h>
+
 
 namespace NK
 {
@@ -47,4 +50,5 @@ namespace NK
 
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> m_buffer;
 	};
+
 }

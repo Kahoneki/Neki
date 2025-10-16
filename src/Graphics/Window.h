@@ -1,14 +1,15 @@
 #pragma once
 
-#include <string>
+#include <Core/Debug/ILogger.h>
 
+#include <string>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-#include <Core/Debug/ILogger.h>
 
 namespace NK
 {
+	
 	struct WindowDesc
 	{
 		std::string name; //Name of the window
@@ -37,4 +38,5 @@ namespace NK
 
 		GLFWwindow* m_window;
 	};
+	
 }

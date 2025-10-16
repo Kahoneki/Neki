@@ -1,10 +1,12 @@
 #pragma once
-#include <mutex>
-#include <unordered_map>
 
 #include "IAllocator.h"
 
-#include "../Debug/ILogger.h"
+#include <Core/Debug/ILogger.h>
+
+#include <mutex>
+#include <unordered_map>
+
 
 namespace NK
 {
@@ -59,4 +61,5 @@ namespace NK
 		bool m_verbose;
 		bool m_vulkanVerbose; //Whether or not to output vulkan internals
 	};
+	
 }

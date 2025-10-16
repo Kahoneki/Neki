@@ -1,27 +1,16 @@
 #pragma once
+
 #include "ICommandPool.h"
-#include "glm/vec2.hpp"
-#include "Types/ResourceStates.h"
-#include <Types/DataFormat.h>
-#include "glm/vec3.hpp"
+
+#include <Types/NekiTypes.h>
+
 
 namespace NK
 {
-	enum class COMMAND_BUFFER_LEVEL
-	{
-		PRIMARY,
-		SECONDARY,
-	};
-
+	
 	struct CommandBufferDesc
 	{
 		COMMAND_BUFFER_LEVEL level;
-	};
-
-	enum class PIPELINE_BIND_POINT
-	{
-		GRAPHICS,
-		COMPUTE,
 	};
 
 
@@ -71,4 +60,5 @@ namespace NK
 
 		COMMAND_BUFFER_LEVEL m_level;
 	};
+	
 }

@@ -1,8 +1,14 @@
 #include "VulkanBuffer.h"
-#include <stdexcept>
+
 #include "VulkanDevice.h"
-#include <Core/Utils/FormatUtils.h>
+#include "VulkanUtils.h"
+
 #include <Core/Utils/EnumUtils.h>
+#include <Core/Utils/FormatUtils.h>
+
+#include <stdexcept>
+
+
 
 namespace NK
 {
@@ -28,7 +34,7 @@ namespace NK
 		VkBufferCreateInfo bufferInfo{};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		bufferInfo.size = m_size;
-		bufferInfo.usage = GetVulkanUsageFlags();
+		bufferInfo.usage = VulkanUtils::GetVulkanBufferUsageFlags(m_usage);
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		VkResult result{ vkCreateBuffer(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), &bufferInfo, m_allocator.GetVulkanCallbacks(), &m_buffer) };
 		if (result == VK_SUCCESS)
@@ -149,23 +155,6 @@ namespace NK
 	void VulkanBuffer::Unmap()
 	{
 		vkUnmapMemory(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_memory);
-	}
-
-
-
-	VkBufferUsageFlags VulkanBuffer::GetVulkanUsageFlags() const
-	{
-		VkBufferUsageFlags vkFlags{ 0 };
-		
-		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT))		{ vkFlags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT; }
-		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT))		{ vkFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT; }
-		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; }
-		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; }
-		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; }
-		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT))		{ vkFlags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT; }
-		if (EnumUtils::Contains(m_usage, BUFFER_USAGE_FLAGS::INDIRECT_BUFFER_BIT))	{ vkFlags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT; }
-
-		return vkFlags;
 	}
 
 }

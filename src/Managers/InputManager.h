@@ -1,7 +1,10 @@
 #pragma once
+
+#include <Graphics/Window.h>
+
 #include <unordered_map>
 #include <variant>
-#include <Graphics/Window.h>
+
 
 namespace NK
 {

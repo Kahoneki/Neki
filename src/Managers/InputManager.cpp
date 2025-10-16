@@ -1,5 +1,6 @@
 #include "InputManager.h"
 
+
 namespace NK
 {
 
@@ -31,4 +32,5 @@ namespace NK
 
 		glfwSetWindowShouldClose(glfwWin, glfwGetKey(glfwWin, GLFW_KEY_ESCAPE) == GLFW_PRESS);
 	}
+	
 }

@@ -1,8 +1,11 @@
 #pragma once
+
 #include "Context.h"
+
 
 namespace NK
 {
+	
 	class RAIIContext final
 	{
 	public:
@@ -18,4 +21,5 @@ namespace NK
 			Context::Shutdown();
 		}
 	};
+	
 }

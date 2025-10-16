@@ -1,7 +1,10 @@
+//Included in both NekiTypes.h for C++ SHADER_ATTRIBUTE enum class and in ShaderMacros.hlsli for HLSL ATTRIBUTE() macro
 #pragma once
+
 
 namespace NK
 {
+	
 	enum SHADER_ATTRIBUTE_LOCATION
 	{
 		SHADER_ATTRIBUTE_LOCATION_POSITION		= 0,
@@ -11,4 +14,5 @@ namespace NK
 		SHADER_ATTRIBUTE_LOCATION_BITANGENT		= 4,
 		SHADER_ATTRIBUTE_LOCATION_COLOUR_0		= 5,
 	};
+
 }

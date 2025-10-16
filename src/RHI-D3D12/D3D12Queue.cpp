@@ -1,13 +1,13 @@
 #include "D3D12Queue.h"
-#include <stdexcept>
-#include <Core/Utils/FormatUtils.h>
 
 #include "D3D12CommandBuffer.h"
 #include "D3D12Fence.h"
 #include "D3D12Semaphore.h"
-#ifdef ERROR
-	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
-#endif
+
+#include <Core/Utils/FormatUtils.h>
+
+#include <stdexcept>
+
 
 namespace NK
 {

@@ -1,6 +1,9 @@
 #pragma once
-#include <RHI/ISurface.h>
+
 #include "D3D12Device.h"
+
+#include <RHI/ISurface.h>
+
 
 namespace NK
 {

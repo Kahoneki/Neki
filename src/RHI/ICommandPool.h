@@ -1,38 +1,24 @@
 #pragma once
+
 #include "IDevice.h"
-#include "Core/Debug/ILogger.h"
-#include "Core/Memory/IAllocator.h"
+
+#include <Core/Debug/ILogger.h>
+#include <Core/Memory/IAllocator.h>
+#include <Types/NekiTypes.h>
 
 
 namespace NK
 {
+	
 	struct CommandBufferDesc;
 	class ICommandBuffer;
-}
-
-
-namespace NK
-{
-	enum class COMMAND_POOL_TYPE : std::uint32_t
-	{
-		GRAPHICS,
-		COMPUTE,
-		TRANSFER,
-	};
-
+	
 	struct CommandPoolDesc
 	{
-		COMMAND_POOL_TYPE type;
+		COMMAND_TYPE type;
 	};
 
-
-	enum class COMMAND_POOL_RESET_FLAGS : std::uint32_t
-	{
-		NONE,
-		RELEASE_RESOURCES,
-	};
-
-
+	
 	class ICommandPool
 	{
 	public:
@@ -41,7 +27,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ICommandBuffer> AllocateCommandBuffer(const CommandBufferDesc& _desc) = 0;
 		virtual void Reset(COMMAND_POOL_RESET_FLAGS _type) = 0;
 
-		[[nodiscard]] inline COMMAND_POOL_TYPE GetPoolType() const { return m_type; }
+		[[nodiscard]] inline COMMAND_TYPE GetPoolType() const { return m_type; }
 
 
 	protected:
@@ -53,6 +39,7 @@ namespace NK
 		IAllocator& m_allocator;
 		IDevice& m_device;
 		
-		COMMAND_POOL_TYPE m_type;
+		COMMAND_TYPE m_type;
 	};
+	
 }

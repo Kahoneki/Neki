@@ -1,9 +1,13 @@
 #pragma once
-#include <RHI/ISemaphore.h>
+
 #include "D3D12Device.h"
+
+#include <RHI/ISemaphore.h>
+
 
 namespace NK
 {
+	
 	class D3D12Semaphore final : public ISemaphore
 	{
 	public:
@@ -23,4 +27,5 @@ namespace NK
 		//This is the value the producer queue will signal and that the consumer will wait for
 		std::uint64_t m_fenceValue{ 0 };
 	};
+
 }

@@ -1,10 +1,14 @@
 #pragma once
+
+#include "D3D12Device.h"
+
 #include <RHI/ISwapchain.h>
 #include <RHI/ITexture.h>
-#include "D3D12Device.h"
+
 
 namespace NK
 {
+	
 	class D3D12Swapchain final : public ISwapchain
 	{
 	public:
@@ -29,4 +33,5 @@ namespace NK
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rtvDescriptorHeap;
 		UINT m_rtvDescriptorSize{ 0 };
 	};
+
 }

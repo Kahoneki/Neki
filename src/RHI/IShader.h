@@ -1,20 +1,12 @@
 #pragma once
+
+#include <Core/Debug/ILogger.h>
+
 #include <vector>
 
-#include "Core/Debug/ILogger.h"
 
 namespace NK
 {
-	
-	enum class SHADER_TYPE
-	{
-		VERTEX,
-		TESS_CTRL,
-		TESS_EVAL,
-		FRAGMENT,
-
-		COMPUTE,
-	};
 
 	struct ShaderDesc
 	{

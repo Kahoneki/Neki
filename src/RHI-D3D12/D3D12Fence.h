@@ -1,9 +1,13 @@
 #pragma once
-#include <RHI/IFence.h>
+
 #include "D3D12Device.h"
+
+#include <RHI/IFence.h>
+
 
 namespace NK
 {
+	
 	//State of the fence - to mimic Vulkan's stricter fence usage rules
 	enum class FENCE_STATE
 	{
@@ -39,4 +43,5 @@ namespace NK
 		//This is the internal fence value the producer queue will signal after Submit() and that the consumer will wait for when Wait() is called
 		std::uint64_t m_fenceValue{ 0 };
 	};
+
 }

@@ -1,8 +1,11 @@
 #pragma once
+
 #include <RHI/IQueue.h>
+
 
 namespace NK
 {
+	
 	class VulkanQueue final : public IQueue
 	{
 		friend class VulkanDevice;
@@ -25,4 +28,5 @@ namespace NK
 		VkQueue m_queue{ VK_NULL_HANDLE };
 		std::uint32_t m_queueIndex{ FreeListAllocator::INVALID_INDEX };
 	};
+	
 }

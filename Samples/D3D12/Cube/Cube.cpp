@@ -1,4 +1,3 @@
-#include <cstring>
 #include <Core/RAIIContext.h>
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/Allocation.h>
@@ -6,21 +5,17 @@
 #include <Core/Utils/FormatUtils.h>
 #include <RHI-D3D12/D3D12Device.h>
 #include <RHI/IBuffer.h>
+#include <RHI/IBufferView.h>
+#include <RHI/IPipeline.h>
 #include <RHI/IShader.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
 #include <RHI/ITexture.h>
 
+#include <cstring>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
-#include "glm/gtx/transform.hpp"
-#include "RHI/IBufferView.h"
-#include "RHI/IPipeline.h"
-
-#ifdef ERROR
-	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
-#endif
-
+#include <glm/gtx/transform.hpp>
 
 
 int main()
@@ -40,7 +35,7 @@ int main()
 
 	//Graphics Command Pool
 	NK::CommandPoolDesc graphicsCommandPoolDesc{};
-	graphicsCommandPoolDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
+	graphicsCommandPoolDesc.type = NK::COMMAND_TYPE::GRAPHICS;
 	const NK::UniquePtr<NK::ICommandPool> graphicsCommandPool{ device->CreateCommandPool(graphicsCommandPoolDesc) };
 
 	//Primary Level Command Buffer Description
@@ -49,12 +44,12 @@ int main()
 
 	//Graphics Queue
 	NK::QueueDesc graphicsQueueDesc{};
-	graphicsQueueDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
+	graphicsQueueDesc.type = NK::COMMAND_TYPE::GRAPHICS;
 	const NK::UniquePtr<NK::IQueue> graphicsQueue(device->CreateQueue(graphicsQueueDesc));
 
 	//Transfer Queue
 	NK::QueueDesc transferQueueDesc{};
-	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
+	transferQueueDesc.type = NK::COMMAND_TYPE::TRANSFER;
 	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
 
 	//GPU Uploader

@@ -1,15 +1,16 @@
 #include "D3D12CommandBuffer.h"
+
+#include "D3D12Buffer.h"
 #include "D3D12CommandPool.h"
-#include <stdexcept>
-#ifdef ERROR
-	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
-#endif
+#include "D3D12Pipeline.h"
+#include "D3D12RootSignature.h"
 #include "D3D12Texture.h"
 #include "D3D12TextureView.h"
-#include "D3D12Pipeline.h"
-#include "D3D12Buffer.h"
+
 #include <Core/Utils/EnumUtils.h>
-#include "D3D12RootSignature.h"
+
+#include <stdexcept>
+
 
 namespace NK
 {

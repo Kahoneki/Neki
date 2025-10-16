@@ -1,17 +1,18 @@
 #include "GPUUploader.h"
 
-#include <cstring>
-#include <ranges>
-#include <stdexcept>
 #include <Core/Utils/ImageLoader.h>
-#include <Core/Utils/RHIUtils.h>
 #include <RHI/IBuffer.h>
+#include <RHI/IBufferView.h>
 #include <RHI/ICommandBuffer.h>
 #include <RHI/IQueue.h>
 #include <RHI/ITexture.h>
 #include <RHI/ITextureView.h>
+#include <RHI/RHIUtils.h>
 
-#include "RHI/IBufferView.h"
+#include <cstring>
+#include <ranges>
+#include <stdexcept>
+
 
 
 namespace NK
@@ -23,9 +24,9 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::GPU_UPLOADER, "Initialising GPUUploader\n");
 
-		if (m_queue->GetType() != COMMAND_POOL_TYPE::TRANSFER)
+		if (m_queue->GetType() != COMMAND_TYPE::TRANSFER)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "Provided _desc.transferQueue is not of type COMMAND_POOL_TYPE::TRANSFER as required. Type = " + std::to_string(std::to_underlying(m_queue->GetType())) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "Provided _desc.transferQueue is not of type COMMAND_TYPE::TRANSFER as required. Type = " + std::to_string(std::to_underlying(m_queue->GetType())) + "\n");
 			throw std::runtime_error("");
 		}
 
@@ -38,7 +39,7 @@ namespace NK
 		m_stagingBufferMap = static_cast<unsigned char*>(m_stagingBuffer->Map());
 
 		CommandPoolDesc commandPoolDesc{};
-		commandPoolDesc.type = COMMAND_POOL_TYPE::TRANSFER;
+		commandPoolDesc.type = COMMAND_TYPE::TRANSFER;
 		m_commandPool = m_device.CreateCommandPool(commandPoolDesc);
 
 		CommandBufferDesc commandBufferDesc{};

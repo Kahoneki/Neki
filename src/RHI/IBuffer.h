@@ -1,35 +1,12 @@
 #pragma once
+
 #include "IDevice.h"
-#include "Core/Debug/ILogger.h"
+
+#include <Core/Debug/ILogger.h>
+
 
 namespace NK
 {
-	//Bitfield of states the buffer is allowed to occupy
-	//For compatibility, this must be specified at creation and cannot be changed
-	enum class BUFFER_USAGE_FLAGS : std::uint32_t
-	{
-		NONE				= 0,
-		TRANSFER_SRC_BIT	= 1 << 0,
-		TRANSFER_DST_BIT	= 1 << 1,
-		UNIFORM_BUFFER_BIT	= 1 << 2,
-		STORAGE_BUFFER_BIT	= 1 << 3,
-		VERTEX_BUFFER_BIT	= 1 << 4,
-		INDEX_BUFFER_BIT	= 1 << 5,
-		INDIRECT_BUFFER_BIT	= 1 << 6,
-	};
-}
-
-//Enable bitmask operators for the BUFFER_USAGE_FLAG_BITS type
-template<>
-struct enable_bitmask_operators<NK::BUFFER_USAGE_FLAGS> : std::true_type {};
-
-namespace NK
-{
-	enum class MEMORY_TYPE
-	{
-		HOST,
-		DEVICE,
-	};
 
 	struct BufferDesc
 	{
@@ -67,4 +44,5 @@ namespace NK
 		MEMORY_TYPE m_memType;
 		BUFFER_USAGE_FLAGS m_usage;
 	};
+	
 }

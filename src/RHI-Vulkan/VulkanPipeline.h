@@ -1,8 +1,11 @@
 #pragma once
+
 #include <RHI/IPipeline.h>
+
 
 namespace NK
 {
+	
 	class VulkanPipeline final : public IPipeline
 	{
 	public:
@@ -40,4 +43,5 @@ namespace NK
 
 		VkPipeline m_pipeline{ VK_NULL_HANDLE };
 	};
+	
 }

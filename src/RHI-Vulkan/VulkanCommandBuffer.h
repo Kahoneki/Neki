@@ -1,15 +1,10 @@
 #pragma once
-#include "RHI/ICommandBuffer.h"
+
+#include <RHI/ICommandBuffer.h>
+
 
 namespace NK
 {
-	struct BarrierInfo
-	{
-		VkImageLayout layout;
-		VkAccessFlags accessMask;
-		VkPipelineStageFlags stageMask;
-	};
-	
 	
 	class VulkanCommandBuffer final : public ICommandBuffer
 	{
@@ -47,11 +42,9 @@ namespace NK
 
 
 	private:
-		BarrierInfo GetVulkanBarrierInfo(RESOURCE_STATE _state);
-		VkIndexType GetVulkanIndexType(DATA_FORMAT _format);
-		VkPipelineBindPoint GetVulkanPipelineBindPoint(PIPELINE_BIND_POINT _bindPoint);
 		
 		
 		VkCommandBuffer m_buffer{ VK_NULL_HANDLE };
 	};
+	
 }

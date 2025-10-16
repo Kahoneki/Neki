@@ -1,14 +1,15 @@
 #pragma once
+
 #include "ICommandBuffer.h"
 #include "IFence.h"
-#include "ISemaphore.h"
+
 
 namespace NK
 {
-
+	
 	struct QueueDesc
 	{
-		COMMAND_POOL_TYPE type;
+		COMMAND_TYPE type;
 	};
 	
 	
@@ -20,7 +21,7 @@ namespace NK
 		virtual void Submit(ICommandBuffer* _cmdBuffer, ISemaphore* _waitSemaphore, ISemaphore* _signalSemaphore, IFence* _signalFence) = 0;
 		virtual void WaitIdle() = 0;
 
-		[[nodiscard]] inline COMMAND_POOL_TYPE GetType() const { return m_type; }
+		[[nodiscard]] inline COMMAND_TYPE GetType() const { return m_type; }
 
 
 	protected:
@@ -31,7 +32,7 @@ namespace NK
 		ILogger& m_logger;
 		IDevice& m_device;
 		
-		COMMAND_POOL_TYPE m_type;
+		COMMAND_TYPE m_type;
 	};
 
 }

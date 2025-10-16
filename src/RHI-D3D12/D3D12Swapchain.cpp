@@ -1,15 +1,14 @@
 #include "D3D12Swapchain.h"
+
 #include "D3D12Device.h"
+#include "D3D12Fence.h"
+#include "D3D12Queue.h"
+#include "D3D12Semaphore.h"
 #include "D3D12Surface.h"
 #include "D3D12Texture.h"
 #include "D3D12TextureView.h"
-#ifdef ERROR
-	#undef ERROR
-#endif
+
 #include <stdexcept>
-#include "D3D12Queue.h"
-#include "D3D12Semaphore.h"
-#include "D3D12Fence.h"
 
 
 namespace NK

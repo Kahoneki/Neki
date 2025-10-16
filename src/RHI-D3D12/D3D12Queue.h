@@ -1,9 +1,13 @@
 #pragma once
-#include <RHI/IQueue.h>
+
 #include "D3D12Device.h"
+
+#include <RHI/IQueue.h>
+
 
 namespace NK
 {
+
 	class D3D12Queue final : public IQueue
 	{	
 	public:
@@ -21,4 +25,5 @@ namespace NK
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue;
 		ICommandBuffer* m_syncList; //Used for WaitIdle()
 	};
+
 }

@@ -1,9 +1,13 @@
 #pragma once
-#include <RHI/IRootSignature.h>
+
 #include "D3D12Device.h"
+
+#include <RHI/IRootSignature.h>
+
 
 namespace NK
 {
+	
 	class D3D12RootSignature final : public IRootSignature
 	{
 	public:
@@ -34,4 +38,5 @@ namespace NK
 		RootDescriptorTable m_uavDescriptorTable;
 		RootDescriptorTable m_samplerDescriptorTable;
 	};
+
 }

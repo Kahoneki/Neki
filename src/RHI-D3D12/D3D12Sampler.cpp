@@ -1,10 +1,11 @@
 #include "D3D12Sampler.h"
-#include <stdexcept>
-#include <Core/Utils/FormatUtils.h>
+
 #include "D3D12Pipeline.h"
-#ifdef ERROR
-	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
-#endif
+
+#include <Core/Utils/FormatUtils.h>
+
+#include <stdexcept>
+
 
 namespace NK
 {
@@ -119,4 +120,5 @@ namespace NK
 		
 		m_logger.Unindent();
 	}
+	
 }

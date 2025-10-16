@@ -1,9 +1,10 @@
 #include "TrackingAllocator.h"
 
+#include <Core/Utils/FormatUtils.h>
+
 #include <cstring>
 #include <stdexcept>
 
-#include "Core/Utils/FormatUtils.h"
 
 namespace NK
 {
@@ -293,4 +294,5 @@ namespace NK
 			free(_ptr);
 		#endif
 	}
+	
 }

@@ -1,7 +1,9 @@
 #include "VulkanSurface.h"
 
 #include "VulkanDevice.h"
+
 #include <stdexcept>
+
 
 namespace NK
 {

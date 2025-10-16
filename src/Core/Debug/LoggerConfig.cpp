@@ -1,5 +1,6 @@
 #include "LoggerConfig.h"
 
+
 namespace NK
 {
 

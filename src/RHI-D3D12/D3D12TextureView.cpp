@@ -1,9 +1,9 @@
 #include "D3D12TextureView.h"
+
 #include "D3D12Texture.h"
+
 #include <stdexcept>
-#ifdef ERROR
-	#undef ERROR
-#endif
+
 
 namespace NK
 {

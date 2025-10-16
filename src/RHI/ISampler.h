@@ -1,25 +1,12 @@
 #pragma once
+
 #include "IDevice.h"
-#include "IPipeline.h"
+
 #include <glm/glm.hpp>
+
 
 namespace NK
 {
-
-	enum class FILTER_MODE
-	{
-		NEAREST,
-		LINEAR,
-	};
-
-	enum class ADDRESS_MODE
-	{
-		REPEAT,
-		MIRRORED_REPEAT,
-		CLAMP_TO_EDGE,
-		CLAMP_TO_BORDER,
-		MIRROR_CLAMP_TO_EDGE,
-	};
 	
 	struct SamplerDesc
 	{

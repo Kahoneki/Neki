@@ -1,9 +1,8 @@
 #include "D3D12Shader.h"
+
 #include <fstream>
 #include <stdexcept>
-#ifdef ERROR
-	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
-#endif
+
 
 namespace NK
 {

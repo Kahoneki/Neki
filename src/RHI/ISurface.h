@@ -1,9 +1,6 @@
 #pragma once
-#include <string>
-#include "IDevice.h"
 
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
+#include "IDevice.h"
 
 #include <Graphics/Window.h>
 

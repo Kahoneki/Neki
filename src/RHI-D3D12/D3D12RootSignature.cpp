@@ -1,10 +1,10 @@
 #include "D3D12RootSignature.h"
-#include <stdexcept>
-#include <array>
+
 #include <Core/Utils/FormatUtils.h>
-#ifdef ERROR
-	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
-#endif
+
+#include <array>
+#include <stdexcept>
+
 
 namespace NK
 {

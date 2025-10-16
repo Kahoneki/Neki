@@ -1,8 +1,11 @@
 #pragma once
+
 #include "RHI/ITexture.h"
+
 
 namespace NK
 {
+	
 	class VulkanTexture final : public ITexture
 	{
 	public:
@@ -12,11 +15,6 @@ namespace NK
 
 		virtual ~VulkanTexture() override;
 
-		[[nodiscard]] static VkImageUsageFlags GetVulkanUsageFlags(TEXTURE_USAGE_FLAGS _flags);
-		[[nodiscard]] static TEXTURE_USAGE_FLAGS GetRHIUsageFlags(VkImageUsageFlags _flags);
-		[[nodiscard]] static VkFormat GetVulkanFormat(DATA_FORMAT _format);
-		[[nodiscard]] static DATA_FORMAT GetRHIFormat(VkFormat _format);
-
 		//Vulkan internal API (for use by other RHI-Vulkan classes)
 		[[nodiscard]] VkImage GetTexture() const { return m_texture; }
 
@@ -25,4 +23,5 @@ namespace NK
 		VkImage m_texture{ VK_NULL_HANDLE };
 		VkDeviceMemory m_memory{ VK_NULL_HANDLE };
 	};
+
 }

@@ -1,8 +1,11 @@
 #pragma once
+
 #include <RHI/IBuffer.h>
+
 
 namespace NK
 {
+	
 	class VulkanBuffer final : public IBuffer
 	{
 	public:
@@ -17,10 +20,8 @@ namespace NK
 
 
 	private:
-		[[nodiscard]] VkBufferUsageFlags GetVulkanUsageFlags() const;
-
-
 		VkBuffer m_buffer{ VK_NULL_HANDLE };
 		VkDeviceMemory m_memory{ VK_NULL_HANDLE };
 	};
+	
 }

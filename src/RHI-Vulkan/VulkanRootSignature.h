@@ -1,8 +1,11 @@
 #pragma once
+
 #include <RHI/IRootSignature.h>
+
 
 namespace NK
 {
+	
 	class VulkanRootSignature final : public IRootSignature
 	{
 	public:
@@ -18,4 +21,5 @@ namespace NK
 		VkDescriptorSet m_descriptorSet{ VK_NULL_HANDLE };
 		VkPipelineLayout m_pipelineLayout{ VK_NULL_HANDLE };
 	};
+
 }

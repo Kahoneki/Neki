@@ -1,16 +1,4 @@
 #include "VulkanDevice.h"
-#include "VulkanDevice.h"
-
-#include <algorithm>
-#include <cstring>
-#include <set>
-#include <stdexcept>
-#include <GLFW/glfw3.h>
-
-#include <Core/Debug/ILogger.h>
-#include <Core/Memory/Allocation.h>
-#include <Core/Utils/EnumUtils.h>
-#include <Core/Utils/RHIUtils.h>
 
 #include "VulkanBuffer.h"
 #include "VulkanBufferView.h"
@@ -26,6 +14,17 @@
 #include "VulkanSwapchain.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
+
+#include <Core/Debug/ILogger.h>
+#include <Core/Memory/Allocation.h>
+#include <Core/Utils/EnumUtils.h>
+#include <RHI/RHIUtils.h>
+
+#include <algorithm>
+#include <cstring>
+#include <set>
+#include <stdexcept>
+#include <GLFW/glfw3.h>
 
 
 namespace NK

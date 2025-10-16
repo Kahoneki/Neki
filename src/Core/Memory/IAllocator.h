@@ -1,18 +1,14 @@
 #pragma once
+
+#include <cstddef>
+
 #if NEKI_VULKAN_SUPPORTED
 	#include <vulkan/vulkan.h>
 #endif
-#include <cstddef>
+
 
 namespace NK
 {
-	enum class ALLOCATOR_TYPE
-	{
-		TRACKING,
-		TRACKING_VERBOSE,
-		TRACKING_VERBOSE_INCLUDE_VULKAN,
-	};
-
 
 	class IAllocator
 	{
@@ -36,4 +32,5 @@ namespace NK
 			VkAllocationCallbacks m_vulkanCallbacks{ VK_NULL_HANDLE };
 		#endif
 	};
+	
 }

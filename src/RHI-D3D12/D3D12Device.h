@@ -1,19 +1,19 @@
 #pragma once
-#include <RHI/IDevice.h>
-#include <RHI/ICommandPool.h>
 
-#include <dxgi1_6.h>
+#include <RHI/ICommandBuffer.h>
+#include <RHI/ICommandPool.h>
+#include <RHI/IDevice.h>
+
 #include <d3d12.h>
+#include <dxgi1_6.h>
 #include <wrl.h>
+
 #ifdef CreateSemaphore
 	#undef CreateSemaphore
 #endif
 #ifdef CreateWindow
 	#undef CreateWindow
 #endif
-#include <RHI/ICommandPool.h>
-#include <RHI/ICommandBuffer.h>
-
 
 
 namespace NK

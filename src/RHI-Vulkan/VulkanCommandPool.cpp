@@ -1,10 +1,16 @@
 #include "VulkanCommandPool.h"
 
+#include "VulkanCommandBuffer.h"
+#include "VulkanUtils.h"
+
+#include <Core/Memory/Allocation.h>
+#include <RHI/RHIUtils.h>
+
 #include <stdexcept>
 #include <utility>
 
-#include "VulkanCommandBuffer.h"
-#include "Core/Memory/Allocation.h"
+
+
 
 namespace NK
 {
@@ -19,11 +25,11 @@ namespace NK
 		VkCommandPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; //Allow individual command buffers to be reset
-		poolInfo.queueFamilyIndex = GetQueueFamilyIndex();
+		poolInfo.queueFamilyIndex = VulkanUtils::GetVulkanQueueFamilyIndex(m_type, dynamic_cast<VulkanDevice&>(m_device));
 		const VkResult result{ vkCreateCommandPool(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), &poolInfo, _allocator.GetVulkanCallbacks(), &m_pool) };
 		if (result == VK_SUCCESS)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::COMMAND_POOL, "Initialisation successful - type = " + GetPoolTypeString() + '\n');
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::COMMAND_POOL, "Initialisation successful - type = " + RHIUtils::GetCommandTypeString(m_type) + '\n');
 		}
 		else
 		{
@@ -64,39 +70,5 @@ namespace NK
 	{
 		//todo: implement
 	}
-
-
-
-	std::size_t VulkanCommandPool::GetQueueFamilyIndex() const
-	{
-		const VulkanDevice& vulkanDevice{ dynamic_cast<VulkanDevice&>(m_device) };
-		switch (m_type)
-		{
-		case COMMAND_POOL_TYPE::GRAPHICS: return vulkanDevice.GetGraphicsQueueFamilyIndex();
-		case COMMAND_POOL_TYPE::COMPUTE: return vulkanDevice.GetComputeQueueFamilyIndex();
-		case COMMAND_POOL_TYPE::TRANSFER: return vulkanDevice.GetTransferQueueFamilyIndex();
-		default:
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "GetQueueFamilyIndex() - switch case returned default. type = " + GetPoolTypeString());
-			throw std::runtime_error("");
-		}
-		}
-	}
-
-
-
-	std::string VulkanCommandPool::GetPoolTypeString() const
-	{
-		switch (m_type)
-		{
-		case COMMAND_POOL_TYPE::GRAPHICS: return "GRAPHICS";
-		case COMMAND_POOL_TYPE::COMPUTE: return "COMPUTE";
-		case COMMAND_POOL_TYPE::TRANSFER: return "TRANSFER";
-		default:
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "GetPoolTypeString() - switch case returned default. type = " + std::to_string(std::to_underlying(m_type)));
-			throw std::runtime_error("");
-		}
-		}
-	}
+	
 }

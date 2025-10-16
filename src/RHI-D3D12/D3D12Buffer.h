@@ -1,9 +1,13 @@
 #pragma once
-#include <RHI/IBuffer.h>
+
 #include "D3D12Device.h"
+
+#include <RHI/IBuffer.h>
+
 
 namespace NK
 {
+	
 	class D3D12Buffer final : public IBuffer
 	{
 	public:
@@ -26,4 +30,5 @@ namespace NK
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_buffer;
 		D3D12_RESOURCE_DESC m_resourceDesc;
 	};
+
 }

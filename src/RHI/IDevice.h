@@ -1,14 +1,16 @@
 #pragma once
-#include "Core/Debug/ILogger.h"
-#include "Core/Memory/Allocation.h"
-#include "Core/Memory/FreeListAllocator.h"
-#include "Core/Memory/IAllocator.h"
-#include "Graphics/GPUUploader.h"
-#include "Graphics/Window.h"
+
+#include <Core/Debug/ILogger.h>
+#include <Core/Memory/Allocation.h>
+#include <Core/Memory/FreeListAllocator.h>
+#include <Core/Memory/IAllocator.h>
+#include <Graphics/GPUUploader.h>
+#include <Graphics/Window.h>
 
 
 namespace NK
 {
+	
 	//Forward declarations
 	class IBuffer;
 	struct BufferDesc;
@@ -49,23 +51,10 @@ namespace NK
 	class ISemaphore;
 
 	
-	typedef std::uint32_t ResourceIndex;
-	typedef std::uint32_t SamplerIndex;
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
 	constexpr std::uint32_t MAX_BINDLESS_SAMPLERS{ 2048 };
-
-
-	struct TextureCopyMemoryLayout
-	{
-		std::uint32_t totalBytes;
-		std::uint32_t rowPitch;
-	};
-}
-
-
-
-namespace NK
-{
+	
+	
 	class IDevice
 	{
 	public:
@@ -109,4 +98,5 @@ namespace NK
 		UniquePtr<FreeListAllocator> m_resourceIndexAllocator;
 		UniquePtr<FreeListAllocator> m_samplerIndexAllocator;
 	};
+	
 }

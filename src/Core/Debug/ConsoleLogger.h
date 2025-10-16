@@ -1,5 +1,9 @@
 #pragma once
+
 #include "ILogger.h"
+
+#include <Types/NekiTypes.h>
+
 
 namespace NK
 {

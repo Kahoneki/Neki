@@ -1,9 +1,13 @@
 #pragma once
+
 #include "VulkanDevice.h"
-#include "RHI/ICommandPool.h"
+
+#include <RHI/ICommandPool.h>
+
 
 namespace NK
 {
+
 	class VulkanCommandPool final : public ICommandPool
 	{
 	public:
@@ -19,9 +23,7 @@ namespace NK
 
 
 	private:
-		[[nodiscard]] std::size_t GetQueueFamilyIndex() const;
-		[[nodiscard]] std::string GetPoolTypeString() const;
-		
 		VkCommandPool m_pool{ VK_NULL_HANDLE };
 	};
+	
 }

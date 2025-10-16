@@ -1,8 +1,11 @@
 #pragma once
+
 #include <RHI/ISwapchain.h>
+
 
 namespace NK
 {
+	
 	class VulkanSwapchain final : public ISwapchain
 	{
 	public:
@@ -29,4 +32,5 @@ namespace NK
 		VkFormat m_format{ VK_FORMAT_UNDEFINED };
 		VkSwapchainKHR m_swapchain{ VK_NULL_HANDLE };
 	};
+
 }

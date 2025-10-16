@@ -1,4 +1,3 @@
-#include <cstring>
 #include <Core/RAIIContext.h>
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/Allocation.h>
@@ -16,14 +15,11 @@
 #include <RHI/ISwapchain.h>
 #include <RHI/ITexture.h>
 
+#include <cstring>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/transform.hpp>
-#ifdef ERROR
-	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
-#endif
-
 
 
 int main()
@@ -52,12 +48,12 @@ int main()
 
 	//Graphics Queue
 	NK::QueueDesc graphicsQueueDesc{};
-	graphicsQueueDesc.type = NK::COMMAND_POOL_TYPE::GRAPHICS;
+	graphicsQueueDesc.type = NK::COMMAND_TYPE::GRAPHICS;
 	const NK::UniquePtr<NK::IQueue> graphicsQueue(device->CreateQueue(graphicsQueueDesc));
 
 	//Transfer Queue
 	NK::QueueDesc transferQueueDesc{};
-	transferQueueDesc.type = NK::COMMAND_POOL_TYPE::TRANSFER;
+	transferQueueDesc.type = NK::COMMAND_TYPE::TRANSFER;
 	const NK::UniquePtr<NK::IQueue> transferQueue{ device->CreateQueue(transferQueueDesc) };
 
 	//GPU Uploader

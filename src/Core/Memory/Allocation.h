@@ -1,14 +1,15 @@
 #pragma once
-#include <memory>
 
-#include "Core/Context.h"
-#include <iostream>
+#include <Core/Context.h>
+
+#include <memory>
 
 #define NK_NEW(Type, ...)	NK::NewImpl<Type>(__FILE__, __LINE__, ##__VA_ARGS__)
 #define NK_DELETE(ptr)		NK::DeleteImpl(ptr)
 //For static objects - disables memory leak tracking, make sure you know what you're doing!
 #define NK_STATIC_NEW(Type, ...)	NK::StaticNewImpl<Type>(__FILE__, __LINE__, ##__VA_ARGS__)
 #define NK_STATIC_DELETE(ptr)		NK::StaticDeleteImpl(ptr)
+
 
 namespace NK
 {

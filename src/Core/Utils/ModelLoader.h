@@ -1,16 +1,19 @@
 #pragma once
+
+#include "ImageLoader.h"
+
+#include <Core/Memory/Allocation.h>
+#include <RHI/IPipeline.h>
+#include <Types/Materials.h>
+
 #include <array>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
-#include <Core/Memory/Allocation.h>
 #include <glm/glm.hpp>
 
-#include "ImageLoader.h"
-#include "RHI/IPipeline.h"
-#include "Types/Materials.h"
 
 //Forward declaration for Assimp types to avoid including Assimp headers in public Neki library
 struct aiNode;

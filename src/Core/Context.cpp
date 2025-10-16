@@ -1,14 +1,15 @@
 #include "Context.h"
 
-#include <stdexcept>
-
-#include <GLFW/glfw3.h>
 #include "Debug/ConsoleLogger.h"
 #include "Memory/TrackingAllocator.h"
-#include "Utils/ImageLoader.h"
+
+#include <stdexcept>
+#include <GLFW/glfw3.h>
+
 
 namespace NK
 {
+	
 	ILogger* Context::m_logger{ nullptr };
 	IAllocator* Context::m_allocator{ nullptr };
 
@@ -51,7 +52,6 @@ namespace NK
 		delete m_allocator;
 		m_logger->Unindent();
 		delete m_logger;
-
 	}
 
 }

@@ -1,13 +1,11 @@
 #include "ILogger.h"
-#include <iomanip>
+
 #include <iostream>
 
 #if defined(_WIN32)
 	#include <windows.h>
-	#if defined(ERROR)
-		#undef ERROR //Error is used for LOGGER_CHANNEL::ERROR
-	#endif
 #endif
+
 
 namespace NK
 {
@@ -26,12 +24,12 @@ namespace NK
 	bool ILogger::EnableAnsiSupport()
 	{
 		#if defined(_WIN32)
-		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-		if (hOut == INVALID_HANDLE_VALUE) { return false; }
-		DWORD dwMode = 0;
-		if (!GetConsoleMode(hOut, &dwMode)) { return false; }
-		dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-		if (!SetConsoleMode(hOut, dwMode)) { return false; }
+			HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+			if (hOut == INVALID_HANDLE_VALUE) { return false; }
+			DWORD dwMode = 0;
+			if (!GetConsoleMode(hOut, &dwMode)) { return false; }
+			dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+			if (!SetConsoleMode(hOut, dwMode)) { return false; }
 		#endif
 
 		return true;

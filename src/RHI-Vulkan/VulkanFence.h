@@ -1,8 +1,11 @@
 #pragma once
+
 #include <RHI/IFence.h>
+
 
 namespace NK
 {
+	
 	class VulkanFence final : public IFence
 	{
 	public:
@@ -19,4 +22,5 @@ namespace NK
 	private:
 		VkFence m_fence{ VK_NULL_HANDLE };
 	};
+	
 }

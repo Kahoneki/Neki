@@ -1,10 +1,8 @@
 #include "D3D12Buffer.h"
-#include <utility>
+
 #include <Core/Utils/EnumUtils.h>
 #include <Core/Utils/FormatUtils.h>
-#ifdef ERROR
-	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
-#endif
+
 
 namespace NK
 {

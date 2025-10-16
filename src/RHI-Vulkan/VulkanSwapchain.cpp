@@ -1,16 +1,17 @@
 #include "VulkanSwapchain.h"
 
-#include <algorithm>
-
 #include "VulkanDevice.h"
+#include "VulkanFence.h"
+#include "VulkanQueue.h"
+#include "VulkanSemaphore.h"
 #include "VulkanSurface.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
+#include "VulkanUtils.h"
+
+#include <algorithm>
 #include <stdexcept>
 
-#include "VulkanFence.h"
-#include "VulkanSemaphore.h"
-#include "VulkanQueue.h"
 
 namespace NK
 {
@@ -228,7 +229,7 @@ namespace NK
 			desc.size = glm::ivec3(m_extent.width, m_extent.height, 1);
 			desc.arrayTexture = false;
 			desc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT;
-			desc.format = VulkanTexture::GetRHIFormat(m_format);
+			desc.format = VulkanUtils::GetRHIFormat(m_format);
 			desc.dimension = TEXTURE_DIMENSION::DIM_2;
 			m_backBuffers.push_back(UniquePtr<ITexture>(NK_NEW(VulkanTexture, m_logger, m_allocator, m_device, desc, image)));
 		}
@@ -248,7 +249,7 @@ namespace NK
 		{
 			TextureViewDesc desc{};
 			desc.dimension = TEXTURE_DIMENSION::DIM_2;
-			desc.format = VulkanTexture::GetRHIFormat(m_format);
+			desc.format = VulkanUtils::GetRHIFormat(m_format);
 			desc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
 
 			m_backBufferViews.push_back(UniquePtr<ITextureView>(NK_NEW(VulkanTextureView, m_logger, m_allocator, m_device, m_backBuffers[i].get(), desc)));

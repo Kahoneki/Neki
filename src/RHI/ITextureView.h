@@ -1,20 +1,12 @@
 #pragma once
+
 #include "ITexture.h"
+
 #include <Core/Memory/FreeListAllocator.h>
+
 
 namespace NK
 {
-	typedef std::uint32_t ResourceIndex; //todo: redefinition
-	
-	enum class TEXTURE_VIEW_TYPE
-	{
-		RENDER_TARGET,
-		DEPTH,
-		DEPTH_STENCIL,
-		
-		SHADER_READ_ONLY,
-		SHADER_READ_WRITE,
-	};
 	
 	struct TextureViewDesc
 	{
@@ -56,4 +48,5 @@ namespace NK
 		TEXTURE_DIMENSION m_dimension;
 		DATA_FORMAT m_format;
 	};
+	
 }

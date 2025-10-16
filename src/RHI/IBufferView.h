@@ -1,14 +1,10 @@
 #pragma once
+
 #include "IDevice.h"
+
 
 namespace NK
 {
-	enum class BUFFER_VIEW_TYPE
-	{
-		UNIFORM,
-		STORAGE_READ_ONLY,
-		STORAGE_READ_WRITE,
-	};
 
 	struct BufferViewDesc
 	{
@@ -42,4 +38,5 @@ namespace NK
 		std::uint64_t m_offset;
 		std::uint64_t m_size;
 	};
+	
 }

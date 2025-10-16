@@ -1,10 +1,8 @@
 #include "D3D12Surface.h"
-#include <stdexcept>
+
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
-#ifdef ERROR
-	#undef ERROR
-#endif
+
 
 namespace NK
 {

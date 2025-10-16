@@ -5,7 +5,7 @@
 namespace NK
 {
 
-	std::uint32_t RHIUtils::GetFormatBytesPerPixel(DATA_FORMAT _format)
+	std::uint32_t RHIUtils::GetFormatBytesPerPixel(const DATA_FORMAT _format)
 	{
 		switch (_format)
 		{
@@ -75,7 +75,39 @@ namespace NK
 
 		default:
 		{
-			throw std::runtime_error("GetFormatBytesPerPixel() default case reached. Format = " + std::to_string(std::to_underlying(_format)));
+			throw std::invalid_argument("GetFormatBytesPerPixel() default case reached. Format = " + std::to_string(std::to_underlying(_format)));
+		}
+		}
+	}
+
+
+
+	std::uint32_t RHIUtils::Convert8BitMaskTo32BitMask(const std::uint8_t _mask)
+	{
+		//For each set bit in the input mask, the corresponding 4 bits in the output mask will be set
+		std::uint32_t result{ 0 };
+		for (int i{ 0 }; i < 8; ++i)
+		{
+			if ((_mask >> i) & 1)
+			{
+				result |= (0b1111 << (i * 4));
+			}
+		}
+		return result;
+	}
+
+
+
+	std::string RHIUtils::GetCommandTypeString(const COMMAND_TYPE _type)
+	{
+		switch (_type)
+		{
+		case COMMAND_TYPE::GRAPHICS:	return "GRAPHICS";
+		case COMMAND_TYPE::COMPUTE:		return "COMPUTE";
+		case COMMAND_TYPE::TRANSFER:	return "TRANSFER";
+		default:
+		{
+			throw std::invalid_argument("GetCommandTypeString() - switch case returned default. type = " + std::to_string(std::to_underlying(_type)));
 		}
 		}
 	}

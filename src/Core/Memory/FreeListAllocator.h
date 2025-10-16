@@ -1,9 +1,12 @@
 #pragma once
+
 #include <cstdint>
 #include <vector>
 
+
 namespace NK
 {
+	
 	class FreeListAllocator
 	{
 	public:
@@ -25,4 +28,5 @@ namespace NK
 		std::uint32_t m_nextFreeIndex;
 		std::vector<std::uint32_t> m_freeList;
 	};
+	
 }

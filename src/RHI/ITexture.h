@@ -1,38 +1,16 @@
 #pragma once
+
 #include <Core/Debug/ILogger.h>
-#include <glm/glm.hpp>
-#include <Types/DataFormat.h>
 #include <Core/Memory/IAllocator.h>
+#include <Types/NekiTypes.h>
+
+#include <glm/glm.hpp>
+
 
 namespace NK
 {
-	class IDevice;
 	
-	enum class TEXTURE_USAGE_FLAGS : std::uint32_t
-	{
-		NONE                     = 1 << 0,
-		TRANSFER_SRC_BIT         = 1 << 1,
-		TRANSFER_DST_BIT         = 1 << 2,
-		READ_ONLY                = 1 << 3,
-		READ_WRITE               = 1 << 4,
-		COLOUR_ATTACHMENT        = 1 << 5,
-		DEPTH_STENCIL_ATTACHMENT = 1 << 6,
-	};
-
-	enum class TEXTURE_DIMENSION
-	{
-		DIM_1,
-		DIM_2,
-		DIM_3,
-	};
-}
-
-//Enable bitmask operators for the TEXTURE_USAGE_FLAG_BITS type
-template<>
-struct enable_bitmask_operators<NK::TEXTURE_USAGE_FLAGS> : std::true_type {};
-
-namespace NK
-{
+	class IDevice;
 
 	struct TextureDesc
 	{
@@ -82,4 +60,5 @@ namespace NK
 		//^trying to destroy the images yourself (e.g. in this class' destructor) results in a crash
 		bool m_isOwned;
 	};
+	
 }

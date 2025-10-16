@@ -1,7 +1,11 @@
 #include "VulkanFence.h"
-#include <stdexcept>
-#include <Core/Utils/FormatUtils.h>
+
 #include "VulkanDevice.h"
+
+#include <Core/Utils/FormatUtils.h>
+
+#include <stdexcept>
+
 
 namespace NK
 {

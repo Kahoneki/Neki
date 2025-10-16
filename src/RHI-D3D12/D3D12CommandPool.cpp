@@ -1,11 +1,12 @@
 #include "D3D12CommandPool.h"
-#include <stdexcept>
+
 #include "D3D12CommandBuffer.h"
-#include "Core/Memory/Allocation.h"
+
+#include <Core/Memory/Allocation.h>
+
+#include <stdexcept>
 #include <utility>
-#ifdef ERROR
-	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
-#endif
+
 
 namespace NK
 {

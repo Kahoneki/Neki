@@ -1,15 +1,18 @@
 #pragma once
+
+#include "RHI/IQueue.h"
+
+#include <RHI/IDevice.h>
+
 #include <array>
 #include <cstdint>
 #include <vector>
-#include <RHI/IDevice.h>
 #include <vulkan/vulkan.h>
-
-#include "RHI/IQueue.h"
 
 
 namespace NK
 {
+	
 	class VulkanDevice final : public IDevice
 	{
 	public:
@@ -81,11 +84,11 @@ namespace NK
 		std::uint32_t m_transferQueueFamilyIndex{ UINT32_MAX };
 		UniquePtr<FreeListAllocator> m_transferQueueIndexAllocator;
 
-		std::unordered_map<COMMAND_POOL_TYPE, UniquePtr<FreeListAllocator>*> m_queueIndexAllocatorLookup
+		std::unordered_map<COMMAND_TYPE, UniquePtr<FreeListAllocator>*> m_queueIndexAllocatorLookup
 		{
-			{ COMMAND_POOL_TYPE::GRAPHICS, &m_graphicsQueueIndexAllocator },
-			{ COMMAND_POOL_TYPE::COMPUTE, &m_computeQueueIndexAllocator },
-			{ COMMAND_POOL_TYPE::TRANSFER, &m_transferQueueIndexAllocator },
+			{ COMMAND_TYPE::GRAPHICS, &m_graphicsQueueIndexAllocator },
+			{ COMMAND_TYPE::COMPUTE, &m_computeQueueIndexAllocator },
+			{ COMMAND_TYPE::TRANSFER, &m_transferQueueIndexAllocator },
 		};
 
 		//Mutable type
@@ -108,4 +111,5 @@ namespace NK
 		const std::array<const char*, 1> m_requiredInstanceExtensions{ VK_KHR_SURFACE_EXTENSION_NAME };
 		const std::array<const char*, 3> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader", "VK_EXT_mutable_descriptor_type" };
 	};
+	
 }

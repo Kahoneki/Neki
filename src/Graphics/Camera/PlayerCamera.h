@@ -1,10 +1,14 @@
 #pragma once
+
+#include "Camera.h"
+
 #include <glm/glm.hpp>
 #include <Graphics/Window.h>
-#include "Camera.h"
+
 
 namespace NK
 {
+
 	class PlayerCamera final : public Camera
 	{
 	public:

@@ -1,8 +1,11 @@
 #pragma once
+
 #include <utility>
+
 
 namespace NK
 {
+	
 	class EnumUtils
 	{
 	public:
@@ -13,4 +16,5 @@ namespace NK
 			return (std::to_underlying(_field) & std::to_underlying(_bit));
 		}
 	};
+	
 }

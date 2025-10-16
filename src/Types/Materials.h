@@ -1,6 +1,7 @@
 #ifndef NEKI_MATERIALS_H
 #define NEKI_MATERIALS_H
 
+
 namespace NK
 {
 	//`hasX` fields are of type int for compatibility between C++ (bools aligned to 1-byte) and HLSL (bools aligned to 4-bytes)

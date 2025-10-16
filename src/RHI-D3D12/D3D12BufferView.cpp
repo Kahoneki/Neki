@@ -1,10 +1,11 @@
 #include "D3D12BufferView.h"
+
 #include "D3D12Buffer.h"
+
 #include <Core/Utils/FormatUtils.h>
+
 #include <stdexcept>
-#ifdef ERROR
-	#undef ERROR
-#endif
+
 
 namespace NK
 {

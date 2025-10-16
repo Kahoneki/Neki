@@ -1,9 +1,12 @@
 #pragma once
+
 #include "Debug/ILogger.h"
 #include "Memory/IAllocator.h"
 
+
 namespace NK
 {
+	
 	//Global static context class
 	class Context
 	{
@@ -22,4 +25,5 @@ namespace NK
 		static ILogger* m_logger;
 		static IAllocator* m_allocator;
 	};
+	
 }

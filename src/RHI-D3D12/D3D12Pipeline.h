@@ -1,10 +1,13 @@
 #pragma once
-#include <RHI/IPipeline.h>
+
 #include "D3D12Device.h"
+
+#include <RHI/IPipeline.h>
 
 
 namespace NK
 {
+	
 	class D3D12Pipeline final : public IPipeline
 	{
 	public:
@@ -34,4 +37,5 @@ namespace NK
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipeline;
 	};
+
 }

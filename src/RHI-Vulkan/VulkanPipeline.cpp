@@ -1,13 +1,19 @@
 #include "VulkanPipeline.h"
-#include <stdexcept>
-#include <Core/Utils/EnumUtils.h>
+
 #include "VulkanDevice.h"
 #include "VulkanRootSignature.h"
 #include "VulkanShader.h"
 #include "VulkanTexture.h"
+#include "VulkanUtils.h"
+
+#include <Core/Utils/EnumUtils.h>
+
+#include <stdexcept>
+
 
 namespace NK
 {
+	
 	VulkanPipeline::VulkanPipeline(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const PipelineDesc& _desc)
 	: IPipeline(_logger, _allocator, _device, _desc)
 	{
@@ -199,7 +205,7 @@ namespace NK
 		{
 			attributeDescs[i].location = std::to_underlying(m_vertexInputDesc.attributeDescriptions[i].attribute);
 			attributeDescs[i].binding = m_vertexInputDesc.attributeDescriptions[i].binding;
-			attributeDescs[i].format = VulkanTexture::GetVulkanFormat(m_vertexInputDesc.attributeDescriptions[i].format);
+			attributeDescs[i].format = VulkanUtils::GetVulkanFormat(m_vertexInputDesc.attributeDescriptions[i].format);
 			attributeDescs[i].offset = m_vertexInputDesc.attributeDescriptions[i].offset;
 		}
 
@@ -303,11 +309,11 @@ namespace NK
 		std::vector<VkFormat> vulkanColourAttachmentFormats(m_colourAttachmentFormats.size());
 		for (size_t i = 0; i < m_colourAttachmentFormats.size(); ++i)
 		{
-			vulkanColourAttachmentFormats[i] = VulkanTexture::GetVulkanFormat(m_colourAttachmentFormats[i]);
+			vulkanColourAttachmentFormats[i] = VulkanUtils::GetVulkanFormat(m_colourAttachmentFormats[i]);
 		}
 		renderingInfo.pColorAttachmentFormats = vulkanColourAttachmentFormats.data();
 		//Use same format for depth and stencil for parity with dx12
-		renderingInfo.depthAttachmentFormat = VulkanTexture::GetVulkanFormat(m_depthStencilAttachmentFormat);
+		renderingInfo.depthAttachmentFormat = VulkanUtils::GetVulkanFormat(m_depthStencilAttachmentFormat);
 //		renderingInfo.stencilAttachmentFormat = VulkanTexture::GetVulkanFormat(m_depthStencilAttachmentFormat);
 
 

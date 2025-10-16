@@ -1,9 +1,9 @@
 #include "D3D12Semaphore.h"
-#include <stdexcept>
+
 #include <Core/Utils/FormatUtils.h>
-#ifdef ERROR
-	#undef ERROR
-#endif
+
+#include <stdexcept>
+
 
 namespace NK
 {

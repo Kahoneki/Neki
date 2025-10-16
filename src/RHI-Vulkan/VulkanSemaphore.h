@@ -1,8 +1,11 @@
 #pragma once
+
 #include <RHI/ISemaphore.h>
+
 
 namespace NK
 {
+	
 	class VulkanSemaphore final : public ISemaphore
 	{
 	public:
@@ -16,4 +19,5 @@ namespace NK
 	private:
 		VkSemaphore m_semaphore{ VK_NULL_HANDLE };
 	};
+
 }

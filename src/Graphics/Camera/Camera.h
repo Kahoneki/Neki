@@ -1,21 +1,12 @@
 #pragma once
+
+#include <Types/NekiTypes.h>
+
 #include <glm/glm.hpp>
+
 
 namespace NK
 {
-
-	enum class PROJECTION_METHOD
-	{
-		ORTHOGRAPHIC,
-		PERSPECTIVE,
-	};
-
-	struct CameraShaderData
-	{
-		glm::mat4 viewMat;
-		glm::mat4 projMat;
-	};
-
 
 	class Camera
 	{

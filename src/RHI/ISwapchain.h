@@ -1,12 +1,11 @@
 #pragma once
+
 #include "IDevice.h"
-#include "ISurface.h"
 #include "ITextureView.h"
-#include "IQueue.h"
+
 
 namespace NK
 {
-
 
 	struct SwapchainDesc
 	{

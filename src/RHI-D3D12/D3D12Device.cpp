@@ -1,27 +1,27 @@
 #include "D3D12Device.h"
 
-#include <Core/Memory/Allocation.h>
-#include <Core/Utils/FormatUtils.h>
-#include <Core/Utils/EnumUtils.h>
-#include "D3D12CommandPool.h"
 #include "D3D12Buffer.h"
 #include "D3D12BufferView.h"
-#include "D3D12Texture.h"
-#include "D3D12TextureView.h"
-#include "D3D12Sampler.h"
-#include "D3D12Surface.h"
-#include "D3D12Swapchain.h"
-#include "D3D12Shader.h"
+#include "D3D12CommandPool.h"
+#include "D3D12Fence.h"
 #include "D3D12Pipeline.h"
 #include "D3D12Queue.h"
-#include "D3D12Fence.h"
-#include "D3D12Semaphore.h"
-#include <stdexcept>
-#include <array>
-#ifdef ERROR
-	#undef ERROR //conflicts with LOGGER_CHANNEL::ERROR
-#endif
 #include "D3D12RootSignature.h"
+#include "D3D12Sampler.h"
+#include "D3D12Semaphore.h"
+#include "D3D12Shader.h"
+#include "D3D12Surface.h"
+#include "D3D12Swapchain.h"
+#include "D3D12Texture.h"
+#include "D3D12TextureView.h"
+
+#include <Core/Memory/Allocation.h>
+#include <Core/Utils/EnumUtils.h>
+#include <Core/Utils/FormatUtils.h>
+
+#include <array>
+#include <stdexcept>
+
 
 namespace NK
 {

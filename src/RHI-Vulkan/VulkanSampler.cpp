@@ -1,8 +1,12 @@
 #include "VulkanSampler.h"
-#include <stdexcept>
-#include <Core/Utils/FormatUtils.h>
+
 #include "VulkanDevice.h"
 #include "VulkanPipeline.h"
+#include "VulkanUtils.h"
+
+#include <stdexcept>
+
+
 
 namespace NK
 {
@@ -25,12 +29,12 @@ namespace NK
 		//Create the sampler
 		VkSamplerCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		createInfo.minFilter = GetVulkanFilter(_desc.minFilter);
-		createInfo.magFilter = GetVulkanFilter(_desc.magFilter);
-		createInfo.mipmapMode = GetVulkanMipmapMode(_desc.mipmapFilter);
-		createInfo.addressModeU = GetVulkanAddressMode(_desc.addressModeU);
-		createInfo.addressModeV = GetVulkanAddressMode(_desc.addressModeV);
-		createInfo.addressModeW = GetVulkanAddressMode(_desc.addressModeW);
+		createInfo.minFilter = VulkanUtils::GetVulkanFilter(_desc.minFilter);
+		createInfo.magFilter = VulkanUtils::GetVulkanFilter(_desc.magFilter);
+		createInfo.mipmapMode = VulkanUtils::GetVulkanMipmapMode(_desc.mipmapFilter);
+		createInfo.addressModeU = VulkanUtils::GetVulkanAddressMode(_desc.addressModeU);
+		createInfo.addressModeV = VulkanUtils::GetVulkanAddressMode(_desc.addressModeV);
+		createInfo.addressModeW = VulkanUtils::GetVulkanAddressMode(_desc.addressModeW);
 		createInfo.mipLodBias = _desc.mipLODBias;
 		createInfo.anisotropyEnable = _desc.maxAnisotropy > 1;
 		createInfo.maxAnisotropy = _desc.maxAnisotropy;
@@ -99,54 +103,6 @@ namespace NK
 
 		
 		m_logger.Unindent();
-	}
-
-
-
-	VkFilter VulkanSampler::GetVulkanFilter(FILTER_MODE _filterMode)
-	{
-		switch (_filterMode)
-		{
-		case FILTER_MODE::NEAREST:	return VK_FILTER_NEAREST;
-		case FILTER_MODE::LINEAR:	return VK_FILTER_LINEAR;
-		default:
-		{
-			throw std::runtime_error("Default case reached for VulkanSampler::GetVulkanFilter() - filter mode = " + std::to_string(std::to_underlying(_filterMode)));
-		}
-		}
-	}
-
-
-
-	VkSamplerMipmapMode VulkanSampler::GetVulkanMipmapMode(FILTER_MODE _filterMode)
-	{
-		switch (_filterMode)
-		{
-		case FILTER_MODE::NEAREST:	return VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		case FILTER_MODE::LINEAR:	return VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		default:
-		{
-			throw std::runtime_error("Default case reached for VulkanSampler::GetVulkanMipmapMode() - filter mode = " + std::to_string(std::to_underlying(_filterMode)));
-		}
-		}
-	}
-
-
-
-	VkSamplerAddressMode VulkanSampler::GetVulkanAddressMode(ADDRESS_MODE _addressMode)
-	{
-		switch (_addressMode)
-		{
-		case ADDRESS_MODE::REPEAT:					return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		case ADDRESS_MODE::MIRRORED_REPEAT:			return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-		case ADDRESS_MODE::CLAMP_TO_EDGE:			return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		case ADDRESS_MODE::CLAMP_TO_BORDER:			return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-		case ADDRESS_MODE::MIRROR_CLAMP_TO_EDGE:	return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-		default:
-		{
-			throw std::runtime_error("Default case reached for VulkanSampler::GetVulkanAddressMode() - address mode = " + std::to_string(std::to_underlying(_addressMode)));
-		}
-		}
 	}
 	
 }
