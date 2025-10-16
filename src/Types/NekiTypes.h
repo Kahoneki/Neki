@@ -468,8 +468,11 @@ namespace NK
 		D3D12_EXECUTION,
 		D3D12_SHADER,
 
+		ENGINE,
 		CONTEXT,
 		TRACKING_ALLOCATOR,
+
+		RENDER_SYSTEM,
 		
 		DEVICE,
 		COMMAND_POOL,
@@ -538,4 +541,10 @@ namespace NK
 		DEPTH_STENCIL,
 	};
 
+	enum class GRAPHICS_BACKEND
+	{
+		VULKAN,
+		D3D12,
+	};
+	
 }

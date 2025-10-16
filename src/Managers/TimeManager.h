@@ -4,7 +4,7 @@
 namespace NK
 {
 	
-	class TimeManager
+	class TimeManager final
 	{
 	public:
 		static void Update();

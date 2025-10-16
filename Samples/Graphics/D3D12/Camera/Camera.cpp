@@ -29,8 +29,8 @@ int main()
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	NK::RAIIContext context{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE };
-	NK::ILogger* logger{ NK::Context::GetLogger() };
-	NK::IAllocator* allocator{ NK::Context::GetAllocator() };
+	NK::ILogger* logger{ NK::Engine::GetLogger() };
+	NK::IAllocator* allocator{ NK::Engine::GetAllocator() };
 
 	logger->Unindent();
 

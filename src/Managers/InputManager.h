@@ -31,7 +31,7 @@ namespace NK
 
 	
 	//Static class for storing input action states
-	class InputManager
+	class InputManager final
 	{
 	public:
 		//Updates the actionStates map with the current input state on _window

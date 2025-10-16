@@ -7,7 +7,7 @@
 namespace NK
 {
 	
-	//Global static context class
+	//Global static context class - todo: replace entirely with Engine class?
 	class Context
 	{
 	public:
