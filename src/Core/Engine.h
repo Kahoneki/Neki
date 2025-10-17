@@ -20,7 +20,7 @@ namespace NK
 
 	private:
 		ILogger* m_logger;
-		IAllocator* m_allocator;
+		static IAllocator* m_allocator;
 
 		Application* m_application;
 		
