@@ -239,6 +239,8 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 
 
     #Create executables
+    
+    #Graphics
     if(NEKI_BUILD_VULKAN)
         add_executable(NKVulkanSample_Library "Samples/Graphics/Vulkan/Library/Library.cpp")
         target_include_directories(NKVulkanSample_Library PUBLIC "${CMAKE_SOURCE_DIR}/src")
@@ -316,5 +318,13 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
         target_link_libraries(NKD3D12Sample_Model PRIVATE Neki)
         add_dependencies(NKD3D12Sample_Model Shaders)
     endif()
+    
+    
+    
+    #Engine
+    add_executable(NKEngineSample_ECS "Samples/Engine/ECS/ECS.cpp")
+    target_include_directories(NKEngineSample_ECS PUBLIC "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(NKEngineSample_ECS PRIVATE Neki)
+    add_dependencies(NKEngineSample_ECS Shaders)
 
 endif()

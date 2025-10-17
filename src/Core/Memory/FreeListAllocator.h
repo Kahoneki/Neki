@@ -19,7 +19,7 @@ namespace NK
 		
 		[[nodiscard]] std::uint32_t Allocate();
 		void Free(std::uint32_t _val);
-
+		
 		static constexpr std::size_t INVALID_INDEX{ UINT32_MAX };
 		
 

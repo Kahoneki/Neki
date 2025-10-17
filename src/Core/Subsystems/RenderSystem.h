@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Core/Memory/Allocation.h>
 #include <Graphics/Window.h>
 #include <Types/NekiTypes.h>
 

@@ -1,6 +1,5 @@
 #include "Engine.h"
 #include "EngineConfig.h"
-#include "RAIIContext.h"
 
 
 //To be implemented by user
@@ -11,8 +10,7 @@
 int main()
 {
 	const NK::EngineConfig config{ CreateEngine() };
-	NK::RAIIContext context{ config.loggerConfig, config.allocatorType };
-	NK::Engine engine{ config.application };
+	NK::Engine engine{ config };
 
 	engine.Run();
 	
