@@ -2,6 +2,8 @@
 
 #include "IAllocator.h"
 
+#include <Core/Context.h>
+
 #include <memory>
 
 
@@ -11,31 +13,12 @@
 
 namespace NK
 {
-
-	//Logically owned (initialised and freed) by Engine class
-	//In here because of circular dependency in Engine class requiring UniquePtr
-	class PrivateAllocator
-	{
-		friend class Engine;
-		
-		template<typename T, typename... Args>
-		friend T* NewImpl(const char* _file, int _line, Args&&... _args);
-
-		template<typename T>
-		friend void DeleteImpl(T* _ptr);
-		
-		
-	private:
-		static IAllocator* m_allocator;
-	};
-
-	
 	
 	//Implementation of NK_NEW macro
 	template<typename T, typename... Args>
 	T* NewImpl(const char* _file, int _line, Args&&... _args)
 	{
-		void* mem{ PrivateAllocator::m_allocator->Allocate(sizeof(T), _file, _line, false) };
+		void* mem{ Context::GetAllocator()->Allocate(sizeof(T), _file, _line, false) };
 		return std::construct_at(reinterpret_cast<T*>(mem), std::forward<Args>(_args)...);
 	}
 
@@ -48,7 +31,7 @@ namespace NK
 		if (_ptr)
 		{
 			std::destroy_at(_ptr);
-			PrivateAllocator::m_allocator->Free(_ptr, false);
+			Context::GetAllocator()->Free(_ptr, false);
 		}
 	}
 

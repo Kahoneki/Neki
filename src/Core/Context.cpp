@@ -14,17 +14,23 @@ namespace NK
 	IAllocator* Context::m_allocator{ nullptr };
 
 
-
-	void Context::Initialise(const LoggerConfig& _loggerConfig, ALLOCATOR_TYPE _allocatorType)
+	void GLFWErrorCallback(int _error, const char* _description)
 	{
-		switch (_loggerConfig.type)
+		Context::GetLogger()->IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GLFW, _description);
+	}
+
+
+
+	void Context::Initialise(const ContextConfig& _config)
+	{
+		switch (_config.loggerConfig.type)
 		{
-		case LOGGER_TYPE::CONSOLE: m_logger = new ConsoleLogger(_loggerConfig);
+		case LOGGER_TYPE::CONSOLE: m_logger = new ConsoleLogger(_config.loggerConfig);
 			break;
-		default: throw std::runtime_error("Context::Context() - _loggerConfig.type not recognised.\n");
+		default: throw std::runtime_error("Context::Context() - _config.loggerConfig.type not recognised.\n");
 		}
 
-		switch (_allocatorType)
+		switch (_config.allocatorType)
 		{
 		case ALLOCATOR_TYPE::TRACKING: m_allocator = new TrackingAllocator(*m_logger, false, false);
 			break;
@@ -33,6 +39,7 @@ namespace NK
 		case ALLOCATOR_TYPE::TRACKING_VERBOSE_INCLUDE_VULKAN: m_allocator = new TrackingAllocator(*m_logger, true, true);
 		}
 
+		glfwSetErrorCallback(GLFWErrorCallback);
 		glfwInit();
 		m_logger->IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::CONTEXT, "GLFW Initialised\n");
 		

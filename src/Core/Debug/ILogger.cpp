@@ -59,6 +59,8 @@ namespace NK
 		case LOGGER_LAYER::D3D12_EXECUTION:		return "[D3D12 EXECUTION]";
 		case LOGGER_LAYER::D3D12_SHADER:		return "[D3D12 SHADER]";
 
+		case LOGGER_LAYER::GLFW:				return "[GLFW]";
+
 		case LOGGER_LAYER::ENGINE:				return "[ENGINE]";
 		case LOGGER_LAYER::CONTEXT:				return "[CONTEXT]";
 		case LOGGER_LAYER::TRACKING_ALLOCATOR:	return "[TRACKING ALLOCATOR]";

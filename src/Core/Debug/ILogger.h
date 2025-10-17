@@ -13,6 +13,7 @@
 
 namespace NK
 {
+	
 	class ILogger
 	{
 	public:

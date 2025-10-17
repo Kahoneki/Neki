@@ -9,9 +9,9 @@ namespace NK
 	class RAIIContext final
 	{
 	public:
-		explicit RAIIContext(const LoggerConfig& _loggerConfig, ALLOCATOR_TYPE _allocatorType)
+		explicit RAIIContext(const ContextConfig& _config)
 		{
-			Context::Initialise(_loggerConfig, _allocatorType);
+			Context::Initialise(_config);
 		}
 
 

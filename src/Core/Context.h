@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ContextConfig.h"
 #include "Debug/ILogger.h"
 #include "Memory/IAllocator.h"
 
@@ -7,11 +8,11 @@
 namespace NK
 {
 	
-	//Global static context class - todo: replace entirely with Engine class?
+	//Global static context class
 	class Context
 	{
 	public:
-		static void Initialise(const LoggerConfig& _loggerConfig, ALLOCATOR_TYPE _allocatorType);
+		static void Initialise(const ContextConfig& _config);
 		static void Shutdown();
 		
 		Context() = delete;

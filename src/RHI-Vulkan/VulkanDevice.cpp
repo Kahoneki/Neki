@@ -18,6 +18,7 @@
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/EnumUtils.h>
+#include <Graphics/GPUUploader.h>
 #include <RHI/RHIUtils.h>
 
 #include <algorithm>
@@ -224,6 +225,20 @@ namespace NK
 	UniquePtr<ISemaphore> VulkanDevice::CreateSemaphore()
 	{
 		return UniquePtr<ISemaphore>(NK_NEW(VulkanSemaphore, m_logger, m_allocator, *this));
+	}
+
+
+
+	UniquePtr<GPUUploader> VulkanDevice::CreateGPUUploader(const GPUUploaderDesc& _desc)
+	{
+		return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _desc));
+	}
+
+
+
+	UniquePtr<Window> VulkanDevice::CreateWindow(const WindowDesc& _desc) const
+	{
+		return UniquePtr<Window>(NK_NEW(Window, m_logger, _desc));
 	}
 
 

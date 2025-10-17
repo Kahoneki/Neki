@@ -4,8 +4,6 @@
 #include <Core/Memory/Allocation.h>
 #include <Core/Memory/FreeListAllocator.h>
 #include <Core/Memory/IAllocator.h>
-#include <Graphics/GPUUploader.h>
-#include <Graphics/Window.h>
 
 
 namespace NK
@@ -50,6 +48,12 @@ namespace NK
 
 	class ISemaphore;
 
+	class GPUUploader;
+	struct GPUUploaderDesc;
+
+	class Window;
+	struct WindowDesc;
+
 	
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
 	constexpr std::uint32_t MAX_BINDLESS_SAMPLERS{ 2048 };
@@ -79,9 +83,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() = 0;
-
-		[[nodiscard]] UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc) { return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _desc)); }
-		[[nodiscard]] UniquePtr<Window> CreateWindow(const WindowDesc& _desc) const { return UniquePtr<Window>(NK_NEW(Window, m_logger, _desc)); }
+		[[nodiscard]] virtual UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc) = 0;
+		[[nodiscard]] virtual UniquePtr<Window> CreateWindow(const WindowDesc& _desc) const = 0;
 
 		//When copying data from a buffer to a texture, the buffer data needs to be in a specific layout that depends on the destination texture
 		//This function calculates it for you

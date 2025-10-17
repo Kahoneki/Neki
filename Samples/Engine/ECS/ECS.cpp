@@ -134,12 +134,12 @@ public:
 };
 
 
+
 [[nodiscard]] NK::EngineConfig CreateEngine()
 {
-	const NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE };
-	NK::RenderSystemDesc renderSystemDesc{};
-	renderSystemDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
-	NK::EngineConfig config{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING, new GameApp(), renderSystemDesc };
+	const NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
+	const NK::RenderSystemDesc renderSystemDesc{};
+	NK::EngineConfig config{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE, new GameApp(), renderSystemDesc };
 	
 	return config;
 }

@@ -208,7 +208,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     #Shader compilation
 
     #Define shader files
-    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/Samples/*.hlsl")
+    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/*.hlsl")
     message(STATUS "---- Found Shader Files ----")
     foreach(FILE ${SHADER_SOURCES})
         message(STATUS "  ${FILE}")
@@ -326,5 +326,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     target_include_directories(NKEngineSample_ECS PUBLIC "${CMAKE_SOURCE_DIR}/src")
     target_link_libraries(NKEngineSample_ECS PRIVATE Neki)
     add_dependencies(NKEngineSample_ECS Shaders)
+
+    add_executable(NKEngineSample_Rendering "Samples/Engine/Rendering/Rendering.cpp")
+    target_include_directories(NKEngineSample_Rendering PUBLIC "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(NKEngineSample_Rendering PRIVATE Neki)
+    add_dependencies(NKEngineSample_Rendering Shaders)
 
 endif()

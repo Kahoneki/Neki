@@ -2,26 +2,19 @@
 
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/ModelLoader.h>
+#include <RHI/IBuffer.h>
+#include <RHI/IDevice.h>
 #include <RHI/ITextureView.h>
 #include <Types/NekiTypes.h>
 
 #include <cstddef>
 #include <vector>
 
+#include "RHI/ICommandBuffer.h"
+
 
 namespace NK
 {
-	
-	class ILogger;
-	class IDevice;
-	class IBuffer;
-	class IBufferView;
-	class ICommandPool;
-	class ICommandBuffer;
-	class IQueue;
-	class ITexture;
-	class IFence;
-	typedef std::uint32_t RESOURCE_INDEX; //Todo: this is a duplicate definition
 	
 	struct BufferSubregion
 	{
@@ -52,7 +45,7 @@ namespace NK
 	struct GPUMaterial
 	{
 		LIGHTING_MODEL lightingModel;
-		RESOURCE_INDEX bufferIndex;
+		ResourceIndex bufferIndex;
 
 		//This material will hence be valid for as long as its in scope
 		UniquePtr<IBuffer> materialBuffer;

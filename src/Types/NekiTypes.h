@@ -468,6 +468,8 @@ namespace NK
 		D3D12_EXECUTION,
 		D3D12_SHADER,
 
+		GLFW,
+
 		ENGINE,
 		CONTEXT,
 		TRACKING_ALLOCATOR,
@@ -543,6 +545,7 @@ namespace NK
 
 	enum class GRAPHICS_BACKEND
 	{
+		NONE,
 		VULKAN,
 		D3D12,
 	};
