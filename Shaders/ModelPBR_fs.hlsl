@@ -87,6 +87,8 @@ float3 FresnelSchlick(float _cosTheta, float3 _F0)
 [shader("pixel")]
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
+	return float4(0.0, 0.0, 1.0, 0.0);
+
 	NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
 	SamplerState sampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 

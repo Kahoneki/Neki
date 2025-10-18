@@ -14,7 +14,11 @@ namespace NK
 	public:
 		Application() = default;
 		virtual ~Application() = default;
-		virtual void Run() = 0;
+
+		inline virtual void Update()
+		{
+			m_scenes[m_activeScene]->Update();
+		}
 
 
 	protected:

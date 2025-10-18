@@ -19,6 +19,7 @@ namespace NK
 		virtual ~IQueue() = default;
 
 		virtual void Submit(ICommandBuffer* _cmdBuffer, ISemaphore* _waitSemaphore, ISemaphore* _signalSemaphore, IFence* _signalFence) = 0;
+		virtual void Submit(ICommandBuffer* _cmdBuffer, std::vector<ISemaphore*> _waitSemaphores, std::vector<ISemaphore*> _signalSemaphores, IFence* _signalFence) = 0;
 		virtual void WaitIdle() = 0;
 
 		[[nodiscard]] inline COMMAND_TYPE GetType() const { return m_type; }

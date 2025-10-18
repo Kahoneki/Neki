@@ -12,7 +12,7 @@ namespace NK
 
 
 	
-	void PlayerCamera::Update(Window* _window)
+	void PlayerCamera::Update()
 	{
 		//Process keyboard input
 		const float speed{ m_movementSpeed * static_cast<float>(TimeManager::GetDeltaTime()) };

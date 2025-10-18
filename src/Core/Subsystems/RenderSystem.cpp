@@ -1,7 +1,7 @@
 #include "RenderSystem.h"
 
-#include <iostream>
 #include <Components/CModelRenderer.h>
+#include <Components/CTransform.h>
 #include <RHI/IBuffer.h>
 #include <RHI/ISampler.h>
 #include <RHI/ISemaphore.h>
@@ -15,6 +15,10 @@
 	#include <RHI-D3D12/D3D12Device.h>
 #endif
 
+#include <cstring>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 
 namespace NK
 {
@@ -27,14 +31,14 @@ namespace NK
 
 
 		InitBaseResources();
+		InitCameraBuffer();
 		InitSkybox();
 		InitShadersAndPipelines();
 		InitAntiAliasingResources();
 
-		m_gpuUploaderFlushFence->Wait();
-		m_gpuUploaderFlushFence->Reset();
+		m_gpuUploader->Flush(true, nullptr, nullptr);
+		m_gpuUploader->Reset();
 		
-
 		m_logger.Unindent();
 	}
 
@@ -81,7 +85,7 @@ namespace NK
 		};
 
 		PushConstantData pushConstantData{};
-		pushConstantData.camDataBufferIndex = 0; //todo
+		pushConstantData.camDataBufferIndex = m_camDataBufferView->GetIndex();
 		pushConstantData.skyboxCubemapIndex = m_skyboxTextureView ? m_skyboxTextureView->GetIndex() : 0;
 		pushConstantData.samplerIndex = m_linearSampler->GetIndex();
 		
@@ -96,23 +100,49 @@ namespace NK
 			m_graphicsCommandBuffers[m_currentFrame]->DrawIndexed(36, 1, 0, 0);
 		}
 
-		//Models
-		std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
+		//Models (Loading Phase)
 		for (auto&& [modelRenderer] : _reg.View<CModelRenderer>())
 		{
-			const GPUModel& model{ modelRenderer.model };
-			pushConstantData.modelMat = glm::mat4(1.0f); //todo
-			for (std::size_t i{ 0 }; i<modelRenderer.model.meshes.size(); ++i)
+			if (modelRenderer.model == nullptr && !modelRenderer.modelPath.empty())
 			{
-				const GPUMesh* mesh{ model.meshes[i].get() };
+				if (!m_gpuModelCache.contains(modelRenderer.modelPath))
+				{
+					const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
+					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
+					m_newGPUUploaderUpload = true;
+				}
+				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
+			}
+		}
+		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the semaphore to wait on before drawing
+		if (m_newGPUUploaderUpload)
+		{
+			m_gpuUploader->Flush(false, m_gpuUploaderFlushFence.get(), nullptr);
+		}
+
+		//Models (Rendering Phase)
+		std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
+		for (auto&& [modelRenderer, transform] : _reg.View<CModelRenderer, CTransform>())
+		{
+			if (transform.posDirty || transform.rotDirty || transform.scaleDirty)
+			{
+				UpdateModelMatrix(transform);
+			}
+			pushConstantData.modelMat = transform.modelMat;
+			
+			
+			const GPUModel* const model{ modelRenderer.model };
+			for (std::size_t i{ 0 }; i<modelRenderer.model->meshes.size(); ++i)
+			{
+				const GPUMesh* mesh{ model->meshes[i].get() };
 				
-				pushConstantData.materialBufferIndex = model.materials[mesh->materialIndex]->bufferIndex;
+				pushConstantData.materialBufferIndex = model->materials[mesh->materialIndex]->bufferIndex;
 				m_graphicsCommandBuffers[m_currentFrame]->PushConstants(m_meshPiplineRootSignature.get(), &pushConstantData);
-				IPipeline* pipeline{ model.materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
+				IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
 				m_graphicsCommandBuffers[m_currentFrame]->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
-				m_graphicsCommandBuffers[m_currentFrame]->BindVertexBuffers(0, 1, model.meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
-				m_graphicsCommandBuffers[m_currentFrame]->BindIndexBuffer(model.meshes[i]->indexBuffer.get(), DATA_FORMAT::R32_UINT);
-				m_graphicsCommandBuffers[m_currentFrame]->DrawIndexed(model.meshes[i]->indexCount, 1, 0, 0);
+				m_graphicsCommandBuffers[m_currentFrame]->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
+				m_graphicsCommandBuffers[m_currentFrame]->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), DATA_FORMAT::R32_UINT);
+				m_graphicsCommandBuffers[m_currentFrame]->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
 			}
 		}
 
@@ -135,7 +165,13 @@ namespace NK
 		//Present
 		m_graphicsCommandBuffers[m_currentFrame]->End();
 
-
+		if (m_newGPUUploaderUpload)
+		{
+			m_gpuUploaderFlushFence->Wait();
+			m_gpuUploaderFlushFence->Reset();
+			m_gpuUploader->Reset();
+		}
+		
 		//Submit
 		m_graphicsQueue->Submit(m_graphicsCommandBuffers[m_currentFrame].get(), m_imageAvailableSemaphores[m_currentFrame].get(), m_renderFinishedSemaphores[imageIndex].get(), m_inFlightFences[m_currentFrame].get());
 		m_swapchain->Present(m_renderFinishedSemaphores[imageIndex].get(), imageIndex);
@@ -143,14 +179,7 @@ namespace NK
 		m_currentFrame = (m_currentFrame + 1) % m_framesInFlight;
 	}
 
-
-
-	bool RenderSystem::WindowShouldClose() const
-	{
-		return m_window->ShouldClose();
-	}
-
-
+	
 
 	void RenderSystem::InitBaseResources()
 	{
@@ -215,6 +244,12 @@ namespace NK
 		gpuUploaderDesc.transferQueue = m_transferQueue.get();
 		m_gpuUploader = m_device->CreateGPUUploader(gpuUploaderDesc);
 
+		//GPU Uploader Flush Fence
+		FenceDesc gpuUploaderFlushFenceDesc{};
+		gpuUploaderFlushFenceDesc.initiallySignaled = false;
+		m_gpuUploaderFlushFence = m_device->CreateFence(gpuUploaderFlushFenceDesc);
+		m_newGPUUploaderUpload = false;
+
 		//Window and Surface
 		m_window = m_device->CreateWindow(m_windowDesc);
 		m_surface = m_device->CreateSurface(m_window.get());
@@ -259,6 +294,25 @@ namespace NK
 		{
 			m_inFlightFences[i] = m_device->CreateFence(inFlightFenceDesc);
 		}
+	}
+
+
+
+	void RenderSystem::InitCameraBuffer()
+	{
+		BufferDesc camDataBufferDesc{};
+		camDataBufferDesc.size = sizeof(CameraShaderData);
+		camDataBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
+		camDataBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
+		m_camDataBuffer = m_device->CreateBuffer(camDataBufferDesc);
+
+		BufferViewDesc camDataBufferViewDesc{};
+		camDataBufferViewDesc.size = sizeof(CameraShaderData);
+		camDataBufferViewDesc.offset = 0;
+		camDataBufferViewDesc.type = BUFFER_VIEW_TYPE::UNIFORM;
+		m_camDataBufferView = m_device->CreateBufferView(m_camDataBuffer.get(), camDataBufferViewDesc);
+
+		m_camDataBufferMap = m_camDataBuffer->Map();
 	}
 
 
@@ -321,9 +375,6 @@ namespace NK
 		//Upload vertex and index buffers
 		m_gpuUploader->EnqueueBufferDataUpload(vertices, m_skyboxVertBuffer.get(), RESOURCE_STATE::UNDEFINED);
 		m_gpuUploader->EnqueueBufferDataUpload(indices, m_skyboxIndexBuffer.get(), RESOURCE_STATE::UNDEFINED);
-
-		
-		m_gpuUploaderFlushFence = m_gpuUploader->Flush(false);
 	}
 
 
@@ -465,6 +516,43 @@ namespace NK
 		depthBufferViewDesc.format = DATA_FORMAT::D32_SFLOAT;
 		depthBufferViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
 		m_intermediateDepthBufferView = m_device->CreateDepthStencilTextureView(m_intermediateDepthBuffer.get(), depthBufferViewDesc);
+	}
+
+
+
+	void RenderSystem::UpdateCameraBuffer(const CCAmera& _camera) const
+	{
+		const CameraShaderData camShaderData{ _camera.camera->GetCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
+		memcpy(m_camDataBufferMap, &camShaderData, sizeof(CameraShaderData));
+	}
+
+
+
+	void RenderSystem::UpdateModelMatrix(CTransform& _transform)
+	{
+		//Scale -> Rotation -> Translation
+		//Because matrix multiplication order is reversed, do glm::translate -> glm::rotate -> glm::scale
+		
+		if (_transform.posDirty)
+		{
+			const glm::vec3 posDelta{ _transform.pos - _transform.oldPos };
+			_transform.modelMat = glm::translate(_transform.modelMat, posDelta);
+			_transform.posDirty = false;
+		}
+		
+		if (_transform.rotDirty)
+		{
+			const glm::vec3 rotDelta{ _transform.rot - _transform.oldRot };
+			_transform.modelMat = _transform.modelMat * glm::mat4_cast(glm::quat(rotDelta));
+			_transform.rotDirty = false;
+		}
+
+		if (_transform.scaleDirty)
+		{
+			const glm::vec3 scaleDelta{ _transform.scale - _transform.oldScale };
+			_transform.modelMat = glm::scale(_transform.modelMat, scaleDelta);
+			_transform.scaleDirty = false;
+		}
 	}
 
 }

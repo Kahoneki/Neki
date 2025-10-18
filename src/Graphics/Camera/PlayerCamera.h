@@ -3,7 +3,6 @@
 #include "Camera.h"
 
 #include <glm/glm.hpp>
-#include <Graphics/Window.h>
 
 
 namespace NK
@@ -18,7 +17,7 @@ namespace NK
 		explicit PlayerCamera(glm::vec3 _pos, float _yaw, float _pitch, float _nearPlaneDist, float _farPlaneDist, float _fov, float _aspectRatio, float _movementSpeed, float _mouseSensitivity);
 		~PlayerCamera() = default;
 
-		void Update(Window* _window);
+		void Update();
 
 		[[nodiscard]] inline float GetMovementSpeed() const { return m_movementSpeed; }
 		[[nodiscard]] inline float GetMouseSensitivity() const { return m_mouseSensitivity; }

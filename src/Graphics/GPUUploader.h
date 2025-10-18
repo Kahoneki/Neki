@@ -87,12 +87,14 @@ namespace NK
 		//_cpuModel should be populated from ModelLoader::LoadModel()
 		[[nodiscard]] UniquePtr<GPUModel> EnqueueModelDataUpload(const CPUModel* _cpuModel);
 
-		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and the returned fence will already be signalled
+		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and the provided fence and semaphore will already be signalled
 		//
-		//If _waitIdle = false, the calling thread will not be blocked, instead a fence is returned that will be signalled when the flush is complete
+		//If _waitIdle = false, the calling thread will not be blocked, instead the provided fence and semaphore will be signalled when the flush is complete
+		//
+		//_fence and _semaphore can be set to nullptr if they are not required
 		//
 		//Once the flush has been complete, Reset() should be called.
-		UniquePtr<IFence> Flush(bool _waitIdle);
+		void Flush(bool _waitIdle, IFence* _signalFence, ISemaphore* _signalSemaphore);
 
 		void Reset();
 		

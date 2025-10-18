@@ -5,6 +5,7 @@
 #include <RHI/IBufferView.h>
 #include <RHI/ICommandBuffer.h>
 #include <RHI/IQueue.h>
+#include <RHI/ISemaphore.h>
 #include <RHI/ITexture.h>
 #include <RHI/ITextureView.h>
 #include <RHI/RHIUtils.h>
@@ -96,7 +97,7 @@ namespace NK
 		if (subregion.offset + subregion.size > m_stagingBufferSize)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::GPU_UPLOADER, "EnqueueBufferDataUpload() exceeded m_stagingBufferSize - calling Flush(true) and Reset().\n");
-			Flush(true);
+			Flush(true, nullptr, nullptr);
 			Reset();
 
 			subregion.offset = 0;
@@ -132,7 +133,7 @@ namespace NK
 		if (subregion.offset + subregion.size > m_stagingBufferSize)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::GPU_UPLOADER, "EnqueueArrayTextureDataUpload() exceeded m_stagingBufferSize - flushing staging buffer with _waitIdle = true.\n");
-			Flush(true);
+			Flush(true, nullptr, nullptr);
 			Reset();
 
 			subregion.offset = 0;
@@ -207,7 +208,7 @@ namespace NK
 		if (subregion.offset + subregion.size > m_stagingBufferSize)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::GPU_UPLOADER, "EnqueueTextureDataUpload() exceeded m_stagingBufferSize - flushing staging buffer with _waitIdle = true.\n");
-			Flush(true);
+			Flush(true, nullptr, nullptr);
 			Reset();
 
 			subregion.offset = 0;
@@ -409,8 +410,13 @@ namespace NK
 
 
 
-	UniquePtr<IFence> GPUUploader::Flush(bool _waitIdle)
+	void GPUUploader::Flush(bool _waitIdle, IFence* _signalFence, ISemaphore* _signalSemaphore)
 	{
+		if (!_waitIdle && !_signalFence && !_signalSemaphore)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::GPU_UPLOADER, "In Flush() - _waitIdle = false, _signalFence = nullptr, _signalSemaphore - you have no way of knowing when the flush has finished - this is considered bad practice and is almost certainly a mistake.\n");
+		}
+		
 		if (m_flushing)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "Attempted to call Flush() while GPUUploader was already flushing.\n");
@@ -418,20 +424,14 @@ namespace NK
 		}
 		
 		m_commandBuffer->End();
-
-		FenceDesc fenceDesc{};
-		fenceDesc.initiallySignaled = false;
-		UniquePtr<IFence> fence{ m_device.CreateFence(fenceDesc) };
 		
 		m_flushing = true;
-		m_queue->Submit(m_commandBuffer.get(), nullptr, nullptr, fence.get());
+		m_queue->Submit(m_commandBuffer.get(), nullptr, _signalSemaphore, _signalFence);
 
 		if (_waitIdle)
 		{
 			m_queue->WaitIdle();
 		}
-		
-		return std::move(fence);
 	}
 
 }

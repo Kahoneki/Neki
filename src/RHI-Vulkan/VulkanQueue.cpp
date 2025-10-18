@@ -76,11 +76,11 @@ namespace NK
 
 	void VulkanQueue::Submit(ICommandBuffer* _cmdBuffer, ISemaphore* _waitSemaphore, ISemaphore* _signalSemaphore, IFence* _signalFence)
 	{
-		VkSemaphore vkWaitSemaphore{ _waitSemaphore ? dynamic_cast<VulkanSemaphore*>(_waitSemaphore)->GetSemaphore() : nullptr };
-		VkPipelineStageFlags vkStageMask{ VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
-		VkSemaphore vkSignalSemaphore{ _signalSemaphore ? dynamic_cast<VulkanSemaphore*>(_signalSemaphore)->GetSemaphore() : nullptr };
-		VkFence vkSignalFence{ _signalFence ? dynamic_cast<VulkanFence*>(_signalFence)->GetFence() : VK_NULL_HANDLE };
 		VkCommandBuffer vkCommandBuffer{ dynamic_cast<VulkanCommandBuffer*>(_cmdBuffer)->GetBuffer() };
+		VkSemaphore vkWaitSemaphore{ _waitSemaphore ? dynamic_cast<VulkanSemaphore*>(_waitSemaphore)->GetSemaphore() : VK_NULL_HANDLE };
+		VkSemaphore vkSignalSemaphore{ _signalSemaphore ? dynamic_cast<VulkanSemaphore*>(_signalSemaphore)->GetSemaphore() : VK_NULL_HANDLE };
+		VkFence vkSignalFence{ _signalFence ? dynamic_cast<VulkanFence*>(_signalFence)->GetFence() : VK_NULL_HANDLE };
+		constexpr VkPipelineStageFlags vkStageMask{ VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
 		
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -91,6 +91,43 @@ namespace NK
 		submitInfo.pCommandBuffers = &vkCommandBuffer;
 		submitInfo.signalSemaphoreCount = _signalSemaphore ? 1 : 0;
 		submitInfo.pSignalSemaphores = &vkSignalSemaphore;
+
+		const VkResult result{ vkQueueSubmit(m_queue, 1, &submitInfo, vkSignalFence) };
+		if (result != VK_SUCCESS)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::QUEUE, "Failed to submit queue. result = " + std::to_string(result) + '\n');
+			throw std::runtime_error("");
+		}
+	}
+
+
+
+	void VulkanQueue::Submit(ICommandBuffer* _cmdBuffer, std::vector<ISemaphore*> _waitSemaphores, std::vector<ISemaphore*> _signalSemaphores, IFence* _signalFence)
+	{
+		VkCommandBuffer vkCommandBuffer{ dynamic_cast<VulkanCommandBuffer*>(_cmdBuffer)->GetBuffer() };
+		std::vector<VkSemaphore> vkWaitSemaphores(_waitSemaphores.size());
+		std::vector<VkPipelineStageFlags> vkStageMasks(_waitSemaphores.size());
+		for (std::size_t i{ 0 }; i<_waitSemaphores.size(); ++i)
+		{
+			vkWaitSemaphores[i] = dynamic_cast<VulkanSemaphore*>(_waitSemaphores[i])->GetSemaphore();
+			vkStageMasks[i] = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		}
+		std::vector<VkSemaphore> vkSignalSemaphores(_signalSemaphores.size());
+		for (std::size_t i{ 0 }; i<_signalSemaphores.size(); ++i)
+		{
+			vkSignalSemaphores[i] = dynamic_cast<VulkanSemaphore*>(_signalSemaphores[i])->GetSemaphore();
+		}
+		VkFence vkSignalFence{ _signalFence ? dynamic_cast<VulkanFence*>(_signalFence)->GetFence() : VK_NULL_HANDLE };
+		
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.waitSemaphoreCount = _waitSemaphores.size();
+		submitInfo.pWaitSemaphores = vkWaitSemaphores.data();
+		submitInfo.pWaitDstStageMask = vkStageMasks.data();
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &vkCommandBuffer;
+		submitInfo.signalSemaphoreCount = _signalSemaphores.size();
+		submitInfo.pSignalSemaphores = vkSignalSemaphores.data();
 
 		const VkResult result{ vkQueueSubmit(m_queue, 1, &submitInfo, vkSignalFence) };
 		if (result != VK_SUCCESS)

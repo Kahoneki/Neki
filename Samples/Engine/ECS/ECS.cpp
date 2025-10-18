@@ -14,7 +14,7 @@ public:
 	struct C3 {};
 
 	
-	virtual void Run() override
+	virtual void Update() override
 	{
 		constexpr int testWidth{ 40 };
 		constexpr int resultWidth{ 30 };

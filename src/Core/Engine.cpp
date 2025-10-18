@@ -4,10 +4,12 @@
 #include "Debug/ConsoleLogger.h"
 #include "Memory/TrackingAllocator.h"
 
-#include <iomanip>
-#include <iostream>
+#include <Managers/InputManager.h>
+#include <Managers/TimeManager.h>
+
 #include <stdexcept>
 #include <GLFW/glfw3.h>
+
 
 
 namespace NK
@@ -41,16 +43,18 @@ namespace NK
 		//If render system was initialised, start render loop, otherwise, just run once
 		if (m_renderSystem)
 		{
-			while (!m_renderSystem->WindowShouldClose())
+			while (!m_renderSystem->GetWindow()->ShouldClose())
 			{
 				glfwPollEvents();
-				m_application->Run();
+				TimeManager::Update();
+				InputManager::Update(m_renderSystem->GetWindow());
+				m_application->Update();
 				m_renderSystem->Update(m_application->m_scenes[m_application->m_activeScene]->m_reg);
 			}
 		}
 		else
 		{
-			m_application->Run();
+			m_application->Update();
 		}
 	}
 

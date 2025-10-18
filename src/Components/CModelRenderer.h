@@ -8,7 +8,16 @@ namespace NK
 
 	struct CModelRenderer
 	{
-		GPUModel model;
+		friend class RenderSystem;
+
+
+	public:
+		std::string modelPath;
+
+
+	private:
+		//Non-owning pointer. The RenderSystem owns and manages the GPUModel
+		GPUModel* model;
 	};
 	
 }

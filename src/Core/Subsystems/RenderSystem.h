@@ -1,6 +1,9 @@
 #pragma once
 
+#include <Components/CCamera.h>
+#include <Components/CTransform.h>
 #include <Core-ECS/Registry.h>
+#include <Graphics/GPUUploader.h>
 #include <Graphics/Window.h>
 #include <RHI/ICommandBuffer.h>
 #include <RHI/IDevice.h>
@@ -33,15 +36,20 @@ namespace NK
 		~RenderSystem();
 
 		void Update(Registry& _reg);
-		[[nodiscard]] bool WindowShouldClose() const;
+
+		[[nodiscard]] inline Window* GetWindow() const { return m_window.get(); }
 		
 		
 	private:
 		//Init sub-functions
 		void InitBaseResources();
+		void InitCameraBuffer();
 		void InitSkybox();
 		void InitShadersAndPipelines();
 		void InitAntiAliasingResources();
+
+		void UpdateCameraBuffer(const CCAmera& _camera) const;
+		static void UpdateModelMatrix(CTransform& _transform);
 		
 		
 		//Dependency injections
@@ -67,6 +75,7 @@ namespace NK
 		UniquePtr<IQueue> m_transferQueue;
 		UniquePtr<GPUUploader> m_gpuUploader;
 		UniquePtr<IFence> m_gpuUploaderFlushFence;
+		bool m_newGPUUploaderUpload; //True if there are any new gpu uploader uploads since last frame
 		UniquePtr<Window> m_window;
 		UniquePtr<ISurface> m_surface;
 		UniquePtr<ISwapchain> m_swapchain;
@@ -75,6 +84,10 @@ namespace NK
 		std::vector<UniquePtr<ISemaphore>> m_imageAvailableSemaphores;
 		std::vector<UniquePtr<ISemaphore>> m_renderFinishedSemaphores;
 		std::vector<UniquePtr<IFence>> m_inFlightFences;
+
+		UniquePtr<IBuffer> m_camDataBuffer;
+		UniquePtr<IBufferView> m_camDataBufferView;
+		void* m_camDataBufferMap;
 		
 		UniquePtr<ITexture> m_skyboxTexture; //Not created at startup
 		UniquePtr<ITextureView> m_skyboxTextureView; //Not created at startup
@@ -91,12 +104,15 @@ namespace NK
 		UniquePtr<IPipeline> m_pbrPipeline;
 		UniquePtr<IPipeline> m_skyboxPipeline;
 		
-
 		//Anti-aliasing
 		UniquePtr<ITexture> m_intermediateRenderTarget;
 		UniquePtr<ITextureView> m_intermediateRenderTargetView;
 		UniquePtr<ITexture> m_intermediateDepthBuffer;
 		UniquePtr<ITextureView> m_intermediateDepthBufferView;
+
+		
+		//RenderSystem owns and is responsible for all GPUModels - todo: move to out-of-core rendering with HLODs
+		std::unordered_map<std::string, UniquePtr<GPUModel>> m_gpuModelCache;
 	};
 
 }
