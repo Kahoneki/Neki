@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Components/CCamera.h>
+#include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <Core-ECS/Registry.h>
 #include <Graphics/GPUUploader.h>
@@ -48,7 +49,8 @@ namespace NK
 		void InitShadersAndPipelines();
 		void InitAntiAliasingResources();
 
-		void UpdateCameraBuffer(const CCAmera& _camera) const;
+		void UpdateSkybox(CSkybox& _skybox);
+		void UpdateCameraBuffer(const CCamera& _camera) const;
 		static void UpdateModelMatrix(CTransform& _transform);
 		
 		

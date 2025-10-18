@@ -14,17 +14,10 @@ struct VertexOutput
 	float3 bitangent : BITANGENT;
 };
 
-struct PointLight
-{
-	float4 pos;
-	float4 colour; //Intensity in w component
-};
-
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
 [[vk::binding(0,0)]] TextureCube g_skyboxes[] : register(t0, space0);
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
 [[vk::binding(0,0)]] ConstantBuffer<NK::PBRMaterial> g_materials[] : register(b0, space0);
-[[vk::binding(0,0)]] ConstantBuffer<PointLight> g_pointLights[] : register(b0, space0);
 
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
@@ -32,8 +25,6 @@ PUSH_CONSTANTS_BLOCK(
 	uint skyboxCubemapIndex;
 	uint materialBufferIndex;
 	uint samplerIndex;
-	//uint lightBuffersStartIndex;
-	//uint numLightBuffers;
 );
 
 
@@ -87,8 +78,6 @@ float3 FresnelSchlick(float _cosTheta, float3 _F0)
 [shader("pixel")]
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
-	return float4(0.0, 0.0, 1.0, 0.0);
-
 	NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
 	SamplerState sampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 
@@ -97,8 +86,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	float4 metallicSample = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(sampler, vertexOutput.texCoord);
 	float4 roughnessSample = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(sampler, vertexOutput.texCoord);
 	float4 aoSample = g_textures[NonUniformResourceIndex(material.aoIdx)].Sample(sampler, vertexOutput.texCoord);
-	float4 emissiveSample = 0.0f;
-	if (material.hasEmissive) { float4 emissiveSample = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(sampler, vertexOutput.texCoord); }
+	float4 emissiveSample = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(sampler, vertexOutput.texCoord);
 
     float3 albedo = albedoSample.rgb;
     float3 normal = normalize(mul(vertexOutput.TBN, normalSample.rgb * 2.0 - 1.0));
@@ -113,40 +101,16 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
     //Calculate incoming radiance
+    float3 lightPos = float3(2,-2,2);
+    float3 radiantFlux = float3(23.47, 21.31, 20.79);
+    float distance2 = dot(vertexOutput.fragPos - lightPos, vertexOutput.fragPos - lightPos);
+    float attenuation = 1.0 / distance2;
+    float3 incomingRadiance = radiantFlux * attenuation;
 
-	float3 radiantFlux = float3(23.47, 21.31, 20.79) * 100;
-	float3 pointLightPositions[] = 
-	{
-    	// --- Main Hall Lights (high up) ---
-    	{   0.0, 400.0, -400.0 }, // Back of the hall
-        {   0.0, 400.0,    0.0 }, // Center of the hall
-        {   0.0, 400.0,  400.0 }, // Front of the hall
 
-        // --- Lower Side Corridor Lights ---
-        { -450.0, 200.0, -250.0 }, // Left side, front
-        { -450.0, 200.0,  250.0 }, // Left side, back
-        {  450.0, 200.0, -250.0 }, // Right side, front
-        {  450.0, 200.0,  250.0 }  // Right side, back
-	};
-	//float3 radiantFlux = float3(8, 4, 12);
-
-	float3 incomingRadiance = 0.0f;
-	for (int i = 0; i<6; ++i)
-	{
-		float3 lightPos = pointLightPositions[i];
-		float distance2 = dot(vertexOutput.fragPos - lightPos, vertexOutput.fragPos - lightPos);
-   		float attenuation = 1.0 / distance2;
-		
-		incomingRadiance += radiantFlux * attenuation;
-	}
-
-	float3 outgoingRadiance = 0.0f;
-	float3 viewDir = normalize(vertexOutput.camPos - vertexOutput.fragPos);
-	for (int i = 0; i<6; ++i)
-	{
-float3 lightPos = pointLightPositions[i];
-		    //Calculate outgoing radiance
+    //Calculate outgoing radiance
     float3 incomingDirection = normalize(vertexOutput.fragPos - lightPos);
+    float3 viewDir = normalize(vertexOutput.camPos - vertexOutput.fragPos);
     float3 halfwayDir = normalize(-incomingDirection + viewDir);
 
     //Cook-Torrance BRDF
@@ -163,11 +127,7 @@ float3 lightPos = pointLightPositions[i];
     float3 specular = numerator / denominator;
 
     float cosWeighting = max(dot(normal, -incomingDirection), 0.0);
-    outgoingRadiance += (diffuseStrength * albedo / 3.141592653589 + specular) * incomingRadiance * cosWeighting;
-	}
-
-
-
+    float3 outgoingRadiance = (diffuseStrength * albedo / 3.141592653589 + specular) * incomingRadiance * cosWeighting;
 
 
     //Ambient
@@ -175,14 +135,6 @@ float3 lightPos = pointLightPositions[i];
 	float3 reflectionDir = reflect(-viewDir, normal);
 	float4 skyboxSample = g_skyboxes[NonUniformResourceIndex(PC(skyboxCubemapIndex))].Sample(sampler, reflectionDir);
 	float3 ambient = skyboxSample.rgb * albedo * ao * ambientStrength;
-
-	//Kaju
-    //float ambientStrength = 0.5;
-	
-	//Damaged Helmet	
-	//float ambientStrength = 0.005;
-	
-	//float3 ambient = ambientStrength * albedo * ao;
 
 
     float3 colour = ambient + emissive + outgoingRadiance;

@@ -1,35 +1,50 @@
 #include <Components/CCamera.h>
 #include <Components/CModelRenderer.h>
+#include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <Core/EngineConfig.h>
 #include <Core/RAIIContext.h>
 #include <Graphics/Camera/PlayerCamera.h>
 
+#include "Managers/TimeManager.h"
+
 
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(2), m_playerCamera(NK::PlayerCamera(glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, 1.0f, 300.0f, 0.05f))
+	explicit GameScene() : Scene(3), m_playerCamera(NK::PlayerCamera(glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f))
 	{
+		m_skyboxEntity = m_reg.Create();
+		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
+		skybox.SetTextureDirectory("Samples/Resource Files/skybox");
+		skybox.SetFileExtension("jpg");
+
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& modelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
 		modelRenderer.modelPath = "Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf";
 		NK::CTransform& transform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
-		transform.SetPosition(glm::vec3(0,0,-3));
-		
+		transform.SetPosition(glm::vec3(0, 0, -3));
+		transform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
+
 		m_cameraEntity = m_reg.Create();
-		NK::CCAmera& camera{ m_reg.AddComponent<NK::CCAmera>(m_cameraEntity) };
+		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
 		camera.camera = &m_playerCamera;
 	}
+
 
 
 	virtual void Update() override
 	{
 		m_playerCamera.Update();
+		NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+		constexpr float speed{ 50.0f };
+		float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
+		transform.SetRotation(transform.GetRotation() + glm::vec3(0, rotationAmount, 0));
 	}
 
-	
+
 private:
+	NK::Entity m_skyboxEntity;
 	NK::Entity m_helmetEntity;
 	NK::Entity m_cameraEntity;
 	NK::PlayerCamera m_playerCamera;
@@ -45,7 +60,8 @@ public:
 		m_activeScene = 0;
 	}
 
-	
+
+
 	virtual void Update() override
 	{
 		Application::Update();
@@ -70,6 +86,9 @@ public:
 {
 	NK::RenderSystemDesc renderSystemDesc{};
 	renderSystemDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
+	renderSystemDesc.enableSSAA = true;
+	renderSystemDesc.ssaaMultiplier = 4;
+	renderSystemDesc.windowDesc.size = { 1920, 1080 };
 	NK::EngineConfig config{ NK_NEW(GameApp), renderSystemDesc };
 	return config;
 }

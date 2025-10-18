@@ -8,9 +8,9 @@ namespace NK
 	
 	void TimeManager::Update()
 	{
-		const double currentTime{ glfwGetTime() };
-		dt = currentTime - lastTime;
-		lastTime = currentTime;
+		m_totalTime = glfwGetTime();
+		m_dt = m_totalTime - m_lastTime;
+		m_lastTime = m_totalTime;
 	}
 	
 }

@@ -1,6 +1,7 @@
 #include "RenderSystem.h"
 
 #include <Components/CModelRenderer.h>
+#include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <RHI/IBuffer.h>
 #include <RHI/ISampler.h>
@@ -38,7 +39,7 @@ namespace NK
 
 		m_gpuUploader->Flush(true, nullptr, nullptr);
 		m_gpuUploader->Reset();
-		
+
 		m_logger.Unindent();
 	}
 
@@ -53,6 +54,47 @@ namespace NK
 
 	void RenderSystem::Update(Registry& _reg)
 	{
+		//Update skybox
+		bool found{ false };
+		for (auto&& [skybox] : _reg.View<CSkybox>())
+		{
+			if (found)
+			{
+				//Multiple skyboxes, notify the user only the first one is being considered for rendering
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_SYSTEM, "Multiple `CSkybox`s found in registry. Note that only one skybox is supported - only the first skybox will be used.\n");
+				break;
+			}
+			found = true;
+			if (skybox.dirty)
+			{
+				UpdateSkybox(skybox);
+			}
+		}
+		if (!found)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_SYSTEM, "No `CCamera`s found in registry.\n");
+		}
+
+
+		//Update camera
+		found = false;
+		for (auto&& [camera] : _reg.View<CCamera>())
+		{
+			if (found)
+			{
+				//Multiple cameras, notify the user only the first one is being considered for rendering - todo: change this (probably let the user specify on CModelRenderer which camera they want to use)
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_SYSTEM, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
+				break;
+			}
+			found = true;
+			UpdateCameraBuffer(camera);
+		}
+		if (!found)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_SYSTEM, "No `CCamera`s found in registry.\n");
+		}
+
+
 		//Begin rendering
 		m_inFlightFences[m_currentFrame]->Wait();
 		m_inFlightFences[m_currentFrame]->Reset();
@@ -66,13 +108,13 @@ namespace NK
 		}
 		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
 		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateDepthBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
-		
+
 		m_graphicsCommandBuffers[m_currentFrame]->BeginRendering(1, m_msaaEnabled ? m_intermediateRenderTargetView.get() : nullptr, m_ssaaEnabled ? m_intermediateRenderTargetView.get() : m_swapchain->GetImageView(imageIndex), m_intermediateDepthBufferView.get(), nullptr);
 		m_graphicsCommandBuffers[m_currentFrame]->BindRootSignature(m_meshPiplineRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
-		
+
 		m_graphicsCommandBuffers[m_currentFrame]->SetViewport({ 0, 0 }, { m_ssaaEnabled ? m_supersampleResolution : m_windowDesc.size });
 		m_graphicsCommandBuffers[m_currentFrame]->SetScissor({ 0, 0 }, { m_ssaaEnabled ? m_supersampleResolution : m_windowDesc.size });
-		
+
 
 		//Draw
 		struct PushConstantData
@@ -88,7 +130,7 @@ namespace NK
 		pushConstantData.camDataBufferIndex = m_camDataBufferView->GetIndex();
 		pushConstantData.skyboxCubemapIndex = m_skyboxTextureView ? m_skyboxTextureView->GetIndex() : 0;
 		pushConstantData.samplerIndex = m_linearSampler->GetIndex();
-		
+
 		//Skybox
 		if (m_skyboxTexture)
 		{
@@ -124,18 +166,18 @@ namespace NK
 		std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
 		for (auto&& [modelRenderer, transform] : _reg.View<CModelRenderer, CTransform>())
 		{
-			if (transform.posDirty || transform.rotDirty || transform.scaleDirty)
+			if (transform.dirty)
 			{
 				UpdateModelMatrix(transform);
 			}
 			pushConstantData.modelMat = transform.modelMat;
-			
-			
+
+
 			const GPUModel* const model{ modelRenderer.model };
-			for (std::size_t i{ 0 }; i<modelRenderer.model->meshes.size(); ++i)
+			for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
 			{
 				const GPUMesh* mesh{ model->meshes[i].get() };
-				
+
 				pushConstantData.materialBufferIndex = model->materials[mesh->materialIndex]->bufferIndex;
 				m_graphicsCommandBuffers[m_currentFrame]->PushConstants(m_meshPiplineRootSignature.get(), &pushConstantData);
 				IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
@@ -161,7 +203,7 @@ namespace NK
 		{
 			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::RENDER_TARGET, RESOURCE_STATE::PRESENT);
 		}
-		
+
 		//Present
 		m_graphicsCommandBuffers[m_currentFrame]->End();
 
@@ -171,7 +213,7 @@ namespace NK
 			m_gpuUploaderFlushFence->Reset();
 			m_gpuUploader->Reset();
 		}
-		
+
 		//Submit
 		m_graphicsQueue->Submit(m_graphicsCommandBuffers[m_currentFrame].get(), m_imageAvailableSemaphores[m_currentFrame].get(), m_renderFinishedSemaphores[imageIndex].get(), m_inFlightFences[m_currentFrame].get());
 		m_swapchain->Present(m_renderFinishedSemaphores[imageIndex].get(), imageIndex);
@@ -179,7 +221,7 @@ namespace NK
 		m_currentFrame = (m_currentFrame + 1) % m_framesInFlight;
 	}
 
-	
+
 
 	void RenderSystem::InitBaseResources()
 	{
@@ -194,20 +236,20 @@ namespace NK
 		case GRAPHICS_BACKEND::VULKAN:
 		{
 			#ifdef NEKI_VULKAN_SUPPORTED
-				m_device = UniquePtr<IDevice>(NK_NEW(VulkanDevice, m_logger, m_allocator));
+			m_device = UniquePtr<IDevice>(NK_NEW(VulkanDevice, m_logger, m_allocator));
 			#else
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_SYSTEM, "_desc.backend = GRAPHICS_BACKEND::VULKAN but compiler definition NEKI_VULKAN_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
-				throw std::invalid_argument("");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_SYSTEM, "_desc.backend = GRAPHICS_BACKEND::VULKAN but compiler definition NEKI_VULKAN_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
+			throw std::invalid_argument("");
 			#endif
 			break;
 		}
 		case GRAPHICS_BACKEND::D3D12:
 		{
 			#ifdef NEKI_D3D12_SUPPORTED
-				m_device = UniquePtr<IDevice>(NK_NEW(D3D12Device, m_logger, m_allocator));
+			m_device = UniquePtr<IDevice>(NK_NEW(D3D12Device, m_logger, m_allocator));
 			#else
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_SYSTEM, "_desc.backend = GRAPHICS_BACKEND::D3D12 but compiler definition NEKI_D3D12_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
-				throw std::invalid_argument("");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_SYSTEM, "_desc.backend = GRAPHICS_BACKEND::D3D12 but compiler definition NEKI_D3D12_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
+			throw std::invalid_argument("");
 			#endif
 			break;
 		}
@@ -324,14 +366,14 @@ namespace NK
 		//Vertex Buffer
 		constexpr glm::vec3 vertices[8] =
 		{
-			glm::vec3(-1.0f, -1.0f,  1.0f), //0: Front-Left-Bottom
-			glm::vec3( 1.0f, -1.0f,  1.0f), //1: Front-Right-Bottom
-			glm::vec3( 1.0f,  1.0f,  1.0f), //2: Front-Right-Top
-			glm::vec3(-1.0f,  1.0f,  1.0f), //3: Front-Left-Top
+			glm::vec3(-1.0f, -1.0f, 1.0f), //0: Front-Left-Bottom
+			glm::vec3(1.0f, -1.0f, 1.0f), //1: Front-Right-Bottom
+			glm::vec3(1.0f, 1.0f, 1.0f), //2: Front-Right-Top
+			glm::vec3(-1.0f, 1.0f, 1.0f), //3: Front-Left-Top
 			glm::vec3(-1.0f, -1.0f, -1.0f), //4: Back-Left-Bottom
-			glm::vec3( 1.0f, -1.0f, -1.0f), //5: Back-Right-Bottom
-			glm::vec3( 1.0f,  1.0f, -1.0f), //6: Back-Right-Top
-			glm::vec3(-1.0f,  1.0f, -1.0f)  //7: Back-Left-Top
+			glm::vec3(1.0f, -1.0f, -1.0f), //5: Back-Right-Bottom
+			glm::vec3(1.0f, 1.0f, -1.0f), //6: Back-Right-Top
+			glm::vec3(-1.0f, 1.0f, -1.0f)  //7: Back-Left-Top
 		};
 		BufferDesc skyboxVertBufferDesc{};
 		skyboxVertBufferDesc.size = sizeof(glm::vec3) * 8;
@@ -371,7 +413,7 @@ namespace NK
 		indexBufferDesc.type = MEMORY_TYPE::DEVICE;
 		indexBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT;
 		m_skyboxIndexBuffer = m_device->CreateBuffer(indexBufferDesc);
-	
+
 		//Upload vertex and index buffers
 		m_gpuUploader->EnqueueBufferDataUpload(vertices, m_skyboxVertBuffer.get(), RESOURCE_STATE::UNDEFINED);
 		m_gpuUploader->EnqueueBufferDataUpload(indices, m_skyboxIndexBuffer.get(), RESOURCE_STATE::UNDEFINED);
@@ -404,7 +446,7 @@ namespace NK
 		rootSigDesc.num32BitPushConstantValues = 16 + 1 + 1 + 1 + 1 + 1; //model matrix + cam data buffer index + skybox cubemap index + material buffer index + sampler index
 		m_meshPiplineRootSignature = m_device->CreateRootSignature(rootSigDesc);
 
-		
+
 		//Graphics Pipeline
 		VertexInputDesc vertexInputDesc{ ModelLoader::GetModelVertexInputDescription() };
 
@@ -453,7 +495,7 @@ namespace NK
 		graphicsPipelineDesc.fragmentShader = m_pbrFragShader.get();
 		m_pbrPipeline = m_device->CreatePipeline(graphicsPipelineDesc);
 
-		
+
 		//Skybox pipeline
 		std::vector<VertexAttributeDesc> vertexAttributes;
 		VertexAttributeDesc posAttribute{};
@@ -520,8 +562,48 @@ namespace NK
 
 
 
-	void RenderSystem::UpdateCameraBuffer(const CCAmera& _camera) const
+	void RenderSystem::UpdateSkybox(CSkybox& _skybox)
 	{
+		std::array<std::string, 6> textureNames{ "right", "left", "top", "bottom", "front", "back" };
+		void* skyboxImageData[6];
+		std::string filepath{};
+		for (std::size_t i{ 0 }; i < 6; ++i)
+		{
+			filepath = _skybox.GetTextureDirectory() + "/" + textureNames[i] + "." + _skybox.GetFileExtension();
+			skyboxImageData[i] = ImageLoader::LoadImage(filepath, false, true)->data;
+		}
+		
+		TextureDesc skyboxTextureDesc{ ImageLoader::LoadImage(filepath, false, true)->desc }; //cached, very inexpensive load
+		skyboxTextureDesc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
+		skyboxTextureDesc.arrayTexture = true;
+		skyboxTextureDesc.size.z = 6;
+		skyboxTextureDesc.cubemap = true;
+		m_skyboxTexture = m_device->CreateTexture(skyboxTextureDesc);
+		m_gpuUploader->EnqueueArrayTextureDataUpload(skyboxImageData, m_skyboxTexture.get(), RESOURCE_STATE::UNDEFINED);
+		m_newGPUUploaderUpload = true;
+
+		TextureViewDesc skyboxTextureViewDesc{};
+		skyboxTextureViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_CUBE;
+		skyboxTextureViewDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
+		skyboxTextureViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+		skyboxTextureViewDesc.baseArrayLayer = 0;
+		skyboxTextureViewDesc.arrayLayerCount = 6;
+		m_skyboxTextureView = m_device->CreateShaderResourceTextureView(m_skyboxTexture.get(), skyboxTextureViewDesc);
+		
+		_skybox.dirty = false;
+	}
+
+
+
+	void RenderSystem::UpdateCameraBuffer(const CCamera& _camera) const
+	{
+		//Check if the user has requested that the camera's aspect ratio be the window's aspect ratio
+		constexpr float epsilon{ 0.1f }; //Buffer for floating-point-comparison-imprecision mitigation
+		if (std::abs(_camera.camera->GetAspectRatio() - WIN_ASPECT_RATIO) < epsilon)
+		{
+			_camera.camera->SetAspectRatio(static_cast<float>(m_windowDesc.size.x) / m_windowDesc.size.y);
+		}
+		
 		const CameraShaderData camShaderData{ _camera.camera->GetCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
 		memcpy(m_camDataBufferMap, &camShaderData, sizeof(CameraShaderData));
 	}
@@ -531,28 +613,15 @@ namespace NK
 	void RenderSystem::UpdateModelMatrix(CTransform& _transform)
 	{
 		//Scale -> Rotation -> Translation
-		//Because matrix multiplication order is reversed, do glm::translate -> glm::rotate -> glm::scale
-		
-		if (_transform.posDirty)
-		{
-			const glm::vec3 posDelta{ _transform.pos - _transform.oldPos };
-			_transform.modelMat = glm::translate(_transform.modelMat, posDelta);
-			_transform.posDirty = false;
-		}
-		
-		if (_transform.rotDirty)
-		{
-			const glm::vec3 rotDelta{ _transform.rot - _transform.oldRot };
-			_transform.modelMat = _transform.modelMat * glm::mat4_cast(glm::quat(rotDelta));
-			_transform.rotDirty = false;
-		}
+		//Because matrix multiplication order is reversed, do trans * rot * scale
 
-		if (_transform.scaleDirty)
-		{
-			const glm::vec3 scaleDelta{ _transform.scale - _transform.oldScale };
-			_transform.modelMat = glm::scale(_transform.modelMat, scaleDelta);
-			_transform.scaleDirty = false;
-		}
+		const glm::mat4 scaleMat = glm::scale(glm::mat4(1.0f), _transform.scale);
+		const glm::mat4 rotMat = glm::mat4_cast(glm::quat(_transform.rot));
+		const glm::mat4 transMat = glm::translate(glm::mat4(1.0f), _transform.pos);
+
+		_transform.modelMat = transMat * rotMat * scaleMat;
+
+		_transform.dirty = false;
 	}
 
 }

@@ -4,6 +4,9 @@
 
 #include <glm/glm.hpp>
 
+//Special value that render system will check for each update and set the aspect ratio to the window's aspect ratio
+#define WIN_ASPECT_RATIO -2346773 //Random value that hopefully the user wasn't planning on actually using as their aspect ratio
+
 
 namespace NK
 {

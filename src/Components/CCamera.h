@@ -5,7 +5,7 @@
 namespace NK
 {
 
-	struct CCAmera
+	struct CCamera
 	{
 	public:
 		Camera* camera;

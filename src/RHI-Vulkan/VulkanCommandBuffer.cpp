@@ -184,7 +184,7 @@ namespace NK
 
 			colourAttachmentInfos[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			colourAttachmentInfos[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			colourAttachmentInfos[i].clearValue.color = { { 1.0f, 0.0f, 0.0f, 1.0f } };
+			colourAttachmentInfos[i].clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 		}
 
 		//Depth attachment
