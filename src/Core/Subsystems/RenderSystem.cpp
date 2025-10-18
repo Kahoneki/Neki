@@ -606,6 +606,9 @@ namespace NK
 		
 		const CameraShaderData camShaderData{ _camera.camera->GetCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
 		memcpy(m_camDataBufferMap, &camShaderData, sizeof(CameraShaderData));
+
+		//Set aspect ratio back to WIN_ASPECT_RATIO for future lookups (can't keep it as the window's current aspect ratio in case it changes)
+		_camera.camera->SetAspectRatio(WIN_ASPECT_RATIO);
 	}
 
 
