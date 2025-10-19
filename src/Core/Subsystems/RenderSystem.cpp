@@ -40,6 +40,7 @@ namespace NK
 		m_gpuUploader->Flush(true, nullptr, nullptr);
 		m_gpuUploader->Reset();
 
+		
 		m_logger.Unindent();
 	}
 

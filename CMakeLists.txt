@@ -332,4 +332,9 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     target_link_libraries(NKEngineSample_Rendering PRIVATE Neki)
     add_dependencies(NKEngineSample_Rendering Shaders)
 
+    add_executable(NKEngineSample_Events "Samples/Engine/Events/Events.cpp")
+    target_include_directories(NKEngineSample_Events PUBLIC "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(NKEngineSample_Events PRIVATE Neki)
+    add_dependencies(NKEngineSample_Events Shaders)
+
 endif()
