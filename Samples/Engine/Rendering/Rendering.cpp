@@ -85,10 +85,10 @@ public:
 [[nodiscard]] NK::EngineConfig CreateEngine()
 {
 	NK::RenderSystemDesc renderSystemDesc{};
-	renderSystemDesc.backend = NK::GRAPHICS_BACKEND::D3D12;
+	renderSystemDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 	renderSystemDesc.enableSSAA = false;
 	renderSystemDesc.ssaaMultiplier = 4;
-	renderSystemDesc.windowDesc.size = { 1920, 1080 };
+	renderSystemDesc.windowDesc.size = { 3840, 2400 };
 	NK::EngineConfig config{ NK_NEW(GameApp), renderSystemDesc };
 	return config;
 }

@@ -15,7 +15,7 @@ struct VertexOutput
 };
 
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
-[[vk::binding(0,1)]] TextureCube g_skyboxes[] : register(t0, space1);
+[[vk::binding(0,0)]] TextureCube g_skyboxes[] : register(t0, space1);
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
 [[vk::binding(0,0)]] ConstantBuffer<NK::PBRMaterial> g_materials[] : register(b0, space0);
 

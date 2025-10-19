@@ -93,7 +93,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
+	void VulkanCommandBuffer::TransitionBarrierImpl(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
 	{
 		const VulkanBarrierInfo src{ VulkanUtils::GetVulkanBarrierInfo(_oldState) };
 		const VulkanBarrierInfo dst{ VulkanUtils::GetVulkanBarrierInfo(_newState) };
@@ -132,7 +132,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
+	void VulkanCommandBuffer::TransitionBarrierImpl(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
 	{
 		const VulkanBarrierInfo src{ VulkanUtils::GetVulkanBarrierInfo(_oldState) };
 		const VulkanBarrierInfo dst{ VulkanUtils::GetVulkanBarrierInfo(_newState) };
