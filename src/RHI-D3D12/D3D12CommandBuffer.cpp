@@ -532,32 +532,35 @@ namespace NK
 		
 		//Get footprint of destination texture
 		D3D12_RESOURCE_DESC dstDesc{ d3d12DstTexture->GetResourceDesc() };
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT dstFootprint;
-		UINT64 totalBytes;
-		dynamic_cast<D3D12Device&>(m_device).GetDevice()->GetCopyableFootprints(&dstDesc, 0, 1, 0, &dstFootprint, nullptr, nullptr, &totalBytes);
-		dstFootprint.Offset += _srcOffset;
+		UINT numLayers = (dstDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) ? 1 : dstDesc.DepthOrArraySize;
+		std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> dstFootprints(numLayers);
+		dynamic_cast<D3D12Device&>(m_device).GetDevice()->GetCopyableFootprints(&dstDesc, 0, numLayers, _srcOffset, dstFootprints.data(), nullptr, nullptr, nullptr);
 
-		D3D12_BOX srcBox{};
-		srcBox.left = 0;
-		srcBox.top = 0;
-		srcBox.front = 0;
-		srcBox.right = _dstExtent.x;
-		srcBox.bottom = _dstExtent.y;
-		srcBox.back = _dstExtent.z;
 
-		//Describe source copy location
-		D3D12_TEXTURE_COPY_LOCATION srcLocation{};
-		srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-		srcLocation.PlacedFootprint = dstFootprint;
-		srcLocation.pResource = d3d12SrcBuffer->GetBuffer();
+		for (UINT i{ 0 }; i < numLayers; ++i)
+		{
+			D3D12_BOX srcBox{};
+			srcBox.left = 0;
+			srcBox.top = 0;
+			srcBox.front = 0;
+			srcBox.right = _dstExtent.x;
+			srcBox.bottom = _dstExtent.y;
+			srcBox.back = _dstExtent.z;
 
-		//Describe destination copy location
-		D3D12_TEXTURE_COPY_LOCATION dstLocation{};
-		dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-		dstLocation.SubresourceIndex = 0;
-		dstLocation.pResource = d3d12DstTexture->GetResource();
+			//Describe source copy location
+			D3D12_TEXTURE_COPY_LOCATION srcLocation{};
+			srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+			srcLocation.PlacedFootprint = dstFootprints[i];
+			srcLocation.pResource = d3d12SrcBuffer->GetBuffer();
 
-		m_buffer->CopyTextureRegion(&dstLocation, _dstOffset.x, _dstOffset.y, _dstOffset.z, &srcLocation, &srcBox);
+			//Describe destination copy location
+			D3D12_TEXTURE_COPY_LOCATION dstLocation{};
+			dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+			dstLocation.SubresourceIndex = i;
+			dstLocation.pResource = d3d12DstTexture->GetResource();
+
+			m_buffer->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, &srcBox);
+		}
 	}
 
 

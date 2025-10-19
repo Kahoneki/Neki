@@ -188,14 +188,15 @@ namespace NK
 
 	TextureCopyMemoryLayout D3D12Device::GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture)
 	{
-		D3D12_RESOURCE_DESC desc{ dynamic_cast<D3D12Texture*>(_texture)->GetResourceDesc()};
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
+		D3D12_RESOURCE_DESC desc{ dynamic_cast<D3D12Texture*>(_texture)->GetResourceDesc() };
+		UINT numLayers{ (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1u : desc.DepthOrArraySize) };
+		std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> footprints(numLayers);
 		UINT64 totalBytes;
-		m_device->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, nullptr, nullptr, &totalBytes);
+		m_device->GetCopyableFootprints(&desc, 0, numLayers, 0, footprints.data(), nullptr, nullptr, &totalBytes);
 
 		TextureCopyMemoryLayout memLayout{};
 		memLayout.totalBytes = totalBytes;
-		memLayout.rowPitch = footprint.Footprint.RowPitch;
+		memLayout.rowPitch = footprints[0].Footprint.RowPitch; //same for non-mipmapped - todo: add mipmap support
 
 		return memLayout;
 	}
