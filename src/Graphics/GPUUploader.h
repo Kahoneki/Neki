@@ -27,10 +27,11 @@ namespace NK
 		//Size of the staging buffer in bytes - if the staging buffer is filled without flushing, a blocking flush will be automatically issued
 		std::size_t stagingBufferSize;
 
-		//A non-owning copy of a transfer queue. The GPUUploader will use it when flushing commands, synchronisation should be handled externally by the caller
+		//A non-owning copy of a graphics queue. The GPUUploader will use it when flushing commands, synchronisation should be handled externally by the caller
+		//Note: needs to be a graphics queue for full flexibility in resource transitions
 		//When flushing, either set the _waitIdle parameter to true or use the returned fence to know when the GPUUploader is done using the queue
 		//Note: there is no logical impact (beyond performance) in submitting commands to the transfer queue while the GPUUploader is using it
-		IQueue* transferQueue;
+		IQueue* graphicsQueue;
 	};
 
 	

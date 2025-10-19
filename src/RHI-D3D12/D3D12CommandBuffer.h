@@ -23,8 +23,6 @@ namespace NK
 		virtual void SetBlendConstants(const float _blendConstants[4]) override;
 		virtual void End() override;
 
-		virtual void TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
-		virtual void TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
 		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment) override;
 		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment) override;
 		virtual void BlitTexture(ITexture* _srcTexture, TEXTURE_ASPECT _srcAspect, ITexture* _dstTexture, TEXTURE_ASPECT _dstAspect) override;
@@ -44,6 +42,12 @@ namespace NK
 
 		//D3D12 internal API (for use by other RHI-D3D12 classes)
 		[[nodiscard]] inline ID3D12GraphicsCommandList* GetCommandList() const { return m_buffer.Get(); }
+
+
+	protected:
+		//NVI implementations
+		virtual void TransitionBarrierImpl(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
+		virtual void TransitionBarrierImpl(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
 
 
 	private:

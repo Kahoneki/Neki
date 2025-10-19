@@ -20,14 +20,14 @@ namespace NK
 {
 
 	GPUUploader::GPUUploader(ILogger& _logger, IDevice& _device, const GPUUploaderDesc& _desc)
-	: m_logger(_logger), m_device(_device), m_stagingBufferSize(_desc.stagingBufferSize), m_queue(_desc.transferQueue)
+	: m_logger(_logger), m_device(_device), m_stagingBufferSize(_desc.stagingBufferSize), m_queue(_desc.graphicsQueue)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::GPU_UPLOADER, "Initialising GPUUploader\n");
 
-		if (m_queue->GetType() != COMMAND_TYPE::TRANSFER)
+		if (m_queue->GetType() != COMMAND_TYPE::GRAPHICS)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "Provided _desc.transferQueue is not of type COMMAND_TYPE::TRANSFER as required. Type = " + std::to_string(std::to_underlying(m_queue->GetType())) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "Provided _desc.graphicsQueue is not of type COMMAND_TYPE::GRAPHICS as required. Type = " + std::to_string(std::to_underlying(m_queue->GetType())) + "\n");
 			throw std::runtime_error("");
 		}
 
@@ -40,7 +40,7 @@ namespace NK
 		m_stagingBufferMap = static_cast<unsigned char*>(m_stagingBuffer->Map());
 
 		CommandPoolDesc commandPoolDesc{};
-		commandPoolDesc.type = COMMAND_TYPE::TRANSFER;
+		commandPoolDesc.type = COMMAND_TYPE::GRAPHICS;
 		m_commandPool = m_device.CreateCommandPool(commandPoolDesc);
 
 		CommandBufferDesc commandBufferDesc{};
@@ -52,6 +52,7 @@ namespace NK
 		//Start recording commands
 		m_commandBuffer->Begin();
 
+		m_commandBuffer->TransitionBarrier(m_stagingBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_SOURCE);
 
 		m_logger.Unindent();
 	}
@@ -271,6 +272,7 @@ namespace NK
 			vertexBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
 			gpuMesh->vertexBuffer = m_device.CreateBuffer(vertexBufferDesc);
 			EnqueueBufferDataUpload(cpuMesh.vertices.data(), gpuMesh->vertexBuffer.get(), RESOURCE_STATE::UNDEFINED);
+			m_commandBuffer->TransitionBarrier(gpuMesh->vertexBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::VERTEX_BUFFER);
 
 			//Index buffer
 			BufferDesc indexBufferDesc{};
@@ -280,6 +282,7 @@ namespace NK
 			gpuMesh->indexBuffer = m_device.CreateBuffer(indexBufferDesc);
 			gpuMesh->indexCount = cpuMesh.indices.size();
 			EnqueueBufferDataUpload(cpuMesh.indices.data(), gpuMesh->indexBuffer.get(), RESOURCE_STATE::UNDEFINED);
+			m_commandBuffer->TransitionBarrier(gpuMesh->indexBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::INDEX_BUFFER);
 
 			//Material index
 			gpuMesh->materialIndex = cpuMesh.materialIndex;
@@ -300,6 +303,7 @@ namespace NK
 				const std::size_t index{ std::to_underlying(_textureType) };
 				gpuMaterial->textures[index] = m_device.CreateTexture(cpuMaterial.allTextures[index]->desc);
 				EnqueueTextureDataUpload(cpuMaterial.allTextures[index]->data, gpuMaterial->textures[index].get(), RESOURCE_STATE::UNDEFINED);
+				m_commandBuffer->TransitionBarrier(gpuMaterial->textures[index].get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::SHADER_RESOURCE);
 
 				TextureViewDesc viewDesc{};
 				viewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
@@ -335,6 +339,7 @@ namespace NK
 				materialBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
 				gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
 				EnqueueBufferDataUpload(&material, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
+				m_commandBuffer->TransitionBarrier(gpuMaterial->materialBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::CONSTANT_BUFFER);
 
 				//Material buffer view
 				BufferViewDesc materialBufferViewDesc{};

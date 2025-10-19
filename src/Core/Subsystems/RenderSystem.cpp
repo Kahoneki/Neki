@@ -33,10 +33,18 @@ namespace NK
 
 
 		InitBaseResources();
+
+		//For resource transition
+		m_graphicsCommandBuffers[0]->Begin();
+
 		InitCameraBuffer();
 		InitSkybox();
 		InitShadersAndPipelines();
 		InitAntiAliasingResources();
+
+		m_graphicsCommandBuffers[0]->End();
+		m_graphicsQueue->Submit(m_graphicsCommandBuffers[0].get(), nullptr, nullptr, nullptr);
+		m_graphicsQueue->WaitIdle();
 
 		m_gpuUploader->Flush(true, nullptr, nullptr);
 		m_gpuUploader->Reset();
@@ -110,7 +118,7 @@ namespace NK
 		{
 			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
 		}
-		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
+		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::RENDER_TARGET);
 		//m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateDepthBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
 		m_graphicsCommandBuffers[m_currentFrame]->BeginRendering(1, m_msaaEnabled ? m_intermediateRenderTargetView.get() : nullptr, m_ssaaEnabled ? m_intermediateRenderTargetView.get() : m_swapchain->GetImageView(imageIndex), m_intermediateDepthBufferView.get(), nullptr);
@@ -287,7 +295,7 @@ namespace NK
 		//GPU Uploader
 		GPUUploaderDesc gpuUploaderDesc{};
 		gpuUploaderDesc.stagingBufferSize = 1024 * 512 * 512; //512MiB
-		gpuUploaderDesc.transferQueue = m_transferQueue.get();
+		gpuUploaderDesc.graphicsQueue = m_graphicsQueue.get();
 		m_gpuUploader = m_device->CreateGPUUploader(gpuUploaderDesc);
 
 		//GPU Uploader Flush Fence
@@ -351,6 +359,7 @@ namespace NK
 		camDataBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
 		camDataBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
 		m_camDataBuffer = m_device->CreateBuffer(camDataBufferDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_camDataBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::CONSTANT_BUFFER);
 
 		BufferViewDesc camDataBufferViewDesc{};
 		camDataBufferViewDesc.size = sizeof(CameraShaderData);
@@ -421,6 +430,9 @@ namespace NK
 		//Upload vertex and index buffers
 		m_gpuUploader->EnqueueBufferDataUpload(vertices, m_skyboxVertBuffer.get(), RESOURCE_STATE::UNDEFINED);
 		m_gpuUploader->EnqueueBufferDataUpload(indices, m_skyboxIndexBuffer.get(), RESOURCE_STATE::UNDEFINED);
+
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_skyboxVertBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::VERTEX_BUFFER);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_skyboxIndexBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::INDEX_BUFFER);
 	}
 
 
@@ -555,6 +567,7 @@ namespace NK
 		depthBufferDesc.arrayTexture = false;
 		depthBufferDesc.sampleCount = m_msaaEnabled ? m_msaaSampleCount : SAMPLE_COUNT::BIT_1;
 		m_intermediateDepthBuffer = m_device->CreateTexture(depthBufferDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_intermediateDepthBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
 		//Supersample Depth Buffer View
 		TextureViewDesc depthBufferViewDesc{};

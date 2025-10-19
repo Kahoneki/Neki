@@ -101,7 +101,7 @@ namespace NK
 
 
 
-	void D3D12CommandBuffer::TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
+	void D3D12CommandBuffer::TransitionBarrierImpl(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
 	{
 		D3D12_RESOURCE_BARRIER barrierInfo{};
 		barrierInfo.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -111,12 +111,20 @@ namespace NK
 		barrierInfo.Transition.StateAfter = GetD3D12ResourceState(_newState);
 
 		m_buffer->ResourceBarrier(1, &barrierInfo);
+
+		
 	}
 
 
 
-	void D3D12CommandBuffer::TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
+	void D3D12CommandBuffer::TransitionBarrierImpl(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
 	{
+		if (_buffer->GetState() != _oldState)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "TransitionBarrier() - Provided _buffer's current state is " + std::to_string(std::to_underlying(_buffer->GetState())) + " which doesn't match _oldState provided (" + std::to_string(std::to_underlying(_oldState)) + ")\n");
+			throw std::runtime_error("");
+		}
+
 		D3D12_RESOURCE_BARRIER barrierInfo{};
 		barrierInfo.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		barrierInfo.Transition.pResource = dynamic_cast<D3D12Buffer*>(_buffer)->GetBuffer();
@@ -143,6 +151,18 @@ namespace NK
 		std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> colourAttachmentInfos(_numColourAttachments);
 		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
 		{
+			if (_multisampleColourAttachments && _multisampleColourAttachments[i].GetParentTexture()->GetState() != RESOURCE_STATE::RENDER_TARGET)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _multisampleColourAttachments[ " + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_multisampleColourAttachments[i].GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::RENDER_TARGET\n");
+				throw std::runtime_error("");
+			}
+
+			if (_outputColourAttachments[i].GetParentTexture()->GetState() != RESOURCE_STATE::RENDER_TARGET)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _outputColourAttachments[ " + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_outputColourAttachments[i].GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::RENDER_TARGET\n");
+				throw std::runtime_error("");
+			}
+
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
 			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_outputColourAttachments[i].GetFormat());
@@ -160,6 +180,18 @@ namespace NK
 		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC depthStencilAttachmentInfo{};
 		if (_depthAttachment || _stencilAttachment)
 		{
+			if (_depthAttachment && _depthAttachment->GetParentTexture()->GetState() != RESOURCE_STATE::DEPTH_WRITE)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _depthAttachment's current state is " + std::to_string(std::to_underlying(_depthAttachment->GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::DEPTH_WRITE\n");
+				throw std::runtime_error("");
+			}
+
+			if (_stencilAttachment && _stencilAttachment->GetParentTexture()->GetState() != RESOURCE_STATE::DEPTH_WRITE)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _stencilAttachment's current state is " + std::to_string(std::to_underlying(_stencilAttachment->GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::DEPTH_WRITE\n");
+				throw std::runtime_error("");
+			}
+
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
 			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_depthAttachment ? _depthAttachment->GetFormat() : _stencilAttachment->GetFormat());
@@ -194,6 +226,18 @@ namespace NK
 		std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> colourAttachmentInfos(_numColourAttachments);
 		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
 		{
+			if (_multisampleColourAttachments && _multisampleColourAttachments[i].GetParentTexture()->GetState() != RESOURCE_STATE::RENDER_TARGET)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _multisampleColourAttachments[ " + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_multisampleColourAttachments[i].GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::RENDER_TARGET\n");
+				throw std::runtime_error("");
+			}
+
+			if (_outputColourAttachments[i].GetParentTexture()->GetState() != RESOURCE_STATE::RENDER_TARGET)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _outputColourAttachments[" + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_outputColourAttachments[i].GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::RENDER_TARGET\n");
+				throw std::runtime_error("");
+			}
+
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
 			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_outputColourAttachments[i].GetFormat());
@@ -211,6 +255,12 @@ namespace NK
 		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC depthStencilAttachmentInfo{};
 		if (_depthStencilAttachment)
 		{
+			if (_depthStencilAttachment->GetParentTexture()->GetState() != RESOURCE_STATE::DEPTH_WRITE)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _depthStencilAttachment's current state is " + std::to_string(std::to_underlying(_depthStencilAttachment->GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::DEPTH_WRITE\n");
+				throw std::runtime_error("");
+			}
+
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
 			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_depthStencilAttachment->GetFormat());
@@ -250,6 +300,12 @@ namespace NK
 		std::vector<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews(_bindingCount);
 		for (std::size_t i{ 0 }; i < _bindingCount; ++i)
 		{
+			if (_buffers[i].GetState() != RESOURCE_STATE::VERTEX_BUFFER)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BindVertexBuffers() - Provided _buffers[" + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_buffers[i].GetState())) + " which doesn't match required state of RESOURCE_STATE::VERTEX_BUFFER\n");
+				throw std::runtime_error("");
+			}
+
 			vertexBufferViews[i].BufferLocation = dynamic_cast<D3D12Buffer*>(&(_buffers[i]))->GetBuffer()->GetGPUVirtualAddress();
 			vertexBufferViews[i].SizeInBytes = _buffers[i].GetSize();
 			vertexBufferViews[i].StrideInBytes = _strides[i];
@@ -262,6 +318,12 @@ namespace NK
 
 	void D3D12CommandBuffer::BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format)
 	{
+		if (_buffer->GetState() != RESOURCE_STATE::INDEX_BUFFER)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BindIndexBuffer() - Provided _buffer's current state is " + std::to_string(std::to_underlying(_buffer->GetState())) + " which doesn't match required state of RESOURCE_STATE::INDEX_BUFFER\n");
+			throw std::runtime_error("");
+		}
+
 		//Create the view
 		D3D12_INDEX_BUFFER_VIEW indexBufferView{};
 		indexBufferView.BufferLocation = dynamic_cast<D3D12Buffer*>(_buffer)->GetBuffer()->GetGPUVirtualAddress();
@@ -402,6 +464,20 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+		//Ensure source buffer is in copy source state
+		if (_srcBuffer->GetState() != RESOURCE_STATE::COPY_SOURCE)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "CopyBufferToBuffer() - Provided _srcBuffer's current state is " + std::to_string(std::to_underlying(_srcBuffer->GetState())) + " which doesn't match required state of RESOURCE_STATE::COPY_SOURCE\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure destination buffer is in copy dest state
+		if (_dstBuffer->GetState() != RESOURCE_STATE::COPY_DEST)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "CopyBufferToBuffer() - Provided _dstBuffer's current state is " + std::to_string(std::to_underlying(_dstBuffer->GetState())) + " which doesn't match required state of RESOURCE_STATE::COPY_DEST\n");
+			throw std::runtime_error("");
+		}
+
 
 		m_buffer->CopyBufferRegion(dynamic_cast<D3D12Buffer*>(_dstBuffer)->GetBuffer(), _dstOffset, dynamic_cast<D3D12Buffer*>(_srcBuffer)->GetBuffer(), _srcOffset, _size);
 	}
@@ -433,6 +509,20 @@ namespace NK
 			(_dstOffset.z + _dstExtent.z > textureSize.z))
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToTexture() - Specified destination region is out of bounds for the texture.\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure source buffer is in copy source state
+		if (_srcBuffer->GetState() != RESOURCE_STATE::COPY_SOURCE)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "CopyBufferToTexture() - Provided _srcBuffer's current state is " + std::to_string(std::to_underlying(_srcBuffer->GetState())) + " which doesn't match required state of RESOURCE_STATE::COPY_SOURCE\n");
+			throw std::runtime_error("");
+		}
+
+		//Ensure destination texture is in copy dest state
+		if (_dstTexture->GetState() != RESOURCE_STATE::COPY_DEST)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "CopyBufferToTexture() - Provided _dstTexture's current state is " + std::to_string(std::to_underlying(_dstTexture->GetState())) + " which doesn't match required state of RESOURCE_STATE::COPY_DEST\n");
 			throw std::runtime_error("");
 		}
 

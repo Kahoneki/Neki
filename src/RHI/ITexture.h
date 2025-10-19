@@ -11,6 +11,7 @@
 namespace NK
 {
 	
+	class ICommandBuffer;
 	class IDevice;
 
 	struct TextureDesc
@@ -31,6 +32,8 @@ namespace NK
 
 	class ITexture
 	{
+		friend class ICommandBuffer;
+
 	public:
 		virtual ~ITexture() = default;
 
@@ -40,13 +43,14 @@ namespace NK
 		[[nodiscard]] inline SAMPLE_COUNT GetSampleCount() const { return m_sampleCount; }
 		[[nodiscard]] inline bool IsArrayTexture() const { return m_arrayTexture; }
 		[[nodiscard]] inline TEXTURE_DIMENSION GetDimension() const { return m_dimension; }
+		[[nodiscard]] inline RESOURCE_STATE GetState() const { return m_state; }
 
 
 	protected:
 		explicit ITexture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc, bool _isOwned)
 		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
 		  m_size(_desc.size), m_arrayTexture(_desc.arrayTexture), m_usage(_desc.usage), m_format(_desc.format), m_dimension(_desc.dimension), m_cubeMap(_desc.cubemap), m_sampleCount(_desc.sampleCount),
-		  m_isOwned(_isOwned)
+		  m_isOwned(_isOwned), m_state(RESOURCE_STATE::UNDEFINED)
 		{
 			if (m_cubeMap && !m_arrayTexture)
 			{
@@ -76,6 +80,8 @@ namespace NK
 		//This flag exists mainly for the swapchain which in Vulkan/D3D12, owns its images
 		//^trying to destroy the images yourself (e.g. in this class' destructor) results in a crash
 		bool m_isOwned;
+
+		RESOURCE_STATE m_state; //For enforcing strict state, updated by ICommandBuffer::TransitionBarrier()
 	};
 	
 }

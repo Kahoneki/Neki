@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ICommandPool.h"
+#include "ITexture.h"
+#include "IBuffer.h"
 
 #include <Types/NekiTypes.h>
 
@@ -25,8 +27,34 @@ namespace NK
 		virtual void SetBlendConstants(const float _blendConstants[4]) = 0;
 		virtual void End() = 0;
 
-		virtual void TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) = 0;
-		virtual void TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) = 0;
+
+		//----NVIs----/
+		//NVIs because m_state is a private member of ITexture and IBuffer - ICommandBuffer is a friend class but VulkanCommandBuffer and D3D12CommandBuffer aren't
+		
+		void TransitionBarrier(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
+		{
+			if (_texture->m_state != _oldState)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "TransitionBarrier() - Provided _texture's current state is " + std::to_string(std::to_underlying(_texture->GetState())) + " which doesn't match _oldState provided (" + std::to_string(std::to_underlying(_oldState)) + ")\n");
+				throw std::runtime_error("");
+			}
+			TransitionBarrierImpl(_texture, _oldState, _newState);
+			_texture->m_state = _newState;
+		}
+
+		void TransitionBarrier(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState)
+		{
+			if (_buffer->GetState() != _oldState)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "TransitionBarrier() - Provided _buffer's current state is " + std::to_string(std::to_underlying(_buffer->GetState())) + " which doesn't match _oldState provided (" + std::to_string(std::to_underlying(_oldState)) + ")\n");
+				throw std::runtime_error("");
+			}
+			TransitionBarrierImpl(_buffer, _oldState, _newState);
+			_buffer->m_state = _newState;
+		}
+
+		//----End of NVIs----//
+
 
 		//Used for individual depth and stencil attachments (either or both can be set to nullptr if unused)
 		//Note: _numColourAttachments is not the size of the swapchain, it is used for rendering to multiple colour attachments in a single pass. For most scenarios, this value should be 1.
@@ -82,6 +110,10 @@ namespace NK
 	protected:
 		explicit ICommandBuffer(ILogger& _logger, IDevice& _device, ICommandPool& _pool, const CommandBufferDesc& _desc)
 		: m_logger(_logger), m_device(_device), m_pool(_pool), m_level(_desc.level) {}
+
+		//NVI implementations
+		virtual void TransitionBarrierImpl(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) = 0;
+		virtual void TransitionBarrierImpl(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) = 0;
 
 
 		//Dependency injections
