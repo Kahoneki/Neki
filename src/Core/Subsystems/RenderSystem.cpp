@@ -8,6 +8,7 @@
 #include <RHI/ISemaphore.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
+#include <RHI/IQueue.h>
 
 #ifdef NEKI_VULKAN_SUPPORTED
 	#include <RHI-Vulkan/VulkanDevice.h>
@@ -55,6 +56,8 @@ namespace NK
 
 	void RenderSystem::Update(Registry& _reg)
 	{
+		m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::RENDER_SYSTEM, "Draw\n");
+
 		//Update skybox
 		bool found{ false };
 		for (auto&& [skybox] : _reg.View<CSkybox>())
@@ -108,7 +111,7 @@ namespace NK
 			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
 		}
 		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
-		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateDepthBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
+		//m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateDepthBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
 		m_graphicsCommandBuffers[m_currentFrame]->BeginRendering(1, m_msaaEnabled ? m_intermediateRenderTargetView.get() : nullptr, m_ssaaEnabled ? m_intermediateRenderTargetView.get() : m_swapchain->GetImageView(imageIndex), m_intermediateDepthBufferView.get(), nullptr);
 		m_graphicsCommandBuffers[m_currentFrame]->BindRootSignature(m_meshPiplineRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);

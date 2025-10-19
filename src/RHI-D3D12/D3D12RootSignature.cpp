@@ -22,10 +22,10 @@ namespace NK
 
 		
 		//Create the root signature
-		std::array<D3D12_ROOT_PARAMETER1, 5> rootParams;
+		std::array<D3D12_ROOT_PARAMETER1, 6> rootParams;
 
 
-		//Root parameter 0, 1, 2: resources (cbvs, srvs, and uavs)
+		//Root parameters 0, 1, 2, 3: resources (cbvs, srvs, and uavs)
 		D3D12_DESCRIPTOR_RANGE1 cbvResourceRange{};
 		cbvResourceRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 		cbvResourceRange.NumDescriptors = -1; //unbounded - go until end of heap
@@ -34,13 +34,23 @@ namespace NK
 		cbvResourceRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE; //DATA_STATIC flag on an unbounded range gets ignored and treated as volatile
 		cbvResourceRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		D3D12_DESCRIPTOR_RANGE1 srvResourceRange{};
-		srvResourceRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		srvResourceRange.NumDescriptors = -1; //unbounded - go until end of heap
-		srvResourceRange.BaseShaderRegister = 0; //resources start at t0
-		srvResourceRange.RegisterSpace = 0; //resource range in register space 0
-		srvResourceRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE; //hint that descriptors can change
-		srvResourceRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		//Texture2D
+		D3D12_DESCRIPTOR_RANGE1 tex2DSRVResourceRange{};
+		tex2DSRVResourceRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		tex2DSRVResourceRange.NumDescriptors = -1; //unbounded - go until end of heap
+		tex2DSRVResourceRange.BaseShaderRegister = 0; //resources start at t0
+		tex2DSRVResourceRange.RegisterSpace = 0; //resource range in register space 0
+		tex2DSRVResourceRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE; //hint that descriptors can change
+		tex2DSRVResourceRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		//TextureCube
+		D3D12_DESCRIPTOR_RANGE1 texCubeSRVResourceRange{};
+		texCubeSRVResourceRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		texCubeSRVResourceRange.NumDescriptors = -1; //unbounded - go until end of heap
+		texCubeSRVResourceRange.BaseShaderRegister = 0; //resources start at t0
+		texCubeSRVResourceRange.RegisterSpace = 1; //resource range in register space 0
+		texCubeSRVResourceRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE; //hint that descriptors can change
+		texCubeSRVResourceRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 		D3D12_DESCRIPTOR_RANGE1 uavResourceRange{};
 		uavResourceRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
@@ -58,12 +68,17 @@ namespace NK
 		rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[1].DescriptorTable.pDescriptorRanges = &srvResourceRange;
+		rootParams[1].DescriptorTable.pDescriptorRanges = &tex2DSRVResourceRange;
 
 		rootParams[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[2].DescriptorTable.pDescriptorRanges = &uavResourceRange;
+		rootParams[2].DescriptorTable.pDescriptorRanges = &texCubeSRVResourceRange;
+
+		rootParams[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		rootParams[3].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[3].DescriptorTable.pDescriptorRanges = &uavResourceRange;
 
 
 		//Root parameter 3: samplers
@@ -75,19 +90,19 @@ namespace NK
 		samplerRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE; //hint that descriptors can change
 		samplerRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		rootParams[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-		rootParams[3].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[3].DescriptorTable.pDescriptorRanges = &samplerRange;
+		rootParams[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		rootParams[4].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[4].DescriptorTable.pDescriptorRanges = &samplerRange;
 
 
 		//Root parameter 4: root constants
 		m_actualNum32BitPushConstantValues = m_providedNum32BitPushConstantValues; //Irrelevant for dx12, just for parity with vulkan
-		rootParams[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-		rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-		rootParams[4].Constants.Num32BitValues = m_actualNum32BitPushConstantValues;
-		rootParams[4].Constants.ShaderRegister = 0;
-		rootParams[4].Constants.RegisterSpace = 1; //So as to not conflict with buffers in resource descriptor heap
+		rootParams[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		rootParams[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		rootParams[5].Constants.Num32BitValues = m_actualNum32BitPushConstantValues;
+		rootParams[5].Constants.ShaderRegister = 0;
+		rootParams[5].Constants.RegisterSpace = 1; //So as to not conflict with buffers in resource descriptor heap
 
 
 		//Serialise root signature
@@ -129,11 +144,13 @@ namespace NK
 		//Populate descriptor table structs
 		m_cbvDescriptorTable.rootParamIndex = 0;
 		m_cbvDescriptorTable.gpuHandle = m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-		m_srvDescriptorTable.rootParamIndex = 1;
-		m_srvDescriptorTable.gpuHandle = m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-		m_uavDescriptorTable.rootParamIndex = 2;
+		m_tex2DSRVDescriptorTable.rootParamIndex = 1;
+		m_tex2DSRVDescriptorTable.gpuHandle = m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+		m_texCubeSRVDescriptorTable.rootParamIndex = 2;
+		m_texCubeSRVDescriptorTable.gpuHandle = m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+		m_uavDescriptorTable.rootParamIndex = 3;
 		m_uavDescriptorTable.gpuHandle = m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-		m_samplerDescriptorTable.rootParamIndex = 3;
+		m_samplerDescriptorTable.rootParamIndex = 4;
 		m_samplerDescriptorTable.gpuHandle = m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 
 

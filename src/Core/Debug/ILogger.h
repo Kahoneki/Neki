@@ -6,10 +6,6 @@
 
 #include <string>
 
-#if defined(ERROR)
-	#undef ERROR //Error is used for LOGGER_CHANNEL::ERROR
-#endif
-
 
 namespace NK
 {

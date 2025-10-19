@@ -34,7 +34,7 @@
 
 #else //dxil
 	#define PUSH_CONSTANTS_BLOCK(DATA) \
-	cbuffer PC_DECL_NAME : register(b0, space1) { DATA }
+	cbuffer PC_DECL_NAME : register(b0, space1) { DATA };
 
 	#define PC(NAME) NAME
 

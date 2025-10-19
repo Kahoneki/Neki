@@ -14,6 +14,12 @@
 #ifdef CreateWindow
 	#undef CreateWindow
 #endif
+#if defined(ERROR)
+	#undef ERROR //Error is used for LOGGER_CHANNEL::ERROR
+#endif
+#ifdef LoadImage
+	#undef LoadImage //Conflicts with ImageLoader::LoadImage()
+#endif
 
 
 namespace NK
@@ -45,6 +51,8 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() override;
+		[[nodiscard]] virtual UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<Window> CreateWindow(const WindowDesc& _desc) const override;
 
 		[[nodiscard]] virtual TextureCopyMemoryLayout GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture) override;
 
@@ -85,7 +93,7 @@ namespace NK
 		UniquePtr<ICommandPool> m_graphicsSyncListAllocator;
 		UniquePtr<ICommandPool> m_computeSyncListAllocator;
 		UniquePtr<ICommandPool> m_transferSyncListAllocator;
-		std::unordered_map<COMMAND_POOL_TYPE, UniquePtr<ICommandBuffer>> m_syncLists;
+		std::unordered_map<COMMAND_TYPE, UniquePtr<ICommandBuffer>> m_syncLists;
 
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_resourceDescriptorHeap;
 		UINT m_resourceDescriptorSize;

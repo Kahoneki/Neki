@@ -49,6 +49,30 @@ namespace NK
 				desc.Texture3D.MipLevels = 1;
 				break;
 			}
+			case TEXTURE_VIEW_DIMENSION::DIM_CUBE:
+			{
+				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+				desc.TextureCube.MipLevels = 1;
+				break;
+			}
+			case TEXTURE_VIEW_DIMENSION::DIM_1D_ARRAY:
+			{
+				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
+				desc.Texture1DArray.MipLevels = 1;
+				break;
+			}
+			case TEXTURE_VIEW_DIMENSION::DIM_2D_ARRAY:
+			{
+				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+				desc.Texture2DArray.MipLevels = 1;
+				break;
+			}
+			case TEXTURE_VIEW_DIMENSION::DIM_CUBE_ARRAY:
+			{
+				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+				desc.TextureCubeArray.MipLevels = 1;
+				break;
+			}
 			}
 
 			desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;

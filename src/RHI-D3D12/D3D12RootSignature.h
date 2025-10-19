@@ -24,7 +24,8 @@ namespace NK
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetResourceDescriptorHeap() const { return m_resourceDescriptorHeap; }
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetSamplerDescriptorHeap() const { return m_samplerDescriptorHeap; }
 		[[nodiscard]] inline RootDescriptorTable GetCBVDescriptorTable() const { return m_cbvDescriptorTable; }
-		[[nodiscard]] inline RootDescriptorTable GetSRVDescriptorTable() const { return m_srvDescriptorTable; }
+		[[nodiscard]] inline RootDescriptorTable GetTexture2DSRVDescriptorTable() const { return m_tex2DSRVDescriptorTable; }
+		[[nodiscard]] inline RootDescriptorTable GetTextureCubeSRVDescriptorTable() const { return m_texCubeSRVDescriptorTable; }
 		[[nodiscard]] inline RootDescriptorTable GetUAVDescriptorTable() const { return m_uavDescriptorTable; }
 		[[nodiscard]] inline RootDescriptorTable GetSamplerDescriptorTable() const { return m_samplerDescriptorTable; }
 		
@@ -34,7 +35,8 @@ namespace NK
 		ID3D12DescriptorHeap* m_resourceDescriptorHeap; //Owned by D3D12Device
 		ID3D12DescriptorHeap* m_samplerDescriptorHeap; //Owned by D3D12Device
 		RootDescriptorTable m_cbvDescriptorTable;
-		RootDescriptorTable m_srvDescriptorTable;
+		RootDescriptorTable m_tex2DSRVDescriptorTable;
+		RootDescriptorTable m_texCubeSRVDescriptorTable;
 		RootDescriptorTable m_uavDescriptorTable;
 		RootDescriptorTable m_samplerDescriptorTable;
 	};

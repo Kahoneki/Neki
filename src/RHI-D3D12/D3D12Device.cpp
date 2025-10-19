@@ -1,5 +1,4 @@
 #include "D3D12Device.h"
-#include "D3D12Device.h"
 
 #include "D3D12Buffer.h"
 #include "D3D12BufferView.h"
@@ -19,6 +18,7 @@
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/EnumUtils.h>
 #include <Core/Utils/FormatUtils.h>
+#include <Graphics/GPUUploader.h>
 
 #include <array>
 #include <stdexcept>
@@ -168,6 +168,20 @@ namespace NK
 	UniquePtr<ISemaphore> D3D12Device::CreateSemaphore()
 	{
 		return UniquePtr<ISemaphore>(NK_NEW(D3D12Semaphore, m_logger, m_allocator, *this));
+	}
+
+	
+	
+	UniquePtr<GPUUploader> D3D12Device::CreateGPUUploader(const GPUUploaderDesc& _desc)
+	{
+		return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _desc));
+	}
+
+
+
+	UniquePtr<Window> D3D12Device::CreateWindow(const WindowDesc& _desc) const
+	{
+		return UniquePtr<Window>(NK_NEW(Window, m_logger, _desc));
 	}
 
 
@@ -440,16 +454,16 @@ namespace NK
 		primaryLevelBufferDesc.level = COMMAND_BUFFER_LEVEL::PRIMARY;
 
 		CommandPoolDesc poolDesc{};
-		poolDesc.type = COMMAND_POOL_TYPE::GRAPHICS;
+		poolDesc.type = COMMAND_TYPE::GRAPHICS;
 		m_graphicsSyncListAllocator = CreateCommandPool(poolDesc);
-		poolDesc.type = COMMAND_POOL_TYPE::COMPUTE;
+		poolDesc.type = COMMAND_TYPE::COMPUTE;
 		m_computeSyncListAllocator = CreateCommandPool(poolDesc);
-		poolDesc.type = COMMAND_POOL_TYPE::TRANSFER;
+		poolDesc.type = COMMAND_TYPE::TRANSFER;
 		m_transferSyncListAllocator = CreateCommandPool(poolDesc);
 
-		m_syncLists[COMMAND_POOL_TYPE::GRAPHICS] = m_graphicsSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
-		m_syncLists[COMMAND_POOL_TYPE::COMPUTE] = m_computeSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
-		m_syncLists[COMMAND_POOL_TYPE::TRANSFER] = m_transferSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
+		m_syncLists[COMMAND_TYPE::GRAPHICS] = m_graphicsSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
+		m_syncLists[COMMAND_TYPE::COMPUTE] = m_computeSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
+		m_syncLists[COMMAND_TYPE::TRANSFER] = m_transferSyncListAllocator->AllocateCommandBuffer(primaryLevelBufferDesc);
 
 
 		m_logger.Unindent();

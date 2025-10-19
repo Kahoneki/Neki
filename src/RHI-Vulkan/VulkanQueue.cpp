@@ -102,43 +102,6 @@ namespace NK
 
 
 
-	void VulkanQueue::Submit(ICommandBuffer* _cmdBuffer, std::vector<ISemaphore*> _waitSemaphores, std::vector<ISemaphore*> _signalSemaphores, IFence* _signalFence)
-	{
-		VkCommandBuffer vkCommandBuffer{ dynamic_cast<VulkanCommandBuffer*>(_cmdBuffer)->GetBuffer() };
-		std::vector<VkSemaphore> vkWaitSemaphores(_waitSemaphores.size());
-		std::vector<VkPipelineStageFlags> vkStageMasks(_waitSemaphores.size());
-		for (std::size_t i{ 0 }; i<_waitSemaphores.size(); ++i)
-		{
-			vkWaitSemaphores[i] = dynamic_cast<VulkanSemaphore*>(_waitSemaphores[i])->GetSemaphore();
-			vkStageMasks[i] = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		}
-		std::vector<VkSemaphore> vkSignalSemaphores(_signalSemaphores.size());
-		for (std::size_t i{ 0 }; i<_signalSemaphores.size(); ++i)
-		{
-			vkSignalSemaphores[i] = dynamic_cast<VulkanSemaphore*>(_signalSemaphores[i])->GetSemaphore();
-		}
-		VkFence vkSignalFence{ _signalFence ? dynamic_cast<VulkanFence*>(_signalFence)->GetFence() : VK_NULL_HANDLE };
-		
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.waitSemaphoreCount = _waitSemaphores.size();
-		submitInfo.pWaitSemaphores = vkWaitSemaphores.data();
-		submitInfo.pWaitDstStageMask = vkStageMasks.data();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &vkCommandBuffer;
-		submitInfo.signalSemaphoreCount = _signalSemaphores.size();
-		submitInfo.pSignalSemaphores = vkSignalSemaphores.data();
-
-		const VkResult result{ vkQueueSubmit(m_queue, 1, &submitInfo, vkSignalFence) };
-		if (result != VK_SUCCESS)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::QUEUE, "Failed to submit queue. result = " + std::to_string(result) + '\n');
-			throw std::runtime_error("");
-		}
-	}
-
-
-
 	void VulkanQueue::WaitIdle()
 	{
 		vkQueueWaitIdle(m_queue);

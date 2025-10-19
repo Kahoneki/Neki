@@ -21,9 +21,9 @@ namespace NK
 		D3D12_COMMAND_LIST_TYPE type;
 		switch (m_type)
 		{
-		case COMMAND_POOL_TYPE::GRAPHICS:	type = D3D12_COMMAND_LIST_TYPE_DIRECT;	break;
-		case COMMAND_POOL_TYPE::COMPUTE:	type = D3D12_COMMAND_LIST_TYPE_COMPUTE;	break;
-		case COMMAND_POOL_TYPE::TRANSFER:	type = D3D12_COMMAND_LIST_TYPE_COPY;	break;
+		case COMMAND_TYPE::GRAPHICS:	type = D3D12_COMMAND_LIST_TYPE_DIRECT;	break;
+		case COMMAND_TYPE::COMPUTE:		type = D3D12_COMMAND_LIST_TYPE_COMPUTE;	break;
+		case COMMAND_TYPE::TRANSFER:	type = D3D12_COMMAND_LIST_TYPE_COPY;	break;
 		}
 		const HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommandAllocator(type, IID_PPV_ARGS(&m_pool)) };
 
@@ -81,9 +81,9 @@ namespace NK
 	{
 		switch (m_type)
 		{
-		case COMMAND_POOL_TYPE::GRAPHICS:	return "GRAPHICS";
-		case COMMAND_POOL_TYPE::COMPUTE:	return "COMPUTE";
-		case COMMAND_POOL_TYPE::TRANSFER:	return "TRANSFER";
+		case COMMAND_TYPE::GRAPHICS:	return "GRAPHICS";
+		case COMMAND_TYPE::COMPUTE:		return "COMPUTE";
+		case COMMAND_TYPE::TRANSFER:	return "TRANSFER";
 		default:
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_POOL, "GetPoolTypeString() - switch case returned default. type = " + std::to_string(std::to_underlying(m_type)));

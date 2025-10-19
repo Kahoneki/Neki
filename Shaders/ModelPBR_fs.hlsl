@@ -15,7 +15,7 @@ struct VertexOutput
 };
 
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
-[[vk::binding(0,0)]] TextureCube g_skyboxes[] : register(t0, space0);
+[[vk::binding(0,0)]] TextureCube g_skyboxes[] : register(t0, space1);
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
 [[vk::binding(0,0)]] ConstantBuffer<NK::PBRMaterial> g_materials[] : register(b0, space0);
 
@@ -79,14 +79,14 @@ float3 FresnelSchlick(float _cosTheta, float3 _F0)
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
 	NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
-	SamplerState sampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
+	SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 
-	float4 albedoSample = g_textures[NonUniformResourceIndex(material.baseColourIdx)].Sample(sampler, vertexOutput.texCoord);
-	float4 normalSample = g_textures[NonUniformResourceIndex(material.normalIdx)].Sample(sampler, vertexOutput.texCoord);
-	float4 metallicSample = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(sampler, vertexOutput.texCoord);
-	float4 roughnessSample = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(sampler, vertexOutput.texCoord);
-	float4 aoSample = g_textures[NonUniformResourceIndex(material.aoIdx)].Sample(sampler, vertexOutput.texCoord);
-	float4 emissiveSample = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(sampler, vertexOutput.texCoord);
+    float4 albedoSample = g_textures[NonUniformResourceIndex(material.baseColourIdx)].Sample(linearSampler, vertexOutput.texCoord);
+    float4 normalSample = g_textures[NonUniformResourceIndex(material.normalIdx)].Sample(linearSampler, vertexOutput.texCoord);
+    float4 metallicSample = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
+    float4 roughnessSample = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
+	float4 aoSample = g_textures[NonUniformResourceIndex(material.aoIdx)].Sample(linearSampler, vertexOutput.texCoord);
+    float4 emissiveSample = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(linearSampler, vertexOutput.texCoord);
 
     float3 albedo = albedoSample.rgb;
     float3 normal = normalize(mul(vertexOutput.TBN, normalSample.rgb * 2.0 - 1.0));
@@ -133,7 +133,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
     //Ambient
 	float ambientStrength = 0.5f;
 	float3 reflectionDir = reflect(-viewDir, normal);
-	float4 skyboxSample = g_skyboxes[NonUniformResourceIndex(PC(skyboxCubemapIndex))].Sample(sampler, reflectionDir);
+    float4 skyboxSample = g_skyboxes[NonUniformResourceIndex(PC(skyboxCubemapIndex))].Sample(linearSampler, reflectionDir);
 	float3 ambient = skyboxSample.rgb * albedo * ao * ambientStrength;
 
 

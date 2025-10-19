@@ -15,7 +15,6 @@ namespace NK
 		virtual ~VulkanQueue() override;
 
 		virtual void Submit(ICommandBuffer* _cmdBuffer, ISemaphore* _waitSemaphore, ISemaphore* _signalSemaphore, IFence* _signalFence) override;
-		virtual void Submit(ICommandBuffer* _cmdBuffer, std::vector<ISemaphore*> _waitSemaphores, std::vector<ISemaphore*> _signalSemaphores, IFence* _signalFence) override;
 		virtual void WaitIdle() override;
 
 		//Vulkan internal API (for use by other RHI-Vulkan classes)

@@ -23,9 +23,9 @@ namespace NK
 		D3D12_COMMAND_QUEUE_DESC desc{};
 		switch (m_type)
 		{
-		case COMMAND_POOL_TYPE::GRAPHICS:	desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT; break;
-		case COMMAND_POOL_TYPE::COMPUTE:	desc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE; break;
-		case COMMAND_POOL_TYPE::TRANSFER:	desc.Type = D3D12_COMMAND_LIST_TYPE_COPY; break;
+		case COMMAND_TYPE::GRAPHICS:	desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT; break;
+		case COMMAND_TYPE::COMPUTE:		desc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE; break;
+		case COMMAND_TYPE::TRANSFER:	desc.Type = D3D12_COMMAND_LIST_TYPE_COPY; break;
 		}
 		const HRESULT hr{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_queue)) };
 		if (SUCCEEDED(hr))

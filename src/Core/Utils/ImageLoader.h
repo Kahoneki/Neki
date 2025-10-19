@@ -5,10 +5,6 @@
 
 #include <string>
 
-#ifdef LoadImage
-	#undef LoadImage //Conflicts with ImageLoader::LoadImage()
-#endif
-
 
 namespace NK
 {

@@ -25,9 +25,9 @@ namespace NK
 		D3D12_COMMAND_LIST_TYPE type;
 		switch (m_pool.GetPoolType())
 		{
-		case COMMAND_POOL_TYPE::GRAPHICS:	type = D3D12_COMMAND_LIST_TYPE_DIRECT;	break;
-		case COMMAND_POOL_TYPE::COMPUTE:	type = D3D12_COMMAND_LIST_TYPE_COMPUTE;	break;
-		case COMMAND_POOL_TYPE::TRANSFER:	type = D3D12_COMMAND_LIST_TYPE_COPY;	break;
+		case COMMAND_TYPE::GRAPHICS:	type = D3D12_COMMAND_LIST_TYPE_DIRECT;	break;
+		case COMMAND_TYPE::COMPUTE:		type = D3D12_COMMAND_LIST_TYPE_COMPUTE;	break;
+		case COMMAND_TYPE::TRANSFER:	type = D3D12_COMMAND_LIST_TYPE_COPY;	break;
 		}
 		const HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommandList(0, type, dynamic_cast<D3D12CommandPool&>(m_pool).GetCommandPool(), nullptr, IID_PPV_ARGS(&m_buffer)) };
 
@@ -313,7 +313,8 @@ namespace NK
 		D3D12RootSignature* d3d12RootSig{ dynamic_cast<D3D12RootSignature*>(_rootSignature) };
 		ID3D12DescriptorHeap* heaps[2]{ d3d12RootSig->GetResourceDescriptorHeap(), d3d12RootSig->GetSamplerDescriptorHeap() };
 		D3D12RootSignature::RootDescriptorTable cbvDescriptorTable{ d3d12RootSig->GetCBVDescriptorTable() };
-		D3D12RootSignature::RootDescriptorTable srvDescriptorTable{ d3d12RootSig->GetSRVDescriptorTable() };
+		D3D12RootSignature::RootDescriptorTable tex2DSRVDescriptorTable{ d3d12RootSig->GetTexture2DSRVDescriptorTable() };
+		D3D12RootSignature::RootDescriptorTable texCubeSRVDescriptorTable{ d3d12RootSig->GetTextureCubeSRVDescriptorTable() };
 		D3D12RootSignature::RootDescriptorTable uavDescriptorTable{ d3d12RootSig->GetUAVDescriptorTable() };
 		D3D12RootSignature::RootDescriptorTable samplerDescriptorTable{ d3d12RootSig->GetSamplerDescriptorTable() };
 
@@ -325,7 +326,8 @@ namespace NK
 			m_buffer->SetGraphicsRootSignature(d3d12RootSig->GetRootSignature());
 			m_buffer->SetDescriptorHeaps(2, heaps);
 			m_buffer->SetGraphicsRootDescriptorTable(cbvDescriptorTable.rootParamIndex, cbvDescriptorTable.gpuHandle);
-			m_buffer->SetGraphicsRootDescriptorTable(srvDescriptorTable.rootParamIndex, srvDescriptorTable.gpuHandle);
+			m_buffer->SetGraphicsRootDescriptorTable(tex2DSRVDescriptorTable.rootParamIndex, tex2DSRVDescriptorTable.gpuHandle);
+			m_buffer->SetGraphicsRootDescriptorTable(texCubeSRVDescriptorTable.rootParamIndex, texCubeSRVDescriptorTable.gpuHandle);
 			m_buffer->SetGraphicsRootDescriptorTable(uavDescriptorTable.rootParamIndex, uavDescriptorTable.gpuHandle);
 			m_buffer->SetGraphicsRootDescriptorTable(samplerDescriptorTable.rootParamIndex, samplerDescriptorTable.gpuHandle);
 			break;
@@ -335,7 +337,8 @@ namespace NK
 			m_buffer->SetComputeRootSignature(d3d12RootSig->GetRootSignature());
 			m_buffer->SetDescriptorHeaps(2, heaps);
 			m_buffer->SetComputeRootDescriptorTable(cbvDescriptorTable.rootParamIndex, cbvDescriptorTable.gpuHandle);
-			m_buffer->SetComputeRootDescriptorTable(srvDescriptorTable.rootParamIndex, srvDescriptorTable.gpuHandle);
+			m_buffer->SetComputeRootDescriptorTable(tex2DSRVDescriptorTable.rootParamIndex, tex2DSRVDescriptorTable.gpuHandle);
+			m_buffer->SetComputeRootDescriptorTable(texCubeSRVDescriptorTable.rootParamIndex, texCubeSRVDescriptorTable.gpuHandle);
 			m_buffer->SetComputeRootDescriptorTable(uavDescriptorTable.rootParamIndex, uavDescriptorTable.gpuHandle);
 			m_buffer->SetComputeRootDescriptorTable(samplerDescriptorTable.rootParamIndex, samplerDescriptorTable.gpuHandle);
 		}
@@ -349,8 +352,8 @@ namespace NK
 		D3D12RootSignature* d3d12RootSig{ dynamic_cast<D3D12RootSignature*>(_rootSignature) };
 		switch (d3d12RootSig->GetBindPoint())
 		{
-		case PIPELINE_BIND_POINT::GRAPHICS: m_buffer->SetGraphicsRoot32BitConstants(4, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
-		case PIPELINE_BIND_POINT::COMPUTE: m_buffer->SetComputeRoot32BitConstants(4, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
+		case PIPELINE_BIND_POINT::GRAPHICS: m_buffer->SetGraphicsRoot32BitConstants(5, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
+		case PIPELINE_BIND_POINT::COMPUTE: m_buffer->SetComputeRoot32BitConstants(5, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
 		}
 		
 	}

@@ -135,11 +135,22 @@ public:
 
 
 
+[[nodiscard]] NK::ContextConfig CreateContext()
+{
+	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
+	const NK::ContextConfig config{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE };
+	return config;
+}
+
+
+
 [[nodiscard]] NK::EngineConfig CreateEngine()
 {
-	const NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
-	const NK::RenderSystemDesc renderSystemDesc{};
-	NK::EngineConfig config{ loggerConfig, NK::ALLOCATOR_TYPE::TRACKING_VERBOSE, new GameApp(), renderSystemDesc };
-	
+	NK::RenderSystemDesc renderSystemDesc{};
+	renderSystemDesc.backend = NK::GRAPHICS_BACKEND::NONE;
+	NK::EngineConfig config{ NK_NEW(GameApp), renderSystemDesc };
 	return config;
 }
