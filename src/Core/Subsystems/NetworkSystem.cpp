@@ -400,7 +400,6 @@ namespace NK
 		
 		//Repeatedly try to connect to the server until successful or timeout
 		Timer timer{ mc_settings.serverConnectTimeout };
-		mc_tcpSocket.setBlocking(true);
 		while (mc_tcpSocket.connect(mc_serverAddress.value(), _port) != sf::Socket::Status::Done)
 		{
 			if (timer.IsComplete())
@@ -414,8 +413,6 @@ namespace NK
 			timer.Update();
 		}
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::NETWORK_SYSTEM_CLIENT, "Successfully connected to server\n");
-
-		
 		mc_tcpSocket.setBlocking(false);
 
 

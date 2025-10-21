@@ -565,15 +565,15 @@ namespace NK
 	{
 		SERVER_TYPE type;
 		std::uint32_t maxClients;
-		std::uint64_t portClaimTimeout{ 5000u }; //Time in milliseconds the server is allowed to try and claim the port for before timing out
+		double portClaimTimeout{ 5.0 }; //Time in seconds the server is allowed to try and claim the port for before timing out
 		std::uint32_t maxTCPPacketsPerClientPerTick{ 128u }; //If a client sends more TCP packets than this in a single tick, they will be kicked from the server
 		std::uint32_t maxUDPPacketsPerClientPerTick{ 512u }; //If a client sends more TCP packets than this in a single tick, they will be kicked from the server
 	};
 
 	struct ClientSettings
 	{
-		std::uint64_t serverConnectTimeout{ 5000u }; //Time in milliseconds the client is allowed to spend trying to connect to the server before timing out
-		std::uint64_t serverClientIndexPacketTimeout{ 5000u }; //Time in milliseconds the client is allowed to spend waiting to receive their client index packet from the server
+		double serverConnectTimeout{ 5.0 }; //Time in seconds the client is allowed to spend trying to connect to the server before timing out
+		double serverClientIndexPacketTimeout{ 5.0 }; //Time in seconds the client is allowed to spend waiting to receive their client index packet from the server
 	};
 
 	enum class NETWORK_SYSTEM_TYPE

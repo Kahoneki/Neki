@@ -4,7 +4,7 @@
 namespace NK
 {
 
-	Timer::Timer(const std::uint64_t _time)
+	Timer::Timer(const double _time)
 	{
 		m_lastTime = glfwGetTime();
 		m_timeLeft = _time;
@@ -15,7 +15,7 @@ namespace NK
 	void Timer::Update()
 	{
 		const double currentTime{ glfwGetTime() };
-		const double dt{ m_lastTime - currentTime };
+		const double dt{ currentTime - m_lastTime };
 		m_timeLeft -= dt;
 		m_lastTime = currentTime;
 	}

@@ -11,16 +11,16 @@ namespace NK
 	{
 	public:
 		//Start a timer for _time milliseconds
-		explicit Timer(const std::uint64_t _time);
+		explicit Timer(const double _time);
 
 		//Query the timer's completion
 		[[nodiscard]] inline bool IsComplete() const { return (m_timeLeft < 0); }
 
-		//Query how much time the timer has left (in milliseconds)
+		//Query how much time the timer has left (in seconds)
 		[[nodiscard]] inline bool TimeLeft() const { return m_timeLeft; }
 
-		//Reset the timer to _time milliseconds
-		inline void Reset(const std::uint64_t _time) { *this = Timer(_time); }
+		//Reset the timer to _time seconds
+		inline void Reset(const double _time) { *this = Timer(_time); }
 
 		//Update the state of the timer
 		void Update();
