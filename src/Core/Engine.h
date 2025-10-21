@@ -22,6 +22,7 @@ namespace NK
 	private:
 		UniquePtr<Application> m_application;
 		UniquePtr<RenderSystem> m_renderSystem;
+		UniquePtr<NetworkSystem> m_networkSystem;
 	};
 	
 }

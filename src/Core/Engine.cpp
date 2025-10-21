@@ -23,6 +23,9 @@ namespace NK
 		{
 			m_renderSystem = UniquePtr<RenderSystem>(NK_NEW(RenderSystem, *Context::GetLogger(), *Context::GetAllocator(), _config.renderSystemDesc));
 		}
+		m_networkSystem = UniquePtr<NetworkSystem>(NK_NEW(NetworkSystem, *Context::GetLogger(), _config.networkSystemDesc));
+
+		m_networkSystem->Host(7777);
 		
 		Context::GetLogger()->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::ENGINE, "Engine Initialised\n");
 	}
@@ -50,11 +53,16 @@ namespace NK
 				InputManager::Update(m_renderSystem->GetWindow());
 				m_application->Update();
 				m_renderSystem->Update(m_application->m_scenes[m_application->m_activeScene]->m_reg);
+				m_networkSystem->Update(m_application->m_scenes[m_application->m_activeScene]->m_reg);
 			}
 		}
 		else
 		{
-			m_application->Update();
+			while (true)
+			{
+				m_application->Update();
+				m_networkSystem->Update(m_application->m_scenes[m_application->m_activeScene]->m_reg);
+			}
 		}
 	}
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Application.h"
+#include "Subsystems/NetworkSystem.h"
 #include "Subsystems/RenderSystem.h"
 
 
@@ -11,7 +12,8 @@ namespace NK
 	{
 		Application* application;
 
-		RenderSystemDesc renderSystemDesc;
+		RenderSystemDesc renderSystemDesc{};
+		NetworkSystemDesc networkSystemDesc{};
 	};
 	
 }

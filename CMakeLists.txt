@@ -114,6 +114,11 @@ set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(assimp)
 target_link_libraries(Neki PRIVATE assimp)
 
+#SFML
+FetchContent_Declare(sfml GIT_REPOSITORY https://github.com/SFML/SFML.git .gitignore TAG 2.6.1)
+FetchContent_MakeAvailable(sfml)
+target_link_libraries(Neki PUBLIC sfml-network)
+
 
 
 #Compiles a given HLSL shader source file to SPIR-V and/or DXIL
@@ -336,5 +341,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     target_include_directories(NKEngineSample_Events PUBLIC "${CMAKE_SOURCE_DIR}/src")
     target_link_libraries(NKEngineSample_Events PRIVATE Neki)
     add_dependencies(NKEngineSample_Events Shaders)
+
+    add_executable(NKEngineSample_Networking "Samples/Engine/Networking/Networking.cpp")
+    target_include_directories(NKEngineSample_Networking PUBLIC "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(NKEngineSample_Networking PRIVATE Neki)
+    add_dependencies(NKEngineSample_Networking Shaders)
 
 endif()

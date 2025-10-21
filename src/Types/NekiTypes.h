@@ -475,6 +475,9 @@ namespace NK
 		TRACKING_ALLOCATOR,
 
 		RENDER_SYSTEM,
+		NETWORK_SYSTEM,
+		NETWORK_SYSTEM_CLIENT,
+		NETWORK_SYSTEM_SERVER,
 		
 		DEVICE,
 		COMMAND_POOL,
@@ -548,6 +551,60 @@ namespace NK
 		NONE,
 		VULKAN,
 		D3D12,
+	};
+
+	typedef std::uint32_t ClientIndex;
+
+	enum class SERVER_TYPE
+	{
+		LAN,
+		WAN, //Requires router port-forwarding
+	};
+	
+	struct ServerSettings
+	{
+		SERVER_TYPE type;
+		std::uint32_t maxClients;
+		std::uint64_t portClaimTimeout{ 5000u }; //Time in milliseconds the server is allowed to try and claim the port for before timing out
+		std::uint32_t maxTCPPacketsPerClientPerTick{ 128u }; //If a client sends more TCP packets than this in a single tick, they will be kicked from the server
+		std::uint32_t maxUDPPacketsPerClientPerTick{ 512u }; //If a client sends more TCP packets than this in a single tick, they will be kicked from the server
+	};
+
+	struct ClientSettings
+	{
+		std::uint64_t serverConnectTimeout{ 5000u }; //Time in milliseconds the client is allowed to spend trying to connect to the server before timing out
+		std::uint64_t serverClientIndexPacketTimeout{ 5000u }; //Time in milliseconds the client is allowed to spend waiting to receive their client index packet from the server
+	};
+
+	enum class NETWORK_SYSTEM_TYPE
+	{
+		NONE,
+		SERVER,
+		CLIENT,
+	};
+
+	enum class NETWORK_SYSTEM_ERROR_CODE
+	{
+		SUCCESS,
+
+		SERVER__TCP_LISTENER_PORT_CLAIM_TIME_OUT,
+		SERVER__UDP_SOCKET_PORT_CLAIM_TIME_OUT,
+		SERVER__FAILED_TO_SEND_CLIENT_INDEX_PACKET,
+		
+		CLIENT__INVALID_SERVER_IP_ADDRESS,
+		CLIENT__SERVER_CONNECTION_TIMED_OUT,
+		CLIENT__CLIENT_INDEX_PACKET_RETRIEVAL_TIMED_OUT,
+		CLIENT__FAILED_TO_SEND_UDP_PORT_PACKET,
+		CLIENT__FAILED_TO_DISCONNECT_FROM_SERVER,
+	};
+
+	enum class PACKET_CODE : std::uint32_t
+	{
+		//TCP
+		DISCONNECT,
+
+		//UDP
+		UDP_PORT,
 	};
 	
 }
