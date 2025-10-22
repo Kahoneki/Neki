@@ -17,7 +17,7 @@ namespace NK
 		[[nodiscard]] inline bool IsComplete() const { return (m_timeLeft < 0); }
 
 		//Query how much time the timer has left (in seconds)
-		[[nodiscard]] inline bool TimeLeft() const { return m_timeLeft; }
+		[[nodiscard]] inline double TimeLeft() const { return m_timeLeft; }
 
 		//Reset the timer to _time seconds
 		inline void Reset(const double _time) { *this = Timer(_time); }
