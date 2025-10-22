@@ -426,12 +426,14 @@ namespace NK
 		SHADER_RESOURCE, //Equivalent to readonly vulkan storage buffer
 		COPY_SOURCE,
 		DEPTH_READ,
+		RESOLVE_SOURCE,
 
 		//Read/write
 		RENDER_TARGET,
 		UNORDERED_ACCESS, //Equivalent to readwrite vulkan storage buffer
 		COPY_DEST,
 		DEPTH_WRITE,
+		RESOLVE_DEST,
 
 		PRESENT,
 	};

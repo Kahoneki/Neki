@@ -71,7 +71,7 @@ namespace NK
 		m_resourceDesc.Alignment = 0;
 		m_resourceDesc.MipLevels = 1;
 		m_resourceDesc.Format = GetDXGIFormat(m_format);
-		m_resourceDesc.SampleDesc.Count = 1;
+		m_resourceDesc.SampleDesc.Count = GetSampleCount();
 		m_resourceDesc.SampleDesc.Quality = 0;
 		m_resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		m_resourceDesc.Flags = GetCreationFlags();
@@ -111,6 +111,25 @@ namespace NK
 	D3D12_RESOURCE_STATES D3D12Texture::GetInitialState() const
 	{
 		return D3D12_RESOURCE_STATE_COMMON;
+	}
+
+
+
+	UINT D3D12Texture::GetSampleCount() const
+	{
+		switch (m_sampleCount)
+		{
+		case SAMPLE_COUNT::BIT_1:	return 1U;
+		case SAMPLE_COUNT::BIT_2:	return 2U;
+		case SAMPLE_COUNT::BIT_4:	return 4U;
+		case SAMPLE_COUNT::BIT_8:	return 8U;
+		case SAMPLE_COUNT::BIT_16:	return 16U;
+		case SAMPLE_COUNT::BIT_32:	return 32U;
+		default:
+		{
+			throw std::invalid_argument("Default case reached for D3D12Texture::GetSampleCount() - sample count = " + std::to_string(std::to_underlying(m_sampleCount)));
+		}
+		}
 	}
 
 

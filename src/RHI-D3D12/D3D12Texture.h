@@ -26,6 +26,7 @@ namespace NK
 	private:
 		[[nodiscard]] D3D12_RESOURCE_FLAGS GetCreationFlags() const;
 		[[nodiscard]] D3D12_RESOURCE_STATES GetInitialState() const;
+		[[nodiscard]] UINT GetSampleCount() const;
 
 
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_texture;

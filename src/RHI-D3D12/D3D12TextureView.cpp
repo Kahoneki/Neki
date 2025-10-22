@@ -119,7 +119,7 @@ namespace NK
 		{
 			D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
 			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
-			desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d dsv?
+			desc.ViewDimension = (m_parentTexture->GetSampleCount() == SAMPLE_COUNT::BIT_1 ? D3D12_DSV_DIMENSION_TEXTURE2D : D3D12_DSV_DIMENSION_TEXTURE2DMS); //todo: look into possible scenarios where you would want a non-2d dsv?
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateDepthStencilView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
 
@@ -131,7 +131,7 @@ namespace NK
 		{
 			D3D12_RENDER_TARGET_VIEW_DESC desc{};
 			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
-			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; //todo: look into possible scenarios where you would want a non-2d rtv?
+			desc.ViewDimension = (m_parentTexture->GetSampleCount() == SAMPLE_COUNT::BIT_1 ? D3D12_RTV_DIMENSION_TEXTURE2D : D3D12_RTV_DIMENSION_TEXTURE2DMS); //todo: look into possible scenarios where you would want a non-2d rtv?
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateRenderTargetView(dynamic_cast<D3D12Texture*>(_texture)->GetResource(), &desc, m_handle);
 

@@ -64,8 +64,6 @@ namespace NK
 
 	void RenderSystem::Update(Registry& _reg)
 	{
-		m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::RENDER_SYSTEM, "Draw\n");
-
 		//Update skybox
 		bool found{ false };
 		for (auto&& [skybox] : _reg.View<CSkybox>())
@@ -114,12 +112,11 @@ namespace NK
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
 		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
 
-		if (m_ssaaEnabled || m_msaaEnabled)
-		{
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
-		}
+		//if (m_ssaaEnabled || m_msaaEnabled)
+		//{
+		//	m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
+		//}
 		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::RENDER_TARGET);
-		//m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateDepthBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
 		m_graphicsCommandBuffers[m_currentFrame]->BeginRendering(1, m_msaaEnabled ? m_intermediateRenderTargetView.get() : nullptr, m_ssaaEnabled ? m_intermediateRenderTargetView.get() : m_swapchain->GetImageView(imageIndex), m_intermediateDepthBufferView.get(), nullptr);
 		m_graphicsCommandBuffers[m_currentFrame]->BindRootSignature(m_meshPiplineRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
@@ -201,15 +198,16 @@ namespace NK
 		}
 
 
-		m_graphicsCommandBuffers[m_currentFrame]->EndRendering();
+		m_graphicsCommandBuffers[m_currentFrame]->EndRendering(1, m_msaaEnabled ? m_intermediateRenderTarget.get() : nullptr, m_swapchain->GetImage(imageIndex));
 
 		if (m_ssaaEnabled)
 		{
 			//Downscaling pass
 			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::RENDER_TARGET, RESOURCE_STATE::COPY_SOURCE);
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
+			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::COPY_DEST);
 			m_graphicsCommandBuffers[m_currentFrame]->BlitTexture(m_intermediateRenderTarget.get(), TEXTURE_ASPECT::COLOUR, m_swapchain->GetImage(imageIndex), TEXTURE_ASPECT::COLOUR);
 			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::PRESENT);
+			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::COPY_SOURCE, RESOURCE_STATE::RENDER_TARGET);
 		}
 		else
 		{
@@ -550,6 +548,7 @@ namespace NK
 		renderTargetDesc.arrayTexture = false;
 		renderTargetDesc.sampleCount = m_msaaEnabled ? m_msaaSampleCount : SAMPLE_COUNT::BIT_1;
 		m_intermediateRenderTarget = m_device->CreateTexture(renderTargetDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
 
 		//Render Target View
 		TextureViewDesc renderTargetViewDesc{};

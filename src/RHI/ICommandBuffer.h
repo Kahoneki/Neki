@@ -91,7 +91,7 @@ namespace NK
 		//- _dstTexture is in RESOURCE_STATE::COPY_DEST state
 		virtual void BlitTexture(ITexture* _srcTexture, TEXTURE_ASPECT _srcAspect, ITexture* _dstTexture, TEXTURE_ASPECT _dstAspect) = 0;
 		
-		virtual void EndRendering() = 0;
+		virtual void EndRendering(std::size_t _numColourAttachments, ITexture* _multisampleColourAttachments, ITexture* _outputColourAttachments) = 0;
 
 		virtual void BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides) = 0;
 		virtual void BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format) = 0;

@@ -153,19 +153,19 @@ namespace NK
 		{
 			if (_multisampleColourAttachments && _multisampleColourAttachments[i].GetParentTexture()->GetState() != RESOURCE_STATE::RENDER_TARGET)
 			{
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _multisampleColourAttachments[ " + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_multisampleColourAttachments[i].GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::RENDER_TARGET\n");
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _multisampleColourAttachments[" + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_multisampleColourAttachments[i].GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::RENDER_TARGET\n");
 				throw std::runtime_error("");
 			}
 
 			if (_outputColourAttachments[i].GetParentTexture()->GetState() != RESOURCE_STATE::RENDER_TARGET)
 			{
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _outputColourAttachments[ " + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_outputColourAttachments[i].GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::RENDER_TARGET\n");
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _outputColourAttachments[" + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_outputColourAttachments[i].GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::RENDER_TARGET\n");
 				throw std::runtime_error("");
 			}
 
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
-			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_outputColourAttachments[i].GetFormat());
+			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat((_multisampleColourAttachments ? _multisampleColourAttachments[i] : _outputColourAttachments[i]).GetFormat());
 			beg.Clear.ClearValue.Color[0] = 0.0f;
 			beg.Clear.ClearValue.Color[1] = 0.0f;
 			beg.Clear.ClearValue.Color[2] = 0.0f;
@@ -173,7 +173,7 @@ namespace NK
 
 			colourAttachmentInfos[i].BeginningAccess = beg;
 			colourAttachmentInfos[i].EndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
-			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_outputColourAttachments[i]))->GetCPUDescriptorHandle();
+			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_multisampleColourAttachments ? _multisampleColourAttachments[i] : _outputColourAttachments[i]))->GetCPUDescriptorHandle();
 		}
 
 		//Depth-stencil attachment
@@ -283,13 +283,47 @@ namespace NK
 	void D3D12CommandBuffer::BlitTexture(ITexture* _srcTexture, TEXTURE_ASPECT _srcAspect, ITexture* _dstTexture, TEXTURE_ASPECT _dstAspect)
 	{
 		//todo: implement
+		//this is actually like surprisingly hard in d3d12?? and i think you need like a whole compute shader pass....
+		m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BlitTexture() - this function is not currently supported in the D3D12 backend - and hence, neither is SSAA");
+		throw std::runtime_error("");
 	}
 
 
 
-	void D3D12CommandBuffer::EndRendering()
+	void D3D12CommandBuffer::EndRendering(std::size_t _numColourAttachments, ITexture* _multisampleColourAttachments, ITexture* _outputColourAttachments)
 	{
 		m_buffer->EndRenderPass();
+		if (_multisampleColourAttachments)
+		{
+			//Resolve
+			for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
+			{
+				RESOURCE_STATE srcState{ _multisampleColourAttachments[i].GetState() };
+				RESOURCE_STATE dstState{ _outputColourAttachments[i].GetState() };
+				if (srcState != RESOURCE_STATE::RESOLVE_SOURCE)
+				{
+					TransitionBarrier(&(_multisampleColourAttachments[i]), _multisampleColourAttachments[i].GetState(), RESOURCE_STATE::RESOLVE_SOURCE);
+				}
+				if (dstState != RESOURCE_STATE::RESOLVE_DEST)
+				{
+					TransitionBarrier(&(_outputColourAttachments[i]), _outputColourAttachments[i].GetState(), RESOURCE_STATE::RESOLVE_DEST);
+				}
+
+				ID3D12Resource* srcTex{ dynamic_cast<D3D12Texture*>(&(_multisampleColourAttachments[i]))->GetResource() };
+				ID3D12Resource* dstTex{ dynamic_cast<D3D12Texture*>(&(_outputColourAttachments[i]))->GetResource() };
+				m_buffer->ResolveSubresource(dstTex, 0, srcTex, 0, D3D12Texture::GetDXGIFormat(_outputColourAttachments[i].GetFormat()));
+
+				//If we've transitioned the states, transition them back
+				if (srcState != RESOURCE_STATE::RESOLVE_SOURCE)
+				{
+					TransitionBarrier(&(_multisampleColourAttachments[i]), RESOURCE_STATE::RESOLVE_SOURCE, srcState);
+				}
+				if (dstState != RESOURCE_STATE::RESOLVE_DEST)
+				{
+					TransitionBarrier(&(_outputColourAttachments[i]), RESOURCE_STATE::RESOLVE_DEST, dstState);
+				}
+			}
+		}
 	}
 
 	
@@ -579,12 +613,14 @@ namespace NK
 		case RESOURCE_STATE::SHADER_RESOURCE:		return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		case RESOURCE_STATE::COPY_SOURCE:			return D3D12_RESOURCE_STATE_COPY_SOURCE;
 		case RESOURCE_STATE::DEPTH_READ:			return D3D12_RESOURCE_STATE_DEPTH_READ;
+		case RESOURCE_STATE::RESOLVE_SOURCE:		return D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
 
 		//Read/write states
 		case RESOURCE_STATE::RENDER_TARGET:		    return D3D12_RESOURCE_STATE_RENDER_TARGET;
 		case RESOURCE_STATE::UNORDERED_ACCESS:		return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		case RESOURCE_STATE::COPY_DEST:			    return D3D12_RESOURCE_STATE_COPY_DEST;
 		case RESOURCE_STATE::DEPTH_WRITE:			return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		case RESOURCE_STATE::RESOLVE_DEST:			return D3D12_RESOURCE_STATE_RESOLVE_DEST;
 
 		case RESOURCE_STATE::PRESENT:			    return D3D12_RESOURCE_STATE_PRESENT;
 
