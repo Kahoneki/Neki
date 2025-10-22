@@ -154,11 +154,11 @@ namespace NK
 		//Process packets
 		for (std::unordered_map<ClientIndex, std::vector<sf::Packet>>::iterator it{ clientPackets.begin() }; it != clientPackets.end(); ++it)
 		{
+			//So that we can update the iterator
+			bool clientDisconnect{ false };
+			
 			for (sf::Packet& packet : it->second)
 			{
-				//So that we don't process any packets after a disconnect packet
-				bool clientDisconnect{ false };
-				
 				std::underlying_type_t<PACKET_CODE> underlyingPacketCode;
 				packet >> underlyingPacketCode;
 				switch (const PACKET_CODE code{ underlyingPacketCode })
@@ -182,7 +182,7 @@ namespace NK
 				//If the client has been disconnected (or an attempt has been made to disconnect the client), don't process any of their other packets for this tick
 				if (clientDisconnect)
 				{
-					it = clientPackets.erase(it);
+					break;
 				}
 			}
 		}
@@ -297,6 +297,9 @@ namespace NK
 	{
 		m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::NETWORK_SYSTEM_SERVER, "Client (index: " + std::to_string(_index) + ") disconnected from the server\n");
 		if (ms_connectedClientUDPPorts.contains(_index)) { ms_connectedClientUDPPorts.erase(_index); }
+		if (ms_connectedClients.contains(ms_connectedClientTCPSockets[_index].getRemoteAddress()->toString())) { ms_connectedClients.erase(ms_connectedClientTCPSockets[_index].getRemoteAddress()->toString()); }
+		ms_clientIndexAllocator->Free(_index);
+		ms_nextClientIndex = ms_clientIndexAllocator->Allocate();
 		return ms_connectedClientTCPSockets.erase(ms_connectedClientTCPSockets.find(_index));
 	}
 
