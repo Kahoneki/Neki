@@ -95,6 +95,7 @@ namespace NK
 
 			//Connection was successful, add to map
 			ms_connectedClientTCPSockets[ms_nextClientIndex] = std::move(socket);
+			ms_connectedClients[ms_connectedClientTCPSockets[ms_nextClientIndex].getRemoteAddress()->toString()] = ms_nextClientIndex;
 			
 			//Send client index back to client
 			sf::Packet outgoingPacket;
@@ -108,11 +109,7 @@ namespace NK
 
 			ms_nextClientIndex = ms_clientIndexAllocator->Allocate();
 		}
-
-
-		std::cout << "BLEH\n";
-		for (std::unordered_map<const char*, ClientIndex>::iterator it{ ms_connectedClients.begin() }; it != ms_connectedClients.end(); ++it) { std::cout << it->first << ' ' << it->second << '\n'; }
-		std::cout << "END OF BLEH\n";
+		
 		
 		return NETWORK_SYSTEM_ERROR_CODE::SUCCESS;
 	}

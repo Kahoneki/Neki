@@ -49,7 +49,7 @@ namespace NK
 		sf::TcpListener ms_tcpListener;
 		sf::TcpSocket ms_tcpSocket;
 		sf::UdpSocket ms_udpSocket;
-		std::unordered_map<const char*, ClientIndex> ms_connectedClients; //For fast lookup (client ip -> client index)
+		std::unordered_map<std::string, ClientIndex> ms_connectedClients; //For fast lookup (client ip -> client index)
 		std::unordered_map<ClientIndex, sf::TcpSocket> ms_connectedClientTCPSockets;
 		std::unordered_map<ClientIndex, unsigned short> ms_connectedClientUDPPorts;
 		UniquePtr<FreeListAllocator> ms_clientIndexAllocator;
