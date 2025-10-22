@@ -1,5 +1,6 @@
 #include "NetworkSystem.h"
 
+#include <iostream>
 #include <Core/Utils/Timer.h>
 
 
@@ -8,7 +9,7 @@ namespace NK
 
 	NetworkSystem::NetworkSystem(ILogger& _logger, const NetworkSystemDesc& _desc)
 	: m_logger(_logger), m_type(NETWORK_SYSTEM_TYPE::NONE),
-	ms_settings(_desc.server),  ms_clientIndexAllocator(NK_NEW(FreeListAllocator, ms_settings.maxClients)),
+	ms_settings(_desc.server), ms_clientIndexAllocator(NK_NEW(FreeListAllocator, ms_settings.maxClients)),
 	mc_settings(_desc.client), mc_connected(false)
 	{
 		m_logger.Indent();
@@ -84,16 +85,20 @@ namespace NK
 	NETWORK_SYSTEM_ERROR_CODE NetworkSystem::S_CheckForIncomingConnectionRequests()
 	{
 		//Create a new socket at a free client index and check if there's a connection request
-		
-		sf::TcpSocket& socket{ ms_connectedClientTCPSockets[ms_nextClientIndex] };
+
+		//Create a temporary socket to accept the new connection
+		sf::TcpSocket socket;
 		socket.setBlocking(false);
 		if (ms_tcpListener.accept(socket) == sf::Socket::Status::Done)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::NETWORK_SYSTEM_SERVER, "Client (address: " + socket.getRemoteAddress()->toString() + ":" + std::to_string(socket.getRemotePort()) + ") connected to the server.\n");
 
+			//Connection was successful, add to map
+			ms_connectedClientTCPSockets[ms_nextClientIndex] = std::move(socket);
+			
 			//Send client index back to client
 			sf::Packet outgoingPacket;
-			outgoingPacket << ms_nextClientIndex << '\n';
+			outgoingPacket << ms_nextClientIndex;
 			if (ms_connectedClientTCPSockets[ms_nextClientIndex].send(outgoingPacket) != sf::Socket::Status::Done)
 			{
 				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::NETWORK_SYSTEM_SERVER, "Failed to send client index back to client\n");
@@ -103,11 +108,11 @@ namespace NK
 
 			ms_nextClientIndex = ms_clientIndexAllocator->Allocate();
 		}
-		else
-		{
-			ms_connectedClientTCPSockets.erase(ms_nextClientIndex);
-		}
 
+
+		std::cout << "BLEH\n";
+		for (std::unordered_map<const char*, ClientIndex>::iterator it{ ms_connectedClients.begin() }; it != ms_connectedClients.end(); ++it) { std::cout << it->first << ' ' << it->second << '\n'; }
+		std::cout << "END OF BLEH\n";
 		
 		return NETWORK_SYSTEM_ERROR_CODE::SUCCESS;
 	}
@@ -207,6 +212,7 @@ namespace NK
 		sf::Packet incomingData;
 		std::optional<sf::IpAddress> incomingClientIP;
 		unsigned short incomingClientPort;
+		ms_udpSocket.setBlocking(false);
 		while (ms_udpSocket.receive(incomingData, incomingClientIP, incomingClientPort) == sf::Socket::Status::Done)
 		{
 			//Make sure client is connected through TCP
@@ -230,6 +236,8 @@ namespace NK
 				S_DisconnectClient(index);
 				clientPackets.erase(index);
 			}
+
+			incomingData.clear();
 		}
 
 		

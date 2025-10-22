@@ -565,7 +565,7 @@ namespace NK
 	{
 		SERVER_TYPE type;
 		std::uint32_t maxClients;
-		double portClaimTimeout{ 5.0 }; //Time in seconds the server is allowed to try and claim the port for before timing out
+		double portClaimTimeout{ 999999 }; //Time in seconds the server is allowed to try and claim the port for before timing out
 		std::uint32_t maxTCPPacketsPerClientPerTick{ 128u }; //If a client sends more TCP packets than this in a single tick, they will be kicked from the server
 		std::uint32_t maxUDPPacketsPerClientPerTick{ 512u }; //If a client sends more TCP packets than this in a single tick, they will be kicked from the server
 	};
