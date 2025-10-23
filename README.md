@@ -1,4 +1,4 @@
-# Neki - A Cross-Platform Vulkan/DX12/PS5 Render Engine
+# Neki - A Cross-Platform Vulkan/DX12/PS5 Game Engine
 ![Logo](.github/logo.png)
 ###### Logo Credit: [@jowsey](https://github.com/jowsey)
 ----------------
