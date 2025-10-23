@@ -43,13 +43,9 @@ public:
 		NK::Axis1DBinding camMoveHorizontalBinding{ { aBinding, dBinding }, { -1, 1 } };
 		NK::Axis1DBinding camMoveVerticalBinding{ { sBinding, wBinding }, { -1, 1 } };
 		NK::Axis2DBinding camMoveBinding{ NK::Axis2DBinding({ camMoveHorizontalBinding, camMoveVerticalBinding }) };
-		m_camMoveInput = NK::Axis2DInput(camMoveBinding);
-
 		NK::Axis2DBinding mouseDiffBinding{ NK::Axis2DBinding(NK::MOUSE::POSITION_DIFFERENCE) };
-		m_camYawPitchInput = NK::Axis2DInput(mouseDiffBinding);
-
-		NK::InputManager::BindActionToInput(NK::PLAYER_CAMERA_ACTIONS::MOVE, &m_camMoveInput, NK::INPUT_TYPE::AXIS_2D);
-		NK::InputManager::BindActionToInput(NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH, &m_camYawPitchInput, NK::INPUT_TYPE::AXIS_2D);
+		NK::InputManager::BindActionToInput(NK::PLAYER_CAMERA_ACTIONS::MOVE, camMoveBinding);
+		NK::InputManager::BindActionToInput(NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH, mouseDiffBinding);
 
 		NK::CInput& input{ m_reg.AddComponent<NK::CInput>(m_cameraEntity) };
 		input.AddActionToMap(NK::PLAYER_CAMERA_ACTIONS::MOVE);
@@ -71,9 +67,6 @@ private:
 	NK::Entity m_helmetEntity;
 	NK::Entity m_cameraEntity;
 	NK::PlayerCamera m_playerCamera;
-
-	NK::Axis2DInput m_camMoveInput;
-	NK::Axis2DInput m_camYawPitchInput;
 };
 
 

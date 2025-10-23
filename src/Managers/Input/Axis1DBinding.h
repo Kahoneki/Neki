@@ -14,8 +14,7 @@ namespace NK
 	struct Axis1DBinding final
 	{
 		explicit Axis1DBinding() = default;
-
-
+		
 
 		explicit Axis1DBinding(const INPUT_VARIANT _input)
 		: input(_input), type(InputUtils::GetInputType(_input)), digital(false)/*, doubleAxes(false)*/
@@ -27,7 +26,6 @@ namespace NK
 		}
 
 
-
 		//Create a digital Axis1DBinding with two ButtonBindings, _digitalValues lets you set what values _input1 and _input1 being pressed will correspond to
 		//For example, you might decide you want to the A and D keys to an Axis1DBinding for horizontal movement with A mapping to -1 and D mapping to 1
 		//The above example can be accomplished with Axis1DBinding({aBinding,dBinding}, {-1,1})
@@ -35,20 +33,23 @@ namespace NK
 		: type(INPUT_VARIANT_ENUM_TYPE::NONE), digital(true), buttonBindings(_bindings), digitalValues(_digitalValues)/*, doubleAxes(false)*/ {}
 
 
+		inline bool operator==(const Axis1DBinding& _other) const noexcept
+		{
+			//Check that they hold the same input type, if not, then they're obviously not equal
+			if (input.index() != _other.input.index())
+			{
+				return false;
+			}
 
-//		//Create an Axis1DBinding with two Axis1DBindings, this lets you map two Axis1DBindings to a single continuous Axis1DBinding
-//		//For example, if you have a car with a velocity value in the range -1 to 1, you may naturally decide you want to express this as a single Axis1DBinding
-//		//You can then choose to bind the negative range of the velocity to the left trigger and the positive range to the right trigger, creating one continuous Axis1DBinding based on the two values
-//		//To accomplish the above example, assuming the input range of the triggers are both -1 to 1, this would be accomplished with Axis1DBinding({leftTrigBinding,rightTrigBinding}, {-1,1}, {-1,0}, {-1,1}, {0,1})
-//		//
-//		//_fromRange1 is the native range of _binding1, _toRange1 is the range you want _binding1 to be mapped to
-//		//_fromRange2 is the native range of _binding2, _toRange2 is the range you want _binding2 to be mapped to
-//		explicit Axis1DBinding(const std::pair<const Axis1DBinding* const, const Axis1DBinding* const>& _bindings, const std::pair<float, float>& _fromRange1, const std::pair<float, float>& _toRange1, const std::pair<float, float>& _fromRange2, const std::pair<float, float>& _toRange2)
-//		: type(INPUT_VARIANT_ENUM_TYPE::NONE), digital(false), doubleAxes(true), axis1DBindings(_bindings),
-//		  doubleAxesFromRange1(_fromRange1), doubleAxesToRange1(_toRange1), doubleAxesFromRange2(_fromRange2), doubleAxesToRange2(_toRange2) {}
+			//Same type, visit and compare the values
+			return std::visit([](const auto& _a, const auto& _b) -> bool
+			{
+				if constexpr (std::is_same_v<decltype(_a), decltype(_b)>) { return _a == _b; }
+				return false; //Shouldn't ever be reached
+			}, input, _other.input);
+		}
 
-
-
+		
 		//Axis1DBinding(const INPUT_VARIANT _input)
 		INPUT_VARIANT input;
 		INPUT_VARIANT_ENUM_TYPE type;
@@ -57,14 +58,38 @@ namespace NK
 		bool digital; //True if Axis1DBinding(const std::pair<ButtonBinding,ButtonBinding>&) is called
 		std::pair<ButtonBinding, ButtonBinding> buttonBindings;
 		std::pair<float, float> digitalValues; //Stores the mapped range of buttonBindings in the axis
-
-//		//Axis1DBinding(const std::pair<const Axis1DBinding* const, const Axis1DBinding* const>&)
-//		bool doubleAxes; //True if Axis1DBinding(const std::pair<Axis1DBinding,Axis1DBinding>&) is called
-//		const std::pair<const Axis1DBinding* const, const Axis1DBinding* const> axis1DBindings;
-//		const std::pair<float, float> doubleAxesFromRange1; //Stores the native range of axis1DBindings.first
-//		const std::pair<float, float> doubleAxesToRange1; //Stores the mapped range of axis1DBindings.first in the axis
-//		const std::pair<float, float> doubleAxesFromRange2; //Stores the native range of axis1DBindings.second
-//		const std::pair<float, float> doubleAxesToRange2; //Stores the mapped range of axis1DBindings.second in the axis
 	};
 
 }
+
+
+
+template<>
+struct std::hash<NK::Axis1DBinding>
+{
+	inline std::size_t operator()(const NK::Axis1DBinding& _binding) const noexcept
+	{
+		//Start by hashing digital vs non-digital
+		std::size_t result{ std::hash<bool>{}(_binding.digital) };
+
+		if (_binding.digital)
+		{
+			//Combine hashes of digital members
+			const std::size_t h1{ std::hash<NK::ButtonBinding>{}(_binding.buttonBindings.first) };
+			const std::size_t h2{ std::hash<NK::ButtonBinding>{}(_binding.buttonBindings.second) };
+			const std::size_t h3{ std::hash<float>{}(_binding.digitalValues.first) };
+			const std::size_t h4{ std::hash<float>{}(_binding.digitalValues.second) };
+			result ^= (h1 << 1);
+			result ^= (h2 << 2);
+			result ^= (h3 << 3);
+			result ^= (h4 << 4);
+		}
+		else
+		{
+			//Just hash the native input variant
+			result ^= (std::hash<NK::INPUT_VARIANT>{}(_binding.input) << 1);
+		}
+		
+		return result;
+	}
+};

@@ -660,7 +660,7 @@ namespace NK
 		glm::vec2 values;
 	};
 
-	enum class INPUT_TYPE
+	enum class INPUT_BINDING_TYPE
 	{
 		BUTTON,
 		AXIS_1D,
@@ -669,6 +669,7 @@ namespace NK
 	};
 
 	typedef std::variant<ButtonState, Axis1DState, Axis2DState> INPUT_STATE_VARIANT;
+	
 }
 
 //std::pair doesn't have a default hashing function for whatever reason
@@ -680,7 +681,7 @@ struct std::hash<ActionTypeMapKey>
 	[[nodiscard]] inline std::size_t operator()(const ActionTypeMapKey& _key) const noexcept
 	{
 		//Compute individual hash values for first and second and combine them using XOR and bit shifting
-		return (std::hash<std::type_index>()(_key.first) ^ (std::hash<std::uint32_t>()(_key.second)) << 1);
+		return (std::hash<std::type_index>{}(_key.first) ^ (std::hash<std::uint32_t>()(_key.second)) << 1);
 	}
 };
 

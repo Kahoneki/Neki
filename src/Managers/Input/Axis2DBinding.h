@@ -24,6 +24,23 @@ namespace NK
 		explicit Axis2DBinding(const std::pair<Axis1DBinding,Axis1DBinding>& _bindings)
 		: type(INPUT_VARIANT_ENUM_TYPE::NONE), doubleAxes(true), axis1DBindings(_bindings) {}
 
+
+		inline bool operator==(const Axis2DBinding& _other) const noexcept
+		{
+			//Check that they hold the same input type, if not, then they're obviously not equal
+			if (input.index() != _other.input.index())
+			{
+				return false;
+			}
+
+			//Same type, visit and compare the values
+			return std::visit([](const auto& _a, const auto& _b) -> bool
+			{
+				if constexpr (std::is_same_v<decltype(_a), decltype(_b)>) { return _a == _b; }
+				return false; //Shouldn't ever be reached
+			}, input, _other.input);
+		}
+
 		
 		//Axis2DBinding(const INPUT_VARIANT _input)
 		INPUT_VARIANT input;
@@ -35,3 +52,31 @@ namespace NK
 	};
 	
 }
+
+
+
+template<>
+struct std::hash<NK::Axis2DBinding>
+{
+	inline std::size_t operator()(const NK::Axis2DBinding& _binding) const noexcept
+	{
+		//Start by hashing doubleAxes vs non-doubleAxes
+		std::size_t result{ std::hash<bool>{}(_binding.doubleAxes) };
+
+		if (_binding.doubleAxes)
+		{
+			//Combine hashes of Axis1DBinding members
+			const std::size_t h1{ std::hash<NK::Axis1DBinding>{}(_binding.axis1DBindings.first) };
+			const std::size_t h2{ std::hash<NK::Axis1DBinding>{}(_binding.axis1DBindings.second) };
+			result ^= (h1 << 1);
+			result ^= (h2 << 2);
+		}
+		else
+		{
+			//Just hash the native input variant
+			result ^= (std::hash<NK::INPUT_VARIANT>{}(_binding.input) << 1);
+		}
+		
+		return result;
+	}
+};

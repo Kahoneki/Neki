@@ -32,12 +32,12 @@ namespace NK
 
 	void PlayerCameraLayer::Update(Registry& _reg)
 	{
-		if (InputManager::GetActionInputType(PLAYER_CAMERA_ACTIONS::MOVE) != INPUT_TYPE::AXIS_2D)
+		if (InputManager::GetActionInputType(PLAYER_CAMERA_ACTIONS::MOVE) != INPUT_BINDING_TYPE::AXIS_2D)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PLAYER_CAMERA_LAYER, "PlayerCameraLayer::Update() - PLAYER_CAMERA_ACTIONS::MOVE is not bound to INPUT_TYPE::AXIS_2D as required");
 		}
 
-		if (InputManager::GetActionInputType(PLAYER_CAMERA_ACTIONS::YAW_PITCH) != INPUT_TYPE::AXIS_2D)
+		if (InputManager::GetActionInputType(PLAYER_CAMERA_ACTIONS::YAW_PITCH) != INPUT_BINDING_TYPE::AXIS_2D)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PLAYER_CAMERA_LAYER, "PlayerCameraLayer::Update() - PLAYER_CAMERA_ACTIONS::YAW_PITCH is not bound to INPUT_TYPE::AXIS_2D as required");
 		}

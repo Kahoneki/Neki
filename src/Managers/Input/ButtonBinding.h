@@ -20,9 +20,36 @@ namespace NK
 			}
 		}
 
+
+		inline bool operator==(const ButtonBinding& _other) const noexcept
+		{
+			//Check that they hold the same input type, if not, then they're obviously not equal
+			if (input.index() != _other.input.index())
+			{
+				return false;
+			}
+
+			//Same type, visit and compare the values
+			return std::visit([](const auto& _a, const auto& _b) -> bool
+			{
+				if constexpr (std::is_same_v<decltype(_a), decltype(_b)>) { return _a == _b; }
+				return false; //Shouldn't ever be reached
+			}, input, _other.input);
+		}
+
 		
 		INPUT_VARIANT input;
 		INPUT_VARIANT_ENUM_TYPE type;
 	};
 	
 }
+
+
+template<>
+struct std::hash<NK::ButtonBinding>
+{
+	inline std::size_t operator()(const NK::ButtonBinding& _binding) const noexcept
+	{
+		return std::hash<NK::INPUT_VARIANT>{}(_binding.input);
+	}
+};

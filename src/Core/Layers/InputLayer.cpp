@@ -37,23 +37,23 @@ namespace NK
 			{
 				switch (InputManager::GetActionInputType(it->first))
 				{
-				case INPUT_TYPE::UNBOUND:
+				case INPUT_BINDING_TYPE::UNBOUND:
 				{
 					//It's fine for the user to not have an input bound to an action, provide a warning, not an error
 					m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::INPUT_LAYER, "Unbound action found - type: " + std::string(it->first.first.name()) + ", element: " + std::to_string(it->first.second) + "\n");
 					break;
 				}
-				case INPUT_TYPE::BUTTON:
+				case INPUT_BINDING_TYPE::BUTTON:
 				{
 					it->second = InputManager::GetButtonState(it->first);
 					break;
 				}
-				case INPUT_TYPE::AXIS_1D:
+				case INPUT_BINDING_TYPE::AXIS_1D:
 				{
 					it->second = InputManager::GetAxis1DState(it->first);
 					break;
 				}
-				case INPUT_TYPE::AXIS_2D:
+				case INPUT_BINDING_TYPE::AXIS_2D:
 				{
 					it->second = InputManager::GetAxis2DState(it->first);
 					break;
