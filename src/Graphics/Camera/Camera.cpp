@@ -96,7 +96,7 @@ namespace NK
 		//Re-calculate right and up vectors
 		constexpr glm::vec3 worldUp{ glm::vec3(0, 1, 0) };
 		m_right = glm::normalize(glm::cross(worldUp, m_forward));
-		m_up = glm::normalize(glm::cross(m_forward, m_right)); 
+		m_up = glm::normalize(glm::cross(m_forward, m_right));
 	}
 	
 }

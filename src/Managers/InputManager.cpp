@@ -4,33 +4,111 @@
 namespace NK
 {
 
-	void InputManager::Update(Window* _window)
+
+	void InputManager::UpdateMouse()
 	{
-		m_actionStatesLastUpdate = m_actionStates;
+		if (!m_window) { throw std::runtime_error("InputManager::UpdateMouse() was called, but m_window is nullptr. Set the window with InputManager::SetWindow()"); }
 
-		GLFWwindow* glfwWin{ _window->GetGLFWWindow() };
-
-		m_actionStates[INPUT_ACTION::MOVE_FORWARDS]		= (glfwGetKey(glfwWin, GLFW_KEY_W) == GLFW_PRESS) ? KEY_INPUT_STATE::HELD : KEY_INPUT_STATE::NOT_HELD;
-		m_actionStates[INPUT_ACTION::MOVE_BACKWARDS]	= (glfwGetKey(glfwWin, GLFW_KEY_S) == GLFW_PRESS) ? KEY_INPUT_STATE::HELD : KEY_INPUT_STATE::NOT_HELD;
-		m_actionStates[INPUT_ACTION::MOVE_LEFT]			= (glfwGetKey(glfwWin, GLFW_KEY_A) == GLFW_PRESS) ? KEY_INPUT_STATE::HELD : KEY_INPUT_STATE::NOT_HELD;
-		m_actionStates[INPUT_ACTION::MOVE_RIGHT]		= (glfwGetKey(glfwWin, GLFW_KEY_D) == GLFW_PRESS) ? KEY_INPUT_STATE::HELD : KEY_INPUT_STATE::NOT_HELD;
-
-		if (!m_firstUpdate)
+		if (m_firstUpdate)
 		{
-			double xPos;
-			double yPos;
-			glfwGetCursorPos(glfwWin, &xPos, &yPos);
-			m_actionStates[INPUT_ACTION::CAMERA_YAW] = xPos;
-			m_actionStates[INPUT_ACTION::CAMERA_PITCH] = yPos;
-		}
-		else
-		{
-			//Don't process mouse movement on first frame
-			glfwSetInputMode(glfwWin, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			//Don't process mouse movement on the first update, it creates a large delta
 			m_firstUpdate = false;
+			return;
 		}
-
-		glfwSetWindowShouldClose(glfwWin, glfwGetKey(glfwWin, GLFW_KEY_ESCAPE) == GLFW_PRESS);
+		double x, y;
+		glfwGetCursorPos(m_window->GetGLFWWindow(), &x, &y);
+		m_mousePosLastFrame = m_mousePosThisFrame;
+		m_mousePosThisFrame = { x, y };
 	}
-	
+
+
+
+	bool InputManager::GetKeyPressed(const KEYBOARD _key)
+	{
+		if (!m_window) { throw std::runtime_error("InputManager::GetKeyHeld() was called internally, but m_window is nullptr. Set the window with InputManager::SetWindow() before the first InputLayer::Update()"); }
+		return (glfwGetKey(m_window->GetGLFWWindow(), InputUtils::GetGLFWKeyboardKey(_key)) == GLFW_PRESS);
+	}
+
+
+
+	bool InputManager::GetKeyReleased(const KEYBOARD _key)
+	{
+		if (!m_window) { throw std::runtime_error("InputManager::GetKeyReleased() was called internally, but m_window is nullptr. Set the window with InputManager::SetWindow() before the first InputLayer::Update()"); }
+		return (glfwGetKey(m_window->GetGLFWWindow(), InputUtils::GetGLFWKeyboardKey(_key)) == GLFW_RELEASE);
+	}
+
+
+
+	bool InputManager::GetMouseButtonPressed(const MOUSE_BUTTON _button)
+	{
+		if (!m_window) { throw std::runtime_error("InputManager::GetMouseButtonHeld() was called internally, but m_window is nullptr. Set the window with InputManager::SetWindow() before the first InputLayer::Update()"); }
+		return (glfwGetKey(m_window->GetGLFWWindow(), InputUtils::GetGLFWMouseButton(_button)) == GLFW_PRESS);
+	}
+
+
+
+	bool InputManager::GetMouseButtonReleased(const MOUSE_BUTTON _button)
+	{
+		if (!m_window) { throw std::runtime_error("InputManager::GetMouseButtonReleased() was called internally, but m_window is nullptr. Set the window with InputManager::SetWindow() before the first InputLayer::Update()"); }
+		return (glfwGetKey(m_window->GetGLFWWindow(), InputUtils::GetGLFWMouseButton(_button)) == GLFW_RELEASE);
+	}
+
+
+
+	glm::vec2 InputManager::GetMouseDiff()
+	{
+		if (m_firstUpdate) { return { 0, 0 }; }
+		return m_mousePosThisFrame - m_mousePosLastFrame;
+	}
+
+
+
+	glm::vec2 InputManager::GetMousePosition()
+	{
+		return m_mousePosThisFrame;
+	}
+
+
+
+	INPUT_TYPE InputManager::GetActionInputType(const ActionTypeMapKey& _key)
+	{
+		return (m_actionToInputTypeMap.contains(_key) ? m_actionToInputTypeMap[_key] : INPUT_TYPE::UNBOUND);
+	}
+
+
+
+	ButtonState InputManager::GetButtonState(const ActionTypeMapKey& _key)
+	{
+		ValidateActionTypeUtil("GetButtonState()", _key, INPUT_TYPE::BUTTON);
+		return dynamic_cast<const ButtonInput* const>(m_actionToInputMap[_key])->GetState();
+	}
+
+
+
+	Axis1DState InputManager::GetAxis1DState(const ActionTypeMapKey& _key)
+	{
+		ValidateActionTypeUtil("GetAxis1DState()", _key, INPUT_TYPE::AXIS_1D);
+		return dynamic_cast<const Axis1DInput* const>(m_actionToInputMap[_key])->GetState();
+	}
+
+
+
+	Axis2DState InputManager::GetAxis2DState(const ActionTypeMapKey& _key)
+	{
+		ValidateActionTypeUtil("GetAxis2DState()", _key, INPUT_TYPE::AXIS_2D);
+		return dynamic_cast<const Axis2DInput* const>(m_actionToInputMap[_key])->GetState();
+	}
+
+
+
+	void InputManager::ValidateActionTypeUtil(const std::string& _func, const ActionTypeMapKey& _key, const INPUT_TYPE _inputType)
+	{
+		if (m_actionToInputTypeMap[_key] != _inputType)
+		{
+			std::string err{ "InputManager::" };
+			err += _func + " - invalid action provided - type: " + std::string(_key.first.name()) + ", element: " + std::to_string(_key.second);
+			throw std::invalid_argument(err);
+		}
+	}
+
 }

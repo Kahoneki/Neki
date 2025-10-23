@@ -1,14 +1,16 @@
 #include <Components/CCamera.h>
+#include <Components/CInput.h>
 #include <Components/CModelRenderer.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <Core/EngineConfig.h>
 #include <Core/RAIIContext.h>
+#include <Core/Layers/InputLayer.h>
+#include <Core/Layers/PlayerCameraLayer.h>
+#include <Core/Layers/RenderLayer.h>
 #include <Graphics/Camera/PlayerCamera.h>
-
-#include "Core/Layers/RenderLayer.h"
-#include "Managers/InputManager.h"
-#include "Managers/TimeManager.h"
+#include <Managers/InputManager.h>
+#include <Managers/TimeManager.h>
 
 
 class GameScene final : public NK::Scene
@@ -31,13 +33,32 @@ public:
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
 		camera.camera = &m_playerCamera;
+
+
+		//Inputs
+		NK::ButtonBinding aBinding{ NK::KEYBOARD::A };
+		NK::ButtonBinding dBinding{ NK::KEYBOARD::D };
+		NK::ButtonBinding sBinding{ NK::KEYBOARD::S };
+		NK::ButtonBinding wBinding{ NK::KEYBOARD::W };
+		NK::Axis1DBinding camMoveHorizontalBinding{ { aBinding, dBinding }, { -1, 1 } };
+		NK::Axis1DBinding camMoveVerticalBinding{ { sBinding, wBinding }, { -1, 1 } };
+		NK::Axis2DBinding camMoveBinding{ NK::Axis2DBinding({ camMoveHorizontalBinding, camMoveVerticalBinding }) };
+		m_camMoveInput = NK::Axis2DInput(camMoveBinding);
+
+		NK::Axis2DBinding mouseDiffBinding{ NK::Axis2DBinding(NK::MOUSE::POSITION_DIFFERENCE) };
+		m_camYawPitchInput = NK::Axis2DInput(mouseDiffBinding);
+
+		NK::InputManager::BindActionToInput(NK::PLAYER_CAMERA_ACTIONS::MOVE, &m_camMoveInput, NK::INPUT_TYPE::AXIS_2D);
+		NK::InputManager::BindActionToInput(NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH, &m_camYawPitchInput, NK::INPUT_TYPE::AXIS_2D);
+
+		NK::CInput& input{ m_reg.AddComponent<NK::CInput>(m_cameraEntity) };
+		input.AddActionToMap(NK::PLAYER_CAMERA_ACTIONS::MOVE);
+		input.AddActionToMap(NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH);
 	}
 
-
-
+	
 	virtual void Update() override
 	{
-		m_playerCamera.Update();
 		NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		constexpr float speed{ 50.0f };
 		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
@@ -50,6 +71,9 @@ private:
 	NK::Entity m_helmetEntity;
 	NK::Entity m_cameraEntity;
 	NK::PlayerCamera m_playerCamera;
+
+	NK::Axis2DInput m_camMoveInput;
+	NK::Axis2DInput m_camYawPitchInput;
 };
 
 
@@ -60,22 +84,37 @@ public:
 	{
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
 		m_activeScene = 0;
-
+		
 		NK::RenderLayerDesc renderLayerDesc{};
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 		renderLayerDesc.enableSSAA = true;
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.windowDesc.size = { 1920, 1080 };
 		m_postAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::RenderLayer, renderLayerDesc)));
+
+		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[0].get())->GetWindow() };
+		
+		NK::InputLayerDesc inputLayerDesc{};
+		inputLayerDesc.window = window;
+		m_preAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::InputLayer, inputLayerDesc)));
+		
+		m_preAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::PlayerCameraLayer)));
+
+		NK::InputManager::SetWindow(window);
+		glfwSetInputMode(window->GetGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
 
 
 
 	virtual void Update() override
 	{
-		NK::InputManager::Update(dynamic_cast<NK::RenderLayer*>(m_postAppLayers[0].get())->GetWindow());
+		NK::InputManager::UpdateMouse();
 		m_scenes[m_activeScene]->Update();
-		m_shutdown = dynamic_cast<NK::RenderLayer*>(m_postAppLayers[0].get())->GetWindow()->ShouldClose();
+
+		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[0].get())->GetWindow() };
+		glfwSetWindowShouldClose(window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
+		
+		m_shutdown = window->ShouldClose();
 	}
 	
 };

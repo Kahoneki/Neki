@@ -6,8 +6,8 @@
 namespace NK
 {
 
-	ClientNetworkLayer::ClientNetworkLayer(ILogger& _logger, const ClientNetworkLayerDesc& _desc)
-	: ILayer(_logger), m_desc(_desc), m_state(CLIENT_STATE::DISCONNECTED)
+	ClientNetworkLayer::ClientNetworkLayer(const ClientNetworkLayerDesc& _desc)
+	: m_desc(_desc), m_state(CLIENT_STATE::DISCONNECTED)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Initialising Client Network Layer\n");

@@ -20,7 +20,7 @@ namespace NK
 	class ClientNetworkLayer final : public ILayer
 	{
 	public:
-		explicit ClientNetworkLayer(ILogger& _logger, const ClientNetworkLayerDesc& _desc);
+		explicit ClientNetworkLayer(const ClientNetworkLayerDesc& _desc);
 		virtual ~ClientNetworkLayer() override;
 
 		virtual void Update(Registry& _reg) override;

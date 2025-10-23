@@ -26,7 +26,7 @@ namespace NK
 {
 
 	RenderLayer::RenderLayer(const RenderLayerDesc& _desc)
-	: ILayer(*Context::GetLogger()), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.windowDesc.size)
+	: m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.windowDesc.size)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Initialising Render Layer\n");

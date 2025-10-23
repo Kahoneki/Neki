@@ -35,12 +35,12 @@ namespace NK
 	class RenderLayer final : public ILayer
 	{
 	public:
-		RenderLayer(const RenderLayerDesc& _desc);
+		explicit RenderLayer(const RenderLayerDesc& _desc);
 		virtual ~RenderLayer() override;
 
 		virtual void Update(Registry& _reg) override;
 
-		[[nodiscard]] inline Window* GetWindow() const { return m_window.get(); }
+		[[nodiscard]] inline const Window* GetWindow() const { return m_window.get(); }
 		
 		
 	private:

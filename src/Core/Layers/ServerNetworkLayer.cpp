@@ -6,8 +6,8 @@
 namespace NK
 {
 
-	ServerNetworkLayer::ServerNetworkLayer(ILogger& _logger, const ServerNetworkLayerDesc& _desc)
-	: ILayer(_logger), m_desc(_desc), m_clientIndexAllocator(NK_NEW(FreeListAllocator, m_desc.maxClients)), m_state(SERVER_STATE::NOT_HOSTING)
+	ServerNetworkLayer::ServerNetworkLayer(const ServerNetworkLayerDesc& _desc)
+	: m_desc(_desc), m_state(SERVER_STATE::NOT_HOSTING), m_clientIndexAllocator(NK_NEW(FreeListAllocator, m_desc.maxClients))
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Initialising Server Network Layer\n");

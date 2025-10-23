@@ -5,6 +5,8 @@
 #include <Core/Utils/enum_enable_bitmask_operators.h>
 
 #include <cstdint>
+#include <typeindex>
+#include <variant>
 #include <vector>
 #include <glm/glm.hpp>
 
@@ -477,6 +479,8 @@ namespace NK
 		RENDER_LAYER,
 		CLIENT_NETWORK_LAYER,
 		SERVER_NETWORK_LAYER,
+		INPUT_LAYER,
+		PLAYER_CAMERA_LAYER,
 		
 		DEVICE,
 		COMMAND_POOL,
@@ -606,4 +610,87 @@ namespace NK
 		HOSTING,
 		NOT_HOSTING,
 	};
+
+	enum class KEYBOARD
+	{
+		Q,W,E,R,T,Y,U,I,O,P,
+		A,S,D,F,G,H,J,K,L,
+		Z,X,C,V,B,N,M,
+		NUM_1, NUM_2, NUM_3, NUM_4, NUM_5, NUM_6, NUM_7, NUM_8, NUM_9, NUM_0,
+		ESCAPE,
+	};
+
+	enum class MOUSE_BUTTON
+	{
+		LEFT,
+		RIGHT,
+	};
+	
+	enum class MOUSE
+	{
+		POSITION,
+		POSITION_DIFFERENCE, //Difference in position between last and current frame - call NK::InputManager::UpdateMouseDiff() every frame if using this input
+	};
+	
+	typedef std::variant<KEYBOARD, MOUSE_BUTTON, MOUSE> INPUT_VARIANT;
+
+	enum class INPUT_VARIANT_ENUM_TYPE
+	{
+		NONE, //Used as default value
+		KEYBOARD,
+		MOUSE_BUTTON,
+		MOUSE,
+	};
+
+	struct ButtonState
+	{
+		//todo: figure out the best way to add a pressed state for first frame
+		
+		bool held; //Button is currently held down
+		bool released; //Button was released this frame
+	};
+
+	struct Axis1DState
+	{
+		float value;
+	};
+
+	struct Axis2DState
+	{
+		glm::vec2 values;
+	};
+
+	enum class INPUT_TYPE
+	{
+		BUTTON,
+		AXIS_1D,
+		AXIS_2D,
+		UNBOUND,
+	};
+
+	typedef std::variant<ButtonState, Axis1DState, Axis2DState> INPUT_STATE_VARIANT;
+}
+
+//std::pair doesn't have a default hashing function for whatever reason
+//Solution adapted from https://stackoverflow.com/a/17017281
+typedef std::pair<std::type_index, std::uint32_t> ActionTypeMapKey;
+template<>
+struct std::hash<ActionTypeMapKey>
+{
+	[[nodiscard]] inline std::size_t operator()(const ActionTypeMapKey& _key) const noexcept
+	{
+		//Compute individual hash values for first and second and combine them using XOR and bit shifting
+		return (std::hash<std::type_index>()(_key.first) ^ (std::hash<std::uint32_t>()(_key.second)) << 1);
+	}
+};
+
+namespace NK
+{
+
+	enum class PLAYER_CAMERA_ACTIONS
+	{
+		MOVE,
+		YAW_PITCH,
+	};
+	
 }

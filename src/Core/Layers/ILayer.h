@@ -11,7 +11,7 @@ namespace NK
 	class ILayer
 	{
 	public:
-		explicit ILayer(ILogger& _logger) : m_logger(_logger) {}
+		explicit ILayer() : m_logger(*Context::GetLogger()) {}
 		virtual ~ILayer() = default;
 
 		virtual void Update(Registry& _reg) = 0;

@@ -23,7 +23,7 @@ namespace NK
 	class ServerNetworkLayer final : public ILayer
 	{
 	public:
-		explicit ServerNetworkLayer(ILogger& _logger, const ServerNetworkLayerDesc& _desc);
+		explicit ServerNetworkLayer(const ServerNetworkLayerDesc& _desc);
 		virtual ~ServerNetworkLayer() override;
 
 		virtual void Update(Registry& _reg) override;
