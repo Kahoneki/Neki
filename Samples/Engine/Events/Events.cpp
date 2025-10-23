@@ -110,15 +110,12 @@ public:
 	explicit GameApp()
 	{
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
-		m_activeScene = 0;
+		m_shutdown = true;
 	}
 
 
 
-	virtual void Update() override
-	{
-		Application::Update();
-	}
+	virtual void Update() override {}
 };
 
 
@@ -137,8 +134,6 @@ public:
 
 [[nodiscard]] NK::EngineConfig CreateEngine()
 {
-	NK::RenderSystemDesc renderSystemDesc{};
-	renderSystemDesc.backend = NK::GRAPHICS_BACKEND::NONE;
-	NK::EngineConfig config{ NK_NEW(GameApp), renderSystemDesc };
+	const NK::EngineConfig config{ NK_NEW(GameApp) };
 	return config;
 }

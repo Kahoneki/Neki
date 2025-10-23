@@ -7,6 +7,7 @@
 #include <Graphics/Camera/PlayerCamera.h>
 
 #include "Core/Layers/RenderLayer.h"
+#include "Managers/InputManager.h"
 #include "Managers/TimeManager.h"
 
 
@@ -72,6 +73,7 @@ public:
 
 	virtual void Update() override
 	{
+		NK::InputManager::Update(dynamic_cast<NK::RenderLayer*>(m_postAppLayers[0].get())->GetWindow());
 		m_scenes[m_activeScene]->Update();
 		m_shutdown = dynamic_cast<NK::RenderLayer*>(m_postAppLayers[0].get())->GetWindow()->ShouldClose();
 	}
