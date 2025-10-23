@@ -49,7 +49,7 @@ public:
 	renderSystemDesc.backend = NK::GRAPHICS_BACKEND::NONE;
 	NK::NetworkSystemDesc networkSystemDesc{};
 	networkSystemDesc.server.maxClients = 1;
-	networkSystemDesc.server.type = NK::SERVER_TYPE::LAN;
+	networkSystemDesc.server.type = NK::SERVER_TYPE::WAN;
 	NK::EngineConfig config;
 	config.application = NK_NEW(GameApp);
 	config.renderSystemDesc = renderSystemDesc;

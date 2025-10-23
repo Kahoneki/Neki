@@ -6,6 +6,7 @@
 #include <Core/RAIIContext.h>
 #include <Graphics/Camera/PlayerCamera.h>
 
+#include "Core/Layers/RenderLayer.h"
 #include "Managers/TimeManager.h"
 
 
@@ -38,7 +39,7 @@ public:
 		m_playerCamera.Update();
 		NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		constexpr float speed{ 50.0f };
-		float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
+		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
 		transform.SetRotation(transform.GetRotation() + glm::vec3(0, rotationAmount, 0));
 	}
 
@@ -58,14 +59,23 @@ public:
 	{
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
 		m_activeScene = 0;
+
+		NK::RenderLayerDesc renderLayerDesc{};
+		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
+		renderLayerDesc.enableSSAA = true;
+		renderLayerDesc.ssaaMultiplier = 4;
+		renderLayerDesc.windowDesc.size = { 1920, 1080 };
+		m_postAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::RenderLayer, renderLayerDesc)));
 	}
 
 
 
 	virtual void Update() override
 	{
-		Application::Update();
+		m_scenes[m_activeScene]->Update();
+		m_shutdown = dynamic_cast<NK::RenderLayer*>(m_postAppLayers[0].get())->GetWindow()->ShouldClose();
 	}
+	
 };
 
 
@@ -84,11 +94,6 @@ public:
 
 [[nodiscard]] NK::EngineConfig CreateEngine()
 {
-	NK::RenderSystemDesc renderSystemDesc{};
-	renderSystemDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
-	renderSystemDesc.enableSSAA = false;
-	renderSystemDesc.ssaaMultiplier = 4;
-	renderSystemDesc.windowDesc.size = { 3840, 2400 };
-	NK::EngineConfig config{ NK_NEW(GameApp), renderSystemDesc };
+	const NK::EngineConfig config{ NK_NEW(GameApp) };
 	return config;
 }

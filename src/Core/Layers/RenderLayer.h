@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ILayer.h"
+
 #include <Components/CCamera.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
@@ -14,7 +16,7 @@
 namespace NK
 {
 
-	struct RenderSystemDesc
+	struct RenderLayerDesc
 	{
 		GRAPHICS_BACKEND backend{ GRAPHICS_BACKEND::NONE };
 		
@@ -30,13 +32,13 @@ namespace NK
 	};
 
 	
-	class RenderSystem final
+	class RenderLayer final : public ILayer
 	{
 	public:
-		RenderSystem(ILogger& _logger, IAllocator& _allocator, const RenderSystemDesc& _desc);
-		~RenderSystem();
+		RenderLayer(const RenderLayerDesc& _desc);
+		virtual ~RenderLayer() override;
 
-		void Update(Registry& _reg);
+		virtual void Update(Registry& _reg) override;
 
 		[[nodiscard]] inline Window* GetWindow() const { return m_window.get(); }
 		
@@ -55,15 +57,8 @@ namespace NK
 		
 		
 		//Dependency injections
-		ILogger& m_logger;
 		IAllocator& m_allocator;
-		GRAPHICS_BACKEND m_backend;
-		bool m_msaaEnabled;
-		SAMPLE_COUNT m_msaaSampleCount;
-		bool m_ssaaEnabled;
-		std::uint32_t m_ssaaMultiplier;
-		WindowDesc m_windowDesc;
-		std::uint32_t m_framesInFlight;
+		const RenderLayerDesc m_desc;
 
 		//Tracks the current frame (in range [0, m_framesInFlight-1])
 		std::uint32_t m_currentFrame;
@@ -113,7 +108,7 @@ namespace NK
 		UniquePtr<ITextureView> m_intermediateDepthBufferView;
 
 		
-		//RenderSystem owns and is responsible for all GPUModels - todo: move to out-of-core rendering with HLODs
+		//RenderLayer owns and is responsible for all GPUModels - todo: move to out-of-core rendering with HLODs
 		std::unordered_map<std::string, UniquePtr<GPUModel>> m_gpuModelCache;
 	};
 

@@ -7,11 +7,11 @@ namespace NK
 
 	class Scene
 	{
-		friend class Engine;
+		friend class Application;
 		
 		
 	public:
-		Scene(const std::size_t _maxEntities) : m_reg(_maxEntities) {}
+		explicit Scene(const std::size_t _maxEntities) : m_reg(_maxEntities) {}
 		virtual ~Scene() = default;
 
 		virtual void Update() = 0;

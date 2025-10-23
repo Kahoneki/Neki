@@ -8,7 +8,7 @@ namespace NK
 
 	struct CModelRenderer
 	{
-		friend class RenderSystem;
+		friend class RenderLayer;
 
 
 	public:
@@ -16,7 +16,7 @@ namespace NK
 
 
 	private:
-		//Non-owning pointer. The RenderSystem owns and manages the GPUModel
+		//Non-owning pointer. The RenderLayer owns and manages the GPUModel
 		GPUModel* model;
 	};
 	
