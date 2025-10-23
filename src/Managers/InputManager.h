@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Input/Axis2DBinding.h"
+#include "Input-Bindings/Axis2DBinding.h"
 
 #include <Graphics/Window.h>
 #include <Types/NekiTypes.h>
