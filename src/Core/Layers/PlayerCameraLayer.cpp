@@ -44,10 +44,11 @@ namespace NK
 
 		for (auto&& [camera, input] : _reg.View<CCamera, CInput>())
 		{
+			PlayerCamera* pc{ dynamic_cast<PlayerCamera*>(camera.camera) };
+			if (!pc) { continue; }
+			
 			for (std::unordered_map<ActionTypeMapKey, INPUT_STATE_VARIANT>::iterator it{ input.actionStates.begin() }; it != input.actionStates.end(); ++it)
 			{
-				PlayerCamera* pc{ dynamic_cast<PlayerCamera*>(camera.camera) };
-				if (!pc) { break; }
 
 				//Process movement
 				const Axis2DState moveState{ input.GetActionState<Axis2DState>(PLAYER_CAMERA_ACTIONS::MOVE) };
