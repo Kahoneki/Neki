@@ -30,13 +30,9 @@ namespace NK
 		default: throw std::runtime_error("Context::Context() - _config.loggerConfig.type not recognised.\n");
 		}
 
-		switch (_config.allocatorType)
+		switch (_config.allocatorDesc.type)
 		{
-		case ALLOCATOR_TYPE::TRACKING: m_allocator = new TrackingAllocator(*m_logger, false, false);
-			break;
-		case ALLOCATOR_TYPE::TRACKING_VERBOSE: m_allocator = new TrackingAllocator(*m_logger, true, false);
-			break;
-		case ALLOCATOR_TYPE::TRACKING_VERBOSE_INCLUDE_VULKAN: m_allocator = new TrackingAllocator(*m_logger, true, true);
+		case ALLOCATOR_TYPE::TRACKING: m_allocator = new TrackingAllocator(*m_logger, _config.allocatorDesc.trackingAllocator); break;
 		}
 
 		glfwSetErrorCallback(GLFWErrorCallback);

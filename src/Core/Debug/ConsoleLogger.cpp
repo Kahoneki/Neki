@@ -63,6 +63,8 @@ namespace NK
 			std::left << std::setw(std::to_underlying(LOGGER_WIDTH::LAYER)) << LayerToString(_layer);
 		}
 		stream << indentedMessage << COLOUR_RESET;
+
+		if (_channel == LOGGER_CHANNEL::ERROR) { stream << std::flush; }
 	}
 	
 }

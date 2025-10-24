@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <vector>
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 
@@ -59,6 +60,7 @@ namespace NK
 		void SetupDebugMessenger();
 		void SelectPhysicalDevice();
 		void CreateLogicalDevice();
+		void CreateVMAAllocator();
 		void CreateMutableResourceType();
 		void CreateDescriptorPool();
 		void CreateDescriptorSetLayout();
@@ -107,12 +109,13 @@ namespace NK
 		VkDescriptorPool m_descriptorPool{ VK_NULL_HANDLE };
 		VkDescriptorSetLayout m_globalDescriptorSetLayout{ VK_NULL_HANDLE };
 		VkDescriptorSet m_globalDescriptorSet{ VK_NULL_HANDLE };
-
-
+		
 		bool m_enableInstanceValidationLayers = true;
 		const std::array<const char*, 1> m_instanceValidationLayers{ "VK_LAYER_KHRONOS_validation" };
 		const std::array<const char*, 1> m_requiredInstanceExtensions{ VK_KHR_SURFACE_EXTENSION_NAME };
 		const std::array<const char*, 4> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader", "VK_EXT_mutable_descriptor_type", "VK_KHR_shader_non_semantic_info" };
+
+		VmaAllocator m_vmaAllocator;
 	};
 	
 }

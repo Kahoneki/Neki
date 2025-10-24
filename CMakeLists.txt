@@ -52,6 +52,17 @@ include(FetchContent)
 if(NEKI_BUILD_VULKAN)
     find_package(Vulkan REQUIRED)
     target_link_libraries(Neki PUBLIC Vulkan::Vulkan)
+    
+    #VMA
+    FetchContent_Declare(
+            vma
+            GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+            GIT_TAG v3.3.0
+    )
+    FetchContent_MakeAvailable(vma)
+    target_link_libraries(Neki PUBLIC VulkanMemoryAllocator)
+    #todo: this is sick i just learnt about this, use it for stb and allat too
+    set_source_files_properties(src/RHI-Vulkan/VulkanDevice.cpp PROPERTIES COMPILE_DEFINITIONS VMA_IMPLEMENTATION)
 endif()
 
 #D3D12 handled automatically

@@ -3,13 +3,14 @@
 #include <cstddef>
 
 #if NEKI_VULKAN_SUPPORTED
+	#include <vk_mem_alloc.h>
 	#include <vulkan/vulkan.h>
 #endif
 
 
 namespace NK
 {
-
+	
 	class IAllocator
 	{
 	public:
@@ -23,13 +24,15 @@ namespace NK
 		virtual void Free(void* _ptr, bool _static) = 0;
 
 		#if NEKI_VULKAN_SUPPORTED
-			[[nodiscard]] virtual inline const VkAllocationCallbacks* GetVulkanCallbacks() const = 0;
+			[[nodiscard]] inline const VkAllocationCallbacks* GetVulkanCallbacks() const { return &m_vulkanCallbacks; }
+			[[nodiscard]] inline const VmaDeviceMemoryCallbacks* GetVMACallbacks() const { return &m_vmaCallbacks; }
 		#endif
 
 
 	protected:
 		#if NEKI_VULKAN_SUPPORTED
 			VkAllocationCallbacks m_vulkanCallbacks{ VK_NULL_HANDLE };
+			VmaDeviceMemoryCallbacks m_vmaCallbacks{ VK_NULL_HANDLE };
 		#endif
 	};
 	

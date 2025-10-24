@@ -509,12 +509,39 @@ namespace NK
 	{
 		CONSOLE,
 	};
+	
+	enum class TRACKING_ALLOCATOR_VERBOSITY_FLAGS : std::uint32_t
+	{
+		NONE =		0,
+		ENGINE =	1 << 0,
+		VULKAN =	1 << 1,
+		VMA =		1 << 2,
+		ALL =		UINT32_MAX
+	};
+	ENABLE_BITMASK_OPERATORS(TRACKING_ALLOCATOR_VERBOSITY_FLAGS)
+	
+	struct TrackingAllocatorConfig
+	{
+		TRACKING_ALLOCATOR_VERBOSITY_FLAGS verbosityFlags;
+	};
 
 	enum class ALLOCATOR_TYPE
 	{
 		TRACKING,
-		TRACKING_VERBOSE,
-		TRACKING_VERBOSE_INCLUDE_VULKAN,
+	};
+	
+	struct AllocatorConfig
+	{
+		ALLOCATOR_TYPE type;
+		TrackingAllocatorConfig trackingAllocator;
+	};
+
+	enum class ALLOCATION_SOURCE
+	{
+		UNKNOWN,
+		ENGINE,
+		VULKAN,
+		VMA,
 	};
 
 	enum class PROJECTION_METHOD

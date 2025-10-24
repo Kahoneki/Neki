@@ -1,3 +1,5 @@
+#include <vk_mem_alloc.h>
+
 #include "VulkanDevice.h"
 
 #include "VulkanBuffer.h"
@@ -41,6 +43,7 @@ namespace NK
 		if (m_enableInstanceValidationLayers) { SetupDebugMessenger(); }
 		SelectPhysicalDevice();
 		CreateLogicalDevice();
+		CreateVMAAllocator();
 		CreateMutableResourceType();
 		CreateDescriptorPool();
 		CreateDescriptorSetLayout();
@@ -56,6 +59,7 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Shutting Down VulkanDevice\n");
 
+		
 		if (m_globalDescriptorSet != VK_NULL_HANDLE)
 		{
 			vkFreeDescriptorSets(m_device, m_descriptorPool, 1, &m_globalDescriptorSet);
@@ -77,6 +81,13 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Descriptor Pool Destroyed\n");
 		}
 
+		if (m_vmaAllocator != VK_NULL_HANDLE)
+		{
+			vmaDestroyAllocator(m_vmaAllocator);
+			m_vmaAllocator = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "VMA Allocator Destroyed\n");
+		}
+		
 		if (m_device != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(m_device);
@@ -100,6 +111,7 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Instance Destroyed\n");
 		}
 
+		
 		m_logger.Unindent();
 	}
 
@@ -539,6 +551,36 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created logical device\n");
+		
+
+		m_logger.Unindent();
+	}
+
+
+
+	void VulkanDevice::CreateVMAAllocator()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating VMA allocator\n");
+		
+		
+		VmaAllocatorCreateInfo createInfo{};
+		createInfo.flags = 0; //Keep internal synchronisation for future proofing
+		createInfo.physicalDevice = m_physicalDevice;
+		createInfo.device = m_device;
+		createInfo.pAllocationCallbacks = m_allocator.GetVulkanCallbacks();
+		createInfo.pDeviceMemoryCallbacks = m_allocator.GetVMACallbacks();
+		createInfo.pHeapSizeLimit = nullptr;
+		createInfo.instance = m_instance;
+		createInfo.vulkanApiVersion = VK_API_VERSION_1_4;
+
+		const VkResult result{ vmaCreateAllocator(&createInfo, &m_vmaAllocator) };
+		if (result != VK_SUCCESS)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create VMA allocator - result: " + std::to_string(result) + "\n");
+			throw std::runtime_error("");
+		}
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Successfully created VMA allocator\n");
 		
 
 		m_logger.Unindent();
