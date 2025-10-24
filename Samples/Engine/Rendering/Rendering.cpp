@@ -20,12 +20,12 @@ public:
 	{
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
-		skybox.SetTextureDirectory("Samples/Resource Files/skybox");
+		skybox.SetTextureDirectory("Samples/Resource-Files/skybox");
 		skybox.SetFileExtension("jpg");
 
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& modelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		modelRenderer.modelPath = "Samples/Resource Files/DamagedHelmet/DamagedHelmet.gltf";
+		modelRenderer.modelPath = "Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf";
 		NK::CTransform& transform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
 		transform.SetPosition(glm::vec3(0, 0, -3));
 		transform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
