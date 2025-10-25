@@ -4,11 +4,11 @@
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <RHI/IBuffer.h>
+#include <RHI/IQueue.h>
 #include <RHI/ISampler.h>
 #include <RHI/ISemaphore.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
-#include <RHI/IQueue.h>
 
 #ifdef NEKI_VULKAN_SUPPORTED
 	#include <RHI-Vulkan/VulkanDevice.h>

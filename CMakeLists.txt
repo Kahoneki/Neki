@@ -108,6 +108,15 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glfw)
 target_link_libraries(Neki PUBLIC glfw)
 
+#SFML
+FetchContent_Declare(sfml GIT_REPOSITORY https://github.com/SFML/SFML.git .gitignore TAG 2.6.1)
+FetchContent_MakeAvailable(sfml)
+target_link_libraries(Neki PUBLIC sfml-network)
+
+#Cereal
+FetchContent_Declare(cereal GIT_REPOSITORY https://github.com/USCiLab/cereal.git GIT_TAG v1.3.2)
+FetchContent_MakeAvailable(cereal)
+target_link_libraries(Neki PUBLIC cereal)
 
 
 #Handle private dependencies
@@ -125,10 +134,6 @@ set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(assimp)
 target_link_libraries(Neki PRIVATE assimp)
 
-#SFML
-FetchContent_Declare(sfml GIT_REPOSITORY https://github.com/SFML/SFML.git .gitignore TAG 2.6.1)
-FetchContent_MakeAvailable(sfml)
-target_link_libraries(Neki PUBLIC sfml-network)
 
 
 
@@ -224,7 +229,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     #Shader compilation
 
     #Define shader files
-    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/*.hlsl")
+    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/Shaders/*.hlsl" "${CMAKE_SOURCE_DIR}/Samples/Graphics/Shaders/*.hlsl")
     message(STATUS "---- Found Shader Files ----")
     foreach(FILE ${SHADER_SOURCES})
         message(STATUS "  ${FILE}")
