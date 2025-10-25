@@ -6,6 +6,7 @@
 #include <Components/CTransform.h>
 #include <Core/EngineConfig.h>
 #include <Core/RAIIContext.h>
+#include <Core/Layers/DiskModelLoaderLayer.h>
 #include <Core/Layers/InputLayer.h>
 #include <Core/Layers/PlayerCameraLayer.h>
 #include <Core/Layers/RenderLayer.h>
@@ -82,6 +83,8 @@ public:
 	{
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
 		m_activeScene = 0;
+
+		m_postAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::DiskModelLoaderLayer)));
 		
 		NK::RenderLayerDesc renderLayerDesc{};
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
@@ -89,8 +92,8 @@ public:
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.windowDesc.size = { 1920, 1080 };
 		m_postAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::RenderLayer, renderLayerDesc)));
-
-		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[0].get())->GetWindow() };
+		
+		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[1].get())->GetWindow() };
 		
 		NK::InputLayerDesc inputLayerDesc{};
 		inputLayerDesc.window = window;
@@ -109,7 +112,7 @@ public:
 		NK::InputManager::UpdateMouse();
 		m_scenes[m_activeScene]->Update();
 
-		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[0].get())->GetWindow() };
+		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[1].get())->GetWindow() };
 		glfwSetWindowShouldClose(window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
 		
 		m_shutdown = window->ShouldClose();

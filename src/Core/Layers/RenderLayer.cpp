@@ -4,6 +4,7 @@
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <RHI/IBuffer.h>
+#include <RHI/IBufferView.h>
 #include <RHI/IQueue.h>
 #include <RHI/ISampler.h>
 #include <RHI/ISemaphore.h>
@@ -48,6 +49,8 @@ namespace NK
 
 		m_gpuUploader->Flush(true, nullptr, nullptr);
 		m_gpuUploader->Reset();
+
+		m_modelUnloadQueues.resize(m_desc.framesInFlight);
 
 		
 		m_logger.Unindent();
@@ -116,6 +119,14 @@ namespace NK
 		m_inFlightFences[m_currentFrame]->Wait();
 		m_inFlightFences[m_currentFrame]->Reset();
 
+		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
+		while (!m_modelUnloadQueues[m_currentFrame].empty())
+		{
+			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
+			m_modelUnloadQueues[m_currentFrame].pop();
+		}
+		
+
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
 		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
 		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::RENDER_TARGET);
@@ -156,15 +167,21 @@ namespace NK
 		//Models (Loading Phase)
 		for (auto&& [modelRenderer] : _reg.View<CModelRenderer>())
 		{
-			if (modelRenderer.model == nullptr && !modelRenderer.modelPath.empty())
+			const bool inCache{ m_gpuModelCache.contains(modelRenderer.modelPath) };
+			if (modelRenderer.visible && !modelRenderer.model)
 			{
-				if (!m_gpuModelCache.contains(modelRenderer.modelPath))
-				{
-					const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
-					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
-					m_newGPUUploaderUpload = true;
-				}
+				//Model is visible but isn't loaded, load it
+				const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
+				m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
+				m_newGPUUploaderUpload = true;
 				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
+			}
+			else if (!modelRenderer.visible && modelRenderer.model)
+			{
+				//Model isn't visible but is loaded, add it to the unload queue
+				m_modelUnloadQueues[m_currentFrame].push(modelRenderer.modelPath);
+				ModelLoader::UnloadModel(modelRenderer.modelPath);
+				modelRenderer.model = nullptr;
 			}
 		}
 		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the semaphore to wait on before drawing
@@ -177,6 +194,8 @@ namespace NK
 		std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
 		for (auto&& [modelRenderer, transform] : _reg.View<CModelRenderer, CTransform>())
 		{
+			if (!modelRenderer.visible) { continue; }
+			
 			if (transform.dirty)
 			{
 				UpdateModelMatrix(transform);

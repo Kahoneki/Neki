@@ -110,6 +110,10 @@ namespace NK
 		
 		//RenderLayer owns and is responsible for all GPUModels - todo: move to out-of-core rendering with HLODs
 		std::unordered_map<std::string, UniquePtr<GPUModel>> m_gpuModelCache;
+
+		//A model can't be unloaded until it's done being used by the GPU, keep track of all models we need to unload for each frame in flight
+		//Once the appropriate fence has been signalled, unload all models in the corresponding queue
+		std::vector<std::queue<std::string>> m_modelUnloadQueues;
 	};
 
 }

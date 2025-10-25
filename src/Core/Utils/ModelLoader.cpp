@@ -36,6 +36,18 @@ namespace NK
 	}
 
 
+
+	void ModelLoader::UnloadModel(const std::string& _filepath)
+	{
+		if (!m_filepathToModelDataCache.contains(_filepath))
+		{
+			throw std::invalid_argument("ModelLoader::UnloadModel() - _filepath not in cache");
+		}
+		m_filepathToModelDataCache.erase(_filepath);
+	}
+
+
+
 	VertexInputDesc ModelLoader::GetModelVertexInputDescription()
 	{
 		std::vector<VertexAttributeDesc> vertexAttributes;
@@ -108,9 +120,27 @@ namespace NK
 		}
 		cereal::BinaryOutputArchive archive(os);
 		CPUModel_Serialised model{ std::get<CPUModel_Serialised>(LoadNonNKModel(_inputFilepath, _flipFaceWinding, _flipTextures, true)) };
-		model.flipTextures = _flipTextures;
+		model.header.flipTextures = _flipTextures;
 		archive(model);
 	}
+
+
+
+	CPUModel_SerialisedHeader ModelLoader::GetNKModelHeader(const std::string& _filepath)
+	{
+		std::ifstream fs(_filepath, std::ios::binary);
+		if (!fs)
+		{
+			throw std::invalid_argument("ModelLoader::GetNKModelHeader() - failed to open model at _filepath (" + _filepath + ")");
+		}
+		cereal::BinaryInputArchive archive(fs);
+
+		CPUModel_SerialisedHeader header{};
+		archive(header);
+		
+		return header;
+	}
+
 
 
 	const CPUModel* ModelLoader::LoadNKModel(const std::string& _filepath)
@@ -138,7 +168,7 @@ namespace NK
 				const std::pair<std::string, bool> texLoadData{ serialisedModel.materials[matIndex].allTextures[texIndex] };
 				if (!texLoadData.first.empty())
 				{
-					model.materials[matIndex].allTextures[texIndex] = ImageLoader::LoadImage(texLoadData.first, serialisedModel.flipTextures, texLoadData.second);
+					model.materials[matIndex].allTextures[texIndex] = ImageLoader::LoadImage(texLoadData.first, serialisedModel.header.flipTextures, texLoadData.second);
 					model.materials[matIndex].allTextures[texIndex]->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
 				}
 			}
@@ -172,6 +202,49 @@ namespace NK
 		std::string modelDirectory{ _filepath.substr(0, _filepath.find_last_of('/')) };
 		if (_serialisedModelOutput) { ProcessNode(scene->mRootNode, scene, &cpuModelSerialised, modelDirectory); }
 		else { ProcessNode(scene->mRootNode, scene, &cpuModel, modelDirectory); }
+		
+		//Calculate model extents
+		glm::vec3 minAABB(std::numeric_limits<float>::max());
+		glm::vec3 maxAABB(std::numeric_limits<float>::lowest());
+		auto calculateExtentsAndCenterModel{ [&](auto* _model)
+		{
+			//Calculate extents
+			for (const CPUMesh& mesh : _model->meshes)
+			{
+				for (const ModelVertex& vertex : mesh.vertices)
+				{
+					minAABB.x = std::min(minAABB.x, vertex.position.x);
+					minAABB.y = std::min(minAABB.y, vertex.position.y);
+					minAABB.z = std::min(minAABB.z, vertex.position.z);
+
+					maxAABB.x = std::max(maxAABB.x, vertex.position.x);
+					maxAABB.y = std::max(maxAABB.y, vertex.position.y);
+					maxAABB.z = std::max(maxAABB.z, vertex.position.z);
+				}
+			}
+
+			const glm::vec3 extentsCentre{ (minAABB + maxAABB) * 0.5f };
+
+			//Center the model so its local origin (0,0,0) is at centre of extents
+			for (CPUMesh& mesh : _model->meshes)
+			{
+				for (ModelVertex& vertex : mesh.vertices)
+				{
+					vertex.position -= extentsCentre;
+				}
+			}
+		} };
+
+		if (_serialisedModelOutput)
+		{
+			calculateExtentsAndCenterModel(&cpuModelSerialised);
+			cpuModelSerialised.header.halfExtents = (maxAABB - minAABB) * 0.5f;
+		}
+		else
+		{
+			calculateExtentsAndCenterModel(&cpuModel);
+			cpuModel.halfExtents = (maxAABB - minAABB) * 0.5f;
+		}
 		
 
 		//Load scene materials

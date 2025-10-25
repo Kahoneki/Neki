@@ -294,6 +294,7 @@ namespace NK
 			auto createTexture{ [&](const MODEL_TEXTURE_TYPE _textureType)
 			{
 				const std::size_t index{ std::to_underlying(_textureType) };
+				m_imageDataPointers.push(cpuMaterial.allTextures[index]);
 				gpuMaterial->textures[index] = m_device.CreateTexture(cpuMaterial.allTextures[index]->desc);
 				EnqueueTextureDataUpload(cpuMaterial.allTextures[index]->data, gpuMaterial->textures[index].get(), RESOURCE_STATE::UNDEFINED);
 				m_commandBuffer->TransitionBarrier(gpuMaterial->textures[index].get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::SHADER_RESOURCE);
@@ -401,6 +402,11 @@ namespace NK
 		}
 		
 		m_stagingBufferSubregions.clear();
+		while (!m_imageDataPointers.empty())
+		{
+			ImageLoader::FreeImage(m_imageDataPointers.back());
+			m_imageDataPointers.pop();
+		}
 		m_flushing = false;
 		m_commandBuffer->Reset();
 		m_commandBuffer->Begin();

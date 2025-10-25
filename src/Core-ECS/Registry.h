@@ -181,6 +181,27 @@ namespace NK
 			}
 			return pool->components[pool->entityToIndex.at(_entity)];
 		}
+
+
+		//Returns entity that contains a given component
+		template<typename Component>
+		[[nodiscard]] Entity GetEntity(const Component& _component) const
+		{
+			const ComponentPool<Component>* pool{ GetPool<Component>() };
+			if (!pool)
+			{
+				throw std::invalid_argument("Registry::GetEntity() - no pool exists for the provided _component type");
+			}
+
+			//Calculate index of component within its pool's vector
+			const Component* poolComponentsBegin{ pool->components.data() };
+			const Component* componentPtr{ &_component };
+			if ((componentPtr < poolComponentsBegin) || (componentPtr >= poolComponentsBegin + pool->components.size()))
+			{
+				throw std::invalid_argument("Registry::GetEntity() - provided component does not belong to this registry");
+			}
+			return pool->indexToEntity[componentPtr - poolComponentsBegin];
+		}
 		
 	
 	private:

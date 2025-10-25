@@ -105,17 +105,25 @@ namespace NK
 	
 	struct CPUModel
 	{
+		glm::vec3 halfExtents;
 		std::vector<CPUMesh> meshes;
 		std::vector<CPUMaterial> materials;
 	};
 
-	struct CPUModel_Serialised
+	struct CPUModel_SerialisedHeader
 	{
 		bool flipTextures;
+		glm::vec3 halfExtents; //model's local origin (0,0,0) is centred in the extents
+	};
+	SERIALISE(CPUModel_SerialisedHeader, v.flipTextures, v.halfExtents)
+	
+	struct CPUModel_Serialised
+	{
+		CPUModel_SerialisedHeader header;
 		std::vector<CPUMesh> meshes;
 		std::vector<CPUMaterial_Serialised> materials;
 	};
-	SERIALISE(CPUModel_Serialised, v.flipTextures, v.meshes, v.materials)
+	SERIALISE(CPUModel_Serialised, v.header, v.meshes, v.materials)
 
 
 	//To avoid having to include assimp headers in public Neki library
@@ -128,8 +136,14 @@ namespace NK
 		//_flipFaceWinding and _flipTextures will be ignored if model extension is .nkmodel as this information is baked into the file format
 		[[nodiscard]] static const CPUModel* LoadModel(const std::string& _filepath, bool _flipFaceWinding = false, bool _flipTextures = false);
 
+		//Removes the specified model from the cache
+		static void UnloadModel(const std::string& _filepath);
+
 		//Serialise a model of any type (.gltf, .fbx, .obj, etc.) from _inputFilepath into a .nkmodel file at _outputFilepath
 		static void SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures);
+
+		//Get the header of a .nkmodel
+		static CPUModel_SerialisedHeader GetNKModelHeader(const std::string& _filepath);
 		
 		[[nodiscard]] static VertexInputDesc GetModelVertexInputDescription();
 
