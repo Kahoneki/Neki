@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <Components/CCamera.h>
 #include <Components/CInput.h>
 #include <Components/CModelRenderer.h>
@@ -23,9 +24,13 @@ public:
 		skybox.SetTextureDirectory("Samples/Resource-Files/skybox");
 		skybox.SetFileExtension("jpg");
 
+		//ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
+		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
+		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath, true, true);
+		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& modelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		modelRenderer.modelPath = "Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf";
+		modelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
 		NK::CTransform& transform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
 		transform.SetPosition(glm::vec3(0, 0, -3));
 		transform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });

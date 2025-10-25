@@ -1,6 +1,10 @@
 #ifndef NEKI_MATERIALS_H
 #define NEKI_MATERIALS_H
 
+#if defined(__cplusplus)
+	#include <Core/Utils/Serialisation.h>
+#endif
+
 
 namespace NK
 {
@@ -34,6 +38,9 @@ namespace NK
 		int hasLightmap;
 		int hasReflection;
 	};
+	#if defined(__cplusplus)
+		SERIALISE(BlinnPhongMaterial, v.diffuseIdx, v.specularIdx, v.ambientIdx, v.emissiveIdx, v.normalIdx, v.shininessIdx, v.opacityIdx, v.heightIdx, v.displacementIdx, v.lightmapIdx, v.reflectionIdx, v.hasDiffuse, v.hasSpecular, v.hasAmbient, v.hasEmissive, v.hasNormal, v.hasShininess, v.hasOpacity, v.hasHeight, v.hasDisplacement, v.hasLightmap, v.hasReflection)
+	#endif
 
 	struct PBRMaterial
 	{
@@ -51,7 +58,7 @@ namespace NK
 		int displacementIdx;
 		int reflectionIdx;
 
-		//Presence flags
+		//Presence flags (0 / 1)
 		int hasBaseColour;
 		int hasMetalness;
 		int hasRoughness;
@@ -65,6 +72,9 @@ namespace NK
 		int hasDisplacement;
 		int hasReflection;
 	};
+	#if defined(__cplusplus)
+		SERIALISE(PBRMaterial, v.baseColourIdx, v.metalnessIdx, v.roughnessIdx, v.specularIdx, v.shininessIdx, v.normalIdx, v.aoIdx, v.emissiveIdx, v.opacityIdx, v.heightIdx, v.displacementIdx, v.reflectionIdx, v.hasBaseColour, v.hasMetalness, v.hasRoughness, v.hasSpecular, v.hasShininess, v.hasNormal, v.hasAO, v.hasEmissive, v.hasOpacity, v.hasHeight, v.hasDisplacement, v.hasReflection)
+	#endif
 	
 }
 
