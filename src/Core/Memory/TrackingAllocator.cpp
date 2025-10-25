@@ -258,6 +258,8 @@ namespace NK
 			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pUserData) };
 			if (allocator->m_vmaVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "VMADeviceMemoryAllocation --- Allocating " + FormatUtils::GetSizeString(_size) + " on memory type index " + std::to_string(_memType) + "\n"); }
 
+			//Not implemented
+		
 			std::lock_guard<std::mutex> lock(allocator->m_deviceAllocationMapMtx);
 			allocator->m_deviceAllocationMap[_memory] = { ALLOCATION_SOURCE::VMA, _size, nullptr, 0 };
 		}
@@ -269,8 +271,10 @@ namespace NK
 			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pUserData) };
 			if (allocator->m_vmaVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "VMADeviceMemoryFree --- Freeing " + FormatUtils::GetSizeString(_size) + " on memory type index " + std::to_string(_memType) + "\n"); }
 
+			//Not implemented
+		
 			std::lock_guard<std::mutex> lock(allocator->m_deviceAllocationMapMtx);
-			allocator->m_deviceAllocationMap[_memory] = { ALLOCATION_SOURCE::VMA, _size, nullptr, 0 };
+			allocator->m_deviceAllocationMap.erase(_memory);
 		}
 	#endif
 
@@ -289,7 +293,7 @@ namespace NK
 		#endif
 		{
 			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "AllocateAligned - Allocation failed.\n");
-			if (!m_engineVerbose) { m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "Set TrackingAllocator::m_verbose flag to see more detailed output"); }
+			if (!m_engineVerbose) { m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, "Set verbose flags flag to see more detailed output"); }
 			throw std::runtime_error("");
 		}
 

@@ -49,10 +49,15 @@ namespace NK
 		[[nodiscard]] inline std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
+		[[nodiscard]] inline VmaAllocator GetVMAAllocator() const { return m_vmaAllocator; }
 		[[nodiscard]] inline VkDescriptorPool GetDescriptorPool() const { return m_descriptorPool; }
 		[[nodiscard]] inline VkDescriptorSetLayout GetGlobalDescriptorSetLayout() const { return m_globalDescriptorSetLayout; }
 		[[nodiscard]] inline VkDescriptorSet GetGlobalDescriptorSet() const { return m_globalDescriptorSet; }
 
+		//Public utility
+		void LogVRAMUsage_Fast() const;
+		void LogVRAMUsage_Detailed() const;
+		
 
 	private:
 		//Init sub-methods
@@ -72,7 +77,8 @@ namespace NK
 		void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& _info) const;
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT _messageSeverity, VkDebugUtilsMessageTypeFlagsEXT _messageType, const VkDebugUtilsMessengerCallbackDataEXT* _pCallbackData, void* _pUserData);
 		[[nodiscard]] bool PhysicalDeviceSuitable(VkPhysicalDevice _device) const; //Checks for physical device compatibility with queue, extension, and feature requirements
-
+		
+		
 
 		//Vulkan handles
 		VkInstance m_instance{ VK_NULL_HANDLE };

@@ -37,7 +37,7 @@ namespace NK
 		stagingBufferDesc.type = MEMORY_TYPE::HOST;
 		stagingBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
 		m_stagingBuffer = m_device.CreateBuffer(stagingBufferDesc);
-		m_stagingBufferMap = static_cast<unsigned char*>(m_stagingBuffer->Map());
+		m_stagingBufferMap = static_cast<unsigned char*>(m_stagingBuffer->GetMap());
 
 		CommandPoolDesc commandPoolDesc{};
 		commandPoolDesc.type = COMMAND_TYPE::GRAPHICS;
@@ -68,13 +68,6 @@ namespace NK
 		if (m_flushing)
 		{
 			m_queue->WaitIdle();
-		}
-
-		if (m_stagingBufferMap != nullptr)
-		{
-			m_stagingBuffer->Unmap();
-			m_stagingBufferMap = nullptr;
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::GPU_UPLOADER, "Staging Buffer Unmapped\n");
 		}
 
 

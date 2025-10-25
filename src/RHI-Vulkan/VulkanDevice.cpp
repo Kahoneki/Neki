@@ -20,6 +20,7 @@
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/Allocation.h>
 #include <Core/Utils/EnumUtils.h>
+#include <Core/Utils/FormatUtils.h>
 #include <Graphics/GPUUploader.h>
 #include <RHI/RHIUtils.h>
 
@@ -38,6 +39,7 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Initialising VulkanDevice\n");
+		
 
 		CreateInstance();
 		if (m_enableInstanceValidationLayers) { SetupDebugMessenger(); }
@@ -49,6 +51,7 @@ namespace NK
 		CreateDescriptorSetLayout();
 		CreateDescriptorSet();
 
+		
 		m_logger.Unindent();
 	}
 
@@ -58,6 +61,9 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Shutting Down VulkanDevice\n");
+
+
+		LogVRAMUsage_Fast();
 
 		
 		if (m_globalDescriptorSet != VK_NULL_HANDLE)
@@ -568,8 +574,8 @@ namespace NK
 		createInfo.flags = 0; //Keep internal synchronisation for future proofing
 		createInfo.physicalDevice = m_physicalDevice;
 		createInfo.device = m_device;
-		createInfo.pAllocationCallbacks = m_allocator.GetVulkanCallbacks();
-		createInfo.pDeviceMemoryCallbacks = m_allocator.GetVMACallbacks();
+//		createInfo.pAllocationCallbacks = m_allocator.GetVulkanCallbacks();
+//		createInfo.pDeviceMemoryCallbacks = m_allocator.GetVMACallbacks();
 		createInfo.pHeapSizeLimit = nullptr;
 		createInfo.instance = m_instance;
 		createInfo.vulkanApiVersion = VK_API_VERSION_1_4;
@@ -906,6 +912,108 @@ namespace NK
 
 		m_logger.Unindent();
 		return true;
+	}
+
+
+
+	void VulkanDevice::LogVRAMUsage_Fast() const
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::DEVICE, "Heap Allocation Log\n");
+
+
+		//Get budgets for each heap
+		VkPhysicalDeviceMemoryProperties memProps;
+		vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memProps);
+		std::vector<VmaBudget> budgets(memProps.memoryHeapCount);
+		vmaGetHeapBudgets(m_vmaAllocator, budgets.data());
+
+
+		std::uint32_t totalVMAAllocations{};
+		VkDeviceSize totalVMAUsage{};
+		std::uint32_t totalVMAReservations{};
+		VkDeviceSize totalVMAReservedSpace{};
+		VkDeviceSize totalProgramUsage{};
+		VkDeviceSize totalUsage{}; //totalVMAUsage + totalProgramUsage
+		VkDeviceSize totalBudget{};
+		
+		
+		auto GetBudgetString{ [&](const VkDeviceSize _size, const VkDeviceSize _budget) -> std::string
+		{
+			//Percent of total budget used
+			constexpr float redZone{ 0.9f };
+			constexpr float amberZone{ 0.75f };
+			
+			std::string output{ "" };
+			
+			const float budgetUsage{ static_cast<float>(_size) / _budget };
+			if (budgetUsage >= redZone) { output += ILogger::COLOUR_RED; }
+			else if (budgetUsage >= amberZone) { output += ILogger::COLOUR_YELLOW; }
+			else { output += ILogger::COLOUR_GREEN; }
+
+			output += FormatUtils::GetSizeString(_size) + " / " + FormatUtils::GetSizeString(_budget) + ILogger::COLOUR_RESET;
+			return output;
+		} };
+
+		auto GetPercentageUsageString{ [&](const VkDeviceSize _size, const VkDeviceSize _total) -> std::string
+		{
+			if (_total == 0)
+			{
+				return "N/A";
+			}
+			
+			//Percent of total used - higher is better (less fragmentation)!
+			constexpr float redZone{ 0.4f };
+			constexpr float amberZone{ 0.6f };
+			
+			std::string output{ "" };
+			
+			const float usage{ static_cast<float>(_size) / _total }; //Avoid divide by 0
+			if (usage <= redZone) { output += ILogger::COLOUR_RED; }
+			else if (usage <= amberZone) { output += ILogger::COLOUR_YELLOW; }
+			else { output += ILogger::COLOUR_GREEN; }
+
+			output += std::to_string(100 * usage) + "%" + ILogger::COLOUR_RESET;
+			return output;
+		} };
+		
+		for (std::uint32_t i{ 0 }; i<memProps.memoryHeapCount; ++i)
+		{
+			const VmaStatistics& stats{ budgets[i].statistics }; //What VMA is using
+			const VkDeviceSize usage{ budgets[i].usage }; //What everything in the program is using (incl. non-VMA things)
+			const VkDeviceSize budget{ budgets[i].budget }; //OS' estimate of how much the program is allowed to use of this heap
+			
+			m_logger.Indent();
+			m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Heap " + std::to_string(i) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "VMA: " + std::to_string(stats.blockCount) + " reservations (" + GetBudgetString(stats.blockBytes, budget) + "), " + std::to_string(stats.allocationCount) + " allocations (" + GetBudgetString(stats.allocationBytes, budget) + "), usage = " + GetPercentageUsageString(stats.allocationBytes, stats.blockBytes) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Program: " + GetBudgetString(usage - stats.allocationBytes, budget) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Total: " + GetBudgetString(usage, budget) + "\n");
+			m_logger.Unindent();
+
+			totalVMAAllocations += stats.allocationCount;
+			totalVMAUsage += stats.allocationBytes;
+			totalVMAReservations += stats.blockCount;
+			totalVMAReservedSpace += stats.blockBytes;
+			totalProgramUsage += (usage - stats.allocationBytes);
+			totalUsage += usage;
+			totalBudget += budget;
+		}
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "All Heaps\n");
+		m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "VMA: " + std::to_string(totalVMAReservations) + " reservations (" + GetBudgetString(totalVMAReservedSpace, totalBudget) + "), " + std::to_string(totalVMAAllocations) + " allocations (" + GetBudgetString(totalVMAUsage, totalBudget) + "), usage = " + GetPercentageUsageString(totalVMAUsage, totalVMAReservedSpace) + "\n");
+		m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Program: " + GetBudgetString(totalProgramUsage, totalBudget) + "\n");
+		m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Total: " + GetBudgetString(totalUsage, totalBudget) + "\n");
+		m_logger.Unindent();
+		
+		
+		m_logger.Unindent();
+	}
+
+
+
+	void VulkanDevice::LogVRAMUsage_Detailed() const
+	{
+		//Todo: implement with VmaTotalStatistics (vmaCalculateStatistics()) to get total vram usage and info on fragmentation and stuff like that
 	}
 
 }

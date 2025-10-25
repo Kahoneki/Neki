@@ -61,6 +61,15 @@ namespace NK
 		static std::string LayerToString(LOGGER_LAYER _layer);
 
 
+		//ANSI colour codes
+		static constexpr const char* COLOUR_RED   { "\033[31m" };
+		static constexpr const char* COLOUR_GREEN { "\033[32m" };
+		static constexpr const char* COLOUR_YELLOW{ "\033[33m" };
+		static constexpr const char* COLOUR_CYAN  { "\033[36m" };
+		static constexpr const char* COLOUR_WHITE { "\033[97m" }; //37 (regular white) is quite dark, use 97 (high intensity white)
+		static constexpr const char* COLOUR_RESET { "\033[0m"  };
+
+		
 	protected:
 		explicit ILogger(const LoggerConfig& _config);
 
@@ -72,15 +81,7 @@ namespace NK
 		//Attempt to enable ANSI support for access to ANSI colour codes
 		//Returns success status
 		static bool EnableAnsiSupport();
-
 		
-		//ANSI colour codes
-		static constexpr const char* COLOUR_RED   { "\033[31m" };
-		static constexpr const char* COLOUR_GREEN { "\033[32m" };
-		static constexpr const char* COLOUR_YELLOW{ "\033[33m" };
-		static constexpr const char* COLOUR_CYAN  { "\033[36m" };
-		static constexpr const char* COLOUR_WHITE { "\033[97m" }; //37 (regular white) is quite dark, use 97 (high intensity white)
-		static constexpr const char* COLOUR_RESET { "\033[0m"  };
 
 		//For output-formatting
 		enum class LOGGER_WIDTH : std::uint32_t

@@ -21,7 +21,7 @@ namespace NK
 
 	private:
 		VkImage m_texture{ VK_NULL_HANDLE };
-		VkDeviceMemory m_memory{ VK_NULL_HANDLE };
+		VmaAllocation m_allocation{ VK_NULL_HANDLE };
 	};
 
 }

@@ -366,7 +366,7 @@ namespace NK
 		camDataBufferViewDesc.type = BUFFER_VIEW_TYPE::UNIFORM;
 		m_camDataBufferView = m_device->CreateBufferView(m_camDataBuffer.get(), camDataBufferViewDesc);
 
-		m_camDataBufferMap = m_camDataBuffer->Map();
+		m_camDataBufferMap = m_camDataBuffer->GetMap();
 	}
 
 
