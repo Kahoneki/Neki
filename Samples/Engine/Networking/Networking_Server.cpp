@@ -76,7 +76,12 @@ public:
 		m_postAppLayers.push_back(m_serverNetworkLayer.get());
 
 		
-		m_serverNetworkLayer->Host(7777);
+		const NK::NETWORK_LAYER_ERROR_CODE err{ m_serverNetworkLayer->Host(7777) };
+		if (!NET_SUCCESS(err))
+		{
+			NK::Context::GetLogger()->IndentLog(NK::LOGGER_CHANNEL::ERROR, NK::LOGGER_LAYER::APPLICATION, "Failed to host - error = " + std::to_string(std::to_underlying(err)) + "\n");
+			throw std::runtime_error("");
+		}
 	}
 
 
