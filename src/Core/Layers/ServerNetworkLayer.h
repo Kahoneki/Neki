@@ -50,7 +50,7 @@ namespace NK
 		sf::TcpListener m_tcpListener;
 		sf::TcpSocket m_tcpSocket;
 		sf::UdpSocket m_udpSocket;
-		std::unordered_map<std::string, ClientIndex> m_connectedClients; //For fast lookup (client ip -> client index)
+		std::unordered_map<std::string, ClientIndex> m_connectedClients; //For fast lookup (client ip:port -> client index)
 		std::unordered_map<ClientIndex, sf::TcpSocket> m_connectedClientTCPSockets;
 		std::unordered_map<ClientIndex, unsigned short> m_connectedClientUDPPorts;
 		UniquePtr<FreeListAllocator> m_clientIndexAllocator;

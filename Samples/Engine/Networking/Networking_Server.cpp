@@ -68,7 +68,7 @@ public:
 		
 		//Post-app layers
 		NK::ServerNetworkLayerDesc serverDesc{};
-		serverDesc.maxClients = 1;
+		serverDesc.maxClients = 2;
 		serverDesc.type = NK::SERVER_TYPE::LAN;
 		m_serverNetworkLayer = NK::UniquePtr<NK::ServerNetworkLayer>(NK_NEW(NK::ServerNetworkLayer, m_reg, serverDesc));
 		

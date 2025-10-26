@@ -134,9 +134,9 @@ namespace NK
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Disconnecting From Server.\n");
 		
 
-		if (m_state == CLIENT_STATE::CONNECTED)
+		if (m_state != CLIENT_STATE::CONNECTED)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Disconnect() - client is not currently connected to a server - m_state = " + std::to_string(std::to_underlying(m_state)));
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Disconnect() - client is not currently connected to a server - m_state = " + std::to_string(std::to_underlying(m_state)) + "\n");
 			throw std::runtime_error("");
 		}
 

@@ -140,7 +140,8 @@ namespace NK
 
 			//Connection was successful, add to map
 			m_connectedClientTCPSockets[m_nextClientIndex] = std::move(socket);
-			m_connectedClients[m_connectedClientTCPSockets[m_nextClientIndex].getRemoteAddress()->toString()] = m_nextClientIndex;
+			const std::string key{ m_connectedClientTCPSockets[m_nextClientIndex].getRemoteAddress()->toString() + ":" + std::to_string(m_connectedClientTCPSockets[m_nextClientIndex].getRemotePort()) };
+			m_connectedClients[key] = m_nextClientIndex;
 			
 			//Send client index back to client
 			sf::Packet outgoingPacket;
@@ -258,7 +259,8 @@ namespace NK
 		while (m_udpSocket.receive(incomingData, incomingClientIP, incomingClientPort) == sf::Socket::Status::Done)
 		{
 			//Make sure client is connected through TCP
-			if (!m_connectedClients.contains(incomingClientIP->toString().c_str()))
+			const std::string key{ incomingClientIP->toString() + ":" + std::to_string(incomingClientPort) };
+			if (!m_connectedClients.contains(key))
 			{
 				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Client at address " + incomingClientIP->toString() + ":" + std::to_string(incomingClientPort) + " attempted to send UDP packet without being connected through TCP\n");
 
@@ -268,7 +270,7 @@ namespace NK
 				continue;
 			}
 			
-			const ClientIndex& index{ m_connectedClients[incomingClientIP->toString().c_str()] };
+			const ClientIndex& index{ m_connectedClients[key] };
 			clientPackets[index].push_back(incomingData);
 
 			//Ensure client hasn't sent more UDP packets this tick than is allowed
@@ -342,7 +344,8 @@ namespace NK
 	{
 		m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Client (index: " + std::to_string(_index) + ") disconnected from the server\n");
 		if (m_connectedClientUDPPorts.contains(_index)) { m_connectedClientUDPPorts.erase(_index); }
-		if (m_connectedClients.contains(m_connectedClientTCPSockets[_index].getRemoteAddress()->toString())) { m_connectedClients.erase(m_connectedClientTCPSockets[_index].getRemoteAddress()->toString()); }
+		const std::string key{ m_connectedClientTCPSockets[_index].getRemoteAddress()->toString() + ":" + std::to_string(m_connectedClientTCPSockets[_index].getRemotePort()) };
+		if (m_connectedClients.contains(key)) { m_connectedClients.erase(key); }
 		m_clientIndexAllocator->Free(_index);
 		m_nextClientIndex = m_clientIndexAllocator->Allocate();
 		return m_connectedClientTCPSockets.erase(m_connectedClientTCPSockets.find(_index));

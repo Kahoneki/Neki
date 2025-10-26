@@ -79,6 +79,7 @@ public:
 			NK::Context::GetLogger()->IndentLog(NK::LOGGER_CHANNEL::ERROR, NK::LOGGER_LAYER::APPLICATION, "Failed to connect - error = " + std::to_string(std::to_underlying(err)) + "\n");
 			throw std::runtime_error("");
 		}
+//		m_clientNetworkLayer->Disconnect();
 	}
 
 
