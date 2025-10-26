@@ -589,7 +589,7 @@ namespace NK
 	enum class SERVER_TYPE
 	{
 		LAN,
-		WAN, //Requires router port-forwarding
+		WAN, //Requires manual router port-forwarding - todo: look into udp hole punching?
 	};
 
 	enum class NETWORK_SYSTEM_TYPE
@@ -615,6 +615,7 @@ namespace NK
 		CLIENT__FAILED_TO_SEND_UDP_PORT_PACKET,
 		CLIENT__FAILED_TO_DISCONNECT_FROM_SERVER,
 	};
+	#define NET_SUCCESS(CODE) (CODE == NK::NETWORK_LAYER_ERROR_CODE::SUCCESS)
 
 	enum class PACKET_CODE : std::uint32_t
 	{

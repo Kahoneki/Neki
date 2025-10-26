@@ -6,15 +6,16 @@
 #include <Components/CTransform.h>
 #include <Core/EngineConfig.h>
 #include <Core/RAIIContext.h>
-#include <Core/Layers/ModelVisibilityLayer.h>
 #include <Core/Layers/InputLayer.h>
+#include <Core/Layers/ModelVisibilityLayer.h>
 #include <Core/Layers/PlayerCameraLayer.h>
 #include <Core/Layers/RenderLayer.h>
+#include <Core/Layers/ServerNetworkLayer.h>
+#include <Core/Layers/WindowLayer.h>
 #include <Graphics/Camera/PlayerCamera.h>
 #include <Managers/InputManager.h>
 #include <Managers/TimeManager.h>
 
-#include "Core/Layers/ServerNetworkLayer.h"
 
 
 class GameScene final : public NK::Scene
@@ -39,47 +40,68 @@ private:
 class GameApp final : public NK::Application
 {
 public:
-	explicit GameApp()
+	explicit GameApp() : Application(1)
 	{
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
 		m_activeScene = 0;
 
-		NK::ServerNetworkLayerDesc serverNetworkLayerDesc{};
-		serverNetworkLayerDesc.maxClients = 1;
-		serverNetworkLayerDesc.type = NK::SERVER_TYPE::LAN;
-		m_postAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::ServerNetworkLayer, serverNetworkLayerDesc)));
-		
-		NK::RenderLayerDesc renderLayerDesc{};
-		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::NONE;
-		m_postAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::RenderLayer, renderLayerDesc)));
-		
-		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[1].get())->GetWindow() };
-		
-		NK::InputLayerDesc inputLayerDesc{};
-		inputLayerDesc.window = window;
-		m_preAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::InputLayer, inputLayerDesc)));
-		
-		m_preAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::PlayerCameraLayer)));
 
-		NK::InputManager::SetWindow(window);
-		glfwSetInputMode(window->GetGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		//Window
+		NK::WindowDesc windowDesc;
+		windowDesc.name = "Networking Sample";
+		windowDesc.size = { 1920, 1080 };
+		m_window = NK::UniquePtr<NK::Window>(NK_NEW(NK::Window, windowDesc));
+		m_window->SetCursorVisibility(false);
+
+		m_windowEntity = m_reg.Create();
+		NK::CWindow& windowComponent{ m_reg.AddComponent<NK::CWindow>(m_windowEntity) };
+		windowComponent.window = m_window.get();
+		
+
+		//Pre-app layers
+		m_windowLayer = NK::UniquePtr<NK::WindowLayer>(NK_NEW(NK::WindowLayer, m_reg));
+		NK::InputLayerDesc inputLayerDesc{ m_window.get() };
+		m_inputLayer = NK::UniquePtr<NK::InputLayer>(NK_NEW(NK::InputLayer, m_scenes[m_activeScene]->m_reg, inputLayerDesc));
+		
+		m_preAppLayers.push_back(m_windowLayer.get());
+		m_preAppLayers.push_back(m_inputLayer.get());
+		
+		
+		//Post-app layers
+		NK::ServerNetworkLayerDesc serverDesc{};
+		serverDesc.maxClients = 1;
+		serverDesc.type = NK::SERVER_TYPE::LAN;
+		m_serverNetworkLayer = NK::UniquePtr<NK::ServerNetworkLayer>(NK_NEW(NK::ServerNetworkLayer, m_reg, serverDesc));
+		
+		m_postAppLayers.push_back(m_serverNetworkLayer.get());
+
+		
+		m_serverNetworkLayer->Host(7777);
 	}
 
 
 
 	virtual void Update() override
 	{
-		NK::InputManager::UpdateMouse();
 		m_scenes[m_activeScene]->Update();
 
-		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[1].get())->GetWindow() };
-		glfwSetWindowShouldClose(window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
+		glfwSetWindowShouldClose(m_window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
 		
-		m_shutdown = window->ShouldClose();
+		m_shutdown = m_window->ShouldClose();
 	}
-	
-};
 
+
+private:
+	NK::UniquePtr<NK::Window> m_window;
+	NK::Entity m_windowEntity;
+
+	//Pre-app layers
+	NK::UniquePtr<NK::WindowLayer> m_windowLayer;
+	NK::UniquePtr<NK::InputLayer> m_inputLayer;
+	
+	//Post-app layers
+	NK::UniquePtr<NK::ServerNetworkLayer> m_serverNetworkLayer;
+};
 
 
 

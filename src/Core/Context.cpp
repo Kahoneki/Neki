@@ -16,7 +16,9 @@ namespace NK
 
 	void GLFWErrorCallback(int _error, const char* _description)
 	{
-		Context::GetLogger()->IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GLFW, _description);
+		std::string msg{ _description };
+		if (msg.back() != '\n') { msg += '\n'; } //glfw just like sometimes doesn't do this
+		Context::GetLogger()->IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GLFW, msg);
 	}
 
 

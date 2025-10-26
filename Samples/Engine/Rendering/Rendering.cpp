@@ -152,7 +152,7 @@ private:
 
 [[nodiscard]] NK::ContextConfig CreateContext()
 {
-	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, false };
+	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
