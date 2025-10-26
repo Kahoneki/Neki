@@ -38,7 +38,6 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() override;
 		[[nodiscard]] virtual UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc) override;
-		[[nodiscard]] virtual UniquePtr<Window> CreateWindow(const WindowDesc& _desc) const override;
 
 		[[nodiscard]] virtual TextureCopyMemoryLayout GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture) override;
 

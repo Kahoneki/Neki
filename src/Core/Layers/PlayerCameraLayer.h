@@ -13,10 +13,10 @@ namespace NK
 	class PlayerCameraLayer final : public ILayer
 	{
 	public:
-		explicit PlayerCameraLayer();
+		explicit PlayerCameraLayer(Registry& _reg);
 		virtual ~PlayerCameraLayer() override;
 
-		virtual void Update(Registry& _reg) override;
+		virtual void Update() override;
 	};
 
 }

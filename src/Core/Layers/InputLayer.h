@@ -12,6 +12,7 @@ namespace NK
 
 	struct InputLayerDesc
 	{
+		explicit InputLayerDesc(const Window* _window) : window(_window) {}
 		const Window* window;
 	};
 	
@@ -19,10 +20,10 @@ namespace NK
 	class InputLayer final : public ILayer
 	{
 	public:
-		explicit InputLayer(const InputLayerDesc& _desc);
+		explicit InputLayer(Registry& _reg, const InputLayerDesc& _desc);
 		virtual ~InputLayer() override;
 
-		virtual void Update(Registry& _reg) override;
+		virtual void Update() override;
 		
 		
 	private:

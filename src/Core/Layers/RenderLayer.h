@@ -5,6 +5,7 @@
 #include <Components/CCamera.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
+#include <Components/CWindow.h>
 #include <Core-ECS/Registry.h>
 #include <Graphics/GPUUploader.h>
 #include <Graphics/Window.h>
@@ -18,7 +19,12 @@ namespace NK
 
 	struct RenderLayerDesc
 	{
-		GRAPHICS_BACKEND backend{ GRAPHICS_BACKEND::NONE };
+		explicit RenderLayerDesc(const GRAPHICS_BACKEND _backend, const bool _enableMSAA, const SAMPLE_COUNT _msaaSampleCount, const bool _enableSSAA, const std::uint32_t _ssaaMultiplier, Window* _window, std::uint32_t _framesInFlight)
+		: backend(_backend), enableMSAA(_enableMSAA), msaaSampleCount(_msaaSampleCount), enableSSAA(_enableSSAA), ssaaMultiplier(_ssaaMultiplier), window(_window), framesInFlight(_framesInFlight) {}
+
+		RenderLayerDesc() {}
+
+		GRAPHICS_BACKEND backend{ GRAPHICS_BACKEND::VULKAN };
 		
 		bool enableMSAA{ false };
 		SAMPLE_COUNT msaaSampleCount{ SAMPLE_COUNT::BIT_1 };
@@ -26,7 +32,7 @@ namespace NK
 		bool enableSSAA{ false };
 		std::uint32_t ssaaMultiplier{ 1 };
 
-		WindowDesc windowDesc{ "App", glm::ivec2(800, 800) };
+		Window* window{ nullptr };
 
 		std::uint32_t framesInFlight{ 3 };
 	};
@@ -35,12 +41,10 @@ namespace NK
 	class RenderLayer final : public ILayer
 	{
 	public:
-		explicit RenderLayer(const RenderLayerDesc& _desc);
+		explicit RenderLayer(Registry& _reg, const RenderLayerDesc& _desc);
 		virtual ~RenderLayer() override;
 
-		virtual void Update(Registry& _reg) override;
-
-		[[nodiscard]] inline const Window* GetWindow() const { return m_window.get(); }
+		virtual void Update() override;
 		
 		
 	private:
@@ -73,7 +77,6 @@ namespace NK
 		UniquePtr<GPUUploader> m_gpuUploader;
 		UniquePtr<IFence> m_gpuUploaderFlushFence;
 		bool m_newGPUUploaderUpload; //True if there are any new gpu uploader uploads since last frame
-		UniquePtr<Window> m_window;
 		UniquePtr<ISurface> m_surface;
 		UniquePtr<ISwapchain> m_swapchain;
 		UniquePtr<ISampler> m_linearSampler;

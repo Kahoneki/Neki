@@ -12,8 +12,13 @@ namespace NK
 
 	struct ServerNetworkLayerDesc
 	{
-		SERVER_TYPE type;
-		std::uint32_t maxClients;
+		explicit ServerNetworkLayerDesc(const SERVER_TYPE _type, const std::uint32_t _maxClients, const double _portClaimTimeout, const std::uint32_t _maxTCPPacketsPerClientTick, const std::uint32_t _maxUDPPacketsPerClientTick)
+		: type(_type), maxClients(_maxClients), portClaimTimeout(_portClaimTimeout), maxTCPPacketsPerClientPerTick(_maxTCPPacketsPerClientTick), maxUDPPacketsPerClientPerTick(_maxUDPPacketsPerClientTick) {}
+
+		ServerNetworkLayerDesc() {}
+
+		SERVER_TYPE type{ SERVER_TYPE::LAN };
+		std::uint32_t maxClients{ 0 };
 		double portClaimTimeout{ 999999 }; //Time in seconds the server is allowed to try and claim the port for before timing out
 		std::uint32_t maxTCPPacketsPerClientPerTick{ 128u }; //If a client sends more TCP packets than this in a single tick, they will be kicked from the server
 		std::uint32_t maxUDPPacketsPerClientPerTick{ 512u }; //If a client sends more TCP packets than this in a single tick, they will be kicked from the server
@@ -23,18 +28,18 @@ namespace NK
 	class ServerNetworkLayer final : public ILayer
 	{
 	public:
-		explicit ServerNetworkLayer(const ServerNetworkLayerDesc& _desc);
+		explicit ServerNetworkLayer(Registry& _reg, const ServerNetworkLayerDesc& _desc);
 		virtual ~ServerNetworkLayer() override;
 
-		virtual void Update(Registry& _reg) override;
+		virtual void Update() override;
 		NETWORK_LAYER_ERROR_CODE Host(const unsigned short _port);
 		
 		
 	private:
 		//Init sub-functions
 		[[nodiscard]] NETWORK_LAYER_ERROR_CODE CheckForIncomingConnectionRequests();
-		[[nodiscard]] NETWORK_LAYER_ERROR_CODE CheckForIncomingTCPData(Registry& _reg);
-		[[nodiscard]] NETWORK_LAYER_ERROR_CODE CheckForIncomingUDPData(Registry& _reg);
+		[[nodiscard]] NETWORK_LAYER_ERROR_CODE CheckForIncomingTCPData();
+		[[nodiscard]] NETWORK_LAYER_ERROR_CODE CheckForIncomingUDPData();
 		std::unordered_map<ClientIndex, sf::TcpSocket>::iterator DisconnectClient(const ClientIndex _index); //Returns iterator to next valid iterator position in m_connectedClientTCPSockets
 		
 		

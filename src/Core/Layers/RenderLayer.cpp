@@ -26,8 +26,8 @@
 namespace NK
 {
 
-	RenderLayer::RenderLayer(const RenderLayerDesc& _desc)
-	: m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.windowDesc.size)
+	RenderLayer::RenderLayer(Registry& _reg, const RenderLayerDesc& _desc)
+	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.window->GetSize())
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Initialising Render Layer\n");
@@ -72,11 +72,11 @@ namespace NK
 
 
 
-	void RenderLayer::Update(Registry& _reg)
+	void RenderLayer::Update()
 	{
 		//Update skybox
 		bool found{ false };
-		for (auto&& [skybox] : _reg.View<CSkybox>())
+		for (auto&& [skybox] : m_reg.get().View<CSkybox>())
 		{
 			if (found)
 			{
@@ -98,7 +98,7 @@ namespace NK
 
 		//Update camera
 		found = false;
-		for (auto&& [camera] : _reg.View<CCamera>())
+		for (auto&& [camera] : m_reg.get().View<CCamera>())
 		{
 			if (found)
 			{
@@ -134,8 +134,8 @@ namespace NK
 		m_graphicsCommandBuffers[m_currentFrame]->BeginRendering(1, m_desc.enableMSAA ? m_intermediateRenderTargetView.get() : nullptr, m_desc.enableSSAA ? m_intermediateRenderTargetView.get() : m_swapchain->GetImageView(imageIndex), m_intermediateDepthBufferView.get(), nullptr);
 		m_graphicsCommandBuffers[m_currentFrame]->BindRootSignature(m_meshPiplineRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-		m_graphicsCommandBuffers[m_currentFrame]->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.windowDesc.size });
-		m_graphicsCommandBuffers[m_currentFrame]->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.windowDesc.size });
+		m_graphicsCommandBuffers[m_currentFrame]->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+		m_graphicsCommandBuffers[m_currentFrame]->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
 
 		//Draw
@@ -165,9 +165,8 @@ namespace NK
 		}
 
 		//Models (Loading Phase)
-		for (auto&& [modelRenderer] : _reg.View<CModelRenderer>())
+		for (auto&& [modelRenderer] : m_reg.get().View<CModelRenderer>())
 		{
-			const bool inCache{ m_gpuModelCache.contains(modelRenderer.modelPath) };
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
 				//Model is visible but isn't loaded, load it
@@ -192,7 +191,7 @@ namespace NK
 
 		//Models (Rendering Phase)
 		std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
-		for (auto&& [modelRenderer, transform] : _reg.View<CModelRenderer, CTransform>())
+		for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 		{
 			if (!modelRenderer.visible) { continue; }
 			
@@ -258,11 +257,6 @@ namespace NK
 		//Initialise device
 		switch (m_desc.backend)
 		{
-		case GRAPHICS_BACKEND::NONE:
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::NONE, RenderLayer should not have been initialised by Engine - this error message indicates an internal error with the engine, please make a GitHub issue on the topic.\n");
-			throw std::invalid_argument("");
-		}
 		case GRAPHICS_BACKEND::VULKAN:
 		{
 			#ifdef NEKI_VULKAN_SUPPORTED
@@ -322,9 +316,8 @@ namespace NK
 		m_gpuUploaderFlushFence = m_device->CreateFence(gpuUploaderFlushFenceDesc);
 		m_newGPUUploaderUpload = false;
 
-		//Window and Surface
-		m_window = m_device->CreateWindow(m_desc.windowDesc);
-		m_surface = m_device->CreateSurface(m_window.get());
+		//Surface
+		m_surface = m_device->CreateSurface(m_desc.window);
 
 		//Swapchain
 		SwapchainDesc swapchainDesc{};
@@ -563,7 +556,7 @@ namespace NK
 		TextureDesc renderTargetDesc{};
 		renderTargetDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		renderTargetDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
-		renderTargetDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.windowDesc.size, 1);
+		renderTargetDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.window->GetSize(), 1);
 		renderTargetDesc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT; //Needs TRANSFER_SRC_BIT for supersampling algorithm
 		renderTargetDesc.arrayTexture = false;
 		renderTargetDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
@@ -581,7 +574,7 @@ namespace NK
 		TextureDesc depthBufferDesc{};
 		depthBufferDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		depthBufferDesc.format = DATA_FORMAT::D32_SFLOAT;
-		depthBufferDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.windowDesc.size, 1);
+		depthBufferDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.window->GetSize(), 1);
 		depthBufferDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT;
 		depthBufferDesc.arrayTexture = false;
 		depthBufferDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
@@ -637,7 +630,7 @@ namespace NK
 		constexpr float epsilon{ 0.1f }; //Buffer for floating-point-comparison-imprecision mitigation
 		if (std::abs(_camera.camera->GetAspectRatio() - WIN_ASPECT_RATIO) < epsilon)
 		{
-			_camera.camera->SetAspectRatio(static_cast<float>(m_desc.windowDesc.size.x) / m_desc.windowDesc.size.y);
+			_camera.camera->SetAspectRatio(static_cast<float>(m_desc.window->GetSize().x) / m_desc.window->GetSize().y);
 		}
 		
 		const CameraShaderData camShaderData{ _camera.camera->GetCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };

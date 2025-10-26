@@ -1,16 +1,16 @@
 #pragma once
 
 #include <Core/Memory/Allocation.h>
-#include <Graphics/Camera/Camera.h>
+#include <Graphics/Window.h>
 
 
 namespace NK
 {
 
-	struct CCamera
+	struct CWindow final
 	{
 	public:
-		Camera* camera;
+		Window* window;
 	};
 	
 }

@@ -72,9 +72,8 @@ namespace NK
 			return (m_actionToInputTypeMap.contains(key) ? m_actionToInputTypeMap[key] : INPUT_BINDING_TYPE::UNBOUND);
 		}
 		
-
-		//To be called every frame if NK::MOUSE is being used
-		static void UpdateMouse();
+		
+		static void Update();
 		
 
 		[[nodiscard]] static bool GetKeyPressed(const KEYBOARD _key);

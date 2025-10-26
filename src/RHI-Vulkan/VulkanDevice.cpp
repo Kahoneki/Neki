@@ -254,13 +254,6 @@ namespace NK
 
 
 
-	UniquePtr<Window> VulkanDevice::CreateWindow(const WindowDesc& _desc) const
-	{
-		return UniquePtr<Window>(NK_NEW(Window, m_logger, _desc));
-	}
-
-
-
 	TextureCopyMemoryLayout VulkanDevice::GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture)
 	{
 		TextureCopyMemoryLayout memLayout{};

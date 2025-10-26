@@ -11,15 +11,19 @@ namespace NK
 	class ILayer
 	{
 	public:
-		explicit ILayer() : m_logger(*Context::GetLogger()) {}
+		explicit ILayer(Registry& _reg) : m_logger(*Context::GetLogger()), m_reg(_reg) {}
 		virtual ~ILayer() = default;
 
-		virtual void Update(Registry& _reg) = 0;
+		inline void SetRegistry(Registry& _reg) { m_reg = _reg; }
+		
+		virtual void Update() = 0;
 
 
 	protected:
 		//Dependency injections
 		ILogger& m_logger;
+
+		std::reference_wrapper<Registry> m_reg;
 	};
 
 }

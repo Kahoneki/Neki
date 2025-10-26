@@ -5,9 +5,9 @@ namespace NK
 {
 
 
-	void InputManager::UpdateMouse()
+	void InputManager::Update()
 	{
-		if (!m_window) { throw std::runtime_error("InputManager::UpdateMouse() was called, but m_window is nullptr. Set the window with InputManager::SetWindow()"); }
+		if (!m_window) { throw std::runtime_error("InputManager::Update() was called, but m_window is nullptr. Set the window with InputManager::SetWindow()"); }
 
 		if (m_firstUpdate)
 		{

@@ -8,7 +8,7 @@ namespace NK
 
 	struct CModelRenderer
 	{
-		friend class DiskModelLoaderLayer;
+		friend class ModelVisibilityLayer;
 		friend class RenderLayer;
 
 

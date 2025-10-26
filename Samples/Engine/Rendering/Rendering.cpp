@@ -6,10 +6,11 @@
 #include <Components/CTransform.h>
 #include <Core/EngineConfig.h>
 #include <Core/RAIIContext.h>
-#include <Core/Layers/DiskModelLoaderLayer.h>
 #include <Core/Layers/InputLayer.h>
+#include <Core/Layers/ModelVisibilityLayer.h>
 #include <Core/Layers/PlayerCameraLayer.h>
 #include <Core/Layers/RenderLayer.h>
+#include <Core/Layers/WindowLayer.h>
 #include <Graphics/Camera/PlayerCamera.h>
 #include <Managers/InputManager.h>
 #include <Managers/TimeManager.h>
@@ -18,7 +19,7 @@
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(3), m_playerCamera(NK::PlayerCamera(glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f))
+	explicit GameScene() : Scene(3), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
 	{
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
@@ -26,8 +27,8 @@ public:
 		skybox.SetFileExtension("jpg");
 
 		//ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
-		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
-		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath, true, true);
+//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
+//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath, true, true);
 		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& modelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
@@ -38,7 +39,7 @@ public:
 
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
-		camera.camera = &m_playerCamera;
+		camera.camera = m_playerCamera.get();
 
 
 		//Inputs
@@ -72,59 +73,86 @@ private:
 	NK::Entity m_skyboxEntity;
 	NK::Entity m_helmetEntity;
 	NK::Entity m_cameraEntity;
-	NK::PlayerCamera m_playerCamera;
+	NK::UniquePtr<NK::PlayerCamera> m_playerCamera;
 };
 
 
 class GameApp final : public NK::Application
 {
 public:
-	explicit GameApp()
+	explicit GameApp() : Application(1)
 	{
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
 		m_activeScene = 0;
 
-		m_postAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::DiskModelLoaderLayer)));
+
+		//Window
+		NK::WindowDesc windowDesc;
+		windowDesc.name = "Rendering Sample";
+		windowDesc.size = { 1920, 1080 };
+		m_window = NK::UniquePtr<NK::Window>(NK_NEW(NK::Window, windowDesc));
+		m_window->SetCursorVisibility(false);
+
+		m_windowEntity = m_reg.Create();
+		NK::CWindow& windowComponent{ m_reg.AddComponent<NK::CWindow>(m_windowEntity) };
+		windowComponent.window = m_window.get();
 		
+
+		//Pre-app layers
+		m_windowLayer = NK::UniquePtr<NK::WindowLayer>(NK_NEW(NK::WindowLayer, m_reg));
+		NK::InputLayerDesc inputLayerDesc{ m_window.get() };
+		m_inputLayer = NK::UniquePtr<NK::InputLayer>(NK_NEW(NK::InputLayer, m_scenes[m_activeScene]->m_reg, inputLayerDesc));
+		m_playerCameraLayer = NK::UniquePtr<NK::PlayerCameraLayer>(NK_NEW(NK::PlayerCameraLayer, m_scenes[m_activeScene]->m_reg));
+
+		m_preAppLayers.push_back(m_windowLayer.get());
+		m_preAppLayers.push_back(m_inputLayer.get());
+		m_preAppLayers.push_back(m_playerCameraLayer.get());
+		
+		
+		//Post-app layers
+		m_modelVisibilityLayer = NK::UniquePtr<NK::ModelVisibilityLayer>(NK_NEW(NK::ModelVisibilityLayer, m_scenes[m_activeScene]->m_reg));
 		NK::RenderLayerDesc renderLayerDesc{};
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 		renderLayerDesc.enableSSAA = true;
 		renderLayerDesc.ssaaMultiplier = 4;
-		renderLayerDesc.windowDesc.size = { 1920, 1080 };
-		m_postAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::RenderLayer, renderLayerDesc)));
-		
-		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[1].get())->GetWindow() };
-		
-		NK::InputLayerDesc inputLayerDesc{};
-		inputLayerDesc.window = window;
-		m_preAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::InputLayer, inputLayerDesc)));
-		
-		m_preAppLayers.push_back(NK::UniquePtr<NK::ILayer>(NK_NEW(NK::PlayerCameraLayer)));
+		renderLayerDesc.window = m_window.get();
+		m_renderLayer = NK::UniquePtr<NK::RenderLayer>(NK_NEW(NK::RenderLayer, m_scenes[m_activeScene]->m_reg,  renderLayerDesc));
 
-		NK::InputManager::SetWindow(window);
-		glfwSetInputMode(window->GetGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		m_postAppLayers.push_back(m_modelVisibilityLayer.get());
+		m_postAppLayers.push_back(m_renderLayer.get());
 	}
 
 
 
 	virtual void Update() override
 	{
-		NK::InputManager::UpdateMouse();
 		m_scenes[m_activeScene]->Update();
 
-		const NK::Window* const window{ dynamic_cast<NK::RenderLayer*>(m_postAppLayers[1].get())->GetWindow() };
-		glfwSetWindowShouldClose(window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
+		glfwSetWindowShouldClose(m_window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
 		
-		m_shutdown = window->ShouldClose();
+		m_shutdown = m_window->ShouldClose();
 	}
-	
+
+
+private:
+	NK::UniquePtr<NK::Window> m_window;
+	NK::Entity m_windowEntity;
+
+	//Pre-app layers
+	NK::UniquePtr<NK::WindowLayer> m_windowLayer;
+	NK::UniquePtr<NK::InputLayer> m_inputLayer;
+	NK::UniquePtr<NK::PlayerCameraLayer> m_playerCameraLayer;
+
+	//Post-app layers
+	NK::UniquePtr<NK::ModelVisibilityLayer> m_modelVisibilityLayer;
+	NK::UniquePtr<NK::RenderLayer> m_renderLayer;
 };
 
 
 
 [[nodiscard]] NK::ContextConfig CreateContext()
 {
-	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, true };
+	NK::LoggerConfig loggerConfig{ NK::LOGGER_TYPE::CONSOLE, false };
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_GENERAL, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::VULKAN_VALIDATION, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);
 	loggerConfig.SetLayerChannelBitfield(NK::LOGGER_LAYER::TRACKING_ALLOCATOR, NK::LOGGER_CHANNEL::WARNING | NK::LOGGER_CHANNEL::ERROR);

@@ -12,6 +12,11 @@ namespace NK
 
 	struct ClientNetworkLayerDesc
 	{
+		explicit ClientNetworkLayerDesc(const double _serverConnectTimeout, const double _serverClientIndexPacketTimeout)
+		: serverConnectTimeout(_serverConnectTimeout), serverClientIndexPacketTimeout(_serverClientIndexPacketTimeout) {}
+
+		ClientNetworkLayerDesc() {}
+
 		double serverConnectTimeout{ 5.0 }; //Time in seconds the client is allowed to spend trying to connect to the server before timing out
 		double serverClientIndexPacketTimeout{ 5.0 }; //Time in seconds the client is allowed to spend waiting to receive their client index packet from the server
 	};
@@ -20,10 +25,10 @@ namespace NK
 	class ClientNetworkLayer final : public ILayer
 	{
 	public:
-		explicit ClientNetworkLayer(const ClientNetworkLayerDesc& _desc);
+		explicit ClientNetworkLayer(Registry& _reg, const ClientNetworkLayerDesc& _desc);
 		virtual ~ClientNetworkLayer() override;
 
-		virtual void Update(Registry& _reg) override;
+		virtual void Update() override;
 		NETWORK_LAYER_ERROR_CODE Connect(const char* _ip, const unsigned short _port);
 		NETWORK_LAYER_ERROR_CODE Disconnect();
 		

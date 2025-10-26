@@ -27,10 +27,11 @@ namespace NK
 	struct CommandPoolDesc;
 
 	class ISurface;
+	class Window;
 
 	class ISwapchain;
 	struct SwapchainDesc;
-
+	
 	class IShader;
 	struct ShaderDesc;
 
@@ -50,9 +51,6 @@ namespace NK
 
 	class GPUUploader;
 	struct GPUUploaderDesc;
-
-	class Window;
-	struct WindowDesc;
 
 	
 	constexpr std::uint32_t MAX_BINDLESS_RESOURCES{ 65536 };
@@ -84,7 +82,6 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) = 0;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() = 0;
 		[[nodiscard]] virtual UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc) = 0;
-		[[nodiscard]] virtual UniquePtr<Window> CreateWindow(const WindowDesc& _desc) const = 0;
 
 		//When copying data from a buffer to a texture, the buffer data needs to be in a specific layout that depends on the destination texture
 		//This function calculates it for you

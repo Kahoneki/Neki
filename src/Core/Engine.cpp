@@ -36,7 +36,6 @@ namespace NK
 	{
 		while (!m_application->m_shutdown)
 		{
-			glfwPollEvents();
 			TimeManager::Update();
 			m_application->PreUpdate();
 			m_application->Update();

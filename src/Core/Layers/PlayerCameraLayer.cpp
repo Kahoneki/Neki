@@ -10,7 +10,7 @@
 namespace NK
 {
 
-	PlayerCameraLayer::PlayerCameraLayer()
+	PlayerCameraLayer::PlayerCameraLayer(Registry& _reg) : ILayer(_reg)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::PLAYER_CAMERA_LAYER, "Initialising Player Camera Layer\n");
@@ -30,7 +30,7 @@ namespace NK
 
 
 
-	void PlayerCameraLayer::Update(Registry& _reg)
+	void PlayerCameraLayer::Update()
 	{
 		if (InputManager::GetActionInputType(PLAYER_CAMERA_ACTIONS::MOVE) != INPUT_BINDING_TYPE::AXIS_2D)
 		{
@@ -42,7 +42,7 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PLAYER_CAMERA_LAYER, "PlayerCameraLayer::Update() - PLAYER_CAMERA_ACTIONS::YAW_PITCH is not bound to INPUT_TYPE::AXIS_2D as required");
 		}
 
-		for (auto&& [camera, input] : _reg.View<CCamera, CInput>())
+		for (auto&& [camera, input] : m_reg.get().View<CCamera, CInput>())
 		{
 			PlayerCamera* pc{ dynamic_cast<PlayerCamera*>(camera.camera) };
 			if (!pc) { continue; }

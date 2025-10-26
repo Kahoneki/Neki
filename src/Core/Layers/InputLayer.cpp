@@ -7,11 +7,13 @@
 namespace NK
 {
 
-	InputLayer::InputLayer(const InputLayerDesc& _desc)
-	: m_desc(_desc)
+	InputLayer::InputLayer(Registry& _reg, const InputLayerDesc& _desc)
+	: ILayer(_reg), m_desc(_desc)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::INPUT_LAYER, "Initialising Input Layer\n");
+
+		InputManager::SetWindow(m_desc.window);
 		
 		m_logger.Unindent();
 	}
@@ -28,10 +30,12 @@ namespace NK
 
 
 
-	void InputLayer::Update(Registry& _reg)
+	void InputLayer::Update()
 	{
+		InputManager::Update();
+		
 		//Get all input components and populate their action states with the input manager
-		for (auto&& [input] : _reg.View<CInput>())
+		for (auto&& [input] : m_reg.get().View<CInput>())
 		{
 			for (std::unordered_map<ActionTypeMapKey, INPUT_STATE_VARIANT>::iterator it{ input.actionStates.begin() }; it != input.actionStates.end(); ++it)
 			{

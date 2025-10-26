@@ -13,14 +13,14 @@ namespace NK
 		
 		
 	public:
-		Application() = default;
+		explicit Application(const std::size_t _maxEntities) : m_reg(_maxEntities) {}
 		virtual ~Application() = default;
 
 		inline virtual void PreUpdate() const final
 		{
-			for (const UniquePtr<ILayer>& l : m_preAppLayers)
+			for (ILayer* const l : m_preAppLayers)
 			{
-				l->Update(m_scenes[m_activeScene]->m_reg);
+				l->Update();
 			}
 		}
 
@@ -29,22 +29,25 @@ namespace NK
 
 		inline virtual void PostUpdate() const final
 		{
-			for (const UniquePtr<ILayer>& l : m_postAppLayers)
+			for (ILayer* const l : m_postAppLayers)
 			{
-				l->Update(m_scenes[m_activeScene]->m_reg);
+				l->Update();
 			}
 		}
 
 
 	protected:
-		std::vector<UniquePtr<ILayer>> m_preAppLayers;
-		std::vector<UniquePtr<ILayer>> m_postAppLayers;
+		//Non-owning pointers, inherited application class should own these
+		std::vector<ILayer*> m_preAppLayers;
+		std::vector<ILayer*> m_postAppLayers;
 
 		std::vector<UniquePtr<Scene>> m_scenes;
-		std::size_t m_activeScene;
+		std::size_t m_activeScene{ 0 };
 
 		//Set to true when you want to shut down the application, the program will exit at the start of the next frame
 		bool m_shutdown{ false };
+
+		Registry m_reg;
 	};
 	
 }

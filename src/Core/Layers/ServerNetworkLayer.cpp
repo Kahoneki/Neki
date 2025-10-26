@@ -6,8 +6,8 @@
 namespace NK
 {
 
-	ServerNetworkLayer::ServerNetworkLayer(const ServerNetworkLayerDesc& _desc)
-	: m_desc(_desc), m_state(SERVER_STATE::NOT_HOSTING), m_clientIndexAllocator(NK_NEW(FreeListAllocator, m_desc.maxClients))
+	ServerNetworkLayer::ServerNetworkLayer(Registry& _reg, const ServerNetworkLayerDesc& _desc)
+	: ILayer(_reg), m_desc(_desc), m_state(SERVER_STATE::NOT_HOSTING), m_clientIndexAllocator(NK_NEW(FreeListAllocator, m_desc.maxClients))
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Initialising Server Network Layer\n");
@@ -25,7 +25,7 @@ namespace NK
 
 
 
-	void ServerNetworkLayer::Update(Registry& _reg)
+	void ServerNetworkLayer::Update()
 	{
 		m_logger.Indent();
 		
@@ -40,14 +40,14 @@ namespace NK
 			}
 		}
 
-		NETWORK_LAYER_ERROR_CODE err{ CheckForIncomingTCPData(_reg) };
+		NETWORK_LAYER_ERROR_CODE err{ CheckForIncomingTCPData() };
 		if (err != NETWORK_LAYER_ERROR_CODE::SUCCESS)
 		{
 			m_logger.Unindent();
 			return;
 		}
 
-		err = CheckForIncomingUDPData(_reg);
+		err = CheckForIncomingUDPData();
 		if (err != NETWORK_LAYER_ERROR_CODE::SUCCESS)
 		{
 			m_logger.Unindent();
@@ -161,7 +161,7 @@ namespace NK
 
 
 
-	NETWORK_LAYER_ERROR_CODE ServerNetworkLayer::CheckForIncomingTCPData(Registry& _reg)
+	NETWORK_LAYER_ERROR_CODE ServerNetworkLayer::CheckForIncomingTCPData()
 	{
 		//In the event of an error, store error code in err rather than returning immediately
 		//^Returning immediately could lead to, for example, a client whom was able to repeatedly flood the server with error packets being able to stop data for subsequent client being received
@@ -238,7 +238,7 @@ namespace NK
 
 
 
-	NETWORK_LAYER_ERROR_CODE ServerNetworkLayer::CheckForIncomingUDPData(Registry& _reg)
+	NETWORK_LAYER_ERROR_CODE ServerNetworkLayer::CheckForIncomingUDPData()
 	{
 		//In the event of an error, store error code in err rather than returning immediately
 		//^Returning immediately could lead to, for example, a client whom was able to repeatedly flood the server with error packets being able to stop data for subsequent client being received
