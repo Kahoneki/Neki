@@ -1,8 +1,8 @@
 #include "InputUtils.h"
 
+#include <GLFW/glfw3.h>
 #include <stdexcept>
-
-#include "GLFW/glfw3.h"
+#include <string>
 
 
 namespace NK

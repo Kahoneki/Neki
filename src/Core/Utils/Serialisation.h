@@ -5,7 +5,6 @@
 #include <cereal/types/atomic.hpp>
 #include <cereal/types/base_class.hpp>
 #include <cereal/types/bitset.hpp>
-#include <cereal/types/boost_variant.hpp>
 #include <cereal/types/chrono.hpp>
 #include <cereal/types/common.hpp>
 #include <cereal/types/complex.hpp>

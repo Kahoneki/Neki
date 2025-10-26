@@ -116,6 +116,7 @@ target_link_libraries(Neki PUBLIC sfml-network)
 
 #Cereal
 FetchContent_Declare(cereal GIT_REPOSITORY https://github.com/USCiLab/cereal.git GIT_TAG v1.3.2)
+set(SKIP_PERFORMANCE_COMPARISON ON CACHE BOOL "" FORCE) #disables boost requirement - i dont want to talk about how long this took to find
 FetchContent_MakeAvailable(cereal)
 target_link_libraries(Neki PUBLIC cereal)
 

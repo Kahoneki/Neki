@@ -51,7 +51,6 @@ public:
 		windowDesc.name = "Networking Sample";
 		windowDesc.size = { 1920, 1080 };
 		m_window = NK::UniquePtr<NK::Window>(NK_NEW(NK::Window, windowDesc));
-		m_window->SetCursorVisibility(false);
 
 		m_windowEntity = m_reg.Create();
 		NK::CWindow& windowComponent{ m_reg.AddComponent<NK::CWindow>(m_windowEntity) };
