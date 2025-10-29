@@ -428,14 +428,14 @@ namespace NK
 		INDEX_BUFFER,
 		CONSTANT_BUFFER,
 		INDIRECT_BUFFER,
-		SHADER_RESOURCE, //Equivalent to readonly vulkan storage buffer
+		SHADER_RESOURCE, //Equivalent to read-only vulkan storage buffer
 		COPY_SOURCE,
 		DEPTH_READ,
 		RESOLVE_SOURCE,
 
 		//Read/write
 		RENDER_TARGET,
-		UNORDERED_ACCESS, //Equivalent to readwrite vulkan storage buffer
+		UNORDERED_ACCESS, //Equivalent to read-write vulkan storage buffer
 		COPY_DEST,
 		DEPTH_WRITE,
 		RESOLVE_DEST,
@@ -777,5 +777,12 @@ namespace NK
 		glm::vec3 scale;
 	};
 	SERIALISE(NetworkTransformData, v.entity, v.pos, v.rot, v.scale)
+
+	enum class RESOURCE_ACCESS_TYPE
+	{
+		READ,
+		WRITE,
+		READ_WRITE,
+	};
 	
 }

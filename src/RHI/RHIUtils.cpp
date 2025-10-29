@@ -112,4 +112,34 @@ namespace NK
 		}
 	}
 
+
+
+	RESOURCE_ACCESS_TYPE RHIUtils::GetResourceAccessType(const RESOURCE_STATE _state)
+	{
+		switch (_state)
+		{
+		case RESOURCE_STATE::UNDEFINED:
+		case RESOURCE_STATE::PRESENT:
+		{
+			throw std::invalid_argument("RHIUtils::GetResourceAccessType() - _state (" + std::to_string(std::to_underlying(_state)) + ") - state has no access type");
+		}
+		case RESOURCE_STATE::VERTEX_BUFFER:
+		case RESOURCE_STATE::INDEX_BUFFER:
+		case RESOURCE_STATE::CONSTANT_BUFFER:
+		case RESOURCE_STATE::INDIRECT_BUFFER:
+		case RESOURCE_STATE::SHADER_RESOURCE:
+		case RESOURCE_STATE::COPY_SOURCE:
+		case RESOURCE_STATE::DEPTH_READ:
+		case RESOURCE_STATE::RESOLVE_SOURCE:
+			return RESOURCE_ACCESS_TYPE::READ;
+			
+		case RESOURCE_STATE::RENDER_TARGET:
+		case RESOURCE_STATE::UNORDERED_ACCESS:
+		case RESOURCE_STATE::COPY_DEST:
+		case RESOURCE_STATE::DEPTH_WRITE:
+		case RESOURCE_STATE::RESOLVE_DEST:
+			return RESOURCE_ACCESS_TYPE::READ_WRITE;
+		}
+	}
+
 }

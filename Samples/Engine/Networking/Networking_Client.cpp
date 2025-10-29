@@ -111,9 +111,9 @@ public:
 		
 		//Post-app layers
 		NK::RenderLayerDesc renderLayerDesc{};
-		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
-		renderLayerDesc.enableSSAA = true;
-		renderLayerDesc.ssaaMultiplier = 4;
+		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::D3D12;
+		renderLayerDesc.enableMSAA = true;
+		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
 		renderLayerDesc.window = m_window.get();
 		m_renderLayer = NK::UniquePtr<NK::RenderLayer>(NK_NEW(NK::RenderLayer, m_scenes[m_activeScene]->m_reg,  renderLayerDesc));
 
@@ -121,7 +121,7 @@ public:
 		m_postAppLayers.push_back(m_clientNetworkLayer.get());
 		
 
-		const NK::NETWORK_LAYER_ERROR_CODE err{ m_clientNetworkLayer->Connect("192.168.0.202", 7777) };
+		const NK::NETWORK_LAYER_ERROR_CODE err{ m_clientNetworkLayer->Connect("172.18.56.56", 7777) };
 		if (!NET_SUCCESS(err))
 		{
 			NK::Context::GetLogger()->IndentLog(NK::LOGGER_CHANNEL::ERROR, NK::LOGGER_LAYER::APPLICATION, "Failed to connect - error = " + std::to_string(std::to_underlying(err)) + "\n");
