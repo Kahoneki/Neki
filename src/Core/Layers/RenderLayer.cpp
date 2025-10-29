@@ -218,19 +218,19 @@ namespace NK
 		}
 
 
-		m_graphicsCommandBuffers[m_currentFrame]->EndRendering(1, m_msaaEnabled ? m_intermediateRenderTarget.get() : nullptr, m_swapchain->GetImage(imageIndex));
+		m_graphicsCommandBuffers[m_currentFrame]->EndRendering(1, m_desc.enableMSAA ? m_intermediateRenderTarget.get() : nullptr, m_swapchain->GetImage(imageIndex));
 
 		if (m_desc.enableSSAA)
 		{
 			//Downscaling pass
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::RENDER_TARGET, RESOURCE_STATE::COPY_SOURCE);
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
+			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), m_intermediateRenderTarget->GetState(), RESOURCE_STATE::COPY_SOURCE);
+			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::COPY_DEST);
 			m_graphicsCommandBuffers[m_currentFrame]->BlitTexture(m_intermediateRenderTarget.get(), TEXTURE_ASPECT::COLOUR, m_swapchain->GetImage(imageIndex), TEXTURE_ASPECT::COLOUR);
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::PRESENT);
+			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::PRESENT);
 		}
 		else
 		{
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::RENDER_TARGET, RESOURCE_STATE::PRESENT);
+			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::PRESENT);
 		}
 
 		//Present

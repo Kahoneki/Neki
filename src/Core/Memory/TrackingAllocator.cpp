@@ -14,7 +14,8 @@ namespace NK
 	: m_logger(_logger),
 	  m_engineVerbose(EnumUtils::Contains(_desc.verbosityFlags, TRACKING_ALLOCATOR_VERBOSITY_FLAGS::ENGINE)),
 	  m_vulkanVerbose(EnumUtils::Contains(_desc.verbosityFlags, TRACKING_ALLOCATOR_VERBOSITY_FLAGS::VULKAN)),
-	  m_vmaVerbose(EnumUtils::Contains(_desc.verbosityFlags, TRACKING_ALLOCATOR_VERBOSITY_FLAGS::VMA))
+	  m_vmaVerbose(EnumUtils::Contains(_desc.verbosityFlags, TRACKING_ALLOCATOR_VERBOSITY_FLAGS::VMA)),
+	  m_d3d12maVerbose(EnumUtils::Contains(_desc.verbosityFlags, TRACKING_ALLOCATOR_VERBOSITY_FLAGS::D3D12MA))
 	{
 		#if NEKI_VULKAN_SUPPORTED
 			m_vulkanCallbacks.pUserData = static_cast<void*>(this);
@@ -25,6 +26,12 @@ namespace NK
 			m_vmaCallbacks.pfnAllocate = &TrackingAllocator::VMADeviceMemoryAllocation;
 			m_vmaCallbacks.pfnFree = &TrackingAllocator::VMADeviceMemoryFree;
 			m_vmaCallbacks.pUserData = static_cast<void*>(this);
+
+		#elif NEKI_D3D12_SUPPORTED
+			m_d3d12maCallbacks.pPrivateData = static_cast<void*>(this);
+			m_d3d12maCallbacks.pAllocate = &TrackingAllocator::Allocation;
+			m_d3d12maCallbacks.pFree = &TrackingAllocator::Free;
+
 		#endif
 	}
 
@@ -45,26 +52,29 @@ namespace NK
 			//Display all host memory leaks
 			//Figure out how many are to be displayed based on the verbosity settings and display the count to the user
 			std::size_t displayCount{ 0 };
-			for (const std::pair<void*, AllocationInfo> hostAlloc : m_hostAllocationMap)
+			for (const std::pair<void*, AllocationInfo>& hostAlloc : m_hostAllocationMap)
 			{
 				if		(hostAlloc.second.source == ALLOCATION_SOURCE::UNKNOWN) { ++displayCount; } //Shouldn't be logically possible
 				else if	(hostAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ if (m_engineVerbose)	{ ++displayCount; } }
 				else if (hostAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ if (m_vulkanVerbose)	{ ++displayCount; } }
 				else if (hostAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ if (m_vmaVerbose)		{ ++displayCount; } }
+				else if (hostAlloc.second.source == ALLOCATION_SOURCE::D3D12MA)	{ if (m_d3d12maVerbose) { ++displayCount; } }
 			}
 			m_logger.RawLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, " - Displaying " + std::to_string(displayCount) + "/" + std::to_string(m_hostAllocationMap.size()) + " based on current verbosity settings\n", 0);
 
-			for (const std::pair<void*, AllocationInfo> hostAlloc : m_hostAllocationMap)
+			for (const std::pair<void*, AllocationInfo>& hostAlloc : m_hostAllocationMap)
 			{
-				if		(hostAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ if (!m_engineVerbose)	{ continue; } }
-				else if (hostAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ if (!m_vulkanVerbose)	{ continue; } }
-				else if (hostAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ if (!m_vmaVerbose)	{ continue; } }
+				if		(hostAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ if (!m_engineVerbose)		{ continue; } }
+				else if (hostAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ if (!m_vulkanVerbose)		{ continue; } }
+				else if (hostAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ if (!m_vmaVerbose)		{ continue; } }
+				else if (hostAlloc.second.source == ALLOCATION_SOURCE::D3D12MA) { if (!m_d3d12maVerbose)	{ continue; } }
 				
 				std::string location;
 				if		(hostAlloc.second.source == ALLOCATION_SOURCE::UNKNOWN)	{ location = "UNKNOWN (LOGICAL ERROR)"; } //Shouldn't be logically possible
 				else if	(hostAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ location = hostAlloc.second.file + std::string(" - line ") + std::to_string(hostAlloc.second.line); }
 				else if (hostAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ location = "VULKAN INTERNAL"; }
 				else if (hostAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ location = "VMA INTERNAL"; }
+				else if (hostAlloc.second.source == ALLOCATION_SOURCE::D3D12MA) { location = "D3D12MA INTERNAL"; }
 				std::string size{ FormatUtils::GetSizeString(hostAlloc.second.size) };
 				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, location + " - " + size + "\n");
 			}
@@ -73,41 +83,43 @@ namespace NK
 		}
 
 
-		//Report device memory leaks - strictly speaking I think VMA is the only one that does device allocation callbacks, but the others are still in here for consistency
-		if (!m_deviceAllocationMap.empty())
-		{
-			m_logger.Indent();
-			m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, std::to_string(m_hostAllocationMap.size()) + " device memory leak" + (m_hostAllocationMap.size() == 1 ? "" : "s") + " detected");
+		#ifdef TRACK_DEVICE_ALLOCATIONS
+			//Report device memory leaks - strictly speaking I think VMA is the only one that does device allocation callbacks, but the others are still in here for consistency
+			if (!m_deviceAllocationMap.empty())
+			{
+				m_logger.Indent();
+				m_logger.Log(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, std::to_string(m_hostAllocationMap.size()) + " device memory leak" + (m_hostAllocationMap.size() == 1 ? "" : "s") + " detected");
 			
-			//Display all device memory leaks
-			//Figure out how many are to be displayed based on the verbosity settings and display the count to the user
-			std::size_t displayCount{ 0 };
-			for (const std::pair<GPU_POINTER, AllocationInfo> deviceAlloc : m_deviceAllocationMap)
-			{
-				if		(deviceAlloc.second.source == ALLOCATION_SOURCE::UNKNOWN) { ++displayCount; } //Shouldn't be logically possible
-				else if	(deviceAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ if (m_engineVerbose)	{ ++displayCount; } }
-				else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ if (m_vulkanVerbose)	{ ++displayCount; } }
-				else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ if (m_vmaVerbose)		{ ++displayCount; } }
-			}
-			m_logger.RawLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, " - Displaying " + std::to_string(displayCount) + "/" + std::to_string(m_hostAllocationMap.size()) + " based on current verbosity settings\n", 0);
+				//Display all device memory leaks
+				//Figure out how many are to be displayed based on the verbosity settings and display the count to the user
+				std::size_t displayCount{ 0 };
+				for (const std::pair<GPU_POINTER, AllocationInfo>& deviceAlloc : m_deviceAllocationMap)
+				{
+					if		(deviceAlloc.second.source == ALLOCATION_SOURCE::UNKNOWN) { ++displayCount; } //Shouldn't be logically possible
+					else if	(deviceAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ if (m_engineVerbose)	{ ++displayCount; } }
+					else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ if (m_vulkanVerbose)	{ ++displayCount; } }
+					else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ if (m_vmaVerbose)		{ ++displayCount; } }
+				}
+				m_logger.RawLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, " - Displaying " + std::to_string(displayCount) + "/" + std::to_string(m_hostAllocationMap.size()) + " based on current verbosity settings\n", 0);
 
-			for (const std::pair<GPU_POINTER, AllocationInfo> deviceAlloc : m_deviceAllocationMap)
-			{
-				if		(deviceAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ if (!m_engineVerbose)	{ continue; } }
-				else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ if (!m_vulkanVerbose)	{ continue; } }
-				else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ if (!m_vmaVerbose)	{ continue; } }
+				for (const std::pair<GPU_POINTER, AllocationInfo>& deviceAlloc : m_deviceAllocationMap)
+				{
+					if		(deviceAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ if (!m_engineVerbose)	{ continue; } }
+					else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ if (!m_vulkanVerbose)	{ continue; } }
+					else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ if (!m_vmaVerbose)	{ continue; } }
 				
-				std::string location;
-				if		(deviceAlloc.second.source == ALLOCATION_SOURCE::UNKNOWN)	{ location = "UNKNOWN (LOGICAL ERROR)"; } //Shouldn't be logically possible
-				else if	(deviceAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ location = deviceAlloc.second.file + std::string(" - line ") + std::to_string(deviceAlloc.second.line); }
-				else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ location = "VULKAN INTERNAL"; }
-				else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ location = "VMA INTERNAL"; }
-				std::string size{ FormatUtils::GetSizeString(deviceAlloc.second.size) };
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, location + " - " + size + "\n");
-			}
+					std::string location;
+					if		(deviceAlloc.second.source == ALLOCATION_SOURCE::UNKNOWN)	{ location = "UNKNOWN (LOGICAL ERROR)"; } //Shouldn't be logically possible
+					else if	(deviceAlloc.second.source == ALLOCATION_SOURCE::ENGINE)	{ location = deviceAlloc.second.file + std::string(" - line ") + std::to_string(deviceAlloc.second.line); }
+					else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VULKAN)	{ location = "VULKAN INTERNAL"; }
+					else if (deviceAlloc.second.source == ALLOCATION_SOURCE::VMA)		{ location = "VMA INTERNAL"; }
+					std::string size{ FormatUtils::GetSizeString(deviceAlloc.second.size) };
+					m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TRACKING_ALLOCATOR, location + " - " + size + "\n");
+				}
 
-			m_logger.Unindent();
-		}
+				m_logger.Unindent();
+			}
+		#endif
 
 		
 		m_logger.Unindent();
@@ -186,7 +198,7 @@ namespace NK
 	std::size_t TrackingAllocator::GetTotalMemoryAllocated()
 	{
 		std::size_t counter{ 0 };
-		for (const std::pair<void*, AllocationInfo> alloc : m_hostAllocationMap)
+		for (const std::pair<void*, AllocationInfo>& alloc : m_hostAllocationMap)
 		{
 			counter += alloc.second.size;
 		}
@@ -229,7 +241,7 @@ namespace NK
 		void VKAPI_CALL TrackingAllocator::Free(void* _pUserData, void* _pMemory)
 		{
 			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pUserData) };
-			if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Free " + std::string("--- Freeing ") + FormatUtils::GetSizeString(allocator->m_hostAllocationMap[_pMemory].size) + "\n"); }
+			if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Free --- Freeing " + FormatUtils::GetSizeString(allocator->m_hostAllocationMap[_pMemory].size) + "\n"); }
 			allocator->FreeAligned(_pMemory);
 
 			std::lock_guard<std::mutex> lock(allocator->m_hostAllocationMapMtx);
@@ -276,6 +288,38 @@ namespace NK
 			std::lock_guard<std::mutex> lock(allocator->m_deviceAllocationMapMtx);
 			allocator->m_deviceAllocationMap.erase(_memory);
 		}
+
+
+
+	#elif NEKI_D3D12_SUPPORTED
+		void* TrackingAllocator::Allocation(std::size_t _Size, std::size_t _Alignment, void* _pPrivateData)
+		{
+			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pPrivateData) };
+			if (allocator->m_d3d12maVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "D3D12MA Host-Allocation --- Request for " + FormatUtils::GetSizeString(_Size) + " (aligned to " + FormatUtils::GetSizeString(_Alignment) + ")\n"); }
+			void* ptr{ allocator->AllocateAligned(_Size, _Alignment) };
+
+			std::lock_guard<std::mutex> lock(allocator->m_hostAllocationMapMtx);
+			allocator->m_hostAllocationMap[ptr] = { ALLOCATION_SOURCE::D3D12MA, _Size, nullptr, 0 };
+
+			return ptr;
+		}
+
+
+		void TrackingAllocator::Free(void* _pMemory, void* _pPrivateData)
+		{
+			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pPrivateData) };
+			if (allocator->m_d3d12maVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "D3D12MA Host-Free --- Freeing " + FormatUtils::GetSizeString(allocator->m_hostAllocationMap[_pMemory].size) + "\n"); }
+			
+			//0-Byte Free calls permitted by D3D12MA, just skip the actual free (as instructed by the docs)
+			if (_pMemory)
+			{
+				allocator->FreeAligned(_pMemory);
+			}
+
+			std::lock_guard<std::mutex> lock(allocator->m_hostAllocationMapMtx);
+			allocator->m_hostAllocationMap.erase(_pMemory);
+		}
+
 	#endif
 
 

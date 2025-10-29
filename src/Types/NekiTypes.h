@@ -523,6 +523,7 @@ namespace NK
 		ENGINE =	1 << 0,
 		VULKAN =	1 << 1,
 		VMA =		1 << 2,
+		D3D12MA =	1 << 3,
 		ALL =		UINT32_MAX
 	};
 	ENABLE_BITMASK_OPERATORS(TRACKING_ALLOCATOR_VERBOSITY_FLAGS)
@@ -549,6 +550,7 @@ namespace NK
 		ENGINE,
 		VULKAN,
 		VMA,
+		D3D12MA,
 	};
 
 	enum class PROJECTION_METHOD

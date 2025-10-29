@@ -5,6 +5,10 @@
 #include <Core/Memory/FreeListAllocator.h>
 #include <Core/Memory/IAllocator.h>
 
+#ifdef CreateSemaphore
+	#undef CreateSemaphore
+#endif
+
 
 namespace NK
 {

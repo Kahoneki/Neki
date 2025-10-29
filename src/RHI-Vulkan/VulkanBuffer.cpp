@@ -85,20 +85,13 @@ namespace NK
 			m_allocation = VK_NULL_HANDLE;
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "Buffer Destroyed And Allocation Freed\n");
 		}
+		if (m_map != nullptr)
+		{
+			m_map = nullptr;
+		}
 
 		
 		m_logger.Unindent();
-	}
-
-
-
-	void* VulkanBuffer::GetMap()
-	{
-		if (!m_map)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::BUFFER, "Attempting to get map of buffer that hasn't been mapped - returning nullptr. Are you trying to call GetMap() on a device local buffer?");
-		}
-		return m_map;
 	}
 
 }

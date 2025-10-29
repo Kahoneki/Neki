@@ -5,6 +5,9 @@
 #include <RHI/ITexture.h>
 
 #include <string>
+#ifdef LoadImage
+	#undef LoadImage
+#endif
 
 
 namespace NK

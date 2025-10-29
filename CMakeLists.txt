@@ -66,7 +66,18 @@ if(NEKI_BUILD_VULKAN)
     set_source_files_properties(src/RHI-Vulkan/VulkanDevice.cpp PROPERTIES COMPILE_DEFINITIONS VMA_IMPLEMENTATION)
 endif()
 
-#D3D12 handled automatically
+if(NEKI_BUILD_D3D12)
+    #D3D12 handled automatically
+
+    #D3D12MA
+    FetchContent_Declare(
+        d3d12ma
+        GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git
+        GIT_TAG v3.0.1
+    )
+    FetchContent_MakeAvailable(d3d12ma)
+    target_link_libraries(Neki PUBLIC D3D12MemoryAllocator)
+endif()
 
 #DXC
 if(WIN32)

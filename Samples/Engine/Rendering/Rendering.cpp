@@ -82,6 +82,9 @@ class GameApp final : public NK::Application
 public:
 	explicit GameApp() : Application(1)
 	{
+		//Register types
+		NK::TypeRegistry::Register<NK::PLAYER_CAMERA_ACTIONS>("PLAYER_CAMERA_ACTIONS");
+
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
 		m_activeScene = 0;
 
@@ -112,9 +115,9 @@ public:
 		//Post-app layers
 		m_modelVisibilityLayer = NK::UniquePtr<NK::ModelVisibilityLayer>(NK_NEW(NK::ModelVisibilityLayer, m_scenes[m_activeScene]->m_reg));
 		NK::RenderLayerDesc renderLayerDesc{};
-		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
-		renderLayerDesc.enableSSAA = true;
-		renderLayerDesc.ssaaMultiplier = 4;
+		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::D3D12;
+		renderLayerDesc.enableMSAA = true;
+		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
 		renderLayerDesc.window = m_window.get();
 		m_renderLayer = NK::UniquePtr<NK::RenderLayer>(NK_NEW(NK::RenderLayer, m_scenes[m_activeScene]->m_reg,  renderLayerDesc));
 

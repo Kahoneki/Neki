@@ -5,6 +5,7 @@
 #include <RHI/IDevice.h>
 
 #include <d3d12.h>
+#include <D3D12MemAlloc.h>
 #include <dxgi1_6.h>
 #include <wrl.h>
 
@@ -14,8 +15,8 @@
 #ifdef CreateWindow
 	#undef CreateWindow
 #endif
-#if defined(ERROR)
-	#undef ERROR //Error is used for LOGGER_CHANNEL::ERROR
+#ifdef ERROR
+	#undef ERROR //Conflicts with LOGGER_CHANNEL::ERROR
 #endif
 #ifdef LoadImage
 	#undef LoadImage //Conflicts with ImageLoader::LoadImage()
@@ -52,7 +53,6 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() override;
 		[[nodiscard]] virtual UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc) override;
-		[[nodiscard]] virtual UniquePtr<Window> CreateWindow(const WindowDesc& _desc) const override;
 
 		[[nodiscard]] virtual TextureCopyMemoryLayout GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture) override;
 
@@ -60,6 +60,7 @@ namespace NK
 		[[nodiscard]] inline IDXGIFactory4* GetFactory() const { return m_factory.Get(); }
 		[[nodiscard]] inline IDXGIAdapter* GetAdapter() const { return m_adapter.Get(); }
 		[[nodiscard]] inline ID3D12Device* GetDevice() const { return m_device.Get();  }
+		[[nodiscard]] inline D3D12MA::Allocator* GetD3D12MAAllocator() const { return m_d3d12maAllocator.Get(); }
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetResourceDescriptorHeap() const { return m_resourceDescriptorHeap.Get(); }
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetSamplerDescriptorHeap() const { return m_samplerDescriptorHeap.Get(); }
 		[[nodiscard]] inline UINT GetResourceDescriptorSize() const { return m_resourceDescriptorSize; }
@@ -72,6 +73,7 @@ namespace NK
 		void CreateFactory();
 		void SelectAdapter();
 		void CreateDevice();
+		void CreateD3D12MAAllocator();
 		void RegisterDebugCallback();
 		void CreateDescriptorHeaps();
 		void CreateSyncLists();
@@ -88,6 +90,7 @@ namespace NK
 		Microsoft::WRL::ComPtr<IDXGIFactory4> m_factory;
 		Microsoft::WRL::ComPtr<IDXGIAdapter1> m_adapter;
 		Microsoft::WRL::ComPtr<ID3D12Device> m_device;
+		Microsoft::WRL::ComPtr<D3D12MA::Allocator> m_d3d12maAllocator;
 
 		//For passing to D3D12Queue for D3D12Queue::WaitIdle()
 		UniquePtr<ICommandPool> m_graphicsSyncListAllocator;

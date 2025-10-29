@@ -30,6 +30,7 @@ namespace NK
 
 
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_texture;
+		Microsoft::WRL::ComPtr<D3D12MA::Allocation> m_allocation;
 		D3D12_RESOURCE_DESC m_resourceDesc;
 	};
 

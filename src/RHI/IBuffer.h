@@ -26,9 +26,14 @@ namespace NK
 	public:
 		virtual ~IBuffer() = default;
 
-		[[nodiscard]] virtual void* GetMap() = 0;
-//		virtual void* Map() = 0;
-//		virtual void Unmap() = 0;
+		[[nodiscard]] inline virtual void* GetMap() const final
+		{
+			if (!m_map)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::BUFFER, "Attempting to get map of buffer that hasn't been mapped - returning nullptr. Are you trying to call GetMap() on a device local buffer?");
+			}
+			return m_map;
+		}
 
 		[[nodiscard]] inline std::size_t GetSize() const { return m_size; }
 		[[nodiscard]] inline MEMORY_TYPE GetMemoryType() const { return m_memType; }
@@ -51,6 +56,12 @@ namespace NK
 		BUFFER_USAGE_FLAGS m_usage;
 
 		RESOURCE_STATE m_state; //For enforcing strict state, updated by ICommandBuffer::TransitionBarrier()
+
+		//Persistent map
+		//todo: vma has full persistent mapping support, but d3d12ma docs are a bit looser:
+		//todo: ^"Unmapping may not be required before using written data - some heap types on some platforms support resources persistently mapped."
+		//todo: ^figure out just how widely supported it really is....
+		void* m_map{ nullptr };
 	};
 	
 }

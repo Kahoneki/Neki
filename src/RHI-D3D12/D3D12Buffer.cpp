@@ -25,19 +25,6 @@ namespace NK
 		}
 
 
-		//Define heap props
-		D3D12_HEAP_PROPERTIES heapProps{};
-		switch (m_memType)
-		{
-		case MEMORY_TYPE::HOST:		heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;	break;
-		case MEMORY_TYPE::DEVICE:	heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;	break;
-		}
-		heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heapProps.CreationNodeMask = 1;
-		heapProps.VisibleNodeMask = 1;
-
-
 		//Create buffer
 		m_resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 		m_resourceDesc.Alignment = 0;
@@ -51,8 +38,39 @@ namespace NK
 		m_resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 		m_resourceDesc.Flags = GetCreationFlags();
 
-		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &m_resourceDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_buffer)) };
-	
+		D3D12MA::ALLOCATION_DESC allocDesc{};
+		switch (m_memType)
+		{
+		case MEMORY_TYPE::HOST:		allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;	break;
+		case MEMORY_TYPE::DEVICE:	allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;	break;
+		}
+		//todo: D3D12MA::ALLOCATION_FLAGS has some really cool stuff i wanna play around with
+
+		HRESULT hr{ dynamic_cast<D3D12Device&>(m_device).GetD3D12MAAllocator()->CreateResource(&allocDesc, &m_resourceDesc, D3D12_RESOURCE_STATE_COMMON, NULL, &m_allocation, IID_PPV_ARGS(&m_buffer)) };
+		if (SUCCEEDED(hr))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "ID3D12Resource initialisation and allocation successful\n");
+		}
+		else
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "ID3D12Resource initialisation or allocation unsuccessful. hr = " + std::to_string(hr) + '\n');
+			throw std::runtime_error("");
+		}
+
+
+		if (m_memType == MEMORY_TYPE::HOST)
+		{
+			hr = m_buffer->Map(0, nullptr, &m_map);
+			if (SUCCEEDED(hr))
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "ID3D12Resource mapping successful\n");
+			}
+			else
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "ID3D12Resource mapping unsuccessful. hr = " + std::to_string(hr) + '\n');
+				throw std::runtime_error("");
+			}
+		}
 
 		m_logger.Unindent();
 	}
@@ -66,23 +84,13 @@ namespace NK
 
 		//ComPtrs are released automatically
 
+		if (m_map != nullptr)
+		{
+			m_buffer->Unmap(0, nullptr);
+			m_map = nullptr;
+		}
+
 		m_logger.Unindent();
-	}
-
-
-
-	void* D3D12Buffer::Map()
-	{
-		void* data;
-		m_buffer->Map(0, nullptr, &data);
-		return data;
-	}
-	
-	
-	
-	void D3D12Buffer::Unmap()
-	{
-		m_buffer->Unmap(0, nullptr);
 	}
 
 

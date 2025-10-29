@@ -1,4 +1,5 @@
 #include "D3D12Device.h"
+#include "D3D12Device.h"
 
 #include "D3D12Buffer.h"
 #include "D3D12BufferView.h"
@@ -37,6 +38,7 @@ namespace NK
 		CreateFactory();
 		SelectAdapter();
 		CreateDevice();
+		CreateD3D12MAAllocator();
 		RegisterDebugCallback();
 		CreateDescriptorHeaps();
 		CreateSyncLists();
@@ -175,13 +177,6 @@ namespace NK
 	UniquePtr<GPUUploader> D3D12Device::CreateGPUUploader(const GPUUploaderDesc& _desc)
 	{
 		return UniquePtr<GPUUploader>(NK_NEW(GPUUploader, m_logger, *this, _desc));
-	}
-
-
-
-	UniquePtr<Window> D3D12Device::CreateWindow(const WindowDesc& _desc) const
-	{
-		return UniquePtr<Window>(NK_NEW(Window, m_logger, _desc));
 	}
 
 
@@ -331,6 +326,35 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
+
+		m_logger.Unindent();
+	}
+
+
+
+	void D3D12Device::CreateD3D12MAAllocator()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating D3D12MA allocator\n");
+
+		D3D12MA::ALLOCATOR_DESC allocDesc{};
+		allocDesc.Flags = D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS; //todo: look into ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED
+		allocDesc.PreferredBlockSize = 0; //0 = default - todo: look into needing to fine tune this?
+		allocDesc.pDevice = m_device.Get();
+		allocDesc.pAdapter = m_adapter.Get();
+		allocDesc.pAllocationCallbacks = m_allocator.GetD3D12MACallbacks();
+
+		const HRESULT hr{ D3D12MA::CreateAllocator(&allocDesc, &m_d3d12maAllocator) };
+
+		if (SUCCEEDED(hr))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "D3D12MA allocator successfully created\n");
+		}
+		else
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create D3D12MA allocator\n");
+			throw std::runtime_error("");
+		}
 
 		m_logger.Unindent();
 	}

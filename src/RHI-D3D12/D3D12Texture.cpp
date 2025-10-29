@@ -25,15 +25,6 @@ namespace NK
 		}
 
 
-		//Define heap props
-		D3D12_HEAP_PROPERTIES heapProps{};
-		heapProps.Type = D3D12_HEAP_TYPE_DEFAULT; //Device-local
-		heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heapProps.CreationNodeMask = 1;
-		heapProps.VisibleNodeMask = 1;
-
-
 		//Create texture
 		switch (m_dimension)
 		{
@@ -77,15 +68,18 @@ namespace NK
 		m_resourceDesc.Flags = GetCreationFlags();
 
 
-		HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &m_resourceDesc, GetInitialState(), nullptr, IID_PPV_ARGS(&m_texture)) };
+		D3D12MA::ALLOCATION_DESC allocDesc{};
+		allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+		//todo: D3D12MA::ALLOCATION_FLAGS has some really cool stuff i wanna play around with
 
-		if (SUCCEEDED(result))
+		HRESULT hr{ dynamic_cast<D3D12Device&>(m_device).GetD3D12MAAllocator()->CreateResource(&allocDesc, &m_resourceDesc, D3D12_RESOURCE_STATE_COMMON, NULL, &m_allocation, IID_PPV_ARGS(&m_texture)) };
+		if (SUCCEEDED(hr))
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::TEXTURE, "ID3D12Resource initialisation successful\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "ID3D12Resource initialisation and allocation successful\n");
 		}
 		else
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE, "ID3D12Resource initialisation unsuccessful. result = " + std::to_string(result) + '\n');
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "ID3D12Resource initialisation or allocation unsuccessful. hr = " + std::to_string(hr) + '\n');
 			throw std::runtime_error("");
 		}
 
