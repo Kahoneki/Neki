@@ -36,81 +36,34 @@ namespace NK
 		bufferInfo.size = m_size;
 		bufferInfo.usage = VulkanUtils::GetVulkanBufferUsageFlags(m_usage);
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		VkResult result{ vkCreateBuffer(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), &bufferInfo, m_allocator.GetVulkanCallbacks(), &m_buffer) };
-		if (result == VK_SUCCESS)
+
+		VmaAllocationCreateInfo allocInfo{};
+		if (m_memType == MEMORY_TYPE::DEVICE)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "VkBuffer initialisation successful\n");
+			allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+			allocInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		}
 		else
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::BUFFER, "VkBuffer initialisation unsuccessful. result = " + std::to_string(result) + '\n');
-			throw std::runtime_error("");
+			allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST; //Todo: VMA_MEMORY_USAGE_CPU_TO_GPU?
+			allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+			allocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		}
-
-
-		//Search for a memory type that satisfies buffer's internal requirements and m_memType
-		VkMemoryRequirements memRequirements;
-		vkGetBufferMemoryRequirements(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_buffer, &memRequirements);
-
-		VkMemoryPropertyFlags memProps;
-		switch (m_memType)
-		{
-		case MEMORY_TYPE::HOST:		memProps = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT; break;
-		case MEMORY_TYPE::DEVICE:	memProps = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT; break;
-		default:
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::BUFFER, "Provided _desc.type (" + std::to_string(std::to_underlying(m_memType)) + ") not supported\n");
-			throw std::runtime_error("");
-		}
-		}
-
-		VkPhysicalDeviceMemoryProperties physicalDeviceMemProps;
-		vkGetPhysicalDeviceMemoryProperties(dynamic_cast<VulkanDevice&>(m_device).GetPhysicalDevice(), &physicalDeviceMemProps);
-		std::uint32_t memTypeIndex{ UINT32_MAX };
-		for (std::uint32_t i{ 0 }; i < physicalDeviceMemProps.memoryTypeCount; ++i)
-		{
-			//Check if memory type is allowed for the buffer
-			if (!(memRequirements.memoryTypeBits & (1 << i))) { continue; }
-			if ((physicalDeviceMemProps.memoryTypes[i].propertyFlags & memProps) != memProps) { continue; }
-
-			//This memory type is allowed
-			memTypeIndex = i;
-			break;
-		}
-		if (memTypeIndex == UINT32_MAX)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::BUFFER, "No suitable memory type could be found\n");
-			throw std::runtime_error("");
-		}
-
-
-		//Allocate memory for the buffer
-		VkMemoryAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		allocInfo.allocationSize = memRequirements.size;
-		allocInfo.memoryTypeIndex = memTypeIndex;
-		result = vkAllocateMemory(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), &allocInfo, m_allocator.GetVulkanCallbacks(), &m_memory);
+		VmaAllocationInfo allocResultInfo{};
+		const VkResult result{ vmaCreateBuffer(dynamic_cast<VulkanDevice&>(m_device).GetVMAAllocator(), &bufferInfo, &allocInfo, &m_buffer, &m_allocation, &allocResultInfo) };
 		if (result == VK_SUCCESS)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "VkDeviceMemory allocation successful (" + FormatUtils::GetSizeString(memRequirements.size) + ")\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "VkBuffer initialisation and allocation successful\n");
 		}
 		else
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::BUFFER, "VkDeviceMemory allocation unsuccessful. result = " + std::to_string(result) + '\n');
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::BUFFER, "VkBuffer initialisation or allocation unsuccessful. result = " + std::to_string(result) + '\n');
 			throw std::runtime_error("");
 		}
 
-
-		//Bind the allocated memory region to the buffer
-		result = vkBindBufferMemory(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_buffer, m_memory, 0);
-		if (result == VK_SUCCESS)
+		if (m_memType == MEMORY_TYPE::HOST)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "Memory binding successful\n");
-		}
-		else
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::BUFFER, "Memory binding unsuccessful. result = " + std::to_string(result) + '\n');
-			throw std::runtime_error("");
+			m_map = allocResultInfo.pMappedData;
 		}
 
 
@@ -123,38 +76,29 @@ namespace NK
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::BUFFER, "Shutting Down VulkanBuffer\n");
-
-		if (m_memory != VK_NULL_HANDLE)
-		{
-			vkFreeMemory(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_memory, m_allocator.GetVulkanCallbacks());
-			m_memory = VK_NULL_HANDLE;
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "Buffer Memory Freed\n");
-		}
 		
-		if (m_buffer != VK_NULL_HANDLE)
+		
+		if (m_buffer != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE)
 		{
-			vkDestroyBuffer(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_buffer, m_allocator.GetVulkanCallbacks());
+			vmaDestroyBuffer(dynamic_cast<VulkanDevice&>(m_device).GetVMAAllocator(), m_buffer, m_allocation);
 			m_buffer = VK_NULL_HANDLE;
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "Buffer Destroyed\n");
+			m_allocation = VK_NULL_HANDLE;
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "Buffer Destroyed And Allocation Freed\n");
 		}
 
+		
 		m_logger.Unindent();
 	}
 
 
 
-	void* VulkanBuffer::Map()
+	void* VulkanBuffer::GetMap()
 	{
-		void* data;
-		vkMapMemory(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_memory, 0, m_size, 0, &data);
-		return data;
-	}
-
-
-
-	void VulkanBuffer::Unmap()
-	{
-		vkUnmapMemory(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_memory);
+		if (!m_map)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::BUFFER, "Attempting to get map of buffer that hasn't been mapped - returning nullptr. Are you trying to call GetMap() on a device local buffer?");
+		}
+		return m_map;
 	}
 
 }

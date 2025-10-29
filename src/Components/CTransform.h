@@ -8,7 +8,7 @@ namespace NK
 
 	struct CTransform
 	{
-		friend class RenderSystem;
+		friend class RenderLayer;
 
 
 	public:

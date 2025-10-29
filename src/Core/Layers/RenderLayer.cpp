@@ -1,14 +1,15 @@
-#include "RenderSystem.h"
+#include "RenderLayer.h"
 
 #include <Components/CModelRenderer.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <RHI/IBuffer.h>
+#include <RHI/IBufferView.h>
+#include <RHI/IQueue.h>
 #include <RHI/ISampler.h>
 #include <RHI/ISemaphore.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
-#include <RHI/IQueue.h>
 
 #ifdef NEKI_VULKAN_SUPPORTED
 	#include <RHI-Vulkan/VulkanDevice.h>
@@ -25,11 +26,11 @@
 namespace NK
 {
 
-	RenderSystem::RenderSystem(ILogger& _logger, IAllocator& _allocator, const RenderSystemDesc& _desc)
-	: m_logger(_logger), m_allocator(_allocator), m_backend(_desc.backend), m_msaaEnabled(_desc.enableMSAA), m_msaaSampleCount(_desc.msaaSampleCount), m_ssaaEnabled(_desc.enableSSAA), m_ssaaMultiplier(_desc.ssaaMultiplier), m_windowDesc(_desc.windowDesc), m_framesInFlight(_desc.framesInFlight), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_ssaaMultiplier) * m_windowDesc.size)
+	RenderLayer::RenderLayer(Registry& _reg, const RenderLayerDesc& _desc)
+	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.window->GetSize())
 	{
 		m_logger.Indent();
-		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_SYSTEM, "Initialising Render System\n");
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Initialising Render Layer\n");
 
 
 		InitBaseResources();
@@ -49,29 +50,38 @@ namespace NK
 		m_gpuUploader->Flush(true, nullptr, nullptr);
 		m_gpuUploader->Reset();
 
+		m_modelUnloadQueues.resize(m_desc.framesInFlight);
+
 		
 		m_logger.Unindent();
 	}
 
 
 
-	RenderSystem::~RenderSystem()
+	RenderLayer::~RenderLayer()
 	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Shutting Down Render Layer\n");
+
+
 		m_graphicsQueue->WaitIdle();
+
+
+		m_logger.Unindent();
 	}
 
 
 
-	void RenderSystem::Update(Registry& _reg)
+	void RenderLayer::Update()
 	{
 		//Update skybox
 		bool found{ false };
-		for (auto&& [skybox] : _reg.View<CSkybox>())
+		for (auto&& [skybox] : m_reg.get().View<CSkybox>())
 		{
 			if (found)
 			{
 				//Multiple skyboxes, notify the user only the first one is being considered for rendering
-				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_SYSTEM, "Multiple `CSkybox`s found in registry. Note that only one skybox is supported - only the first skybox will be used.\n");
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CSkybox`s found in registry. Note that only one skybox is supported - only the first skybox will be used.\n");
 				break;
 			}
 			found = true;
@@ -82,18 +92,18 @@ namespace NK
 		}
 		if (!found)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_SYSTEM, "No `CCamera`s found in registry.\n");
+//			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CSkybox`s found in registry.\n");
 		}
 
 
 		//Update camera
 		found = false;
-		for (auto&& [camera] : _reg.View<CCamera>())
+		for (auto&& [camera] : m_reg.get().View<CCamera>())
 		{
 			if (found)
 			{
 				//Multiple cameras, notify the user only the first one is being considered for rendering - todo: change this (probably let the user specify on CModelRenderer which camera they want to use)
-				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_SYSTEM, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
 				break;
 			}
 			found = true;
@@ -101,7 +111,7 @@ namespace NK
 		}
 		if (!found)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_SYSTEM, "No `CCamera`s found in registry.\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
 		}
 
 
@@ -109,20 +119,23 @@ namespace NK
 		m_inFlightFences[m_currentFrame]->Wait();
 		m_inFlightFences[m_currentFrame]->Reset();
 
+		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
+		while (!m_modelUnloadQueues[m_currentFrame].empty())
+		{
+			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
+			m_modelUnloadQueues[m_currentFrame].pop();
+		}
+		
+
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
 		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
-
-		//if (m_ssaaEnabled || m_msaaEnabled)
-		//{
-		//	m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
-		//}
 		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::RENDER_TARGET);
 
-		m_graphicsCommandBuffers[m_currentFrame]->BeginRendering(1, m_msaaEnabled ? m_intermediateRenderTargetView.get() : nullptr, m_ssaaEnabled ? m_intermediateRenderTargetView.get() : m_swapchain->GetImageView(imageIndex), m_intermediateDepthBufferView.get(), nullptr);
+		m_graphicsCommandBuffers[m_currentFrame]->BeginRendering(1, m_desc.enableMSAA ? m_intermediateRenderTargetView.get() : nullptr, m_desc.enableSSAA ? m_intermediateRenderTargetView.get() : m_swapchain->GetImageView(imageIndex), m_intermediateDepthBufferView.get(), nullptr);
 		m_graphicsCommandBuffers[m_currentFrame]->BindRootSignature(m_meshPiplineRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-		m_graphicsCommandBuffers[m_currentFrame]->SetViewport({ 0, 0 }, { m_ssaaEnabled ? m_supersampleResolution : m_windowDesc.size });
-		m_graphicsCommandBuffers[m_currentFrame]->SetScissor({ 0, 0 }, { m_ssaaEnabled ? m_supersampleResolution : m_windowDesc.size });
+		m_graphicsCommandBuffers[m_currentFrame]->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+		m_graphicsCommandBuffers[m_currentFrame]->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
 
 		//Draw
@@ -152,17 +165,22 @@ namespace NK
 		}
 
 		//Models (Loading Phase)
-		for (auto&& [modelRenderer] : _reg.View<CModelRenderer>())
+		for (auto&& [modelRenderer] : m_reg.get().View<CModelRenderer>())
 		{
-			if (modelRenderer.model == nullptr && !modelRenderer.modelPath.empty())
+			if (modelRenderer.visible && !modelRenderer.model)
 			{
-				if (!m_gpuModelCache.contains(modelRenderer.modelPath))
-				{
-					const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
-					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
-					m_newGPUUploaderUpload = true;
-				}
+				//Model is visible but isn't loaded, load it
+				const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
+				m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
+				m_newGPUUploaderUpload = true;
 				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
+			}
+			else if (!modelRenderer.visible && modelRenderer.model)
+			{
+				//Model isn't visible but is loaded, add it to the unload queue
+				m_modelUnloadQueues[m_currentFrame].push(modelRenderer.modelPath);
+				ModelLoader::UnloadModel(modelRenderer.modelPath);
+				modelRenderer.model = nullptr;
 			}
 		}
 		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the semaphore to wait on before drawing
@@ -173,8 +191,10 @@ namespace NK
 
 		//Models (Rendering Phase)
 		std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
-		for (auto&& [modelRenderer, transform] : _reg.View<CModelRenderer, CTransform>())
+		for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 		{
+			if (!modelRenderer.visible) { continue; }
+			
 			if (transform.dirty)
 			{
 				UpdateModelMatrix(transform);
@@ -200,14 +220,13 @@ namespace NK
 
 		m_graphicsCommandBuffers[m_currentFrame]->EndRendering(1, m_msaaEnabled ? m_intermediateRenderTarget.get() : nullptr, m_swapchain->GetImage(imageIndex));
 
-		if (m_ssaaEnabled)
+		if (m_desc.enableSSAA)
 		{
 			//Downscaling pass
 			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::RENDER_TARGET, RESOURCE_STATE::COPY_SOURCE);
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::COPY_DEST);
+			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
 			m_graphicsCommandBuffers[m_currentFrame]->BlitTexture(m_intermediateRenderTarget.get(), TEXTURE_ASPECT::COLOUR, m_swapchain->GetImage(imageIndex), TEXTURE_ASPECT::COLOUR);
 			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::PRESENT);
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::COPY_SOURCE, RESOURCE_STATE::RENDER_TARGET);
 		}
 		else
 		{
@@ -228,27 +247,22 @@ namespace NK
 		m_graphicsQueue->Submit(m_graphicsCommandBuffers[m_currentFrame].get(), m_imageAvailableSemaphores[m_currentFrame].get(), m_renderFinishedSemaphores[imageIndex].get(), m_inFlightFences[m_currentFrame].get());
 		m_swapchain->Present(m_renderFinishedSemaphores[imageIndex].get(), imageIndex);
 
-		m_currentFrame = (m_currentFrame + 1) % m_framesInFlight;
+		m_currentFrame = (m_currentFrame + 1) % m_desc.framesInFlight;
 	}
 
 
 
-	void RenderSystem::InitBaseResources()
+	void RenderLayer::InitBaseResources()
 	{
 		//Initialise device
-		switch (m_backend)
+		switch (m_desc.backend)
 		{
-		case GRAPHICS_BACKEND::NONE:
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_SYSTEM, "_desc.backend = GRAPHICS_BACKEND::NONE, RenderSystem should not have been initialised by Engine - this error message indicates an internal error with the engine, please make a GitHub issue on the topic.\n");
-			throw std::invalid_argument("");
-		}
 		case GRAPHICS_BACKEND::VULKAN:
 		{
 			#ifdef NEKI_VULKAN_SUPPORTED
 			m_device = UniquePtr<IDevice>(NK_NEW(VulkanDevice, m_logger, m_allocator));
 			#else
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_SYSTEM, "_desc.backend = GRAPHICS_BACKEND::VULKAN but compiler definition NEKI_VULKAN_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::VULKAN but compiler definition NEKI_VULKAN_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
 			throw std::invalid_argument("");
 			#endif
 			break;
@@ -258,14 +272,14 @@ namespace NK
 			#ifdef NEKI_D3D12_SUPPORTED
 			m_device = UniquePtr<IDevice>(NK_NEW(D3D12Device, m_logger, m_allocator));
 			#else
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_SYSTEM, "_desc.backend = GRAPHICS_BACKEND::D3D12 but compiler definition NEKI_D3D12_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::D3D12 but compiler definition NEKI_D3D12_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
 			throw std::invalid_argument("");
 			#endif
 			break;
 		}
 		default:
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_SYSTEM, "_desc.backend (" + std::to_string(std::to_underlying(m_backend)) + ") not recognised.\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend (" + std::to_string(std::to_underlying(m_desc.backend)) + ") not recognised.\n");
 			throw std::invalid_argument("");
 		}
 		}
@@ -302,9 +316,8 @@ namespace NK
 		m_gpuUploaderFlushFence = m_device->CreateFence(gpuUploaderFlushFenceDesc);
 		m_newGPUUploaderUpload = false;
 
-		//Window and Surface
-		m_window = m_device->CreateWindow(m_windowDesc);
-		m_surface = m_device->CreateSurface(m_window.get());
+		//Surface
+		m_surface = m_device->CreateSurface(m_desc.window);
 
 		//Swapchain
 		SwapchainDesc swapchainDesc{};
@@ -320,15 +333,15 @@ namespace NK
 		m_linearSampler = m_device->CreateSampler(samplerDesc);
 
 		//Graphics Command Buffers
-		m_graphicsCommandBuffers.resize(m_framesInFlight);
-		for (std::size_t i{ 0 }; i < m_framesInFlight; ++i)
+		m_graphicsCommandBuffers.resize(m_desc.framesInFlight);
+		for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
 		{
 			m_graphicsCommandBuffers[i] = m_graphicsCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc);
 		}
 
 		//Semaphores
-		m_imageAvailableSemaphores.resize(m_framesInFlight);
-		for (std::size_t i{ 0 }; i < m_framesInFlight; ++i)
+		m_imageAvailableSemaphores.resize(m_desc.framesInFlight);
+		for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
 		{
 			m_imageAvailableSemaphores[i] = m_device->CreateSemaphore();
 		}
@@ -341,8 +354,8 @@ namespace NK
 		//Fences
 		FenceDesc inFlightFenceDesc{};
 		inFlightFenceDesc.initiallySignaled = true;
-		m_inFlightFences.resize(m_framesInFlight);
-		for (std::size_t i{ 0 }; i < m_framesInFlight; ++i)
+		m_inFlightFences.resize(m_desc.framesInFlight);
+		for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
 		{
 			m_inFlightFences[i] = m_device->CreateFence(inFlightFenceDesc);
 		}
@@ -350,7 +363,7 @@ namespace NK
 
 
 
-	void RenderSystem::InitCameraBuffer()
+	void RenderLayer::InitCameraBuffer()
 	{
 		BufferDesc camDataBufferDesc{};
 		camDataBufferDesc.size = sizeof(CameraShaderData);
@@ -365,12 +378,12 @@ namespace NK
 		camDataBufferViewDesc.type = BUFFER_VIEW_TYPE::UNIFORM;
 		m_camDataBufferView = m_device->CreateBufferView(m_camDataBuffer.get(), camDataBufferViewDesc);
 
-		m_camDataBufferMap = m_camDataBuffer->Map();
+		m_camDataBufferMap = m_camDataBuffer->GetMap();
 	}
 
 
 
-	void RenderSystem::InitSkybox()
+	void RenderLayer::InitSkybox()
 	{
 		//Creating m_skyboxTexture and m_skyboxTextureView requires knowing the size of the skybox which cannot be known at startup, skip its creation
 
@@ -435,7 +448,7 @@ namespace NK
 
 
 
-	void RenderSystem::InitShadersAndPipelines()
+	void RenderLayer::InitShadersAndPipelines()
 	{
 		//Vertex Shaders
 		ShaderDesc vertShaderDesc{};
@@ -479,7 +492,7 @@ namespace NK
 		depthStencilDesc.stencilTestEnable = false;
 
 		MultisamplingDesc multisamplingDesc{};
-		multisamplingDesc.sampleCount = m_msaaEnabled ? m_msaaSampleCount : SAMPLE_COUNT::BIT_1;
+		multisamplingDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
 		multisamplingDesc.sampleMask = UINT32_MAX;
 		multisamplingDesc.alphaToCoverageEnable = false;
 
@@ -537,16 +550,16 @@ namespace NK
 
 
 
-	void RenderSystem::InitAntiAliasingResources()
+	void RenderLayer::InitAntiAliasingResources()
 	{
 		//Render Target
 		TextureDesc renderTargetDesc{};
 		renderTargetDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		renderTargetDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
-		renderTargetDesc.size = m_ssaaEnabled ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_windowDesc.size, 1);
+		renderTargetDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.window->GetSize(), 1);
 		renderTargetDesc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT; //Needs TRANSFER_SRC_BIT for supersampling algorithm
 		renderTargetDesc.arrayTexture = false;
-		renderTargetDesc.sampleCount = m_msaaEnabled ? m_msaaSampleCount : SAMPLE_COUNT::BIT_1;
+		renderTargetDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
 		m_intermediateRenderTarget = m_device->CreateTexture(renderTargetDesc);
 		m_graphicsCommandBuffers[0]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
 
@@ -561,10 +574,10 @@ namespace NK
 		TextureDesc depthBufferDesc{};
 		depthBufferDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		depthBufferDesc.format = DATA_FORMAT::D32_SFLOAT;
-		depthBufferDesc.size = m_ssaaEnabled ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_windowDesc.size, 1);
+		depthBufferDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.window->GetSize(), 1);
 		depthBufferDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT;
 		depthBufferDesc.arrayTexture = false;
-		depthBufferDesc.sampleCount = m_msaaEnabled ? m_msaaSampleCount : SAMPLE_COUNT::BIT_1;
+		depthBufferDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
 		m_intermediateDepthBuffer = m_device->CreateTexture(depthBufferDesc);
 		m_graphicsCommandBuffers[0]->TransitionBarrier(m_intermediateDepthBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
@@ -578,7 +591,7 @@ namespace NK
 
 
 
-	void RenderSystem::UpdateSkybox(CSkybox& _skybox)
+	void RenderLayer::UpdateSkybox(CSkybox& _skybox)
 	{
 		std::array<std::string, 6> textureNames{ "right", "left", "top", "bottom", "front", "back" };
 		void* skyboxImageData[6];
@@ -611,13 +624,13 @@ namespace NK
 
 
 
-	void RenderSystem::UpdateCameraBuffer(const CCamera& _camera) const
+	void RenderLayer::UpdateCameraBuffer(const CCamera& _camera) const
 	{
 		//Check if the user has requested that the camera's aspect ratio be the window's aspect ratio
 		constexpr float epsilon{ 0.1f }; //Buffer for floating-point-comparison-imprecision mitigation
 		if (std::abs(_camera.camera->GetAspectRatio() - WIN_ASPECT_RATIO) < epsilon)
 		{
-			_camera.camera->SetAspectRatio(static_cast<float>(m_windowDesc.size.x) / m_windowDesc.size.y);
+			_camera.camera->SetAspectRatio(static_cast<float>(m_desc.window->GetSize().x) / m_desc.window->GetSize().y);
 		}
 		
 		const CameraShaderData camShaderData{ _camera.camera->GetCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
@@ -629,7 +642,7 @@ namespace NK
 
 
 
-	void RenderSystem::UpdateModelMatrix(CTransform& _transform)
+	void RenderLayer::UpdateModelMatrix(CTransform& _transform)
 	{
 		//Scale -> Rotation -> Translation
 		//Because matrix multiplication order is reversed, do trans * rot * scale

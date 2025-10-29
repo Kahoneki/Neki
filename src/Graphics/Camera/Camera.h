@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ViewFrustum.h"
+
 #include <Types/NekiTypes.h>
 
 #include <glm/glm.hpp>
@@ -18,7 +20,7 @@ namespace NK
 		//A yaw of 0 is equivalent to looking at the +X axis, increasing yaw will rotate the camera around the Y axis in an anti-clockwise direction measured in degrees
 		//E.g.: setting the yaw to +90 will have the camera look along +Z, +-180 will be -X, and -90 will be -Z
 		explicit Camera(glm::vec3 _pos, float _yaw, float _pitch, float _nearPlaneDist, float _farPlaneDist, float _fov, float _aspectRatio);
-		~Camera() = default;
+		virtual ~Camera() = default;
 		
 		//Matrices are cached and only updated when necessary - virtually no overhead in calling this function
 		[[nodiscard]] CameraShaderData GetCameraShaderData(const PROJECTION_METHOD _method);
@@ -30,6 +32,15 @@ namespace NK
 		[[nodiscard]] inline float GetFarPlaneDistance() const { return m_farPlaneDist; }
 		[[nodiscard]] inline float GetFOV() const { return m_fov; }
 		[[nodiscard]] inline float GetAspectRatio() const { return m_aspectRatio; }
+		[[nodiscard]] inline ViewFrustum GetFrustum()
+		{
+			if (m_viewMatDirty || m_perspectiveProjMatDirty)
+			{
+				//Frustum is dirty
+				m_frustum.Update(GetProjectionMatrix(PROJECTION_METHOD::PERSPECTIVE) * GetViewMatrix());
+			}
+			return m_frustum;
+		}
 
 		//View-matrix-dirtying setters
 		inline void SetPosition(const glm::vec3 _value)	{ m_pos = _value; m_viewMatDirty = true; }
@@ -71,6 +82,8 @@ namespace NK
 		//Need two flags even though they're based on the same state so we don't have to unnecessarily recalculate, for example, orthographic matrix if user is only requesting perspective matrix
 		bool m_orthographicProjMatDirty; //True if m_fov, m_aspectRatio, m_nearPlaneDist, or m_farPlaneDist has been changed
 		bool m_perspectiveProjMatDirty; //True if m_fov, m_aspectRatio, m_nearPlaneDist, or m_farPlaneDist has been changed
+
+		ViewFrustum m_frustum;
 	};
 	
 }

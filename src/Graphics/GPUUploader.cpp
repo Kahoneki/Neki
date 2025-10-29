@@ -37,7 +37,7 @@ namespace NK
 		stagingBufferDesc.type = MEMORY_TYPE::HOST;
 		stagingBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT;
 		m_stagingBuffer = m_device.CreateBuffer(stagingBufferDesc);
-		m_stagingBufferMap = static_cast<unsigned char*>(m_stagingBuffer->Map());
+		m_stagingBufferMap = static_cast<unsigned char*>(m_stagingBuffer->GetMap());
 
 		CommandPoolDesc commandPoolDesc{};
 		commandPoolDesc.type = COMMAND_TYPE::GRAPHICS;
@@ -68,13 +68,6 @@ namespace NK
 		if (m_flushing)
 		{
 			m_queue->WaitIdle();
-		}
-
-		if (m_stagingBufferMap != nullptr)
-		{
-			m_stagingBuffer->Unmap();
-			m_stagingBufferMap = nullptr;
-			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::GPU_UPLOADER, "Staging Buffer Unmapped\n");
 		}
 
 
@@ -301,6 +294,7 @@ namespace NK
 			auto createTexture{ [&](const MODEL_TEXTURE_TYPE _textureType)
 			{
 				const std::size_t index{ std::to_underlying(_textureType) };
+				m_imageDataPointers.push(cpuMaterial.allTextures[index]);
 				gpuMaterial->textures[index] = m_device.CreateTexture(cpuMaterial.allTextures[index]->desc);
 				EnqueueTextureDataUpload(cpuMaterial.allTextures[index]->data, gpuMaterial->textures[index].get(), RESOURCE_STATE::UNDEFINED);
 				m_commandBuffer->TransitionBarrier(gpuMaterial->textures[index].get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::SHADER_RESOURCE);
@@ -408,6 +402,11 @@ namespace NK
 		}
 		
 		m_stagingBufferSubregions.clear();
+		while (!m_imageDataPointers.empty())
+		{
+			ImageLoader::FreeImage(m_imageDataPointers.back());
+			m_imageDataPointers.pop();
+		}
 		m_flushing = false;
 		m_commandBuffer->Reset();
 		m_commandBuffer->Begin();

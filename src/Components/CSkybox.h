@@ -8,7 +8,7 @@ namespace NK
 
 	struct CSkybox
 	{
-		friend class RenderSystem;
+		friend class RenderLayer;
 		
 		
 	public:
@@ -30,7 +30,7 @@ namespace NK
 		std::string textureDirectory;
 		std::string fileExtension;
 
-		//True if textureDirectory or fileExtension has been modified and the skybox hasn't yet been updated by RenderSystem
+		//True if textureDirectory or fileExtension has been modified and the skybox hasn't yet been updated by RenderLayer
 		bool dirty{ true };
 	};
 	

@@ -12,11 +12,14 @@ namespace NK
 	
 	ILogger* Context::m_logger{ nullptr };
 	IAllocator* Context::m_allocator{ nullptr };
+	LAYER_UPDATE_STATE Context::m_layerUpdateState{ LAYER_UPDATE_STATE::PRE_APP };
 
 
 	void GLFWErrorCallback(int _error, const char* _description)
 	{
-		Context::GetLogger()->IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GLFW, _description);
+		std::string msg{ _description };
+		if (msg.back() != '\n') { msg += '\n'; } //glfw just like sometimes doesn't do this
+		Context::GetLogger()->IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GLFW, msg);
 	}
 
 
@@ -30,13 +33,9 @@ namespace NK
 		default: throw std::runtime_error("Context::Context() - _config.loggerConfig.type not recognised.\n");
 		}
 
-		switch (_config.allocatorType)
+		switch (_config.allocatorDesc.type)
 		{
-		case ALLOCATOR_TYPE::TRACKING: m_allocator = new TrackingAllocator(*m_logger, false, false);
-			break;
-		case ALLOCATOR_TYPE::TRACKING_VERBOSE: m_allocator = new TrackingAllocator(*m_logger, true, false);
-			break;
-		case ALLOCATOR_TYPE::TRACKING_VERBOSE_INCLUDE_VULKAN: m_allocator = new TrackingAllocator(*m_logger, true, true);
+		case ALLOCATOR_TYPE::TRACKING: m_allocator = new TrackingAllocator(*m_logger, _config.allocatorDesc.trackingAllocator); break;
 		}
 
 		glfwSetErrorCallback(GLFWErrorCallback);

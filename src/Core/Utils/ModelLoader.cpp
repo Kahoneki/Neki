@@ -1,11 +1,15 @@
 #include "ModelLoader.h"
 
+#include "FileUtils.h"
 #include "ImageLoader.h"
 
+#include <filesystem>
+#include <fstream>
 #include <stdexcept>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
+#include <cereal/archives/binary.hpp>
 
 
 namespace NK
@@ -15,7 +19,7 @@ namespace NK
 
 
 
-	const CPUModel* const ModelLoader::LoadModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures)
+	const CPUModel* ModelLoader::LoadModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures)
 	{
 		const std::unordered_map<std::string, CPUModel>::iterator it{ m_filepathToModelDataCache.find(_filepath) };
 		if (it != m_filepathToModelDataCache.end())
@@ -24,6 +28,159 @@ namespace NK
 			return &(it->second);
 		}
 		
+		if (FileUtils::GetFileExtension(_filepath) == ".nkmodel")
+		{
+			return LoadNKModel(_filepath);
+		}
+		return std::get<CPUModel*>(LoadNonNKModel(_filepath, _flipFaceWinding, _flipTextures, false));
+	}
+
+
+
+	void ModelLoader::UnloadModel(const std::string& _filepath)
+	{
+		if (!m_filepathToModelDataCache.contains(_filepath))
+		{
+			throw std::invalid_argument("ModelLoader::UnloadModel() - _filepath not in cache");
+		}
+		m_filepathToModelDataCache.erase(_filepath);
+	}
+
+
+
+	VertexInputDesc ModelLoader::GetModelVertexInputDescription()
+	{
+		std::vector<VertexAttributeDesc> vertexAttributes;
+		
+		//Position attribute
+		VertexAttributeDesc posAttribute{};
+		posAttribute.attribute = SHADER_ATTRIBUTE::POSITION;
+		posAttribute.binding = 0;
+		posAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		posAttribute.offset = offsetof(ModelVertex, position);
+		vertexAttributes.push_back(posAttribute);
+
+		//Normal attribute
+		VertexAttributeDesc normAttribute{};
+		normAttribute.attribute = SHADER_ATTRIBUTE::NORMAL;
+		normAttribute.binding = 0;
+		normAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		normAttribute.offset = offsetof(ModelVertex, normal);
+		vertexAttributes.push_back(normAttribute);
+
+		//Texcoord attribute
+		VertexAttributeDesc uvAttribute{};
+		uvAttribute.attribute = SHADER_ATTRIBUTE::TEXCOORD_0;
+		uvAttribute.binding = 0;
+		uvAttribute.format = DATA_FORMAT::R32G32_SFLOAT;
+		uvAttribute.offset = offsetof(ModelVertex, texCoord);
+		vertexAttributes.push_back(uvAttribute);
+
+		//Tangent attribute
+		VertexAttributeDesc tanAttribute{};
+		tanAttribute.attribute = SHADER_ATTRIBUTE::TANGENT;
+		tanAttribute.binding = 0;
+		tanAttribute.format = DATA_FORMAT::R32G32B32A32_SFLOAT;
+		tanAttribute.offset = offsetof(ModelVertex, tangent);
+		vertexAttributes.push_back(tanAttribute);
+
+		//Vertex buffer binding
+		std::vector<VertexBufferBindingDesc> bufferBindings;
+		VertexBufferBindingDesc bufferBinding{};
+		bufferBinding.binding = 0;
+		bufferBinding.inputRate = VERTEX_INPUT_RATE::VERTEX;
+		bufferBinding.stride = sizeof(ModelVertex);
+		bufferBindings.push_back(bufferBinding);
+
+		//Vertex input description
+		VertexInputDesc vertexInputDesc{};
+		vertexInputDesc.attributeDescriptions = vertexAttributes;
+		vertexInputDesc.bufferBindingDescriptions = bufferBindings;
+
+		return vertexInputDesc;
+	}
+
+
+
+	void ModelLoader::SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures)
+	{
+		//Create output filepath if it doesn't exist
+		const std::filesystem::path outputPath{ _outputFilepath };
+		const std::filesystem::path outputDir{ outputPath.parent_path() };
+		if (!outputDir.empty())
+		{
+			std::filesystem::create_directories(outputDir);
+		}
+
+		//Load the serialised model into the archive
+		std::ofstream os(_outputFilepath, std::ios::binary);
+		if (!os)
+		{
+			throw std::runtime_error("ModelLoader::SerialiseNKModel() - failed to open _outputFilepath for writing. _outputFilepath (" + _outputFilepath + ")");
+		}
+		cereal::BinaryOutputArchive archive(os);
+		CPUModel_Serialised model{ std::get<CPUModel_Serialised>(LoadNonNKModel(_inputFilepath, _flipFaceWinding, _flipTextures, true)) };
+		model.header.flipTextures = _flipTextures;
+		archive(model);
+	}
+
+
+
+	CPUModel_SerialisedHeader ModelLoader::GetNKModelHeader(const std::string& _filepath)
+	{
+		std::ifstream fs(_filepath, std::ios::binary);
+		if (!fs)
+		{
+			throw std::invalid_argument("ModelLoader::GetNKModelHeader() - failed to open model at _filepath (" + _filepath + ")");
+		}
+		cereal::BinaryInputArchive archive(fs);
+
+		CPUModel_SerialisedHeader header{};
+		archive(header);
+		
+		return header;
+	}
+
+
+
+	const CPUModel* ModelLoader::LoadNKModel(const std::string& _filepath)
+	{
+		std::ifstream fs(_filepath, std::ios::binary);
+		if (!fs)
+		{
+			throw std::invalid_argument("ModelLoader::LoadModel() - failed to open model at _filepath (" + _filepath + ")");
+		}
+		cereal::BinaryInputArchive archive(fs);
+
+		CPUModel_Serialised serialisedModel;
+		archive(serialisedModel);
+
+		CPUModel& model{ m_filepathToModelDataCache[_filepath] };
+		model.meshes = std::move(serialisedModel.meshes);
+		model.materials.resize(serialisedModel.materials.size());
+		for (std::size_t matIndex{ 0 }; matIndex < serialisedModel.materials.size(); ++matIndex)
+		{
+			model.materials[matIndex].lightingModel = serialisedModel.materials[matIndex].lightingModel;
+			model.materials[matIndex].shaderMaterialData = serialisedModel.materials[matIndex].shaderMaterialData;
+
+			for (std::size_t texIndex{ 0 }; texIndex < serialisedModel.materials[matIndex].allTextures.size(); ++texIndex)
+			{
+				const std::pair<std::string, bool> texLoadData{ serialisedModel.materials[matIndex].allTextures[texIndex] };
+				if (!texLoadData.first.empty())
+				{
+					model.materials[matIndex].allTextures[texIndex] = ImageLoader::LoadImage(texLoadData.first, serialisedModel.header.flipTextures, texLoadData.second);
+					model.materials[matIndex].allTextures[texIndex]->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
+				}
+			}
+		}
+
+		return &(m_filepathToModelDataCache[_filepath]);
+	}
+
+
+
+	std::variant<CPUModel*, CPUModel_Serialised> ModelLoader::LoadNonNKModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, bool _serialisedModelOutput)
+	{
 		Assimp::Importer importer{};
 		const aiScene* scene{ importer.ReadFile(_filepath,
 		                                        aiProcess_Triangulate |			//Ensure model is composed of triangles
@@ -40,20 +197,69 @@ namespace NK
 			throw std::runtime_error("ModelLoader::LoadModel() - Failed to load model (" + _filepath + ") - " + std::string(importer.GetErrorString()));
 		}
 
-		CPUModel model{};
+		CPUModel_Serialised cpuModelSerialised{};
+		CPUModel cpuModel{};
 		std::string modelDirectory{ _filepath.substr(0, _filepath.find_last_of('/')) };
-		ProcessNode(scene->mRootNode, scene, model, modelDirectory);
+		if (_serialisedModelOutput) { ProcessNode(scene->mRootNode, scene, &cpuModelSerialised, modelDirectory); }
+		else { ProcessNode(scene->mRootNode, scene, &cpuModel, modelDirectory); }
+		
+		//Calculate model extents
+		glm::vec3 minAABB(std::numeric_limits<float>::max());
+		glm::vec3 maxAABB(std::numeric_limits<float>::lowest());
+		auto calculateExtentsAndCenterModel{ [&](auto* _model)
+		{
+			//Calculate extents
+			for (const CPUMesh& mesh : _model->meshes)
+			{
+				for (const ModelVertex& vertex : mesh.vertices)
+				{
+					minAABB.x = std::min(minAABB.x, vertex.position.x);
+					minAABB.y = std::min(minAABB.y, vertex.position.y);
+					minAABB.z = std::min(minAABB.z, vertex.position.z);
+
+					maxAABB.x = std::max(maxAABB.x, vertex.position.x);
+					maxAABB.y = std::max(maxAABB.y, vertex.position.y);
+					maxAABB.z = std::max(maxAABB.z, vertex.position.z);
+				}
+			}
+
+			const glm::vec3 extentsCentre{ (minAABB + maxAABB) * 0.5f };
+
+			//Center the model so its local origin (0,0,0) is at centre of extents
+			for (CPUMesh& mesh : _model->meshes)
+			{
+				for (ModelVertex& vertex : mesh.vertices)
+				{
+					vertex.position -= extentsCentre;
+				}
+			}
+		} };
+
+		if (_serialisedModelOutput)
+		{
+			calculateExtentsAndCenterModel(&cpuModelSerialised);
+			cpuModelSerialised.header.halfExtents = (maxAABB - minAABB) * 0.5f;
+		}
+		else
+		{
+			calculateExtentsAndCenterModel(&cpuModel);
+			cpuModel.halfExtents = (maxAABB - minAABB) * 0.5f;
+		}
+		
 
 		//Load scene materials
-		model.materials.resize(scene->mNumMaterials);
+		if (_serialisedModelOutput) { cpuModelSerialised.materials.resize(scene->mNumMaterials); }
+		else { cpuModel.materials.resize(scene->mNumMaterials); }
 		for (std::size_t i{ 0 }; i < scene->mNumMaterials; ++i)
 		{
 			aiMaterial* assimpMaterial{ scene->mMaterials[i] };
+			CPUMaterial_Serialised nekiMaterialSerialised{};
 			CPUMaterial nekiMaterial{};
 
 			auto load{ [&](const MODEL_TEXTURE_TYPE _dst, const aiTextureType _src)
 			{
-				nekiMaterial.allTextures[std::to_underlying(_dst)] = LoadMaterialTexture(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory, _flipTextures);
+				if (_serialisedModelOutput) { nekiMaterialSerialised.allTextures[std::to_underlying(_dst)] = GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory); }
+				else { nekiMaterial.allTextures[std::to_underlying(_dst)] = LoadMaterialTexture(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory, _flipTextures); }
 			}};
 			
 			load(MODEL_TEXTURE_TYPE::DIFFUSE          , aiTextureType_DIFFUSE);
@@ -74,30 +280,32 @@ namespace NK
 			load(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION);
 
 			//If NORMAL_CAMERA wasn't available, fall back to NORMAL
-			if (nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)] == nullptr)
+			if ((nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)] == nullptr) && (nekiMaterialSerialised.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)].first.empty()))
 			{
 				load(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMALS);
 			}
 
 
 			//Determine lighting model
-			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return nekiMaterial.allTextures[std::to_underlying(_tex)] != nullptr; } };
+			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return (nekiMaterial.allTextures[std::to_underlying(_tex)] != nullptr) || (!nekiMaterialSerialised.allTextures[std::to_underlying(_tex)].first.empty()); } };
 			const bool isPBR{	hasTex(MODEL_TEXTURE_TYPE::METALNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::ROUGHNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR)			||
 								hasTex(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION)	||
 								hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) };
 
-			nekiMaterial.lightingModel = isPBR ? LIGHTING_MODEL::PHYSICALLY_BASED : LIGHTING_MODEL::BLINN_PHONG;
+			if (_serialisedModelOutput) { nekiMaterialSerialised.lightingModel = isPBR ? LIGHTING_MODEL::PHYSICALLY_BASED : LIGHTING_MODEL::BLINN_PHONG; }
+			else { nekiMaterial.lightingModel = isPBR ? LIGHTING_MODEL::PHYSICALLY_BASED : LIGHTING_MODEL::BLINN_PHONG; }
 
 
 			//Populate shader material data
-			switch (nekiMaterial.lightingModel)
+			switch (_serialisedModelOutput ? nekiMaterialSerialised.lightingModel : nekiMaterial.lightingModel)
 			{
 			case LIGHTING_MODEL::BLINN_PHONG:
 			{
-				nekiMaterial.shaderMaterialData = BlinnPhongMaterial{};
-				BlinnPhongMaterial& material{ std::get<BlinnPhongMaterial>(nekiMaterial.shaderMaterialData) };
+				if (_serialisedModelOutput) { nekiMaterialSerialised.shaderMaterialData = BlinnPhongMaterial{}; }
+				else { nekiMaterial.shaderMaterialData = BlinnPhongMaterial{}; }
+				BlinnPhongMaterial& material{ std::get<BlinnPhongMaterial>(_serialisedModelOutput ? nekiMaterialSerialised.shaderMaterialData : nekiMaterial.shaderMaterialData) };
 				
 				//Convenient workaround - see explanation in CPUMaterial declaration (ModelLoader.h)
 				material.diffuseIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::DIFFUSE);
@@ -129,8 +337,9 @@ namespace NK
 
 			case LIGHTING_MODEL::PHYSICALLY_BASED:
 			{
-				nekiMaterial.shaderMaterialData = PBRMaterial{};
-				PBRMaterial& material{ std::get<PBRMaterial>(nekiMaterial.shaderMaterialData) };
+				if (_serialisedModelOutput) { nekiMaterialSerialised.shaderMaterialData = PBRMaterial{}; }
+				else { nekiMaterial.shaderMaterialData = PBRMaterial{}; }
+				PBRMaterial& material{ std::get<PBRMaterial>(_serialisedModelOutput ? nekiMaterialSerialised.shaderMaterialData : nekiMaterial.shaderMaterialData) };
 
 				//Convenient workaround - see explanation in CPUMaterial declaration (ModelLoader.h)
 				material.baseColourIdx		= hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR) ? static_cast<int>(MODEL_TEXTURE_TYPE::BASE_COLOUR) : static_cast<int>(MODEL_TEXTURE_TYPE::DIFFUSE);
@@ -162,26 +371,38 @@ namespace NK
 				break;
 			}
 			}
-			
 
-			model.materials[i] = nekiMaterial;
+			
+			if (_serialisedModelOutput) { cpuModelSerialised.materials[i] = nekiMaterialSerialised; }
+			else { cpuModel.materials[i] = nekiMaterial; }
 		}
-		
-		//Add to cache
-		m_filepathToModelDataCache[_filepath] = model;
-		
-		return &(m_filepathToModelDataCache[_filepath]);
+
+
+		if (_serialisedModelOutput)
+		{
+			return std::move(cpuModelSerialised);
+		}
+		else
+		{
+			//Add to cache
+			m_filepathToModelDataCache[_filepath] = cpuModel;
+			return &(m_filepathToModelDataCache[_filepath]);
+		}
 	}
 
 
 
-	void ModelLoader::ProcessNode(aiNode* _node, const aiScene* _scene, CPUModel& _outModel, const std::string& _modelDirectory)
+	void ModelLoader::ProcessNode(aiNode* _node, const aiScene* _scene, std::variant<CPUModel*, CPUModel_Serialised*> _outModel, const std::string& _modelDirectory)
 	{
 		//Process all the node's meshes (if any)
 		for (std::size_t i{ 0 }; i < _node->mNumMeshes; ++i)
 		{
 			aiMesh* mesh{ _scene->mMeshes[_node->mMeshes[i]] };
-			_outModel.meshes.push_back(ProcessMesh(mesh, _scene, _modelDirectory));
+
+			std::visit([&](auto* _model)
+			{
+				_model->meshes.push_back(ProcessMesh(mesh, _scene, _modelDirectory));
+			}, _outModel);
 		}
 
 		//Recursively process each child node
@@ -289,56 +510,37 @@ namespace NK
 
 
 
-	VertexInputDesc ModelLoader::GetModelVertexInputDescription()
+	std::pair<std::string, bool> ModelLoader::GetMaterialTextureDataForSerialisation(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory)
 	{
-		std::vector<VertexAttributeDesc> vertexAttributes;
+		//todo: this should be refactored, too much overlap with LoadMaterialTexture()
 		
-		//Position attribute
-		VertexAttributeDesc posAttribute{};
-		posAttribute.attribute = SHADER_ATTRIBUTE::POSITION;
-		posAttribute.binding = 0;
-		posAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
-		posAttribute.offset = offsetof(ModelVertex, position);
-		vertexAttributes.push_back(posAttribute);
+		const aiTextureType assimpType{ static_cast<aiTextureType>(_assimpType) };
+		
+		if (_material->GetTextureCount(assimpType) == 0)
+		{
+			return {};
+		}
 
-		//Normal attribute
-		VertexAttributeDesc normAttribute{};
-		normAttribute.attribute = SHADER_ATTRIBUTE::NORMAL;
-		normAttribute.binding = 0;
-		normAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
-		normAttribute.offset = offsetof(ModelVertex, normal);
-		vertexAttributes.push_back(normAttribute);
+		//Load first texture of type (multiple textures of same type for same material is not currently supported by Neki)
+		aiString filename;
+		_material->GetTexture(assimpType, 0, &filename);
+		const std::string filepath{ _directory + "/" + filename.C_Str() };
+		auto isColour = [&]()
+		{
+			switch (_nekiType) {
+			case MODEL_TEXTURE_TYPE::DIFFUSE:
+			case MODEL_TEXTURE_TYPE::SPECULAR:
+			case MODEL_TEXTURE_TYPE::AMBIENT:
+			case MODEL_TEXTURE_TYPE::EMISSIVE:
+			case MODEL_TEXTURE_TYPE::EMISSION_COLOUR:
+			case MODEL_TEXTURE_TYPE::BASE_COLOUR:
+			case MODEL_TEXTURE_TYPE::REFLECTION:
+				return true;
+			default: return false;
+			}
+		};
 
-		//Texcoord attribute
-		VertexAttributeDesc uvAttribute{};
-		uvAttribute.attribute = SHADER_ATTRIBUTE::TEXCOORD_0;
-		uvAttribute.binding = 0;
-		uvAttribute.format = DATA_FORMAT::R32G32_SFLOAT;
-		uvAttribute.offset = offsetof(ModelVertex, texCoord);
-		vertexAttributes.push_back(uvAttribute);
-
-		//Tangent attribute
-		VertexAttributeDesc tanAttribute{};
-		tanAttribute.attribute = SHADER_ATTRIBUTE::TANGENT;
-		tanAttribute.binding = 0;
-		tanAttribute.format = DATA_FORMAT::R32G32B32A32_SFLOAT;
-		tanAttribute.offset = offsetof(ModelVertex, tangent);
-		vertexAttributes.push_back(tanAttribute);
-
-		//Vertex buffer binding
-		std::vector<VertexBufferBindingDesc> bufferBindings;
-		VertexBufferBindingDesc bufferBinding{};
-		bufferBinding.binding = 0;
-		bufferBinding.inputRate = VERTEX_INPUT_RATE::VERTEX;
-		bufferBinding.stride = sizeof(ModelVertex);
-		bufferBindings.push_back(bufferBinding);
-
-		//Vertex input description
-		VertexInputDesc vertexInputDesc{};
-		vertexInputDesc.attributeDescriptions = vertexAttributes;
-		vertexInputDesc.bufferBindingDescriptions = bufferBindings;
-
-		return vertexInputDesc;
+		return { filepath, isColour() };
 	}
-	
+
 }

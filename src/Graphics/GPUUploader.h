@@ -112,6 +112,10 @@ namespace NK
 		//Subregions are tightly packed so m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size will be the offset for new resources
 		//Gets cleared when Reset() is called
 		std::vector<BufferSubregion> m_stagingBufferSubregions;
+
+		//Stores all the ImageData pointers whose ImageData::data is in m_stagingBufferSubregions waiting to be flushed
+		//Once it has been flushed, we can free the texture data - todo: this is just a bit for debugging, there should be a better system in place for knowing when to load/unload resources
+		std::queue<ImageData*> m_imageDataPointers;
 		
 		UniquePtr<ICommandPool> m_commandPool;
 		UniquePtr<ICommandBuffer> m_commandBuffer;

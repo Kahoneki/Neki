@@ -21,17 +21,19 @@ namespace NK
 	class Window final
 	{
 	public:
-		explicit Window(ILogger& _logger, const WindowDesc& _desc);
+		explicit Window(const WindowDesc& _desc);
 		~Window();
 
 		[[nodiscard]] inline glm::ivec2 GetSize() const { return m_size; }
 		[[nodiscard]] inline bool ShouldClose() const { return glfwWindowShouldClose(m_window); }
 		[[nodiscard]] inline GLFWwindow* GetGLFWWindow() const { return m_window; }
+
+		void SetCursorVisibility(const bool _visible) const;
 		
 		
 	protected:
 		//Dependency injections
-		ILogger& m_logger;
+		ILogger* m_logger;
 
 		const std::string m_name;
 		const glm::ivec2 m_size; //const for now O_O

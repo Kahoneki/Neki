@@ -1,7 +1,7 @@
 #include "ConsoleLogger.h"
 
-#include <iomanip>
 #include <iostream>
+#include <iomanip>
 
 
 namespace NK
@@ -50,19 +50,21 @@ namespace NK
 		std::string indentedMessage{ _message };
 		indentedMessage.insert(0, std::max((_indentationValue == INT32_MAX ? indentationLevel : _indentationValue), 0) * spacesPerIndent, ' '); //Clamp indentation level to 0
 		
-		//std::cerr for errors, std::cout for everything else
-		//std::ostream& stream{ (_channel == LOGGER_CHANNEL::ERROR) ? std::cerr : std::cout };
-		//todo: the above causes output-order issues - just use std::cout for everything for now
-		//todo: ^a possible solution would be to persistently store the current stream, then when there's a stream change, flush the current stream first
-		//todo: ^i need to look into the performance impacts of this solution
-		std::ostream& stream{ std::cout };
-		stream << colourCode;
+		std::reference_wrapper<std::ostream> stream{ std::cout };
+		if (_channel == LOGGER_CHANNEL::ERROR)
+		{
+			stream.get() << std::flush;
+			stream = std::cerr;
+		}
+		stream.get() << colourCode;
 		if (_formatted)
 		{
-			stream << std::left << std::setw(std::to_underlying(LOGGER_WIDTH::CHANNEL)) << channelStr <<
+			stream.get() << std::left << std::setw(std::to_underlying(LOGGER_WIDTH::CHANNEL)) << channelStr <<
 			std::left << std::setw(std::to_underlying(LOGGER_WIDTH::LAYER)) << LayerToString(_layer);
 		}
-		stream << indentedMessage << COLOUR_RESET;
+		stream.get() << indentedMessage << COLOUR_RESET;
+
+		if (_channel == LOGGER_CHANNEL::ERROR) { stream.get() << std::flush; }
 	}
 	
 }

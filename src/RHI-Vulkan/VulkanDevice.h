@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <vector>
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 
@@ -37,7 +38,6 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<IFence> CreateFence(const FenceDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISemaphore> CreateSemaphore() override;
 		[[nodiscard]] virtual UniquePtr<GPUUploader> CreateGPUUploader(const GPUUploaderDesc& _desc) override;
-		[[nodiscard]] virtual UniquePtr<Window> CreateWindow(const WindowDesc& _desc) const override;
 
 		[[nodiscard]] virtual TextureCopyMemoryLayout GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture) override;
 
@@ -48,10 +48,15 @@ namespace NK
 		[[nodiscard]] inline std::uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetComputeQueueFamilyIndex() const { return m_computeQueueFamilyIndex; }
 		[[nodiscard]] inline std::uint32_t GetTransferQueueFamilyIndex() const { return m_transferQueueFamilyIndex; }
+		[[nodiscard]] inline VmaAllocator GetVMAAllocator() const { return m_vmaAllocator; }
 		[[nodiscard]] inline VkDescriptorPool GetDescriptorPool() const { return m_descriptorPool; }
 		[[nodiscard]] inline VkDescriptorSetLayout GetGlobalDescriptorSetLayout() const { return m_globalDescriptorSetLayout; }
 		[[nodiscard]] inline VkDescriptorSet GetGlobalDescriptorSet() const { return m_globalDescriptorSet; }
 
+		//Public utility
+		void LogVRAMUsage_Fast() const;
+		void LogVRAMUsage_Detailed() const;
+		
 
 	private:
 		//Init sub-methods
@@ -59,6 +64,7 @@ namespace NK
 		void SetupDebugMessenger();
 		void SelectPhysicalDevice();
 		void CreateLogicalDevice();
+		void CreateVMAAllocator();
 		void CreateMutableResourceType();
 		void CreateDescriptorPool();
 		void CreateDescriptorSetLayout();
@@ -70,7 +76,8 @@ namespace NK
 		void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& _info) const;
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT _messageSeverity, VkDebugUtilsMessageTypeFlagsEXT _messageType, const VkDebugUtilsMessengerCallbackDataEXT* _pCallbackData, void* _pUserData);
 		[[nodiscard]] bool PhysicalDeviceSuitable(VkPhysicalDevice _device) const; //Checks for physical device compatibility with queue, extension, and feature requirements
-
+		
+		
 
 		//Vulkan handles
 		VkInstance m_instance{ VK_NULL_HANDLE };
@@ -107,12 +114,13 @@ namespace NK
 		VkDescriptorPool m_descriptorPool{ VK_NULL_HANDLE };
 		VkDescriptorSetLayout m_globalDescriptorSetLayout{ VK_NULL_HANDLE };
 		VkDescriptorSet m_globalDescriptorSet{ VK_NULL_HANDLE };
-
-
+		
 		bool m_enableInstanceValidationLayers = true;
 		const std::array<const char*, 1> m_instanceValidationLayers{ "VK_LAYER_KHRONOS_validation" };
 		const std::array<const char*, 1> m_requiredInstanceExtensions{ VK_KHR_SURFACE_EXTENSION_NAME };
 		const std::array<const char*, 4> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader", "VK_EXT_mutable_descriptor_type", "VK_KHR_shader_non_semantic_info" };
+
+		VmaAllocator m_vmaAllocator;
 	};
 	
 }

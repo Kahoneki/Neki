@@ -42,6 +42,11 @@ namespace NK
 	struct Deleter
 	{
 		inline void operator()(T* _ptr) const { NK_DELETE(_ptr); }
+		Deleter() = default;
+		
+		//Allow conversions to polymorphic derived types
+		template<typename U>
+		explicit inline Deleter(const Deleter<U>&) noexcept requires(std::is_convertible_v<U*, T*>) {}
 	};
 
 	template<typename T>

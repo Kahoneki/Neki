@@ -42,6 +42,7 @@ if(NEKI_BUILD_D3D12)
     target_compile_definitions(Neki PUBLIC NEKI_D3D12_SUPPORTED=1)
     target_link_libraries(Neki PUBLIC d3d12 dxgi)
 endif()
+target_compile_definitions(Neki PUBLIC NEKI_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\")
 
 
 
@@ -52,6 +53,17 @@ include(FetchContent)
 if(NEKI_BUILD_VULKAN)
     find_package(Vulkan REQUIRED)
     target_link_libraries(Neki PUBLIC Vulkan::Vulkan)
+    
+    #VMA
+    FetchContent_Declare(
+            vma
+            GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+            GIT_TAG v3.3.0
+    )
+    FetchContent_MakeAvailable(vma)
+    target_link_libraries(Neki PUBLIC VulkanMemoryAllocator)
+    #todo: this is sick i just learnt about this, use it for stb and allat too
+    set_source_files_properties(src/RHI-Vulkan/VulkanDevice.cpp PROPERTIES COMPILE_DEFINITIONS VMA_IMPLEMENTATION)
 endif()
 
 #D3D12 handled automatically
@@ -97,6 +109,16 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glfw)
 target_link_libraries(Neki PUBLIC glfw)
 
+#SFML
+FetchContent_Declare(sfml GIT_REPOSITORY https://github.com/SFML/SFML.git .gitignore TAG 2.6.1)
+FetchContent_MakeAvailable(sfml)
+target_link_libraries(Neki PUBLIC sfml-network)
+
+#Cereal
+FetchContent_Declare(cereal GIT_REPOSITORY https://github.com/USCiLab/cereal.git GIT_TAG v1.3.2)
+set(SKIP_PERFORMANCE_COMPARISON ON CACHE BOOL "" FORCE) #disables boost requirement - i dont want to talk about how long this took to find
+FetchContent_MakeAvailable(cereal)
+target_link_libraries(Neki PUBLIC cereal)
 
 
 #Handle private dependencies
@@ -114,10 +136,6 @@ set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(assimp)
 target_link_libraries(Neki PRIVATE assimp)
 
-#SFML
-FetchContent_Declare(sfml GIT_REPOSITORY https://github.com/SFML/SFML.git .gitignore TAG 2.6.1)
-FetchContent_MakeAvailable(sfml)
-target_link_libraries(Neki PUBLIC sfml-network)
 
 
 
@@ -207,13 +225,13 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 
 
     #Copy all resource files to the output directory, maintaining subdirectory structure
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Samples/Resource Files/" DESTINATION "${CMAKE_BINARY_DIR}/Samples/Resource Files/")
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Samples/Resource-Files/" DESTINATION "${CMAKE_BINARY_DIR}/Samples/Resource-Files/")
     
 
     #Shader compilation
 
     #Define shader files
-    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/*.hlsl")
+    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/Shaders/*.hlsl" "${CMAKE_SOURCE_DIR}/Samples/Graphics/Shaders/*.hlsl")
     message(STATUS "---- Found Shader Files ----")
     foreach(FILE ${SHADER_SOURCES})
         message(STATUS "  ${FILE}")
@@ -342,9 +360,14 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     target_link_libraries(NKEngineSample_Events PRIVATE Neki)
     add_dependencies(NKEngineSample_Events Shaders)
 
-    add_executable(NKEngineSample_Networking "Samples/Engine/Networking/Networking.cpp")
-    target_include_directories(NKEngineSample_Networking PUBLIC "${CMAKE_SOURCE_DIR}/src")
-    target_link_libraries(NKEngineSample_Networking PRIVATE Neki)
-    add_dependencies(NKEngineSample_Networking Shaders)
+    add_executable(NKEngineSample_Networking_Server "Samples/Engine/Networking/Networking_Server.cpp" "Samples/Engine/Networking/PlayerLayer.cpp")
+    target_include_directories(NKEngineSample_Networking_Server PUBLIC "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(NKEngineSample_Networking_Server PRIVATE Neki)
+    add_dependencies(NKEngineSample_Networking_Server Shaders)
+
+    add_executable(NKEngineSample_Networking_Client "Samples/Engine/Networking/Networking_Client.cpp" "Samples/Engine/Networking/PlayerLayer.cpp")
+    target_include_directories(NKEngineSample_Networking_Client PUBLIC "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(NKEngineSample_Networking_Client PRIVATE Neki)
+    add_dependencies(NKEngineSample_Networking_Client Shaders)
 
 endif()

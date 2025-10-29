@@ -18,15 +18,6 @@ namespace NK
 	Engine::Engine(const EngineConfig& _config)
 	: m_application(UniquePtr<Application>(_config.application))
 	{
-		//Initialise subsystems
-		if (_config.renderSystemDesc.backend != GRAPHICS_BACKEND::NONE)
-		{
-			m_renderSystem = UniquePtr<RenderSystem>(NK_NEW(RenderSystem, *Context::GetLogger(), *Context::GetAllocator(), _config.renderSystemDesc));
-		}
-		m_networkSystem = UniquePtr<NetworkSystem>(NK_NEW(NetworkSystem, *Context::GetLogger(), _config.networkSystemDesc));
-
-		m_networkSystem->Host(7777);
-		
 		Context::GetLogger()->Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::ENGINE, "Engine Initialised\n");
 	}
 
@@ -43,26 +34,14 @@ namespace NK
 
 	void Engine::Run()
 	{
-		//If render system was initialised, start render loop, otherwise, just run once
-		if (m_renderSystem)
+		while (!m_application->m_shutdown)
 		{
-			while (!m_renderSystem->GetWindow()->ShouldClose())
-			{
-				glfwPollEvents();
-				TimeManager::Update();
-				InputManager::Update(m_renderSystem->GetWindow());
-				m_application->Update();
-				m_renderSystem->Update(m_application->m_scenes[m_application->m_activeScene]->m_reg);
-				m_networkSystem->Update(m_application->m_scenes[m_application->m_activeScene]->m_reg);
-			}
-		}
-		else
-		{
-			while (true)
-			{
-				m_application->Update();
-				m_networkSystem->Update(m_application->m_scenes[m_application->m_activeScene]->m_reg);
-			}
+			TimeManager::Update();
+			Context::SetLayerUpdateState(LAYER_UPDATE_STATE::PRE_APP);
+			m_application->PreUpdate();
+			m_application->Update();
+			Context::SetLayerUpdateState(LAYER_UPDATE_STATE::POST_APP);
+			m_application->PostUpdate();
 		}
 	}
 

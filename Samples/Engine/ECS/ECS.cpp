@@ -13,10 +13,10 @@ public:
 	struct C2 {};
 	struct C3 {};
 
-	
-	virtual void Update() override
+
+	GameApp() : Application()
 	{
-		constexpr int testWidth{ 40 };
+				constexpr int testWidth{ 40 };
 		constexpr int resultWidth{ 30 };
 		const std::string COLOUR_GREEN{ "\033[32m" };
 		const std::string COLOUR_RED{ "\033[31m" };
@@ -131,6 +131,8 @@ public:
 
 		//Testing Registry's shutdown logic
 	}
+
+	virtual void Update() override {}
 };
 
 
@@ -149,8 +151,6 @@ public:
 
 [[nodiscard]] NK::EngineConfig CreateEngine()
 {
-	NK::RenderSystemDesc renderSystemDesc{};
-	renderSystemDesc.backend = NK::GRAPHICS_BACKEND::NONE;
-	NK::EngineConfig config{ NK_NEW(GameApp), renderSystemDesc };
+	const NK::EngineConfig config{ NK_NEW(GameApp) };
 	return config;
 }

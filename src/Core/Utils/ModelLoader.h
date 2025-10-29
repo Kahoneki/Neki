@@ -2,7 +2,8 @@
 
 #include "ImageLoader.h"
 
-#include <Core/Memory/Allocation.h>
+#include "Serialisation/Serialisation.h"
+
 #include <RHI/IPipeline.h>
 #include <Types/Materials.h>
 
@@ -59,7 +60,9 @@ namespace NK
 		glm::vec3 normal;
 		glm::vec2 texCoord;
 		glm::vec4 tangent;
+
 	};
+	SERIALISE(ModelVertex, v.position, v.normal, v.texCoord, v.tangent)
 	
 	struct CPUMesh
 	{
@@ -67,6 +70,7 @@ namespace NK
 		std::vector<std::uint32_t> indices;
 		std::size_t materialIndex;
 	};
+	SERIALISE(CPUMesh, v.vertices, v.indices, v.materialIndex)
 
 	enum class LIGHTING_MODEL
 	{
@@ -87,15 +91,39 @@ namespace NK
 		//For example, BlinnPhongMaterial has `hasEmissive` and `emissiveIdx` members, but if the material provides both an EMISSIVE and EMISSION_COLOUR type, which one should these fields refer to?
 		//In the specific case above, it will favour EMISSION_COLOUR - this decision will be specific to each texture type that has this problem
 		//This choice is decided by the ModelLoader which then passes on this information the GPUUploader by populating the emissiveIdx field with MODEL_TEXTURE_TYPE::EMISSIVE or EMISSION_COLOUR so the GPU knows which texture to pull.
-		//The GPUUploader, will update these values with the indices it allocates when creating the GPUMaterial
+		//The GPUUploader will update these values with the indices it allocates when creating the GPUMaterial
 		std::variant<BlinnPhongMaterial, PBRMaterial> shaderMaterialData;
 	};
+
+	struct CPUMaterial_Serialised
+	{
+		LIGHTING_MODEL lightingModel;
+		std::array<std::pair<std::string, bool>, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //Serialised as filepath and srgb-flag std::pair
+		std::variant<BlinnPhongMaterial, PBRMaterial> shaderMaterialData;
+	};
+	SERIALISE(CPUMaterial_Serialised, v.lightingModel, v.allTextures, v.shaderMaterialData)
 	
 	struct CPUModel
 	{
+		glm::vec3 halfExtents;
 		std::vector<CPUMesh> meshes;
 		std::vector<CPUMaterial> materials;
 	};
+
+	struct CPUModel_SerialisedHeader
+	{
+		bool flipTextures;
+		glm::vec3 halfExtents; //model's local origin (0,0,0) is centred in the extents
+	};
+	SERIALISE(CPUModel_SerialisedHeader, v.flipTextures, v.halfExtents)
+	
+	struct CPUModel_Serialised
+	{
+		CPUModel_SerialisedHeader header;
+		std::vector<CPUMesh> meshes;
+		std::vector<CPUMaterial_Serialised> materials;
+	};
+	SERIALISE(CPUModel_Serialised, v.header, v.meshes, v.materials)
 
 
 	//To avoid having to include assimp headers in public Neki library
@@ -105,19 +133,33 @@ namespace NK
 	class ModelLoader final
 	{
 	public:
-		[[nodiscard]] static const CPUModel* const LoadModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures);
+		//_flipFaceWinding and _flipTextures will be ignored if model extension is .nkmodel as this information is baked into the file format
+		[[nodiscard]] static const CPUModel* LoadModel(const std::string& _filepath, bool _flipFaceWinding = false, bool _flipTextures = false);
 
+		//Removes the specified model from the cache
+		static void UnloadModel(const std::string& _filepath);
+
+		//Serialise a model of any type (.gltf, .fbx, .obj, etc.) from _inputFilepath into a .nkmodel file at _outputFilepath
+		static void SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures);
+
+		//Get the header of a .nkmodel
+		static CPUModel_SerialisedHeader GetNKModelHeader(const std::string& _filepath);
+		
 		[[nodiscard]] static VertexInputDesc GetModelVertexInputDescription();
 
 
 	private:
+		[[nodiscard]] static const CPUModel* LoadNKModel(const std::string& _filepath);
+		[[nodiscard]] static std::variant<CPUModel*, CPUModel_Serialised> LoadNonNKModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, bool _serialisedModelOutput);
+		
 		//Recursively process nodes in the Assimp scene graph
-		static void ProcessNode(aiNode* _node, const aiScene* _scene, CPUModel& _outModel, const std::string& _modelDirectory);
+		static void ProcessNode(aiNode* _node, const aiScene* _scene, std::variant<CPUModel*, CPUModel_Serialised*> _outModel, const std::string& _modelDirectory);
 
 		//Translate an Assimp mesh to an NK::Mesh
 		static CPUMesh ProcessMesh(aiMesh* _mesh, const aiScene* _scene, const std::string& _directory);
 
 		static ImageData* LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture);
+		static std::pair<std::string, bool> GetMaterialTextureDataForSerialisation(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory); //std::pair of filepath and srgb-flag
 		
 		
 		//To avoid unnecessary duplicate loads

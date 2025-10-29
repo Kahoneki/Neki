@@ -26,8 +26,9 @@ namespace NK
 	public:
 		virtual ~IBuffer() = default;
 
-		virtual void* Map() = 0;
-		virtual void Unmap() = 0;
+		[[nodiscard]] virtual void* GetMap() = 0;
+//		virtual void* Map() = 0;
+//		virtual void Unmap() = 0;
 
 		[[nodiscard]] inline std::size_t GetSize() const { return m_size; }
 		[[nodiscard]] inline MEMORY_TYPE GetMemoryType() const { return m_memType; }

@@ -51,12 +51,11 @@ namespace NK
 		{
 			if (&(it->second) == _imageData)
 			{
+				stbi_image_free(_imageData->data);
 				m_filepathToImageDataCache.erase(it->first);
-				break;
+				return;
 			}
 		}
-
-		stbi_image_free(_imageData->data);
 	}
 
 }
