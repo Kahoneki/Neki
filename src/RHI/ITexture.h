@@ -2,7 +2,6 @@
 
 #include <Core/Debug/ILogger.h>
 #include <Core/Memory/IAllocator.h>
-#include <Core/Utils/Serialisation.h>
 #include <Types/NekiTypes.h>
 
 #include <stdexcept>

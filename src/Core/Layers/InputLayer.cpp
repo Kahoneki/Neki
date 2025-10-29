@@ -44,7 +44,7 @@ namespace NK
 				case INPUT_BINDING_TYPE::UNBOUND:
 				{
 					//It's fine for the user to not have an input bound to an action, provide a warning, not an error
-					m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::INPUT_LAYER, "Unbound action found - type: " + std::string(it->first.first.name()) + ", element: " + std::to_string(it->first.second) + "\n");
+					m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::INPUT_LAYER, "Unbound action found - type: " + std::to_string(it->first.first) + ", element: " + std::to_string(it->first.second) + "\n");
 					break;
 				}
 				case INPUT_BINDING_TYPE::BUTTON:

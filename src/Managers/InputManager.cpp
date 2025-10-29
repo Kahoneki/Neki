@@ -106,7 +106,7 @@ namespace NK
 		if (m_actionToInputTypeMap[_key] != _inputType)
 		{
 			std::string err{ "InputManager::" };
-			err += _func + " - invalid action provided - type: " + std::string(_key.first.name()) + ", element: " + std::to_string(_key.second);
+			err += _func + " - invalid action provided - type: " + std::to_string(_key.first) + ", element: " + std::to_string(_key.second);
 			throw std::invalid_argument(err);
 		}
 	}

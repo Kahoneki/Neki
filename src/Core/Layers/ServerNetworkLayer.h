@@ -41,6 +41,10 @@ namespace NK
 		[[nodiscard]] NETWORK_LAYER_ERROR_CODE CheckForIncomingTCPData();
 		[[nodiscard]] NETWORK_LAYER_ERROR_CODE CheckForIncomingUDPData();
 		std::unordered_map<ClientIndex, sf::TcpSocket>::iterator DisconnectClient(const ClientIndex _index); //Returns iterator to next valid iterator position in m_connectedClientTCPSockets
+
+		void PreAppUpdate();
+		void PostAppUpdate();
+		void DecodeAndApplyInput(const sf::Packet& _packet) const;
 		
 		
 		ServerNetworkLayerDesc m_desc;
@@ -50,9 +54,13 @@ namespace NK
 		sf::TcpListener m_tcpListener;
 		sf::TcpSocket m_tcpSocket;
 		sf::UdpSocket m_udpSocket;
-		std::unordered_map<std::string, ClientIndex> m_connectedClients; //For fast lookup (client ip:port -> client index)
+		
+		std::unordered_map<ClientIndex, UniqueAddress> m_connectedClientTCPAddresses; //Client index -> client ip + tcp port
+		std::unordered_map<UniqueAddress, ClientIndex> m_rev_connectedClientTCPAddresses; //Client ip + tcp port -> client index
 		std::unordered_map<ClientIndex, sf::TcpSocket> m_connectedClientTCPSockets;
-		std::unordered_map<ClientIndex, unsigned short> m_connectedClientUDPPorts;
+		std::unordered_map<ClientIndex, UniqueAddress> m_connectedClientUDPAddresses; //Client index -> client ip + udp port
+		std::unordered_map<UniqueAddress, ClientIndex> m_rev_connectedClientUDPAddresses; //Client ip + udp port -> client index
+		
 		UniquePtr<FreeListAllocator> m_clientIndexAllocator;
 		ClientIndex m_nextClientIndex;
 	};

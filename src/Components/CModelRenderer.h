@@ -24,7 +24,7 @@ namespace NK
 		//Non-owning pointer. The RenderLayer owns and manages the GPUModel
 		GPUModel* model;
 		
-		bool visible;
+		bool visible{ true };
 	};
 	
 }

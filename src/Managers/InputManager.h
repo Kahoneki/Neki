@@ -2,6 +2,7 @@
 
 #include "Input-Bindings/Axis2DBinding.h"
 
+#include <Core/Utils/Serialisation/TypeRegistry.h>
 #include <Graphics/Window.h>
 #include <Types/NekiTypes.h>
 
@@ -37,7 +38,7 @@ namespace NK
 		[[nodiscard]] inline static Axis1DState GetAxis1DState(const ActionType _action)
 		{
 			ValidateActionTypeUtil("GetAxis1DState()", _action, INPUT_BINDING_TYPE::AXIS_1D);
-			const ActionTypeMapKey key{ std::type_index(typeid(ActionType)), std::to_underlying(_action) };
+			const ActionTypeMapKey key{ typeid(ActionType).name(), std::to_underlying(_action) };
 			return GetAxis1DState(key);
 		}
 
@@ -54,7 +55,7 @@ namespace NK
 		template<typename ActionType>
 		inline static void BindActionToInput(const ActionType _action, const INPUT_BINDING_VARIANT& _input)
 		{
-			const ActionTypeMapKey key{ std::type_index(typeid(ActionType)), std::to_underlying(_action) };
+			const ActionTypeMapKey key{ TypeRegistry::GetConstant(std::type_index(typeid(ActionType))), std::to_underlying(_action) };
 
 			if (std::holds_alternative<ButtonBinding>(_input))		{ m_actionToInputTypeMap[key] = INPUT_BINDING_TYPE::BUTTON; }
 			else if (std::holds_alternative<Axis1DBinding>(_input))	{ m_actionToInputTypeMap[key] = INPUT_BINDING_TYPE::AXIS_1D; }
@@ -68,7 +69,7 @@ namespace NK
 		template<typename ActionType>
 		inline static INPUT_BINDING_TYPE GetActionInputType(const ActionType _action)
 		{
-			const ActionTypeMapKey key{ std::type_index(typeid(ActionType)), std::to_underlying(_action) };
+			const ActionTypeMapKey key{ TypeRegistry::GetConstant(std::type_index(typeid(ActionType))), std::to_underlying(_action) };
 			return (m_actionToInputTypeMap.contains(key) ? m_actionToInputTypeMap[key] : INPUT_BINDING_TYPE::UNBOUND);
 		}
 		
@@ -88,7 +89,7 @@ namespace NK
 		template<typename ActionType>
 		inline static void ValidateActionTypeUtil(const std::string& _func, const ActionType _action, const INPUT_BINDING_TYPE _inputType)
 		{
-			const ActionTypeMapKey key{ std::type_index(typeid(ActionType)), std::to_underlying(_action) };
+			const ActionTypeMapKey key{ TypeRegistry::GetConstant(std::type_index(typeid(ActionType))), std::to_underlying(_action) };
 			ValidateActionTypeUtil(_func, key, _inputType);
 		}
 		

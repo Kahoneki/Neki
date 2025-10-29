@@ -34,6 +34,9 @@ namespace NK
 		
 		
 	private:
+		void PreAppUpdate();
+		void PostAppUpdate();
+		
 		ClientNetworkLayerDesc m_desc;
 		CLIENT_STATE m_state;
 		sf::TcpSocket m_tcpSocket;

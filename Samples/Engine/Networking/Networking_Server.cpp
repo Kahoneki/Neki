@@ -1,3 +1,6 @@
+#include "CPlayer.h"
+#include "PlayerLayer.h"
+
 #include <filesystem>
 #include <Components/CCamera.h>
 #include <Components/CInput.h>
@@ -17,23 +20,41 @@
 #include <Managers/TimeManager.h>
 
 
-
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(0)
+	explicit GameScene() : Scene(1)
 	{
+		m_playerEntity = m_reg.Create();
+		NK::CInput& input{ m_reg.AddComponent<NK::CInput>(m_playerEntity) };
+		NK::CTransform& transform{ m_reg.AddComponent<NK::CTransform>(m_playerEntity) };
+		transform.SetPosition(glm::vec3(0, 0, 3));
+		transform.SetRotation({ glm::radians(70.0f), glm::radians(150.0f), glm::radians(180.0f) });
+		CPlayer& player{ m_reg.AddComponent<CPlayer>(m_playerEntity) };
+		player.movementSpeed = 10.0f;
 
+		NK::ButtonBinding aBinding{ NK::KEYBOARD::A };
+		NK::ButtonBinding dBinding{ NK::KEYBOARD::D };
+		NK::ButtonBinding sBinding{ NK::KEYBOARD::S };
+		NK::ButtonBinding wBinding{ NK::KEYBOARD::W };
+		NK::Axis1DBinding moveHorizontalBinding{ { aBinding, dBinding }, { -1, 1 } };
+		NK::Axis1DBinding moveVerticalBinding{ { sBinding, wBinding }, { -1, 1 } };
+		NK::Axis2DBinding moveBinding{ NK::Axis2DBinding({ moveHorizontalBinding, moveVerticalBinding }) };
+		NK::InputManager::BindActionToInput(PLAYER_ACTIONS::MOVE, moveBinding);
+//		input.AddActionToMap(PLAYER_ACTIONS::MOVE);
 	}
 
 	
 	virtual void Update() override
 	{
-		
+//		if (m_reg.GetComponent<NK::CInput>(m_playerEntity).actionStates.empty()) { return; }
+//		const NK::Axis2DState state{ m_reg.GetComponent<NK::CInput>(m_playerEntity).GetActionState<NK::Axis2DState>(PLAYER_ACTIONS::MOVE) };
+//		NK::Context::GetLogger()->IndentLog(NK::LOGGER_CHANNEL::SUCCESS, NK::LOGGER_LAYER::APPLICATION, "Move state: " + std::to_string(state.values.x) + ", " + std::to_string(state.values.y) + "\n");
 	}
 
 
 private:
+	NK::Entity m_playerEntity;
 };
 
 
@@ -42,6 +63,9 @@ class GameApp final : public NK::Application
 public:
 	explicit GameApp() : Application(1)
 	{
+		//Register types
+		NK::TypeRegistry::Register<PLAYER_ACTIONS>("PLAYER_ACTIONS");
+		
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
 		m_activeScene = 0;
 
@@ -49,8 +73,9 @@ public:
 		//Window
 		NK::WindowDesc windowDesc;
 		windowDesc.name = "Networking Sample";
-		windowDesc.size = { 1920, 1080 };
+		windowDesc.size = { 400, 400 };
 		m_window = NK::UniquePtr<NK::Window>(NK_NEW(NK::Window, windowDesc));
+		NK::InputManager::SetWindow(m_window.get());
 
 		m_windowEntity = m_reg.Create();
 		NK::CWindow& windowComponent{ m_reg.AddComponent<NK::CWindow>(m_windowEntity) };
@@ -59,19 +84,18 @@ public:
 
 		//Pre-app layers
 		m_windowLayer = NK::UniquePtr<NK::WindowLayer>(NK_NEW(NK::WindowLayer, m_reg));
-		NK::InputLayerDesc inputLayerDesc{ m_window.get() };
-		m_inputLayer = NK::UniquePtr<NK::InputLayer>(NK_NEW(NK::InputLayer, m_scenes[m_activeScene]->m_reg, inputLayerDesc));
-		
-		m_preAppLayers.push_back(m_windowLayer.get());
-		m_preAppLayers.push_back(m_inputLayer.get());
-		
-		
-		//Post-app layers
 		NK::ServerNetworkLayerDesc serverDesc{};
 		serverDesc.maxClients = 2;
 		serverDesc.type = NK::SERVER_TYPE::LAN;
-		m_serverNetworkLayer = NK::UniquePtr<NK::ServerNetworkLayer>(NK_NEW(NK::ServerNetworkLayer, m_reg, serverDesc));
+		m_serverNetworkLayer = NK::UniquePtr<NK::ServerNetworkLayer>(NK_NEW(NK::ServerNetworkLayer, m_scenes[m_activeScene]->m_reg, serverDesc));
+		m_playerLayer = NK::UniquePtr<PlayerLayer>(NK_NEW(PlayerLayer, m_scenes[m_activeScene]->m_reg));
 		
+		m_preAppLayers.push_back(m_windowLayer.get());
+		m_preAppLayers.push_back(m_serverNetworkLayer.get());
+		
+		
+		//Post-app layers
+		m_postAppLayers.push_back(m_playerLayer.get());
 		m_postAppLayers.push_back(m_serverNetworkLayer.get());
 
 		
@@ -101,10 +125,10 @@ private:
 
 	//Pre-app layers
 	NK::UniquePtr<NK::WindowLayer> m_windowLayer;
-	NK::UniquePtr<NK::InputLayer> m_inputLayer;
+	NK::UniquePtr<NK::ServerNetworkLayer> m_serverNetworkLayer;
+	NK::UniquePtr<PlayerLayer> m_playerLayer;
 	
 	//Post-app layers
-	NK::UniquePtr<NK::ServerNetworkLayer> m_serverNetworkLayer;
 };
 
 

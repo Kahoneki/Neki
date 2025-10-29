@@ -37,8 +37,10 @@ namespace NK
 		while (!m_application->m_shutdown)
 		{
 			TimeManager::Update();
+			Context::SetLayerUpdateState(LAYER_UPDATE_STATE::PRE_APP);
 			m_application->PreUpdate();
 			m_application->Update();
+			Context::SetLayerUpdateState(LAYER_UPDATE_STATE::POST_APP);
 			m_application->PostUpdate();
 		}
 	}

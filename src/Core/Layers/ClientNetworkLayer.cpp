@@ -1,6 +1,11 @@
 #include "ClientNetworkLayer.h"
 
+#include <Components/CInput.h>
+#include <Components/CTransform.h>
 #include <Core/Utils/Timer.h>
+
+#include <queue>
+#include <cereal/archives/binary.hpp>
 
 
 namespace NK
@@ -36,7 +41,8 @@ namespace NK
 
 	void ClientNetworkLayer::Update()
 	{
-		
+		if (Context::GetLayerUpdateState() == LAYER_UPDATE_STATE::PRE_APP) { PreAppUpdate(); }
+		else { PostAppUpdate(); }
 	}
 
 	
@@ -106,8 +112,15 @@ namespace NK
 
 		//Step 3: Send packet to server over UDP (so the server can get the udp socket's port)
 		//Use blocking so as to not send a bunch of packets
+		if (m_udpSocket.bind(sf::Socket::AnyPort) != sf::Socket::Status::Done)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Failed to bind UDP port\n");
+			m_logger.Unindent();
+			return NETWORK_LAYER_ERROR_CODE::CLIENT__FAILED_TO_BIND_UDP_PORT;
+		}
+		m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "port: " + std::to_string(m_udpSocket.getLocalPort()) + '\n');
 		sf::Packet outgoingPacket;
-		outgoingPacket << std::to_underlying(PACKET_CODE::UDP_PORT);
+		outgoingPacket << std::to_underlying(PACKET_CODE::UDP_PORT) << m_index;
 		if (m_udpSocket.send(outgoingPacket, m_serverAddress.value(), m_serverPort) != sf::Socket::Status::Done)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Failed to send UDP port packet to server\n");
@@ -157,6 +170,85 @@ namespace NK
 		m_state = CLIENT_STATE::DISCONNECTED;
 		m_logger.Unindent();
 		return NETWORK_LAYER_ERROR_CODE::SUCCESS;
+	}
+
+
+
+	void ClientNetworkLayer::PreAppUpdate()
+	{
+		//Serialise all CInputs and send them to the server
+		std::queue<NetworkInputData> inputComponents;
+		for (auto&& [input] : m_reg.get().View<CInput>())
+		{
+			NetworkInputData data{};
+			data.entity = m_reg.get().GetEntity(input);
+			data.actionStates = input.actionStates;
+			inputComponents.push(data);
+		}
+		if (inputComponents.empty())
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "No `CInput`s found in registry\n");
+			return;
+		}
+		std::stringstream ss(std::ios::in | std::ios::out | std::ios::binary);
+		{
+			cereal::BinaryOutputArchive archive(ss);
+			archive(inputComponents);
+		}
+		sf::Packet outgoingPacket;
+		outgoingPacket << std::to_underlying(PACKET_CODE::INPUT);
+		outgoingPacket.append(ss.str().c_str(), ss.str().size());
+		if (m_udpSocket.send(outgoingPacket, m_serverAddress.value(), m_serverPort) == sf::Socket::Status::Error)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Failed to send UDP packet to server\n");
+		}
+	}
+
+
+
+	void ClientNetworkLayer::PostAppUpdate()
+	{
+		sf::Packet incomingData;
+		std::optional<sf::IpAddress> incomingClientIP;
+		unsigned short incomingClientPort;
+		m_udpSocket.setBlocking(false);
+		while (m_udpSocket.receive(incomingData, incomingClientIP, incomingClientPort) == sf::Socket::Status::Done)
+		{
+			if ((incomingClientIP != m_serverAddress) || (incomingClientPort != m_serverPort)) { continue; }
+			std::underlying_type_t<PACKET_CODE> codeValue;
+			incomingData >> codeValue;
+			const PACKET_CODE code{ static_cast<PACKET_CODE>(codeValue) };
+			switch (code)
+			{
+			case PACKET_CODE::TRANSFORM:
+			{
+				//Deserialise all CTransforms and apply them
+				std::stringstream ss(std::ios::in | std::ios::out | std::ios::binary);
+				ss.write(static_cast<const char*>(incomingData.getData()) + incomingData.getReadPosition(), incomingData.getDataSize());
+				std::queue<NetworkTransformData> transformData;
+				{
+					cereal::BinaryInputArchive archive(ss);
+					archive(transformData);
+				}
+
+				while (!transformData.empty())
+				{
+					const NetworkTransformData& data{ transformData.back() };
+					CTransform& trans{ m_reg.get().GetComponent<CTransform>(data.entity) };
+					trans.SetPosition(data.pos);
+					trans.SetRotation(data.rot);
+					trans.SetScale(data.scale);
+					transformData.pop();
+				}
+				break;
+			}
+			default:
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Server sent invalid packet code - code = " + std::to_string(codeValue) + "\n");
+				break;
+			}
+			}
+		}
 	}
 
 }

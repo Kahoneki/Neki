@@ -3,33 +3,36 @@
 #include "ShaderAttributeLocations.h"
 
 #include <Core/Utils/enum_enable_bitmask_operators.h>
+#include <Core/Utils/Serialisation/Serialisation.h>
+#include <Core-ECS/Entity.h>
 
 #include <cstdint>
 #include <typeindex>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 #include <glm/glm.hpp>
+#include <SFML/Network.hpp>
 
 
 namespace NK
 {
-	
 	//Bitfield of states a buffer is allowed to occupy
 	//For compatibility, this must be specified at creation and cannot be changed
 	enum class BUFFER_USAGE_FLAGS : std::uint32_t
 	{
-		NONE				= 0,
-		TRANSFER_SRC_BIT	= 1 << 0,
-		TRANSFER_DST_BIT	= 1 << 1,
-		UNIFORM_BUFFER_BIT	= 1 << 2,
-		STORAGE_BUFFER_BIT	= 1 << 3,
-		VERTEX_BUFFER_BIT	= 1 << 4,
-		INDEX_BUFFER_BIT	= 1 << 5,
-		INDIRECT_BUFFER_BIT	= 1 << 6,
+		NONE                = 0,
+		TRANSFER_SRC_BIT    = 1 << 0,
+		TRANSFER_DST_BIT    = 1 << 1,
+		UNIFORM_BUFFER_BIT  = 1 << 2,
+		STORAGE_BUFFER_BIT  = 1 << 3,
+		VERTEX_BUFFER_BIT   = 1 << 4,
+		INDEX_BUFFER_BIT    = 1 << 5,
+		INDIRECT_BUFFER_BIT = 1 << 6,
 	};
 	ENABLE_BITMASK_OPERATORS(BUFFER_USAGE_FLAGS)
-	
-	enum class MEMORY_TYPE
+
+		enum class MEMORY_TYPE
 	{
 		HOST,
 		DEVICE,
@@ -585,6 +588,25 @@ namespace NK
 	};
 
 	typedef std::uint32_t ClientIndex;
+}
+
+
+//std::pair doesn't have a default hashing function for whatever reason
+//Solution adapted from https://stackoverflow.com/a/17017281
+typedef std::pair<std::string, std::uint32_t> UniqueAddress; //IP + port
+template<>
+struct std::hash<UniqueAddress>
+{
+	[[nodiscard]] inline std::size_t operator()(const UniqueAddress& _key) const noexcept
+	{
+		//Compute individual hash values for first and second and combine them using XOR and bit shifting
+		return (std::hash<std::string>{}(_key.first) ^ (std::hash<std::uint32_t>()(_key.second)) << 1);
+	}
+};
+
+
+namespace NK
+{
 
 	enum class SERVER_TYPE
 	{
@@ -612,6 +634,7 @@ namespace NK
 		CLIENT__INVALID_SERVER_IP_ADDRESS,
 		CLIENT__SERVER_CONNECTION_TIMED_OUT,
 		CLIENT__CLIENT_INDEX_PACKET_RETRIEVAL_TIMED_OUT,
+		CLIENT__FAILED_TO_BIND_UDP_PORT,
 		CLIENT__FAILED_TO_SEND_UDP_PORT_PACKET,
 		CLIENT__FAILED_TO_DISCONNECT_FROM_SERVER,
 	};
@@ -624,6 +647,8 @@ namespace NK
 
 		//UDP
 		UDP_PORT,
+		INPUT,
+		TRANSFORM, //lazy workaround - find a better way of sending a registry diff between start and end of frame
 	};
 
 	enum class CLIENT_STATE
@@ -678,16 +703,19 @@ namespace NK
 		bool held; //Button is currently held down
 		bool released; //Button was released this frame
 	};
+	SERIALISE(ButtonState, v.held, v.released)
 
 	struct Axis1DState
 	{
 		float value;
 	};
+	SERIALISE(Axis1DState, v.value)
 
 	struct Axis2DState
 	{
 		glm::vec2 values;
 	};
+	SERIALISE(Axis2DState, v.values)
 
 	enum class INPUT_BINDING_TYPE
 	{
@@ -703,14 +731,14 @@ namespace NK
 
 //std::pair doesn't have a default hashing function for whatever reason
 //Solution adapted from https://stackoverflow.com/a/17017281
-typedef std::pair<std::type_index, std::uint32_t> ActionTypeMapKey;
+typedef std::pair<std::uint32_t, std::uint32_t> ActionTypeMapKey;
 template<>
 struct std::hash<ActionTypeMapKey>
 {
 	[[nodiscard]] inline std::size_t operator()(const ActionTypeMapKey& _key) const noexcept
 	{
 		//Compute individual hash values for first and second and combine them using XOR and bit shifting
-		return (std::hash<std::type_index>{}(_key.first) ^ (std::hash<std::uint32_t>()(_key.second)) << 1);
+		return (std::hash<std::uint32_t>{}(_key.first) ^ (std::hash<std::uint32_t>()(_key.second)) << 1);
 	}
 };
 
@@ -722,5 +750,28 @@ namespace NK
 		MOVE,
 		YAW_PITCH,
 	};
+
+	enum class LAYER_UPDATE_STATE
+	{
+		PRE_APP,
+		POST_APP,
+	};
+
+	struct NetworkInputData
+	{
+		Entity entity;
+		std::unordered_map<ActionTypeMapKey, INPUT_STATE_VARIANT> actionStates;
+	};
+	SERIALISE(NetworkInputData, v.entity, v.actionStates)
+
+	//todo: this is just a hacky test to see if it works - find a better way to serialise a registry diff between start and end of frame
+	struct NetworkTransformData
+	{
+		Entity entity;
+		glm::vec3 pos;
+		glm::vec3 rot; //Euler in radians
+		glm::vec3 scale;
+	};
+	SERIALISE(NetworkTransformData, v.entity, v.pos, v.rot, v.scale)
 	
 }

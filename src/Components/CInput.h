@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/Utils/Serialisation/TypeRegistry.h>
 #include <Types/NekiTypes.h>
 
 #include <stdexcept>
@@ -20,7 +21,7 @@ namespace NK
 		template<typename ActionType>
 		inline void AddActionToMap(ActionType _action)
 		{
-			const ActionTypeMapKey key{ std::type_index(typeid(ActionType)), std::to_underlying(_action) };
+			const ActionTypeMapKey key{ TypeRegistry::GetConstant(std::type_index(typeid(ActionType))), std::to_underlying(_action) };
 			actionStates[key] = {};
 		}
 
@@ -41,7 +42,7 @@ namespace NK
 		template<typename T, typename ActionType>
 		T GetActionState(ActionType _action) const
 		{
-			const ActionTypeMapKey key{ std::type_index(typeid(ActionType)), std::to_underlying(_action) };
+			const ActionTypeMapKey key{ TypeRegistry::GetConstant(std::type_index(typeid(ActionType))), std::to_underlying(_action) };
 			const std::unordered_map<ActionTypeMapKey, INPUT_STATE_VARIANT>::const_iterator it{ actionStates.find(key) };
 			if (it == actionStates.end()) { return T{}; }
 			return std::get<T>(it->second);

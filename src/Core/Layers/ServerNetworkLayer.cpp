@@ -1,6 +1,10 @@
 #include "ServerNetworkLayer.h"
 
+#include <Components/CInput.h>
+#include <Components/CTransform.h>
 #include <Core/Utils/Timer.h>
+
+#include <cereal/archives/binary.hpp>
 
 
 namespace NK
@@ -27,35 +31,8 @@ namespace NK
 
 	void ServerNetworkLayer::Update()
 	{
-		m_logger.Indent();
-		
-		
-		if (m_nextClientIndex != FreeListAllocator::INVALID_INDEX)
-		{
-			const NETWORK_LAYER_ERROR_CODE err{ CheckForIncomingConnectionRequests() };
-			if (err != NETWORK_LAYER_ERROR_CODE::SUCCESS)
-			{
-				m_logger.Unindent();
-				return;
-			}
-		}
-
-		NETWORK_LAYER_ERROR_CODE err{ CheckForIncomingTCPData() };
-		if (err != NETWORK_LAYER_ERROR_CODE::SUCCESS)
-		{
-			m_logger.Unindent();
-			return;
-		}
-
-		err = CheckForIncomingUDPData();
-		if (err != NETWORK_LAYER_ERROR_CODE::SUCCESS)
-		{
-			m_logger.Unindent();
-			return;
-		}
-
-
-		m_logger.Unindent();
+		if (Context::GetLayerUpdateState() == LAYER_UPDATE_STATE::PRE_APP) { PreAppUpdate(); }
+		else { PostAppUpdate(); }
 	}
 
 
@@ -129,8 +106,6 @@ namespace NK
 
 	NETWORK_LAYER_ERROR_CODE ServerNetworkLayer::CheckForIncomingConnectionRequests()
 	{
-		//Create a new socket at a free client index and check if there's a connection request
-
 		//Create a temporary socket to accept the new connection
 		sf::TcpSocket socket;
 		socket.setBlocking(false);
@@ -138,10 +113,11 @@ namespace NK
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Client (address: " + socket.getRemoteAddress()->toString() + ":" + std::to_string(socket.getRemotePort()) + ") connected to the server.\n");
 
-			//Connection was successful, add to map
+			//Connection was successful, add to maps
 			m_connectedClientTCPSockets[m_nextClientIndex] = std::move(socket);
-			const std::string key{ m_connectedClientTCPSockets[m_nextClientIndex].getRemoteAddress()->toString() + ":" + std::to_string(m_connectedClientTCPSockets[m_nextClientIndex].getRemotePort()) };
-			m_connectedClients[key] = m_nextClientIndex;
+			const UniqueAddress address{ m_connectedClientTCPSockets[m_nextClientIndex].getRemoteAddress()->toString(), m_connectedClientTCPSockets[m_nextClientIndex].getRemotePort() };
+			m_connectedClientTCPAddresses[m_nextClientIndex] = address;
+			m_rev_connectedClientTCPAddresses[address] = m_nextClientIndex;
 			
 			//Send client index back to client
 			sf::Packet outgoingPacket;
@@ -248,47 +224,47 @@ namespace NK
 		
 		//Split up the gathering of packets which is very fast from the processing of packets which might be (relatively) much slower
 		//This stops the server getting stuck in an infinite loop if packets are being sent faster than they can be processed
+		std::unordered_map<ClientIndex, std::vector<sf::Packet>> clientPackets;
 
 		
 		//Gather packets
-		std::unordered_map<ClientIndex, std::vector<sf::Packet>> clientPackets;
 		sf::Packet incomingData;
 		std::optional<sf::IpAddress> incomingClientIP;
 		unsigned short incomingClientPort;
 		m_udpSocket.setBlocking(false);
 		while (m_udpSocket.receive(incomingData, incomingClientIP, incomingClientPort) == sf::Socket::Status::Done)
 		{
-			//Make sure client is connected through TCP
-			const std::string key{ incomingClientIP->toString() + ":" + std::to_string(incomingClientPort) };
-			if (!m_connectedClients.contains(key))
+			sf::Packet packetCopy{ incomingData };
+			std::underlying_type_t<PACKET_CODE> codeValue;
+			packetCopy >> codeValue;
+			const PACKET_CODE code{ static_cast<PACKET_CODE>(codeValue) };
+			if (code == PACKET_CODE::UDP_PORT)
 			{
-				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Client at address " + incomingClientIP->toString() + ":" + std::to_string(incomingClientPort) + " attempted to send UDP packet without being connected through TCP\n");
-
-				//There's not really much we can do in this case since the client isn't connected to us
-				//Due to the nature of UDP, this could simply happen because the user sent a UDP packet then a TCP disconnect packet, and the UDP packet wasn't received until after the TCP disconnect packet
-				//Because of this, it doesn't necessarily indicate any malicious intent from the client, so just ignore it and continue to the next packet
-				continue;
+				ClientIndex index;
+				packetCopy >> index;
+				if (m_connectedClientTCPSockets.contains(index))
+				{
+					m_connectedClientUDPAddresses[index] = { incomingClientIP->toString(), incomingClientPort };
+					m_rev_connectedClientUDPAddresses[m_connectedClientUDPAddresses[index]] = index;
+					m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Registered UDP endpoint for client " + std::to_string(index) + " (address: " + incomingClientIP->toString() + ":" + std::to_string(incomingClientPort) + '\n');
+				}
 			}
-			
-			const ClientIndex& index{ m_connectedClients[key] };
-			clientPackets[index].push_back(incomingData);
-
-			//Ensure client hasn't sent more UDP packets this tick than is allowed
-			if (clientPackets[index].size() > m_desc.maxUDPPacketsPerClientPerTick)
+			else
 			{
-				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Client (index = " + std::to_string(index) + ", address = " + incomingClientIP->toString() + ":" + std::to_string(incomingClientPort) + ") attempted to send " + std::to_string(clientPackets[index].size()) + " UDP packets this tick - this exceeds the limit set in m_desc.maxUDPPacketsPerClientPerTick (" + std::to_string(m_desc.maxUDPPacketsPerClientPerTick) + ") - disconnecting them\n");
-				DisconnectClient(index);
-				clientPackets.erase(index);
+				if (!m_rev_connectedClientUDPAddresses.contains({ incomingClientIP->toString(), incomingClientPort }))
+				{
+					continue;
+				}
+				ClientIndex index{ m_rev_connectedClientUDPAddresses.at({ incomingClientIP->toString(), incomingClientPort }) };
+				clientPackets[index].push_back(std::move(incomingData));
 			}
-
-			incomingData.clear();
 		}
-
+		
 		
 		//Process packets
 		for (std::unordered_map<ClientIndex, std::vector<sf::Packet>>::iterator it{ clientPackets.begin() }; it != clientPackets.end(); ++it)
 		{
-			//So that we don't process anymore of a client's packets after a disconnect packet
+			//So that we don't process anymore of a client's packets after they're disconnected
 			bool clientDisconnect{ false };
 
 			for (sf::Packet& packet : it->second)
@@ -297,24 +273,12 @@ namespace NK
 				packet >> underlyingPacketCode;
 				const PACKET_CODE code{ underlyingPacketCode };
 
-				//Ensure that if client isn't connected through UDP that they aren't try to send anything other than PACKET_CODE::CLIENT_INDEX_FOR_UDP_PORT
-				if (!m_connectedClientUDPPorts.contains(it->first))
-				{
-					if (code != PACKET_CODE::UDP_PORT)
-					{
-						m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Client (index = " + std::to_string(it->first) + ", address = " + incomingClientIP->toString() + ":" + std::to_string(incomingClientPort) + ") attempted to send a UDP packet that was not PACKET_CODE::CLIENT_INDEX_FOR_UDP_PORT without being connected through UDP (code = " + std::to_string(underlyingPacketCode) + ") - disconnecting them\n");
-						DisconnectClient(it->first);
-						clientDisconnect = true;
-						break;
-					}
-				}
-
 				switch (code)
 				{
-				case PACKET_CODE::UDP_PORT:
+				case PACKET_CODE::INPUT:
 				{
-					m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Packet received: UDP_PORT\n");
-					m_connectedClientUDPPorts[it->first] = incomingClientPort;
+					m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SERVER_NETWORK_LAYER, std::to_string(it->first) + ": Packet received: INPUT\n");
+					DecodeAndApplyInput(packet);
 					break;
 				}
 				default:
@@ -343,12 +307,112 @@ namespace NK
 	std::unordered_map<ClientIndex, sf::TcpSocket>::iterator ServerNetworkLayer::DisconnectClient(const ClientIndex _index)
 	{
 		m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Client (index: " + std::to_string(_index) + ") disconnected from the server\n");
-		if (m_connectedClientUDPPorts.contains(_index)) { m_connectedClientUDPPorts.erase(_index); }
-		const std::string key{ m_connectedClientTCPSockets[_index].getRemoteAddress()->toString() + ":" + std::to_string(m_connectedClientTCPSockets[_index].getRemotePort()) };
-		if (m_connectedClients.contains(key)) { m_connectedClients.erase(key); }
+
+		m_rev_connectedClientTCPAddresses.erase(m_connectedClientTCPAddresses[_index]);
+		m_connectedClientTCPAddresses.erase(_index);
+		
+		if (m_connectedClientUDPAddresses.contains(_index))
+		{
+			m_rev_connectedClientUDPAddresses.erase(m_connectedClientUDPAddresses[_index]);
+			m_connectedClientUDPAddresses.erase(_index);
+		}
+		
 		m_clientIndexAllocator->Free(_index);
-		m_nextClientIndex = m_clientIndexAllocator->Allocate();
+
 		return m_connectedClientTCPSockets.erase(m_connectedClientTCPSockets.find(_index));
+	}
+
+
+
+	void ServerNetworkLayer::PreAppUpdate()
+	{
+		//If the server was full, try to allocate a new index because a slot might have opened up from a client disconnecting
+		if (m_nextClientIndex == FreeListAllocator::INVALID_INDEX)
+		{
+			m_nextClientIndex = m_clientIndexAllocator->Allocate();
+		}
+		
+		if (m_nextClientIndex != FreeListAllocator::INVALID_INDEX)
+		{
+			const NETWORK_LAYER_ERROR_CODE err{ CheckForIncomingConnectionRequests() };
+			if (err != NETWORK_LAYER_ERROR_CODE::SUCCESS)
+			{
+				m_logger.Unindent();
+				return;
+			}
+		}
+
+		NETWORK_LAYER_ERROR_CODE err{ CheckForIncomingTCPData() };
+		if (err != NETWORK_LAYER_ERROR_CODE::SUCCESS)
+		{
+			m_logger.Unindent();
+			return;
+		}
+
+		err = CheckForIncomingUDPData();
+		if (err != NETWORK_LAYER_ERROR_CODE::SUCCESS)
+		{
+			m_logger.Unindent();
+			return;
+		}
+	}
+
+
+
+	void ServerNetworkLayer::PostAppUpdate()
+	{
+		//Serialise all CTransforms and send them to the clients
+		std::queue<NetworkTransformData> transformComponents;
+		for (auto&& [transform] : m_reg.get().View<CTransform>())
+		{
+			NetworkTransformData data{};
+			data.entity = m_reg.get().GetEntity(transform);
+			data.pos = transform.GetPosition();
+			data.rot = transform.GetRotation();
+			data.scale = transform.GetScale();
+			transformComponents.push(data);
+		}
+		if (transformComponents.empty())
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SERVER_NETWORK_LAYER, "No `CTransform`s found in registry\n");
+			return;
+		}
+		std::stringstream ss(std::ios::in | std::ios::out | std::ios::binary);
+		{
+			cereal::BinaryOutputArchive archive(ss);
+			archive(transformComponents);
+		}
+		sf::Packet outgoingPacket;
+		outgoingPacket << std::to_underlying(PACKET_CODE::TRANSFORM);
+		outgoingPacket.append(ss.str().c_str(), ss.str().size());
+		for (std::unordered_map<ClientIndex, UniqueAddress>::iterator it{ m_connectedClientUDPAddresses.begin() }; it != m_connectedClientUDPAddresses.end(); ++it)
+		{
+			if (m_udpSocket.send(outgoingPacket, sf::IpAddress::resolve(it->second.first).value(), it->second.second) == sf::Socket::Status::Error)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Failed to send UDP packet to server\n");
+			}
+		}
+	}
+
+
+
+	void ServerNetworkLayer::DecodeAndApplyInput(const sf::Packet& _packet) const
+	{
+		//Deserialise all CInputs and apply them
+		std::stringstream ss(std::ios::in | std::ios::out | std::ios::binary);
+		ss.write(static_cast<const char*>(_packet.getData()) + _packet.getReadPosition(), _packet.getDataSize());
+		std::queue<NetworkInputData> inputData;
+		{
+			cereal::BinaryInputArchive archive(ss);
+			archive(inputData);
+		}
+
+		while (!inputData.empty())
+		{
+			const NetworkInputData& data{ inputData.back() };
+			m_reg.get().GetComponent<CInput>(data.entity).actionStates = data.actionStates;
+			inputData.pop();
+		}
 	}
 
 }
