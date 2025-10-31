@@ -120,7 +120,8 @@ namespace NK
 				if (bufIt != _desc.buffers.bindings.end())
 				{
 					//This resource is a buffer
-					if (bufIt->second->GetState() != reqResState)
+					//Shortcircuit to allow null-set buffers
+					if (bufIt->second && bufIt->second->GetState() != reqResState)
 					{
 						_desc.commandBuffers.at(node.first)->TransitionBarrier(bufIt->second, bufIt->second->GetState(), reqResState);
 					}
@@ -131,7 +132,8 @@ namespace NK
 				if (texIt != _desc.textures.bindings.end())
 				{
 					//This resource is a texture
-					if (texIt->second->GetState() != reqResState)
+					//Shortcircuit to allow null-set textures
+					if (texIt->second && texIt->second->GetState() != reqResState)
 					{
 						_desc.commandBuffers.at(node.first)->TransitionBarrier(texIt->second, texIt->second->GetState(), reqResState);
 					}

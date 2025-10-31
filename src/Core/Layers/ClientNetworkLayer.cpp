@@ -118,7 +118,6 @@ namespace NK
 			m_logger.Unindent();
 			return NETWORK_LAYER_ERROR_CODE::CLIENT__FAILED_TO_BIND_UDP_PORT;
 		}
-		m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "port: " + std::to_string(m_udpSocket.getLocalPort()) + '\n');
 		sf::Packet outgoingPacket;
 		outgoingPacket << std::to_underlying(PACKET_CODE::UDP_PORT) << m_index;
 		if (m_udpSocket.send(outgoingPacket, m_serverAddress.value(), m_serverPort) != sf::Socket::Status::Done)
