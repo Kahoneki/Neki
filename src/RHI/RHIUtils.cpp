@@ -119,10 +119,10 @@ namespace NK
 		switch (_state)
 		{
 		case RESOURCE_STATE::UNDEFINED:
-		case RESOURCE_STATE::PRESENT:
 		{
 			throw std::invalid_argument("RHIUtils::GetResourceAccessType() - _state (" + std::to_string(std::to_underlying(_state)) + ") - state has no access type");
 		}
+		case RESOURCE_STATE::PRESENT:
 		case RESOURCE_STATE::VERTEX_BUFFER:
 		case RESOURCE_STATE::INDEX_BUFFER:
 		case RESOURCE_STATE::CONSTANT_BUFFER:

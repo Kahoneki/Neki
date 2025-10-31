@@ -71,7 +71,7 @@ namespace NK
 		std::mutex m_hostAllocationMapMtx;
 
 		#ifdef TRACK_DEVICE_ALLOCATIONS
-			typedef VkDeviceMemory GPU_POINTER
+			typedef VkDeviceMemory GPU_POINTER;
 			std::unordered_map<GPU_POINTER, AllocationInfo> m_deviceAllocationMap;
 			std::mutex m_deviceAllocationMapMtx;
 		#endif

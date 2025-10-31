@@ -312,7 +312,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::EndRendering()
+	void VulkanCommandBuffer::EndRendering(std::size_t _numColourAttachments, ITexture* _multisampleColourAttachments, ITexture* _outputColourAttachments)
 	{
 		vkCmdEndRendering(m_buffer);
 	}

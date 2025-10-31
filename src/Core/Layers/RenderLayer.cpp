@@ -41,6 +41,7 @@ namespace NK
 		InitCameraBuffer();
 		InitSkybox();
 		InitShadersAndPipelines();
+		InitRenderGraphs();
 		InitAntiAliasingResources();
 
 		m_graphicsCommandBuffers[0]->End();
@@ -129,111 +130,24 @@ namespace NK
 
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
 		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
-		m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::RENDER_TARGET);
-
-		m_graphicsCommandBuffers[m_currentFrame]->BeginRendering(1, m_desc.enableMSAA ? m_intermediateRenderTargetView.get() : nullptr, m_desc.enableSSAA ? m_intermediateRenderTargetView.get() : m_swapchain->GetImageView(imageIndex), m_intermediateDepthBufferView.get(), nullptr);
-		m_graphicsCommandBuffers[m_currentFrame]->BindRootSignature(m_meshPiplineRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
-
-		m_graphicsCommandBuffers[m_currentFrame]->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
-		m_graphicsCommandBuffers[m_currentFrame]->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
-
-
-		//Draw
-		struct PushConstantData
-		{
-			glm::mat4 modelMat;
-			ResourceIndex camDataBufferIndex;
-			ResourceIndex skyboxCubemapIndex;
-			ResourceIndex materialBufferIndex;
-			SamplerIndex samplerIndex;
-		};
-
-		PushConstantData pushConstantData{};
-		pushConstantData.camDataBufferIndex = m_camDataBufferView->GetIndex();
-		pushConstantData.skyboxCubemapIndex = m_skyboxTextureView ? m_skyboxTextureView->GetIndex() : 0;
-		pushConstantData.samplerIndex = m_linearSampler->GetIndex();
-
-		//Skybox
-		if (m_skyboxTexture)
-		{
-			std::size_t skyboxVertexBufferStride{ sizeof(glm::vec3) };
-			m_graphicsCommandBuffers[m_currentFrame]->PushConstants(m_meshPiplineRootSignature.get(), &pushConstantData);
-			m_graphicsCommandBuffers[m_currentFrame]->BindPipeline(m_skyboxPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
-			m_graphicsCommandBuffers[m_currentFrame]->BindVertexBuffers(0, 1, m_skyboxVertBuffer.get(), &skyboxVertexBufferStride);
-			m_graphicsCommandBuffers[m_currentFrame]->BindIndexBuffer(m_skyboxIndexBuffer.get(), DATA_FORMAT::R32_UINT);
-			m_graphicsCommandBuffers[m_currentFrame]->DrawIndexed(36, 1, 0, 0);
-		}
-
-		//Models (Loading Phase)
-		for (auto&& [modelRenderer] : m_reg.get().View<CModelRenderer>())
-		{
-			if (modelRenderer.visible && !modelRenderer.model)
-			{
-				//Model is visible but isn't loaded, load it
-				const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
-				m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
-				m_newGPUUploaderUpload = true;
-				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
-			}
-			else if (!modelRenderer.visible && modelRenderer.model)
-			{
-				//Model isn't visible but is loaded, add it to the unload queue
-				m_modelUnloadQueues[m_currentFrame].push(modelRenderer.modelPath);
-				ModelLoader::UnloadModel(modelRenderer.modelPath);
-				modelRenderer.model = nullptr;
-			}
-		}
-		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the semaphore to wait on before drawing
-		if (m_newGPUUploaderUpload)
-		{
-			m_gpuUploader->Flush(false, m_gpuUploaderFlushFence.get(), nullptr);
-		}
-
-		//Models (Rendering Phase)
-		std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
-		for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
-		{
-			if (!modelRenderer.visible) { continue; }
-			
-			if (transform.dirty)
-			{
-				UpdateModelMatrix(transform);
-			}
-			pushConstantData.modelMat = transform.modelMat;
-
-
-			const GPUModel* const model{ modelRenderer.model };
-			for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
-			{
-				const GPUMesh* mesh{ model->meshes[i].get() };
-
-				pushConstantData.materialBufferIndex = model->materials[mesh->materialIndex]->bufferIndex;
-				m_graphicsCommandBuffers[m_currentFrame]->PushConstants(m_meshPiplineRootSignature.get(), &pushConstantData);
-				IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
-				m_graphicsCommandBuffers[m_currentFrame]->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
-				m_graphicsCommandBuffers[m_currentFrame]->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
-				m_graphicsCommandBuffers[m_currentFrame]->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), DATA_FORMAT::R32_UINT);
-				m_graphicsCommandBuffers[m_currentFrame]->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
-			}
-		}
-
-
-		m_graphicsCommandBuffers[m_currentFrame]->EndRendering(1, m_desc.enableMSAA ? m_intermediateRenderTarget.get() : nullptr, m_swapchain->GetImage(imageIndex));
-
-		if (m_desc.enableSSAA)
-		{
-			//Downscaling pass
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_intermediateRenderTarget.get(), m_intermediateRenderTarget->GetState(), RESOURCE_STATE::COPY_SOURCE);
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::COPY_DEST);
-			m_graphicsCommandBuffers[m_currentFrame]->BlitTexture(m_intermediateRenderTarget.get(), TEXTURE_ASPECT::COLOUR, m_swapchain->GetImage(imageIndex), TEXTURE_ASPECT::COLOUR);
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::PRESENT);
-		}
-		else
-		{
-			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_swapchain->GetImage(imageIndex), m_swapchain->GetImage(imageIndex)->GetState(), RESOURCE_STATE::PRESENT);
-		}
-
-		//Present
+		
+		RenderGraphExecutionDesc execDesc{};
+		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffer.get());
+		execDesc.textures.Set("SCENE_COLOUR", m_intermediateRenderTarget.get());
+		execDesc.textures.Set("SCENE_DEPTH", m_intermediateDepthBuffer.get());
+		execDesc.textures.Set("BACKBUFFER", m_swapchain->GetImage(imageIndex));
+		execDesc.textures.Set("SKYBOX", m_skyboxTexture.get());
+		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferView.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_VIEW", m_intermediateRenderTargetView.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_VIEW", m_intermediateDepthBufferView.get());
+		execDesc.textureViews.Set("BACKBUFFER_VIEW", m_swapchain->GetImageView(imageIndex));
+		execDesc.textureViews.Set("SKYBOX_VIEW", m_skyboxTextureView.get());
+		execDesc.samplers.Set("SAMPLER", m_linearSampler.get());
+		m_meshRenderGraph->Execute(execDesc);
+		
 		m_graphicsCommandBuffers[m_currentFrame]->End();
 
 		if (m_newGPUUploaderUpload)
@@ -546,6 +460,130 @@ namespace NK
 		graphicsPipelineDesc.vertexShader = m_skyboxVertShader.get();
 		graphicsPipelineDesc.fragmentShader = m_skyboxFragShader.get();
 		m_skyboxPipeline = m_device->CreatePipeline(graphicsPipelineDesc);
+	}
+
+
+
+	void RenderLayer::InitRenderGraphs()
+	{
+		RenderGraphDesc meshDesc{};
+		
+		meshDesc.AddNode(
+		"SCENE_PASS",
+		{{ "CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
+		{ "SCENE_COLOUR", RESOURCE_STATE::RENDER_TARGET },
+		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
+		{ "BACKBUFFER", RESOURCE_STATE::RENDER_TARGET },
+		{ "SKYBOX", RESOURCE_STATE::SHADER_RESOURCE }},
+		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+		{
+			_cmdBuf->BeginRendering(1, m_desc.enableMSAA ? _texViews.Get("SCENE_COLOUR_VIEW") : nullptr, m_desc.enableSSAA ? _texViews.Get("SCENE_COLOUR_VIEW") : _texViews.Get("BACKBUFFER_VIEW"), _texViews.Get("SCENE_DEPTH_VIEW"), nullptr);
+			_cmdBuf->BindRootSignature(m_meshPiplineRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+
+			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+
+
+			//Draw
+			struct PushConstantData
+			{
+				glm::mat4 modelMat;
+				ResourceIndex camDataBufferIndex;
+				ResourceIndex skyboxCubemapIndex;
+				ResourceIndex materialBufferIndex;
+				SamplerIndex samplerIndex;
+			};
+
+			PushConstantData pushConstantData{};
+			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
+			pushConstantData.skyboxCubemapIndex = _texViews.Get("SKYBOX_VIEW") ? _texViews.Get("SKYBOX_VIEW")->GetIndex() : 0;
+			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+
+			//Skybox
+			if (_texs.Get("SKYBOX"))
+			{
+				std::size_t skyboxVertexBufferStride{ sizeof(glm::vec3) };
+				_cmdBuf->PushConstants(m_meshPiplineRootSignature.get(), &pushConstantData);
+				_cmdBuf->BindPipeline(m_skyboxPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+				_cmdBuf->BindVertexBuffers(0, 1, m_skyboxVertBuffer.get(), &skyboxVertexBufferStride);
+				_cmdBuf->BindIndexBuffer(m_skyboxIndexBuffer.get(), DATA_FORMAT::R32_UINT);
+				_cmdBuf->DrawIndexed(36, 1, 0, 0);
+			}
+
+			//Models (Loading Phase)
+			for (auto&& [modelRenderer] : m_reg.get().View<CModelRenderer>())
+			{
+				if (modelRenderer.visible && !modelRenderer.model)
+				{
+					//Model is visible but isn't loaded, load it
+					const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
+					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
+					m_newGPUUploaderUpload = true;
+					modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
+				}
+				else if (!modelRenderer.visible && modelRenderer.model)
+				{
+					//Model isn't visible but is loaded, add it to the unload queue
+					m_modelUnloadQueues[m_currentFrame].push(modelRenderer.modelPath);
+					ModelLoader::UnloadModel(modelRenderer.modelPath);
+					modelRenderer.model = nullptr;
+				}
+			}
+			//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the fence to wait on before drawing
+			if (m_newGPUUploaderUpload)
+			{
+				m_gpuUploader->Flush(false, m_gpuUploaderFlushFence.get(), nullptr);
+			}
+
+			//Models (Rendering Phase)
+			std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
+			for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
+			{
+				if (!modelRenderer.visible) { continue; }
+				
+				if (transform.dirty)
+				{
+					UpdateModelMatrix(transform);
+				}
+				pushConstantData.modelMat = transform.modelMat;
+
+
+				const GPUModel* const model{ modelRenderer.model };
+				for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
+				{
+					const GPUMesh* mesh{ model->meshes[i].get() };
+
+					pushConstantData.materialBufferIndex = model->materials[mesh->materialIndex]->bufferIndex;
+					_cmdBuf->PushConstants(m_meshPiplineRootSignature.get(), &pushConstantData);
+					IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
+					_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
+					_cmdBuf->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
+					_cmdBuf->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), DATA_FORMAT::R32_UINT);
+					_cmdBuf->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
+				}
+			}
+
+			_cmdBuf->EndRendering(1, m_desc.enableMSAA ? _texs.Get("SCENE_COLOUR") : nullptr, _texs.Get("BACKBUFFER"));
+		});
+
+		
+		meshDesc.AddNode(
+		"DOWNSAMPLE_PASS",
+		{{"SCENE_COLOUR", RESOURCE_STATE::COPY_SOURCE},
+		{"BACKBUFFER", RESOURCE_STATE::COPY_DEST}},
+		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+		{
+			if (m_desc.enableSSAA)
+			{
+				_cmdBuf->BlitTexture(_texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR, _texs.Get("BACKBUFFER"), TEXTURE_ASPECT::COLOUR);
+			}
+		});
+
+
+		meshDesc.AddNode("PRESENT_TRANSITION_PASS", {{"BACKBUFFER", RESOURCE_STATE::PRESENT}});
+		
+		
+		m_meshRenderGraph = UniquePtr<RenderGraph>(NK_NEW(RenderGraph, meshDesc));
 	}
 
 

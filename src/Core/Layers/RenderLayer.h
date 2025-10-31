@@ -8,6 +8,7 @@
 #include <Components/CWindow.h>
 #include <Core-ECS/Registry.h>
 #include <Graphics/GPUUploader.h>
+#include <Graphics/RenderGraph.h>
 #include <Graphics/Window.h>
 #include <RHI/ICommandBuffer.h>
 #include <RHI/IDevice.h>
@@ -53,6 +54,7 @@ namespace NK
 		void InitCameraBuffer();
 		void InitSkybox();
 		void InitShadersAndPipelines();
+		void InitRenderGraphs();
 		void InitAntiAliasingResources();
 
 		void UpdateSkybox(CSkybox& _skybox);
@@ -79,6 +81,7 @@ namespace NK
 		bool m_newGPUUploaderUpload; //True if there are any new gpu uploader uploads since last frame
 		UniquePtr<ISurface> m_surface;
 		UniquePtr<ISwapchain> m_swapchain;
+		std::uint32_t m_swapchainImageIndex;
 		UniquePtr<ISampler> m_linearSampler;
 		std::vector<UniquePtr<ICommandBuffer>> m_graphicsCommandBuffers;
 		std::vector<UniquePtr<ISemaphore>> m_imageAvailableSemaphores;
@@ -103,6 +106,8 @@ namespace NK
 		UniquePtr<IPipeline> m_blinnPhongPipeline;
 		UniquePtr<IPipeline> m_pbrPipeline;
 		UniquePtr<IPipeline> m_skyboxPipeline;
+		UniquePtr<RenderGraph> m_meshRenderGraph;
+		RenderGraph* m_activeRenderGraph;
 		
 		//Anti-aliasing
 		UniquePtr<ITexture> m_intermediateRenderTarget;
