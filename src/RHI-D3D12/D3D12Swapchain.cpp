@@ -69,7 +69,7 @@ namespace NK
 	{
 		D3D12Semaphore* d3d12WaitSemaphore{ dynamic_cast<D3D12Semaphore*>(_waitSemaphore) };
 		dynamic_cast<D3D12Queue*>(m_presentQueue)->GetQueue()->Wait(d3d12WaitSemaphore->GetFence(), d3d12WaitSemaphore->GetFenceValue());
-		m_swapchain->Present(1, 0);
+		m_swapchain->Present(0, 0);
 	}
 
 
