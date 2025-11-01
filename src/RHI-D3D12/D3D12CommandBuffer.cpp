@@ -29,6 +29,7 @@ namespace NK
 		case COMMAND_TYPE::COMPUTE:		type = D3D12_COMMAND_LIST_TYPE_COMPUTE;	break;
 		case COMMAND_TYPE::TRANSFER:	type = D3D12_COMMAND_LIST_TYPE_COPY;	break;
 		}
+
 		const HRESULT result{ dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateCommandList(0, type, dynamic_cast<D3D12CommandPool&>(m_pool).GetCommandPool(), nullptr, IID_PPV_ARGS(&m_buffer)) };
 
 		if (SUCCEEDED(result))
@@ -40,6 +41,7 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "Initialisation unsuccessful. result = " + std::to_string(result) + '\n');
 			throw std::runtime_error("");
 		}
+
 
 		//Put the command list in the closed state immediately to be able to call Begin() on it and start recording
 		m_buffer->Close();
@@ -64,7 +66,7 @@ namespace NK
 
 	void D3D12CommandBuffer::Reset()
 	{
-		//todo: implement
+
 	}
 	
 	
@@ -72,6 +74,7 @@ namespace NK
 	void D3D12CommandBuffer::Begin()
 	{
 		ID3D12CommandAllocator* allocator{ dynamic_cast<D3D12CommandPool&>(m_pool).GetCommandPool() };
+		allocator->Reset();
 		const HRESULT hr{ m_buffer->Reset(allocator, nullptr) };
 		if (FAILED(hr))
 		{
@@ -144,8 +147,6 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() called with valid _depthAttachment and _stencilAttachment. This is not supported in D3D12 - if you would like both a depth attachment and a stencil attachment, please combine them into one texture and use the other BeginRendering() function.\n");
 			throw std::runtime_error("");
 		}
-
-		//todo: implement msaa
 
 		//Colour attachments
 		std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> colourAttachmentInfos(_numColourAttachments);

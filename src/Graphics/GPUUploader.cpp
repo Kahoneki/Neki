@@ -50,6 +50,7 @@ namespace NK
 		m_flushing = false;
 
 		//Start recording commands
+		m_commandBuffer->Reset();
 		m_commandBuffer->Begin();
 
 		m_commandBuffer->TransitionBarrier(m_stagingBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_SOURCE);

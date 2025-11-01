@@ -50,12 +50,14 @@ namespace NK
 			{
 				//Model boundary hasn't been set yet
 				CPUModel_SerialisedHeader header{ ModelLoader::GetNKModelHeader(modelRenderer.modelPath) };
-				modelRenderer.worldBoundaryHalfExtents = transform.GetScale() * header.halfExtents;
-				modelRenderer.worldBoundaryPosition = transform.GetPosition();
+				modelRenderer.worldBoundaryHalfExtents = header.halfExtents;
+				modelRenderer.worldBoundaryPosition = glm::vec3(0);
 			}
 			
-			const glm::vec3 minPoint{ modelRenderer.worldBoundaryPosition - modelRenderer.worldBoundaryHalfExtents };
-			const glm::vec3 maxPoint{ modelRenderer.worldBoundaryPosition + modelRenderer.worldBoundaryHalfExtents };
+			glm::vec3 minPoint{ modelRenderer.worldBoundaryPosition - modelRenderer.worldBoundaryHalfExtents };
+			glm::vec3 maxPoint{ modelRenderer.worldBoundaryPosition + modelRenderer.worldBoundaryHalfExtents };
+			minPoint = glm::vec3(transform.GetModelMatrix() * glm::vec4(minPoint, 1.0));
+			maxPoint = glm::vec3(transform.GetModelMatrix() * glm::vec4(maxPoint, 1.0));
 			modelRenderer.visible = m_frustum.BoxVisible(minPoint, maxPoint);
 		}
 	}

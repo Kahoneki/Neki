@@ -59,7 +59,6 @@ namespace NK
 
 		void UpdateSkybox(CSkybox& _skybox);
 		void UpdateCameraBuffer(const CCamera& _camera) const;
-		static void UpdateModelMatrix(CTransform& _transform);
 		
 		
 		//Dependency injections
@@ -73,7 +72,7 @@ namespace NK
 		glm::ivec2 m_supersampleResolution;
 		
 		UniquePtr<IDevice> m_device;
-		UniquePtr<ICommandPool> m_graphicsCommandPool;
+		std::vector<UniquePtr<ICommandPool>> m_graphicsCommandPools;
 		UniquePtr<IQueue> m_graphicsQueue;
 		UniquePtr<IQueue> m_transferQueue;
 		UniquePtr<GPUUploader> m_gpuUploader;

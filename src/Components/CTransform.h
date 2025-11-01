@@ -1,6 +1,8 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 
 namespace NK
@@ -15,6 +17,22 @@ namespace NK
 		[[nodiscard]] inline glm::vec3 GetPosition() const { return pos; }
 		[[nodiscard]] inline glm::vec3 GetRotation() const { return rot; }
 		[[nodiscard]] inline glm::vec3 GetScale() const { return scale; }
+		[[nodiscard]] inline glm::mat4 GetModelMatrix()
+		{
+			if (!dirty) { return modelMat; }
+			//Scale -> Rotation -> Translation
+			//Because matrix multiplication order is reversed, do trans * rot * scale
+
+			const glm::mat4 scaleMat = glm::scale(glm::mat4(1.0f), scale);
+			const glm::mat4 rotMat = glm::mat4_cast(glm::quat(rot));
+			const glm::mat4 transMat = glm::translate(glm::mat4(1.0f), pos);
+
+			modelMat = transMat * rotMat * scaleMat;
+
+			dirty = false;
+
+			return modelMat;
+		}
 
 		inline void SetPosition(const glm::vec3 _val) { pos = _val; dirty = true; }
 		//Set euler rotation in radians

@@ -19,8 +19,6 @@
 #endif
 
 #include <cstring>
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
 
 
 namespace NK
@@ -202,7 +200,11 @@ namespace NK
 		//Graphics Command Pool
 		CommandPoolDesc graphicsCommandPoolDesc{};
 		graphicsCommandPoolDesc.type = COMMAND_TYPE::GRAPHICS;
-		m_graphicsCommandPool = m_device->CreateCommandPool(graphicsCommandPoolDesc);
+		m_graphicsCommandPools.resize(m_desc.framesInFlight);
+		for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
+		{
+			m_graphicsCommandPools[i] = m_device->CreateCommandPool(graphicsCommandPoolDesc);
+		}
 
 		//Primary Level Command Buffer Description
 		CommandBufferDesc primaryLevelCommandBufferDesc{};
@@ -250,7 +252,7 @@ namespace NK
 		m_graphicsCommandBuffers.resize(m_desc.framesInFlight);
 		for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
 		{
-			m_graphicsCommandBuffers[i] = m_graphicsCommandPool->AllocateCommandBuffer(primaryLevelCommandBufferDesc);
+			m_graphicsCommandBuffers[i] = m_graphicsCommandPools[i]->AllocateCommandBuffer(primaryLevelCommandBufferDesc);
 		}
 
 		//Semaphores
@@ -540,12 +542,7 @@ namespace NK
 			for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 			{
 				if (!modelRenderer.visible) { continue; }
-				
-				if (transform.dirty)
-				{
-					UpdateModelMatrix(transform);
-				}
-				pushConstantData.modelMat = transform.modelMat;
+				pushConstantData.modelMat = transform.GetModelMatrix();
 
 
 				const GPUModel* const model{ modelRenderer.model };
@@ -676,22 +673,6 @@ namespace NK
 
 		//Set aspect ratio back to WIN_ASPECT_RATIO for future lookups (can't keep it as the window's current aspect ratio in case it changes)
 		_camera.camera->SetAspectRatio(WIN_ASPECT_RATIO);
-	}
-
-
-
-	void RenderLayer::UpdateModelMatrix(CTransform& _transform)
-	{
-		//Scale -> Rotation -> Translation
-		//Because matrix multiplication order is reversed, do trans * rot * scale
-
-		const glm::mat4 scaleMat = glm::scale(glm::mat4(1.0f), _transform.scale);
-		const glm::mat4 rotMat = glm::mat4_cast(glm::quat(_transform.rot));
-		const glm::mat4 transMat = glm::translate(glm::mat4(1.0f), _transform.pos);
-
-		_transform.modelMat = transMat * rotMat * scaleMat;
-
-		_transform.dirty = false;
 	}
 
 }
