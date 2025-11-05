@@ -57,7 +57,6 @@ namespace NK
 
 
 	private:
-		//Parallel vectors - 1 entry for each node
 		std::vector<std::pair<NODE_NAME, Node>> nodes; //node-semantic-name and node - vector to preserve order of nodes - last node in `nodes` is the root node
 		std::unordered_map<NODE_NAME, std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>> resources; //Node-semantic-name to all resources accessed in that node (resource semantic name and required state)
 		std::unordered_map<NODE_NAME, std::function<void(ICommandBuffer*, const BindingMap<IBuffer>&, const BindingMap<ITexture>&, const BindingMap<IBufferView>&, const BindingMap<ITextureView>&, const BindingMap<ISampler>&)>> executionFunctions; //Node-semantic-name to callback function for that node - does not include entries for empty (transition-only) nodes
