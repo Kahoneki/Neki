@@ -6,7 +6,7 @@
 namespace NK
 {
 
-	struct CModelRenderer
+	struct CModelRenderer final
 	{
 		friend class ModelVisibilityLayer;
 		friend class RenderLayer;

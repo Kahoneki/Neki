@@ -648,6 +648,7 @@ namespace NK
 	{
 		//TCP
 		DISCONNECT,
+		EVENT,
 
 		//UDP
 		UDP_PORT,

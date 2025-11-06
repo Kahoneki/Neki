@@ -6,7 +6,7 @@
 namespace NK
 {
 
-	struct CSkybox
+	struct CSkybox final
 	{
 		friend class RenderLayer;
 		

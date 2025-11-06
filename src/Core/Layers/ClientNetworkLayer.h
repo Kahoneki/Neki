@@ -2,6 +2,7 @@
 
 #include "ILayer.h"
 
+#include <Core/Utils/Serialisation/TypeRegistry.h>
 #include <Core-ECS/Registry.h>
 #include <SFML/Network.hpp>
 #include <Types/NekiTypes.h>
@@ -31,7 +32,18 @@ namespace NK
 		virtual void Update() override;
 		NETWORK_LAYER_ERROR_CODE Connect(const char* _ip, const unsigned short _port);
 		NETWORK_LAYER_ERROR_CODE Disconnect();
+
+
+		//Send an event over TCP to be broadcasted to all clients during the next PreAppUpdate()
+		//Note: requires EventPacket type to have been added to the serialisation registry with the SERIALISE() macro
+		template<typename EventPacket>
+		inline void EnqueueEventTrigger(const EventPacket& _packet)
+		{
+
+			m_tcpEventQueue.push(std::move(packet));
+		}
 		
+
 		
 	private:
 		void PreAppUpdate();
@@ -44,6 +56,8 @@ namespace NK
 		std::optional<sf::IpAddress> m_serverAddress;
 		unsigned short m_serverPort;
 		ClientIndex m_index;
+
+		std::queue<sf::Packet> m_tcpEventQueue; //Queue of event packets to be sent and cleared in every PreAppUpdate() - structure: event packet code then the type registry constant for the event type then the event data itself
 	};
 
 }

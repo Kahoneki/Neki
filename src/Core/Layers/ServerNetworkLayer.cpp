@@ -176,7 +176,7 @@ namespace NK
 		//Process packets
 		for (std::unordered_map<ClientIndex, std::vector<sf::Packet>>::iterator it{ clientPackets.begin() }; it != clientPackets.end(); ++it)
 		{
-			//So that we can update the iterator
+			//So that we don't try to process any more of a client's packets after disconnecting them
 			bool clientDisconnect{ false };
 			
 			for (sf::Packet& packet : it->second)
@@ -190,6 +190,12 @@ namespace NK
 					m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Packet received: DISCONNECT\n");
 					DisconnectClient(it->first);
 					clientDisconnect = true;
+					break;
+				}
+				case PACKET_CODE::EVENT:
+				{
+					m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SERVER_NETWORK_LAYER, "Packet received: EVENT\n");
+					m_tcpEventHandler->HandleEvent(packet);
 					break;
 				}
 				default:

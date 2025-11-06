@@ -175,7 +175,7 @@ namespace NK
 
 	void ClientNetworkLayer::PreAppUpdate()
 	{
-		//Serialise all CInputs and send them to the server
+		//Serialise all CInputs and send them to the server over UDP
 		std::queue<NetworkInputData> inputComponents;
 		for (auto&& [input] : m_reg.get().View<CInput>())
 		{
@@ -200,6 +200,19 @@ namespace NK
 		if (m_udpSocket.send(outgoingPacket, m_serverAddress.value(), m_serverPort) == sf::Socket::Status::Error)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Failed to send UDP packet to server\n");
+		}
+
+
+		//Send all enqueued event packets to the server over TCP
+		while (!m_tcpEventQueue.empty())
+		{
+			sf::Packet packet{ std::move(m_tcpEventQueue.front()) };
+			if (m_tcpSocket.send(outgoingPacket) == sf::Socket::Status::Error)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::CLIENT_NETWORK_LAYER, "Failed to send TCP event packet to server\n");
+			}
+
+			m_tcpEventQueue.pop();
 		}
 	}
 

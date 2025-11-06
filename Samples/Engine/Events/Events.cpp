@@ -44,7 +44,7 @@ public:
 	
 	void Subscribe()
 	{
-		m_subscriptionID = NK::EventManager::Subscribe<ExampleEvent>(std::bind(&ExampleEventListeningClass::ExampleEventCallback, this, std::placeholders::_1));
+		m_subscriptionID = NK::EventManager::Subscribe<ExampleEventListeningClass, ExampleEvent>(this, ExampleEventListeningClass::ExampleEventCallback);
 	}
 	
 	void Unsubscribe() const

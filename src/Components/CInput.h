@@ -10,7 +10,7 @@
 namespace NK
 {
 	
-	struct CInput
+	struct CInput final
 	{
 	public:
 		//Map from user's action-types enum (represented as a pair of both the enum class' type index and the std::uint32_t underlying type) to its current state

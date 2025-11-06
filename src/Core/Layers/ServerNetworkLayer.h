@@ -3,6 +3,7 @@
 #include "ILayer.h"
 
 #include <Core-ECS/Registry.h>
+#include <Networking/TCPEventHandler.h>
 #include <SFML/Network.hpp>
 #include <Types/NekiTypes.h>
 
@@ -33,7 +34,8 @@ namespace NK
 
 		virtual void Update() override;
 		NETWORK_LAYER_ERROR_CODE Host(const unsigned short _port);
-		
+		inline void SetTCPEventHandler(TCPEventHandler* const _handler) { m_tcpEventHandler = _handler; }
+
 		
 	private:
 		//Init sub-functions
@@ -63,6 +65,8 @@ namespace NK
 		
 		UniquePtr<FreeListAllocator> m_clientIndexAllocator;
 		ClientIndex m_nextClientIndex;
+
+		TCPEventHandler* m_tcpEventHandler;
 	};
 
 }

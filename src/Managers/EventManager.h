@@ -34,6 +34,14 @@ namespace NK
 			return id;
 		}
 
+
+		//For non-static class methods
+		template<typename Class, typename EventPacket>
+		static inline EventSubscriptionID Subscribe(Class* _classInstance, std::function<void(Class*, const EventPacket&)> _memberCallback)
+		{
+			return Subscribe<EventPacket>(std::bind(_callback, _classInstance, std::placeholders::_1));
+		}
+
 		
 		template<typename EventPacket>
 		static inline void Unsubscribe(const EventSubscriptionID _subscriptionID)

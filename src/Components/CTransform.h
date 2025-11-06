@@ -8,7 +8,7 @@
 namespace NK
 {
 
-	struct CTransform
+	struct CTransform final
 	{
 		friend class RenderLayer;
 
