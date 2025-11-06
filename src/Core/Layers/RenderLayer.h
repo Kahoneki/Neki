@@ -52,8 +52,12 @@ namespace NK
 		//Init sub-functions
 		void InitBaseResources();
 		void InitCameraBuffer();
+		void InitLightCameraBuffer();
 		void InitSkybox();
 		void InitShadersAndPipelines();
+		void InitShadowPipeline();
+		void InitSkyboxPipeline();
+		void InitGraphicsPipelines();
 		void InitRenderGraphs();
 		void InitAntiAliasingResources();
 
@@ -96,15 +100,38 @@ namespace NK
 		UniquePtr<IBuffer> m_skyboxVertBuffer;
 		UniquePtr<IBuffer> m_skyboxIndexBuffer;
 		
+		UniquePtr<IShader> m_shadowVertShader;
 		UniquePtr<IShader> m_meshVertShader;
 		UniquePtr<IShader> m_skyboxVertShader;
+
+		UniquePtr<IShader> m_shadowFragShader;
+		UniquePtr<IShader> m_skyboxFragShader;
 		UniquePtr<IShader> m_blinnPhongFragShader;
 		UniquePtr<IShader> m_pbrFragShader;
-		UniquePtr<IShader> m_skyboxFragShader;
-		UniquePtr<IRootSignature> m_meshPiplineRootSignature;
+		
+		struct ShadowPassPushConstantData
+		{
+			glm::mat4 modelMat;
+			ResourceIndex lightCamDataBufferIndex;
+		};
+		UniquePtr<IRootSignature> m_shadowPassRootSignature;
+		
+		struct MeshPassPushConstantData
+		{
+			glm::mat4 modelMat;
+			ResourceIndex camDataBufferIndex;
+			ResourceIndex shadowMapIndex;
+			ResourceIndex skyboxCubemapIndex;
+			ResourceIndex materialBufferIndex;
+			SamplerIndex samplerIndex;
+		};
+		UniquePtr<IRootSignature> m_meshPassRootSignature;
+		
+		UniquePtr<IPipeline> m_shadowPipeline;
+		UniquePtr<IPipeline> m_skyboxPipeline;
 		UniquePtr<IPipeline> m_blinnPhongPipeline;
 		UniquePtr<IPipeline> m_pbrPipeline;
-		UniquePtr<IPipeline> m_skyboxPipeline;
+
 		UniquePtr<RenderGraph> m_meshRenderGraph;
 		RenderGraph* m_activeRenderGraph;
 		

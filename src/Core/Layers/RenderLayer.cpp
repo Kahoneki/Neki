@@ -37,6 +37,7 @@ namespace NK
 		m_graphicsCommandBuffers[0]->Begin();
 
 		InitCameraBuffer();
+		InitLightCameraBuffer();
 		InitSkybox();
 		InitShadersAndPipelines();
 		InitRenderGraphs();
@@ -114,6 +115,32 @@ namespace NK
 		}
 
 
+		//Model Loading Phase
+		for (auto&& [modelRenderer] : m_reg.get().View<CModelRenderer>())
+		{
+			if (modelRenderer.visible && !modelRenderer.model)
+			{
+				//Model is visible but isn't loaded, load it
+				const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
+				m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
+				m_newGPUUploaderUpload = true;
+				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
+			}
+			else if (!modelRenderer.visible && modelRenderer.model)
+			{
+				//Model isn't visible but is loaded, add it to the unload queue
+				m_modelUnloadQueues[m_currentFrame].push(modelRenderer.modelPath);
+				ModelLoader::UnloadModel(modelRenderer.modelPath);
+				modelRenderer.model = nullptr;
+			}
+		}
+		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the fence to wait on before drawing
+		if (m_newGPUUploaderUpload)
+		{
+			m_gpuUploader->Flush(false, m_gpuUploaderFlushFence.get(), nullptr);
+		}
+
+
 		//Begin rendering
 		m_inFlightFences[m_currentFrame]->Wait();
 		m_inFlightFences[m_currentFrame]->Reset();
@@ -130,9 +157,11 @@ namespace NK
 		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
 		
 		RenderGraphExecutionDesc execDesc{};
+		execDesc.commandBuffers["SHADOW_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", );
 		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffer.get());
 		execDesc.textures.Set("SCENE_COLOUR", m_intermediateRenderTarget.get());
 		execDesc.textures.Set("SCENE_DEPTH", m_intermediateDepthBuffer.get());
@@ -299,6 +328,41 @@ namespace NK
 
 
 
+	void RenderLayer::InitLightCameraBuffer()
+	{
+		BufferDesc lightCamDataBufferDesc{};
+		lightCamDataBufferDesc.size = sizeof(CameraShaderData);
+		lightCamDataBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
+		lightCamDataBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
+		m_lightCamDataBuffer = m_device->CreateBuffer(lightCamDataBufferDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_lightCamDataBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::CONSTANT_BUFFER);
+
+		BufferViewDesc lightCamDataBufferViewDesc{};
+		lightCamDataBufferViewDesc.size = sizeof(CameraShaderData);
+		lightCamDataBufferViewDesc.offset = 0;
+		lightCamDataBufferViewDesc.type = BUFFER_VIEW_TYPE::UNIFORM;
+		m_lightCamDataBufferView = m_device->CreateBufferView(m_lightCamDataBuffer.get(), lightCamDataBufferViewDesc);
+
+		m_lightCamDataBufferMap = m_lightCamDataBuffer->GetMap();
+
+		struct LightCameraShaderData
+		{
+			glm::mat4 viewMat;
+			glm::mat4 projMat;
+		};
+
+		//Todo: turn this into a loop for all lights and like ykno use a Light struct and whatnot
+		LightCameraShaderData lightCameraShaderData{};
+		lightCameraShaderData.viewMat = glm::lookAtLH(glm::vec3(2, -2, 2), glm::vec3(0, 0, 0), );
+		glm::vec3 lightPos{ glm::vec3(2, -2, 2) };
+		Camera cam{ lightPos,  };
+
+		const CameraShaderData camShaderData{ _camera.camera->GetCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
+		memcpy(m_camDataBufferMap, &camShaderData, sizeof(CameraShaderData));
+	}
+
+
+
 	void RenderLayer::InitSkybox()
 	{
 		//Creating m_skyboxTexture and m_skyboxTextureView requires knowing the size of the skybox which cannot be known at startup, skip its creation
@@ -369,6 +433,8 @@ namespace NK
 		//Vertex Shaders
 		ShaderDesc vertShaderDesc{};
 		vertShaderDesc.type = SHADER_TYPE::VERTEX;
+		vertShaderDesc.filepath = "Shaders/Shadow_vs";
+		m_shadowVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/Model_vs";
 		m_meshVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/Skybox_vs";
@@ -377,6 +443,8 @@ namespace NK
 		//Fragment Shaders
 		ShaderDesc fragShaderDesc{};
 		fragShaderDesc.type = SHADER_TYPE::FRAGMENT;
+		fragShaderDesc.filepath = "Shaders/Shadow_fs";
+		m_shadowFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/ModelBlinnPhong_fs";
 		m_blinnPhongFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/ModelPBR_fs";
@@ -384,13 +452,138 @@ namespace NK
 		fragShaderDesc.filepath = "Shaders/Skybox_fs";
 		m_skyboxFragShader = m_device->CreateShader(fragShaderDesc);
 
-		//Root Signature
+
+		//Root Signatures
 		RootSignatureDesc rootSigDesc{};
-		rootSigDesc.num32BitPushConstantValues = 16 + 1 + 1 + 1 + 1 + 1; //model matrix + cam data buffer index + skybox cubemap index + material buffer index + sampler index
-		m_meshPiplineRootSignature = m_device->CreateRootSignature(rootSigDesc);
+		rootSigDesc.num32BitPushConstantValues = sizeof(MeshPassPushConstantData) / 4;
+		m_meshPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
+
+		rootSigDesc.num32BitPushConstantValues = sizeof(ShadowPassPushConstantData) / 4;
+		m_shadowPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 
 
-		//Graphics Pipeline
+		InitShadowPipeline();
+		InitSkyboxPipeline();
+		InitGraphicsPipelines();
+
+
+	}
+
+
+
+	void RenderLayer::InitShadowPipeline()
+	{
+		VertexInputDesc vertexInputDesc{ ModelLoader::GetModelVertexInputDescription() };
+
+		InputAssemblyDesc inputAssemblyDesc{};
+		inputAssemblyDesc.topology = INPUT_TOPOLOGY::TRIANGLE_LIST;
+
+		RasteriserDesc rasteriserDesc{};
+		rasteriserDesc.cullMode = CULL_MODE::BACK;
+		rasteriserDesc.frontFace = WINDING_DIRECTION::CLOCKWISE;
+		rasteriserDesc.depthBiasEnable = false;
+
+		DepthStencilDesc depthStencilDesc{};
+		depthStencilDesc.depthTestEnable = true;
+		depthStencilDesc.depthWriteEnable = true;
+		depthStencilDesc.depthCompareOp = COMPARE_OP::LESS;
+		depthStencilDesc.stencilTestEnable = false;
+
+		MultisamplingDesc multisamplingDesc{};
+		multisamplingDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
+		multisamplingDesc.sampleMask = UINT32_MAX;
+		multisamplingDesc.alphaToCoverageEnable = false;
+
+		std::vector<ColourBlendAttachmentDesc> colourBlendAttachments{};
+		ColourBlendDesc colourBlendDesc{};
+		colourBlendDesc.logicOpEnable = false;
+		colourBlendDesc.attachments = colourBlendAttachments;
+
+		PipelineDesc pipelineDesc{};
+		pipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
+		pipelineDesc.vertexShader = m_shadowVertShader.get();
+		pipelineDesc.fragmentShader = m_shadowFragShader.get();
+		pipelineDesc.rootSignature = m_meshPassRootSignature.get();
+		pipelineDesc.vertexInputDesc = vertexInputDesc;
+		pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
+		pipelineDesc.rasteriserDesc = rasteriserDesc;
+		pipelineDesc.depthStencilDesc = depthStencilDesc;
+		pipelineDesc.multisamplingDesc = multisamplingDesc;
+		pipelineDesc.colourBlendDesc = colourBlendDesc;
+		pipelineDesc.colourAttachmentFormats = {};
+		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
+
+		m_shadowPipeline = m_device->CreatePipeline(pipelineDesc);
+	}
+
+
+
+	void RenderLayer::InitSkyboxPipeline()
+	{
+		std::vector<VertexAttributeDesc> vertexAttributes;
+		VertexAttributeDesc posAttribute{};
+		posAttribute.attribute = SHADER_ATTRIBUTE::POSITION;
+		posAttribute.binding = 0;
+		posAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		posAttribute.offset = 0;
+		vertexAttributes.push_back(posAttribute);
+		std::vector<VertexBufferBindingDesc> bufferBindings;
+		VertexBufferBindingDesc bufferBinding{};
+		bufferBinding.binding = 0;
+		bufferBinding.inputRate = VERTEX_INPUT_RATE::VERTEX;
+		bufferBinding.stride = sizeof(glm::vec3);
+		bufferBindings.push_back(bufferBinding);
+		VertexInputDesc vertexInputDesc{};
+		vertexInputDesc.attributeDescriptions = vertexAttributes;
+		vertexInputDesc.bufferBindingDescriptions = bufferBindings;
+
+		InputAssemblyDesc inputAssemblyDesc{};
+		inputAssemblyDesc.topology = INPUT_TOPOLOGY::TRIANGLE_LIST;
+
+		RasteriserDesc rasteriserDesc{};
+		rasteriserDesc.cullMode = CULL_MODE::FRONT;
+		rasteriserDesc.frontFace = WINDING_DIRECTION::CLOCKWISE;
+		rasteriserDesc.depthBiasEnable = false;
+
+		DepthStencilDesc depthStencilDesc{};
+		depthStencilDesc.depthTestEnable = true;
+		depthStencilDesc.depthWriteEnable = true;
+		depthStencilDesc.depthCompareOp = COMPARE_OP::LESS_OR_EQUAL;
+		depthStencilDesc.stencilTestEnable = false;
+
+		MultisamplingDesc multisamplingDesc{};
+		multisamplingDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
+		multisamplingDesc.sampleMask = UINT32_MAX;
+		multisamplingDesc.alphaToCoverageEnable = false;
+
+		std::vector<ColourBlendAttachmentDesc> colourBlendAttachments(1);
+		colourBlendAttachments[0].colourWriteMask = COLOUR_ASPECT_FLAGS::R_BIT | COLOUR_ASPECT_FLAGS::G_BIT | COLOUR_ASPECT_FLAGS::B_BIT | COLOUR_ASPECT_FLAGS::A_BIT;
+		colourBlendAttachments[0].blendEnable = false;
+		ColourBlendDesc colourBlendDesc{};
+		colourBlendDesc.logicOpEnable = false;
+		colourBlendDesc.attachments = colourBlendAttachments;
+
+		PipelineDesc pipelineDesc{};
+		pipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
+		pipelineDesc.vertexShader = m_skyboxVertShader.get();
+		pipelineDesc.fragmentShader = m_skyboxFragShader.get();
+		pipelineDesc.rootSignature = m_meshPassRootSignature.get();
+		pipelineDesc.vertexInputDesc = vertexInputDesc;
+		pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
+		pipelineDesc.rasteriserDesc = rasteriserDesc;
+		pipelineDesc.depthStencilDesc = depthStencilDesc;
+		pipelineDesc.multisamplingDesc = multisamplingDesc;
+		pipelineDesc.colourBlendDesc = colourBlendDesc;
+		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R8G8B8A8_SRGB };
+		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
+
+		m_skyboxPipeline = m_device->CreatePipeline(pipelineDesc);
+	}
+
+
+
+	void RenderLayer::InitGraphicsPipelines()
+	{
 		VertexInputDesc vertexInputDesc{ ModelLoader::GetModelVertexInputDescription() };
 
 		InputAssemblyDesc inputAssemblyDesc{};
@@ -419,49 +612,24 @@ namespace NK
 		colourBlendDesc.logicOpEnable = false;
 		colourBlendDesc.attachments = colourBlendAttachments;
 
-		PipelineDesc graphicsPipelineDesc{};
-		graphicsPipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
-		graphicsPipelineDesc.vertexShader = m_meshVertShader.get();
-		graphicsPipelineDesc.fragmentShader = m_blinnPhongFragShader.get();
-		graphicsPipelineDesc.rootSignature = m_meshPiplineRootSignature.get();
-		graphicsPipelineDesc.vertexInputDesc = vertexInputDesc;
-		graphicsPipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
-		graphicsPipelineDesc.rasteriserDesc = rasteriserDesc;
-		graphicsPipelineDesc.depthStencilDesc = depthStencilDesc;
-		graphicsPipelineDesc.multisamplingDesc = multisamplingDesc;
-		graphicsPipelineDesc.colourBlendDesc = colourBlendDesc;
-		graphicsPipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R8G8B8A8_SRGB };
-		graphicsPipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
+		PipelineDesc pipelineDesc{};
+		pipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
+		pipelineDesc.vertexShader = m_meshVertShader.get();
+		pipelineDesc.fragmentShader = m_blinnPhongFragShader.get();
+		pipelineDesc.rootSignature = m_meshPassRootSignature.get();
+		pipelineDesc.vertexInputDesc = vertexInputDesc;
+		pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
+		pipelineDesc.rasteriserDesc = rasteriserDesc;
+		pipelineDesc.depthStencilDesc = depthStencilDesc;
+		pipelineDesc.multisamplingDesc = multisamplingDesc;
+		pipelineDesc.colourBlendDesc = colourBlendDesc;
+		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R8G8B8A8_SRGB };
+		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
 
-		m_blinnPhongPipeline = m_device->CreatePipeline(graphicsPipelineDesc);
+		m_blinnPhongPipeline = m_device->CreatePipeline(pipelineDesc);
 
-		graphicsPipelineDesc.fragmentShader = m_pbrFragShader.get();
-		m_pbrPipeline = m_device->CreatePipeline(graphicsPipelineDesc);
-
-
-		//Skybox pipeline
-		std::vector<VertexAttributeDesc> vertexAttributes;
-		VertexAttributeDesc posAttribute{};
-		posAttribute.attribute = SHADER_ATTRIBUTE::POSITION;
-		posAttribute.binding = 0;
-		posAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
-		posAttribute.offset = 0;
-		vertexAttributes.push_back(posAttribute);
-		std::vector<VertexBufferBindingDesc> bufferBindings;
-		VertexBufferBindingDesc bufferBinding{};
-		bufferBinding.binding = 0;
-		bufferBinding.inputRate = VERTEX_INPUT_RATE::VERTEX;
-		bufferBinding.stride = sizeof(glm::vec3);
-		bufferBindings.push_back(bufferBinding);
-		VertexInputDesc skyboxVertexInputDesc{};
-		skyboxVertexInputDesc.attributeDescriptions = vertexAttributes;
-		skyboxVertexInputDesc.bufferBindingDescriptions = bufferBindings;
-		graphicsPipelineDesc.vertexInputDesc = skyboxVertexInputDesc;
-		graphicsPipelineDesc.rasteriserDesc.cullMode = CULL_MODE::FRONT;
-		graphicsPipelineDesc.depthStencilDesc.depthCompareOp = COMPARE_OP::LESS_OR_EQUAL;
-		graphicsPipelineDesc.vertexShader = m_skyboxVertShader.get();
-		graphicsPipelineDesc.fragmentShader = m_skyboxFragShader.get();
-		m_skyboxPipeline = m_device->CreatePipeline(graphicsPipelineDesc);
+		pipelineDesc.fragmentShader = m_pbrFragShader.get();
+		m_pbrPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
 
 
@@ -469,10 +637,52 @@ namespace NK
 	void RenderLayer::InitRenderGraphs()
 	{
 		RenderGraphDesc meshDesc{};
-		
+
+		meshDesc.AddNode(
+			"SHADOW_PASS",
+			{{ "LIGHT_CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
+			{ "SHADOW_MAP", RESOURCE_STATE::DEPTH_WRITE }},
+			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+			{
+				_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SHADOW_MAP_VIEW"), nullptr);
+				_cmdBuf->BindRootSignature(m_shadowPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+
+				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+				_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+
+				ShadowPassPushConstantData pushConstantData{};
+				pushConstantData.lightCamDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
+				
+				//Models
+				std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
+				for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
+				{
+					if (!modelRenderer.visible) { continue; } //todo: this is obviously wrong
+					pushConstantData.modelMat = transform.GetModelMatrix();
+
+
+					const GPUModel* const model{ modelRenderer.model };
+					for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
+					{
+						const GPUMesh* mesh{ model->meshes[i].get() };
+
+						_cmdBuf->PushConstants(m_shadowPassRootSignature.get(), &pushConstantData);
+						_cmdBuf->BindPipeline(m_shadowPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+						_cmdBuf->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
+						_cmdBuf->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), DATA_FORMAT::R32_UINT);
+						_cmdBuf->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
+					}
+				}
+
+				_cmdBuf->EndRendering(0, nullptr, nullptr);
+			}
+		);
+
+
 		meshDesc.AddNode(
 		"SCENE_PASS",
 		{{ "CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
+		{ "SHADOW_MAP", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SCENE_COLOUR", RESOURCE_STATE::RENDER_TARGET },
 		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
 		{ "BACKBUFFER", RESOURCE_STATE::RENDER_TARGET },
@@ -480,23 +690,13 @@ namespace NK
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
 			_cmdBuf->BeginRendering(1, m_desc.enableMSAA ? _texViews.Get("SCENE_COLOUR_VIEW") : nullptr, m_desc.enableSSAA ? _texViews.Get("SCENE_COLOUR_VIEW") : _texViews.Get("BACKBUFFER_VIEW"), _texViews.Get("SCENE_DEPTH_VIEW"), nullptr);
-			_cmdBuf->BindRootSignature(m_meshPiplineRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+			_cmdBuf->BindRootSignature(m_meshPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
 			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
-
-			//Draw
-			struct PushConstantData
-			{
-				glm::mat4 modelMat;
-				ResourceIndex camDataBufferIndex;
-				ResourceIndex skyboxCubemapIndex;
-				ResourceIndex materialBufferIndex;
-				SamplerIndex samplerIndex;
-			};
-
-			PushConstantData pushConstantData{};
+			MeshPassPushConstantData pushConstantData{};
+			pushConstantData.shadowMapIndex = _texViews.Get("SHADOW_MAP_VIEW")->GetIndex();
 			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.skyboxCubemapIndex = _texViews.Get("SKYBOX_VIEW") ? _texViews.Get("SKYBOX_VIEW")->GetIndex() : 0;
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
@@ -505,39 +705,14 @@ namespace NK
 			if (_texs.Get("SKYBOX"))
 			{
 				std::size_t skyboxVertexBufferStride{ sizeof(glm::vec3) };
-				_cmdBuf->PushConstants(m_meshPiplineRootSignature.get(), &pushConstantData);
+				_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
 				_cmdBuf->BindPipeline(m_skyboxPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
 				_cmdBuf->BindVertexBuffers(0, 1, m_skyboxVertBuffer.get(), &skyboxVertexBufferStride);
 				_cmdBuf->BindIndexBuffer(m_skyboxIndexBuffer.get(), DATA_FORMAT::R32_UINT);
 				_cmdBuf->DrawIndexed(36, 1, 0, 0);
 			}
 
-			//Models (Loading Phase)
-			for (auto&& [modelRenderer] : m_reg.get().View<CModelRenderer>())
-			{
-				if (modelRenderer.visible && !modelRenderer.model)
-				{
-					//Model is visible but isn't loaded, load it
-					const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
-					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
-					m_newGPUUploaderUpload = true;
-					modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
-				}
-				else if (!modelRenderer.visible && modelRenderer.model)
-				{
-					//Model isn't visible but is loaded, add it to the unload queue
-					m_modelUnloadQueues[m_currentFrame].push(modelRenderer.modelPath);
-					ModelLoader::UnloadModel(modelRenderer.modelPath);
-					modelRenderer.model = nullptr;
-				}
-			}
-			//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the fence to wait on before drawing
-			if (m_newGPUUploaderUpload)
-			{
-				m_gpuUploader->Flush(false, m_gpuUploaderFlushFence.get(), nullptr);
-			}
-
-			//Models (Rendering Phase)
+			//Models
 			std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
 			for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 			{
@@ -551,7 +726,7 @@ namespace NK
 					const GPUMesh* mesh{ model->meshes[i].get() };
 
 					pushConstantData.materialBufferIndex = model->materials[mesh->materialIndex]->bufferIndex;
-					_cmdBuf->PushConstants(m_meshPiplineRootSignature.get(), &pushConstantData);
+					_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
 					IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
 					_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
 					_cmdBuf->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
