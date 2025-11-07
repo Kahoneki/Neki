@@ -41,7 +41,7 @@ namespace NK
 		InitSkybox();
 		InitShadersAndPipelines();
 		InitRenderGraphs();
-		InitAntiAliasingResources();
+		InitScreenResources();
 
 		m_graphicsCommandBuffers[0]->End();
 		m_graphicsQueue->Submit(m_graphicsCommandBuffers[0].get(), nullptr, nullptr, nullptr);
@@ -148,7 +148,7 @@ namespace NK
 		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
 		while (!m_modelUnloadQueues[m_currentFrame].empty())
 		{
-			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
+			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].front());
 			m_modelUnloadQueues[m_currentFrame].pop();
 		}
 		
@@ -161,13 +161,17 @@ namespace NK
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", );
+		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", m_lightCamDataBuffer.get());
 		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffer.get());
+		execDesc.textures.Set("SHADOW_MAP", m_shadowMap.get());
 		execDesc.textures.Set("SCENE_COLOUR", m_intermediateRenderTarget.get());
 		execDesc.textures.Set("SCENE_DEPTH", m_intermediateDepthBuffer.get());
 		execDesc.textures.Set("BACKBUFFER", m_swapchain->GetImage(imageIndex));
 		execDesc.textures.Set("SKYBOX", m_skyboxTexture.get());
+		execDesc.bufferViews.Set("LIGHT_CAMERA_BUFFER_VIEW", m_lightCamDataBufferView.get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferView.get());
+		execDesc.textureViews.Set("SHADOW_MAP_DSV", m_shadowMapDSV.get());
+		execDesc.textureViews.Set("SHADOW_MAP_SRV", m_shadowMapSRV.get());
 		execDesc.textureViews.Set("SCENE_COLOUR_VIEW", m_intermediateRenderTargetView.get());
 		execDesc.textureViews.Set("SCENE_DEPTH_VIEW", m_intermediateDepthBufferView.get());
 		execDesc.textureViews.Set("BACKBUFFER_VIEW", m_swapchain->GetImageView(imageIndex));
@@ -201,10 +205,10 @@ namespace NK
 		case GRAPHICS_BACKEND::VULKAN:
 		{
 			#ifdef NEKI_VULKAN_SUPPORTED
-			m_device = UniquePtr<IDevice>(NK_NEW(VulkanDevice, m_logger, m_allocator));
-			#else
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::VULKAN but compiler definition NEKI_VULKAN_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
-			throw std::invalid_argument("");
+				m_device = UniquePtr<IDevice>(NK_NEW(VulkanDevice, m_logger, m_allocator));
+				#else
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::VULKAN but compiler definition NEKI_VULKAN_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
+				throw std::invalid_argument("");
 			#endif
 			break;
 		}
@@ -352,13 +356,10 @@ namespace NK
 		};
 
 		//Todo: turn this into a loop for all lights and like ykno use a Light struct and whatnot
-		LightCameraShaderData lightCameraShaderData{};
-		lightCameraShaderData.viewMat = glm::lookAtLH(glm::vec3(2, -2, 2), glm::vec3(0, 0, 0), );
-		glm::vec3 lightPos{ glm::vec3(2, -2, 2) };
-		Camera cam{ lightPos,  };
-
-		const CameraShaderData camShaderData{ _camera.camera->GetCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
-		memcpy(m_camDataBufferMap, &camShaderData, sizeof(CameraShaderData));
+		LightCameraShaderData lightCamShaderData{};
+		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(2, -2, 2), glm::vec3(0, 0, 0), glm::vec3(0,1,0));
+		lightCamShaderData.projMat = glm::orthoLH(-100.0f, 100.0f, -100.0f, 100.0f, 0.01f, 100.0f);
+		memcpy(m_lightCamDataBufferMap, &lightCamShaderData, sizeof(LightCameraShaderData));
 	}
 
 
@@ -644,7 +645,7 @@ namespace NK
 			{ "SHADOW_MAP", RESOURCE_STATE::DEPTH_WRITE }},
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
-				_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SHADOW_MAP_VIEW"), nullptr);
+				_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SHADOW_MAP_DSV"), nullptr);
 				_cmdBuf->BindRootSignature(m_shadowPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
 				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
@@ -696,7 +697,7 @@ namespace NK
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
 			MeshPassPushConstantData pushConstantData{};
-			pushConstantData.shadowMapIndex = _texViews.Get("SHADOW_MAP_VIEW")->GetIndex();
+			pushConstantData.shadowMapIndex = _texViews.Get("SHADOW_MAP_SRV")->GetIndex();
 			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.skyboxCubemapIndex = _texViews.Get("SKYBOX_VIEW") ? _texViews.Get("SKYBOX_VIEW")->GetIndex() : 0;
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
@@ -760,8 +761,28 @@ namespace NK
 
 
 
-	void RenderLayer::InitAntiAliasingResources()
+	void RenderLayer::InitScreenResources()
 	{
+		//Shadow Map
+		TextureDesc shadowMapDesc{};
+		shadowMapDesc.dimension = TEXTURE_DIMENSION::DIM_2;
+		shadowMapDesc.format = DATA_FORMAT::D32_SFLOAT;
+		shadowMapDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.window->GetSize(), 1);
+		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY;
+		shadowMapDesc.arrayTexture = false;
+		shadowMapDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
+		m_shadowMap = m_device->CreateTexture(shadowMapDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_shadowMap.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
+
+		//Shadow Map Views
+		TextureViewDesc shadowMapViewDesc{};
+		shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
+		shadowMapViewDesc.format = DATA_FORMAT::D32_SFLOAT;
+		shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
+		m_shadowMapDSV = m_device->CreateDepthStencilTextureView(m_shadowMap.get(), shadowMapViewDesc);
+		shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+		m_shadowMapSRV = m_device->CreateShaderResourceTextureView(m_shadowMap.get(), shadowMapViewDesc);
+
 		//Render Target
 		TextureDesc renderTargetDesc{};
 		renderTargetDesc.dimension = TEXTURE_DIMENSION::DIM_2;

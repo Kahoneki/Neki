@@ -59,7 +59,7 @@ namespace NK
 		void InitSkyboxPipeline();
 		void InitGraphicsPipelines();
 		void InitRenderGraphs();
-		void InitAntiAliasingResources();
+		void InitScreenResources();
 
 		void UpdateSkybox(CSkybox& _skybox);
 		void UpdateCameraBuffer(const CCamera& _camera) const;
@@ -94,6 +94,10 @@ namespace NK
 		UniquePtr<IBuffer> m_camDataBuffer;
 		UniquePtr<IBufferView> m_camDataBufferView;
 		void* m_camDataBufferMap;
+
+		UniquePtr<IBuffer> m_lightCamDataBuffer;
+		UniquePtr<IBufferView> m_lightCamDataBufferView;
+		void* m_lightCamDataBufferMap;
 		
 		UniquePtr<ITexture> m_skyboxTexture; //Not created at startup
 		UniquePtr<ITextureView> m_skyboxTextureView; //Not created at startup
@@ -135,7 +139,10 @@ namespace NK
 		UniquePtr<RenderGraph> m_meshRenderGraph;
 		RenderGraph* m_activeRenderGraph;
 		
-		//Anti-aliasing
+		//Screen Resources
+		UniquePtr<ITexture> m_shadowMap;
+		UniquePtr<ITextureView> m_shadowMapDSV;
+		UniquePtr<ITextureView> m_shadowMapSRV;
 		UniquePtr<ITexture> m_intermediateRenderTarget;
 		UniquePtr<ITextureView> m_intermediateRenderTargetView;
 		UniquePtr<ITexture> m_intermediateDepthBuffer;

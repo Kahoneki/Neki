@@ -213,9 +213,23 @@ namespace NK
 			stencilAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
 		}
 
+		VkRect2D renderArea = {};
+		if (_outputColourAttachments)
+		{
+			renderArea = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[0]))->GetRenderArea();
+		}
+		else if (_depthAttachment)
+		{
+			renderArea = dynamic_cast<VulkanTextureView*>(_depthAttachment)->GetRenderArea();
+		}
+		else if (_stencilAttachment)
+		{
+			renderArea = dynamic_cast<VulkanTextureView*>(_stencilAttachment)->GetRenderArea();
+		}
+
 		VkRenderingInfo renderingInfo{};
 		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-		renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[0]))->GetRenderArea();
+		renderingInfo.renderArea = renderArea;
 		renderingInfo.layerCount = 1;
 		renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
 		renderingInfo.pColorAttachments = colourAttachmentInfos.data();
@@ -276,9 +290,19 @@ namespace NK
 			depthStencilAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
 		}
 
+		VkRect2D renderArea = {};
+		if (_outputColourAttachments)
+		{
+			renderArea = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[0]))->GetRenderArea();
+		}
+		else if (_depthStencilAttachment)
+		{
+			renderArea = dynamic_cast<VulkanTextureView*>(_depthStencilAttachment)->GetRenderArea();
+		}
+
 		VkRenderingInfo renderingInfo{};
 		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-		renderingInfo.renderArea = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[0]))->GetRenderArea();
+		renderingInfo.renderArea = renderArea;
 		renderingInfo.layerCount = 1;
 		renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
 		renderingInfo.pColorAttachments = colourAttachmentInfos.data();

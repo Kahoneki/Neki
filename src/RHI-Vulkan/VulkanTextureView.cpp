@@ -30,7 +30,7 @@ namespace NK
 		viewInfo.image = dynamic_cast<VulkanTexture*>(_texture)->GetTexture();
 		viewInfo.viewType = VulkanUtils::GetVulkanImageViewType(m_dimension);
 		viewInfo.format = VulkanUtils::GetVulkanFormat(m_format);
-		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.aspectMask = VulkanUtils::GetVulkanAspectFromRHIFormat(m_format);
 
 		
 		//todo: add mip support

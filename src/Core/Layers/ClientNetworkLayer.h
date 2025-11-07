@@ -32,18 +32,7 @@ namespace NK
 		virtual void Update() override;
 		NETWORK_LAYER_ERROR_CODE Connect(const char* _ip, const unsigned short _port);
 		NETWORK_LAYER_ERROR_CODE Disconnect();
-
-
-		//Send an event over TCP to be broadcasted to all clients during the next PreAppUpdate()
-		//Note: requires EventPacket type to have been added to the serialisation registry with the SERIALISE() macro
-		template<typename EventPacket>
-		inline void EnqueueEventTrigger(const EventPacket& _packet)
-		{
-
-			m_tcpEventQueue.push(std::move(packet));
-		}
 		
-
 		
 	private:
 		void PreAppUpdate();

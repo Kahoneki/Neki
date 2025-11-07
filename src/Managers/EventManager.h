@@ -39,7 +39,7 @@ namespace NK
 		template<typename Class, typename EventPacket>
 		static inline EventSubscriptionID Subscribe(Class* _classInstance, std::function<void(Class*, const EventPacket&)> _memberCallback)
 		{
-			return Subscribe<EventPacket>(std::bind(_callback, _classInstance, std::placeholders::_1));
+			return Subscribe<EventPacket>(std::bind(_memberCallback, _classInstance, std::placeholders::_1));
 		}
 
 		

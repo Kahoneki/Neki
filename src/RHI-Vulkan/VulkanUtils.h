@@ -79,6 +79,8 @@ namespace NK
 		[[nodiscard]] static VkFormat GetVulkanFormat(const DATA_FORMAT _format);
 		[[nodiscard]] static DATA_FORMAT GetRHIFormat(const VkFormat _format);
 
+		[[nodiscard]] static VkImageAspectFlags GetVulkanAspectFromRHIFormat(const DATA_FORMAT _format);
+
 		[[nodiscard]] static VkImageViewType GetVulkanImageViewType(const TEXTURE_VIEW_DIMENSION _dimension);
 		[[nodiscard]] static TEXTURE_VIEW_DIMENSION GetRHIImageViewDimension(const VkImageViewType _type);
 
