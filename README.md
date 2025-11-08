@@ -1,15 +1,13 @@
-# Neki - A Cross-Platform Vulkan/DX12/PS5 Game Engine
+# Neki - A Cross-Platform Vulkan/DX12 Game Engine
 ![Logo](.github/logo.png)
 ###### Logo Credit: [@jowsey](https://github.com/jowsey)
 ----------------
 
 <br></br>
 # Summary
-Neki is an in-development cross-platform game engine built for Vulkan (x64/Linux), DX12 (x64), and AGC (PS5).
+Neki is an in-development cross-platform game engine built for Vulkan (x64/Linux) and DirectX 12 (x64).
 
 This engine primarily serves as a personal learning project of mine in an effort to develop a deep understanding for modern graphics APIs and professional software architecture. In this sense, it's built to prioritise clarity and flexibility over enforcing a rigid structure.
-
-AGC code unavailable due to Sony's NDA.
 
 ![Language](https://img.shields.io/badge/Language-C++23-pink.svg)
 ![CMake](https://img.shields.io/badge/CMake-3.28+-pink.svg)
@@ -30,9 +28,6 @@ For building on Vulkan:
 
 ### D3D12
 DX12 is only available for Windows development. If building on a Windows platform, the DX12 SDK should already be installed for you.
-
-### AGC
-AGC development is under strict NDA and hence the source code is maintained in a private repository fork.
 
 
 ## Instructions
