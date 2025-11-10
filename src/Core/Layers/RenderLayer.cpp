@@ -39,6 +39,7 @@ namespace NK
 		InitCameraBuffer();
 		InitLightCameraBuffer();
 		InitSkybox();
+		InitScreenQuad();
 		InitShadersAndPipelines();
 		InitRenderGraphs();
 		InitScreenResources();
@@ -113,8 +114,22 @@ namespace NK
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
 		}
+		
+
+		//Begin rendering
+		m_inFlightFences[m_currentFrame]->Wait();
+		m_inFlightFences[m_currentFrame]->Reset();
 
 
+		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
+		while (!m_modelUnloadQueues[m_currentFrame].empty())
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::APPLICATION, "bleh\n");
+			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].front());
+			m_modelUnloadQueues[m_currentFrame].pop();
+		}
+		
+		
 		//Model Loading Phase
 		for (auto&& [modelRenderer] : m_reg.get().View<CModelRenderer>())
 		{
@@ -141,43 +156,66 @@ namespace NK
 		}
 
 
-		//Begin rendering
-		m_inFlightFences[m_currentFrame]->Wait();
-		m_inFlightFences[m_currentFrame]->Reset();
-
-		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
-		while (!m_modelUnloadQueues[m_currentFrame].empty())
-		{
-			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].front());
-			m_modelUnloadQueues[m_currentFrame].pop();
-		}
-		
-
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
 		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
+
 		
 		RenderGraphExecutionDesc execDesc{};
 		execDesc.commandBuffers["SHADOW_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		execDesc.commandBuffers["DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		if (m_desc.enableMSAA) { execDesc.commandBuffers["MSAA_RESOLVE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
+		execDesc.commandBuffers["POSTPROCESS_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+
 		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", m_lightCamDataBuffer.get());
 		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffer.get());
+
 		execDesc.textures.Set("SHADOW_MAP", m_shadowMap.get());
-		execDesc.textures.Set("SCENE_COLOUR", m_intermediateRenderTarget.get());
-		execDesc.textures.Set("SCENE_DEPTH", m_intermediateDepthBuffer.get());
+		execDesc.textures.Set("SHADOW_MAP_MSAA", m_shadowMapMSAA.get());
+		execDesc.textures.Set("SHADOW_MAP_SSAA", m_shadowMapSSAA.get());
+
+		execDesc.textures.Set("SCENE_COLOUR", m_sceneColour.get());
+		execDesc.textures.Set("SCENE_COLOUR_MSAA", m_sceneColourMSAA.get());
+		execDesc.textures.Set("SCENE_COLOUR_SSAA", m_sceneColourSSAA.get());
+
+		execDesc.textures.Set("SCENE_DEPTH", m_sceneDepth.get());
+		execDesc.textures.Set("SCENE_DEPTH_MSAA", m_sceneDepthMSAA.get());
+		execDesc.textures.Set("SCENE_DEPTH_SSAA", m_sceneDepthSSAA.get());
+
 		execDesc.textures.Set("BACKBUFFER", m_swapchain->GetImage(imageIndex));
 		execDesc.textures.Set("SKYBOX", m_skyboxTexture.get());
+
 		execDesc.bufferViews.Set("LIGHT_CAMERA_BUFFER_VIEW", m_lightCamDataBufferView.get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferView.get());
+
 		execDesc.textureViews.Set("SHADOW_MAP_DSV", m_shadowMapDSV.get());
 		execDesc.textureViews.Set("SHADOW_MAP_SRV", m_shadowMapSRV.get());
-		execDesc.textureViews.Set("SCENE_COLOUR_VIEW", m_intermediateRenderTargetView.get());
-		execDesc.textureViews.Set("SCENE_DEPTH_VIEW", m_intermediateDepthBufferView.get());
-		execDesc.textureViews.Set("BACKBUFFER_VIEW", m_swapchain->GetImageView(imageIndex));
+		execDesc.textureViews.Set("SHADOW_MAP_MSAA_DSV", m_shadowMapMSAADSV.get());
+		execDesc.textureViews.Set("SHADOW_MAP_MSAA_SRV", m_shadowMapMSAASRV.get());
+		execDesc.textureViews.Set("SHADOW_MAP_SSAA_DSV", m_shadowMapSSAADSV.get());
+		execDesc.textureViews.Set("SHADOW_MAP_SSAA_SRV", m_shadowMapSSAASRV.get());
+
+		execDesc.textureViews.Set("SCENE_COLOUR_RTV", m_sceneColourRTV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_SRV", m_sceneColourSRV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_MSAA_RTV", m_sceneColourMSAARTV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_MSAA_SRV", m_sceneColourMSAASRV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_SSAA_RTV", m_sceneColourSSAARTV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_SSAA_SRV", m_sceneColourSSAASRV.get());
+
+		execDesc.textureViews.Set("SCENE_DEPTH_DSV", m_sceneDepthDSV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_SRV", m_sceneDepthSRV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_MSAA_DSV", m_sceneDepthMSAADSV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_MSAA_SRV", m_sceneDepthMSAASRV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_SSAA_DSV", m_sceneDepthSSAADSV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_SSAA_SRV", m_sceneDepthSSAASRV.get());
+
+		execDesc.textureViews.Set("BACKBUFFER_RTV", m_swapchain->GetImageView(imageIndex));
 		execDesc.textureViews.Set("SKYBOX_VIEW", m_skyboxTextureView.get());
+
 		execDesc.samplers.Set("SAMPLER", m_linearSampler.get());
+
 		m_meshRenderGraph->Execute(execDesc);
+
 		
 		m_graphicsCommandBuffers[m_currentFrame]->End();
 
@@ -255,7 +293,7 @@ namespace NK
 
 		//GPU Uploader
 		GPUUploaderDesc gpuUploaderDesc{};
-		gpuUploaderDesc.stagingBufferSize = 1024 * 512 * 512; //512MiB
+		gpuUploaderDesc.stagingBufferSize = 1024 * 1024 * 512; //512MiB
 		gpuUploaderDesc.graphicsQueue = m_graphicsQueue.get();
 		m_gpuUploader = m_device->CreateGPUUploader(gpuUploaderDesc);
 
@@ -429,6 +467,44 @@ namespace NK
 
 
 
+	void RenderLayer::InitScreenQuad()
+	{
+		//Vertex Buffer
+		constexpr ScreenQuadVertex  vertices[4]
+		{
+			{ glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec2(0.0f, 1.0f) },	//Bottom-left
+			{ glm::vec3(-1.0f,  1.0f, 0.0f), glm::vec2(0.0f, 0.0f) },	//Top-left
+			{ glm::vec3( 1.0f, -1.0f, 0.0f), glm::vec2(1.0f, 1.0f) },	//Bottom-right
+			{ glm::vec3( 1.0f,  1.0f, 0.0f), glm::vec2(1.0f, 0.0f) }	//Top-right
+		};
+		BufferDesc vertBufferDesc{};
+		vertBufferDesc.size = sizeof(ScreenQuadVertex) * 4;
+		vertBufferDesc.type = MEMORY_TYPE::DEVICE;
+		vertBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
+		m_screenQuadVertBuffer = m_device->CreateBuffer(vertBufferDesc);
+
+		//Index Buffer
+		const std::uint32_t indices[6] =
+		{
+			0, 1, 2,
+			2, 1, 3
+		};
+		BufferDesc indexBufferDesc{};
+		indexBufferDesc.size = sizeof(std::uint32_t) * 6;
+		indexBufferDesc.type = MEMORY_TYPE::DEVICE;
+		indexBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT;
+		m_screenQuadIndexBuffer = m_device->CreateBuffer(indexBufferDesc);
+
+		//Upload vertex and index buffers
+		m_gpuUploader->EnqueueBufferDataUpload(vertices, m_screenQuadVertBuffer.get(), RESOURCE_STATE::UNDEFINED);
+		m_gpuUploader->EnqueueBufferDataUpload(indices, m_screenQuadIndexBuffer.get(), RESOURCE_STATE::UNDEFINED);
+
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_screenQuadVertBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::VERTEX_BUFFER);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_screenQuadIndexBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::INDEX_BUFFER);
+	}
+
+
+
 	void RenderLayer::InitShadersAndPipelines()
 	{
 		//Vertex Shaders
@@ -440,6 +516,8 @@ namespace NK
 		m_meshVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/Skybox_vs";
 		m_skyboxVertShader = m_device->CreateShader(vertShaderDesc);
+		vertShaderDesc.filepath = "Shaders/ScreenQuad_vs";
+		m_screenQuadVertShader = m_device->CreateShader(vertShaderDesc);
 
 		//Fragment Shaders
 		ShaderDesc fragShaderDesc{};
@@ -452,22 +530,26 @@ namespace NK
 		m_pbrFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Skybox_fs";
 		m_skyboxFragShader = m_device->CreateShader(fragShaderDesc);
+		fragShaderDesc.filepath = "Shaders/Postprocess_fs";
+		m_postprocessFragShader = m_device->CreateShader(fragShaderDesc);
 
 
 		//Root Signatures
 		RootSignatureDesc rootSigDesc{};
+		rootSigDesc.num32BitPushConstantValues = sizeof(ShadowPassPushConstantData) / 4;
+		m_shadowPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
+		
 		rootSigDesc.num32BitPushConstantValues = sizeof(MeshPassPushConstantData) / 4;
 		m_meshPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 
-		rootSigDesc.num32BitPushConstantValues = sizeof(ShadowPassPushConstantData) / 4;
-		m_shadowPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
-
+		rootSigDesc.num32BitPushConstantValues = sizeof(PostprocessPassPushConstantData) / 4;
+		m_postprocessPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
+		
 
 		InitShadowPipeline();
 		InitSkyboxPipeline();
 		InitGraphicsPipelines();
-
-
+		InitPostprocessPipeline();
 	}
 
 
@@ -635,6 +717,76 @@ namespace NK
 
 
 
+	void RenderLayer::InitPostprocessPipeline()
+	{
+		std::vector<VertexAttributeDesc> vertexAttributes;
+		VertexAttributeDesc posAttribute{};
+		posAttribute.attribute = SHADER_ATTRIBUTE::POSITION;
+		posAttribute.binding = 0;
+		posAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		posAttribute.offset = 0;
+		vertexAttributes.push_back(posAttribute);
+		VertexAttributeDesc uvAttribute{};
+		uvAttribute.attribute = SHADER_ATTRIBUTE::TEXCOORD_0;
+		uvAttribute.binding = 0;
+		uvAttribute.format = DATA_FORMAT::R32G32_SFLOAT;
+		uvAttribute.offset = sizeof(glm::vec3);
+		vertexAttributes.push_back(uvAttribute);
+		std::vector<VertexBufferBindingDesc> bufferBindings;
+		VertexBufferBindingDesc bufferBinding{};
+		bufferBinding.binding = 0;
+		bufferBinding.inputRate = VERTEX_INPUT_RATE::VERTEX;
+		bufferBinding.stride = sizeof(ScreenQuadVertex);
+		bufferBindings.push_back(bufferBinding);
+		VertexInputDesc vertexInputDesc{};
+		vertexInputDesc.attributeDescriptions = vertexAttributes;
+		vertexInputDesc.bufferBindingDescriptions = bufferBindings;
+
+		InputAssemblyDesc inputAssemblyDesc{};
+		inputAssemblyDesc.topology = INPUT_TOPOLOGY::TRIANGLE_LIST;
+
+		RasteriserDesc rasteriserDesc{};
+		rasteriserDesc.cullMode = CULL_MODE::BACK;
+		rasteriserDesc.frontFace = WINDING_DIRECTION::CLOCKWISE;
+		rasteriserDesc.depthBiasEnable = false;
+
+		DepthStencilDesc depthStencilDesc{};
+		depthStencilDesc.depthTestEnable = true;
+		depthStencilDesc.depthWriteEnable = true;
+		depthStencilDesc.depthCompareOp = COMPARE_OP::LESS_OR_EQUAL;
+		depthStencilDesc.stencilTestEnable = false;
+
+		MultisamplingDesc multisamplingDesc{};
+		multisamplingDesc.sampleCount = SAMPLE_COUNT::BIT_1;
+		multisamplingDesc.sampleMask = UINT32_MAX;
+		multisamplingDesc.alphaToCoverageEnable = false;
+
+		std::vector<ColourBlendAttachmentDesc> colourBlendAttachments(1);
+		colourBlendAttachments[0].colourWriteMask = COLOUR_ASPECT_FLAGS::R_BIT | COLOUR_ASPECT_FLAGS::G_BIT | COLOUR_ASPECT_FLAGS::B_BIT | COLOUR_ASPECT_FLAGS::A_BIT;
+		colourBlendAttachments[0].blendEnable = false;
+		ColourBlendDesc colourBlendDesc{};
+		colourBlendDesc.logicOpEnable = false;
+		colourBlendDesc.attachments = colourBlendAttachments;
+
+		PipelineDesc pipelineDesc{};
+		pipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
+		pipelineDesc.vertexShader = m_screenQuadVertShader.get();
+		pipelineDesc.fragmentShader = m_postprocessFragShader.get();
+		pipelineDesc.rootSignature = m_meshPassRootSignature.get();
+		pipelineDesc.vertexInputDesc = vertexInputDesc;
+		pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
+		pipelineDesc.rasteriserDesc = rasteriserDesc;
+		pipelineDesc.depthStencilDesc = depthStencilDesc;
+		pipelineDesc.multisamplingDesc = multisamplingDesc;
+		pipelineDesc.colourBlendDesc = colourBlendDesc;
+		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R8G8B8A8_SRGB };
+		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
+
+		m_postprocessPipeline = m_device->CreatePipeline(pipelineDesc);
+	}
+
+
+
 	void RenderLayer::InitRenderGraphs()
 	{
 		RenderGraphDesc meshDesc{};
@@ -642,10 +794,24 @@ namespace NK
 		meshDesc.AddNode(
 			"SHADOW_PASS",
 			{{ "LIGHT_CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
-			{ "SHADOW_MAP", RESOURCE_STATE::DEPTH_WRITE }},
+			{ "SHADOW_MAP", RESOURCE_STATE::DEPTH_WRITE },
+			{ "SHADOW_MAP_MSAA", RESOURCE_STATE::DEPTH_WRITE },
+			{ "SHADOW_MAP_SSAA", RESOURCE_STATE::DEPTH_WRITE }},
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
-				_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SHADOW_MAP_DSV"), nullptr);
+				if (m_desc.enableMSAA)
+				{
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SHADOW_MAP_MSAA_DSV"), nullptr);
+				}
+				else if (m_desc.enableSSAA)
+				{
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SHADOW_MAP_SSAA_DSV"), nullptr);
+				}
+				else
+				{
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SHADOW_MAP_DSV"), nullptr);
+				}
+				
 				_cmdBuf->BindRootSignature(m_shadowPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
 				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
@@ -669,9 +835,9 @@ namespace NK
 
 						_cmdBuf->PushConstants(m_shadowPassRootSignature.get(), &pushConstantData);
 						_cmdBuf->BindPipeline(m_shadowPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
-						_cmdBuf->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
-						_cmdBuf->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), DATA_FORMAT::R32_UINT);
-						_cmdBuf->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
+						_cmdBuf->BindVertexBuffers(0, 1, mesh->vertexBuffer.get(), &modelVertexBufferStride);
+						_cmdBuf->BindIndexBuffer(mesh->indexBuffer.get(), DATA_FORMAT::R32_UINT);
+						_cmdBuf->DrawIndexed(mesh->indexCount, 1, 0, 0);
 					}
 				}
 
@@ -684,20 +850,37 @@ namespace NK
 		"SCENE_PASS",
 		{{ "CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
 		{ "SHADOW_MAP", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SHADOW_MAP_MSAA", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SHADOW_MAP_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SCENE_COLOUR", RESOURCE_STATE::RENDER_TARGET },
+		{ "SCENE_COLOUR_MSAA", RESOURCE_STATE::RENDER_TARGET },
+		{ "SCENE_COLOUR_SSAA", RESOURCE_STATE::RENDER_TARGET },
 		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
-		{ "BACKBUFFER", RESOURCE_STATE::RENDER_TARGET },
+		{ "SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE },
+		{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE },
 		{ "SKYBOX", RESOURCE_STATE::SHADER_RESOURCE }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
-			_cmdBuf->BeginRendering(1, m_desc.enableMSAA ? _texViews.Get("SCENE_COLOUR_VIEW") : nullptr, m_desc.enableSSAA ? _texViews.Get("SCENE_COLOUR_VIEW") : _texViews.Get("BACKBUFFER_VIEW"), _texViews.Get("SCENE_DEPTH_VIEW"), nullptr);
+			if (m_desc.enableMSAA)
+			{
+				_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("SCENE_COLOUR_MSAA_RTV"), nullptr, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), nullptr);
+			}
+			else if (m_desc.enableSSAA)
+			{
+				_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("SCENE_COLOUR_SSAA_RTV"), nullptr, _texViews.Get("SCENE_DEPTH_SSAA_DSV"), nullptr);
+			}
+			else
+			{
+				_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("SCENE_COLOUR_RTV"), nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr);
+			}
+			
 			_cmdBuf->BindRootSignature(m_meshPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
 			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
 			MeshPassPushConstantData pushConstantData{};
-			pushConstantData.shadowMapIndex = _texViews.Get("SHADOW_MAP_SRV")->GetIndex();
+			pushConstantData.shadowMapIndex = _texViews.Get(m_desc.enableMSAA ? "SHADOW_MAP_MSAA_SRV" : (m_desc.enableSSAA ? "SHADOW_MAP_SSAA_SRV" : "SHADOW_MAP_SRV"))->GetIndex();
 			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.skyboxCubemapIndex = _texViews.Get("SKYBOX_VIEW") ? _texViews.Get("SKYBOX_VIEW")->GetIndex() : 0;
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
@@ -730,29 +913,110 @@ namespace NK
 					_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
 					IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
 					_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
-					_cmdBuf->BindVertexBuffers(0, 1, model->meshes[i]->vertexBuffer.get(), &modelVertexBufferStride);
-					_cmdBuf->BindIndexBuffer(model->meshes[i]->indexBuffer.get(), DATA_FORMAT::R32_UINT);
-					_cmdBuf->DrawIndexed(model->meshes[i]->indexCount, 1, 0, 0);
+					_cmdBuf->BindVertexBuffers(0, 1, mesh->vertexBuffer.get(), &modelVertexBufferStride);
+					_cmdBuf->BindIndexBuffer(mesh->indexBuffer.get(), DATA_FORMAT::R32_UINT);
+					_cmdBuf->DrawIndexed(mesh->indexCount, 1, 0, 0);
 				}
 			}
 
-			_cmdBuf->EndRendering(1, m_desc.enableMSAA ? _texs.Get("SCENE_COLOUR") : nullptr, _texs.Get("BACKBUFFER"));
-		});
-
-		
-		meshDesc.AddNode(
-		"DOWNSAMPLE_PASS",
-		{{"SCENE_COLOUR", RESOURCE_STATE::COPY_SOURCE},
-		{"BACKBUFFER", RESOURCE_STATE::COPY_DEST}},
-		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
-		{
-			if (m_desc.enableSSAA)
+			if (m_desc.enableMSAA)
 			{
-				_cmdBuf->BlitTexture(_texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR, _texs.Get("BACKBUFFER"), TEXTURE_ASPECT::COLOUR);
+				_cmdBuf->EndRendering(1, nullptr, _texs.Get("SCENE_COLOUR_MSAA"));
+			}
+			else if (m_desc.enableSSAA)
+			{
+				_cmdBuf->EndRendering(1, nullptr, _texs.Get("SCENE_COLOUR_SSAA"));
+			}
+			else
+			{
+				_cmdBuf->EndRendering(1, nullptr, _texs.Get("SCENE_COLOUR"));
 			}
 		});
 
+		//No AA: shadow map / scene colour / scene depth is stored in SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
+		//MSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP_MSAA / SCENE_COLOUR_MSAA / SCENE_DEPTH_MSAA
+		//SSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP_SSAA / SCENE_COLOUR_SSAA / SCENE_DEPTH_SSAA
+//		//If SSAA is enabled, add another pass to downsample SHADOW_MAP_SSAA / SCENE_COLOUR_SSAA / SCENE_DEPTH_SSAA into SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
+//		
+//		if (m_desc.enableSSAA)
+//		{
+//			meshDesc.AddNode(
+//			"DOWNSAMPLE_PASS",
+//			{{"SCENE_COLOUR_SSAA", RESOURCE_STATE::COPY_SOURCE},
+//			{"SCENE_COLOUR", RESOURCE_STATE::COPY_DEST},
+//			{"SCENE_DEPTH_SSAA", RESOURCE_STATE::COPY_SOURCE},
+//			{"SCENE_DEPTH", RESOURCE_STATE::COPY_DEST}},
+//			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+//			{
+//				_cmdBuf->BlitTexture(_texs.Get("SCENE_COLOUR_SSAA"), TEXTURE_ASPECT::COLOUR, _texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR);
+//				_cmdBuf->BlitTexture(_texs.Get("SCENE_DEPTH_SSAA"), TEXTURE_ASPECT::DEPTH, _texs.Get("SCENE_DEPTH"), TEXTURE_ASPECT::DEPTH);
+//				_cmdBuf->BlitTexture(_texs.Get("SHADOW_MAP_SSAA"), TEXTURE_ASPECT::DEPTH, _texs.Get("SHADOW_MAP"), TEXTURE_ASPECT::DEPTH);
+//			});
+//		}
 
+//		//No AA: shadow map / scene colour / scene depth is stored in SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
+//		//MSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP_MSAA / SCENE_COLOUR / SCENE_DEPTH_MSAA
+//		//SSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
+
+		//If MSAA is enabled, SHADOW_MAP_MSAA, SCENE_COLOUR_MSAA, and SCENE_DEPTH_MSAA need to be resolved into SHADOW_MAP, SCENE_COLOUR, and SCENE_DEPTH before being sampled in the postprocess shader
+		if (m_desc.enableMSAA)
+		{
+			meshDesc.AddNode(
+			"MSAA_RESOLVE_PASS",
+			{{"SCENE_COLOUR", RESOURCE_STATE::RENDER_TARGET},
+			{"SCENE_COLOUR_MSAA", RESOURCE_STATE::RENDER_TARGET},
+			{"SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE},
+			{"SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE},
+			{"SHADOW_MAP", RESOURCE_STATE::DEPTH_WRITE},
+			{"SHADOW_MAP_MSAA", RESOURCE_STATE::DEPTH_WRITE}},
+			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+			{
+				_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SHADOW_MAP_MSAA_DSV"), _texViews.Get("SHADOW_MAP_DSV"), nullptr);
+				_cmdBuf->EndRendering(0, nullptr, nullptr);
+				_cmdBuf->BeginRendering(0, _texViews.Get("SCENE_COLOUR_MSAA_RTV"), _texViews.Get("SCENE_COLOUR_RTV"), _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr);
+				_cmdBuf->EndRendering(0, nullptr, nullptr);
+			});
+		}
+		
+		meshDesc.AddNode(
+		"POSTPROCESS_PASS",
+		{{ "SHADOW_MAP", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SHADOW_MAP_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SCENE_COLOUR_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SCENE_DEPTH", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "BACKBUFFER", RESOURCE_STATE::RENDER_TARGET }},
+		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+		{
+			_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("BACKBUFFER_RTV"), nullptr, nullptr, nullptr);
+			_cmdBuf->BindRootSignature(m_postprocessPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+
+			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+
+			PostprocessPassPushConstantData pushConstantData{};
+			pushConstantData.sceneColourIndex = _texViews.Get(m_desc.enableSSAA ? "SCENE_COLOUR_SSAA_SRV" : "SCENE_COLOUR_SRV")->GetIndex();
+			pushConstantData.sceneDepthIndex = _texViews.Get(m_desc.enableSSAA ? "SCENE_DEPTH_SSAA_SRV" : "SCENE_DEPTH_SRV")->GetIndex();
+			pushConstantData.shadowMapIndex = _texViews.Get(m_desc.enableSSAA ? "SHADOW_MAP_SSAA_SRV" : "SHADOW_MAP_SRV")->GetIndex();
+			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+
+			//Screen Quad
+			std::size_t screenQuadVertexBufferStride{ sizeof(ScreenQuadVertex) };
+			_cmdBuf->PushConstants(m_postprocessPassRootSignature.get(), &pushConstantData);
+			_cmdBuf->BindPipeline(m_postprocessPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+			_cmdBuf->BindVertexBuffers(0, 1, m_screenQuadVertBuffer.get(), &screenQuadVertexBufferStride);
+			_cmdBuf->BindIndexBuffer(m_screenQuadIndexBuffer.get(), DATA_FORMAT::R32_UINT);
+			_cmdBuf->DrawIndexed(6, 1, 0, 0);
+
+			_cmdBuf->EndRendering(1, nullptr, _texs.Get("BACKBUFFER"));
+		});
+
+		//No AA: scene colour is stored in BACKBUFFER
+		//MSAA: scene colour is stored in BACKBUFFER
+		//SSAA: scene colour is stored in BACKBUFFER
+
+		//Transition backbuffer to present state
 		meshDesc.AddNode("PRESENT_TRANSITION_PASS", {{"BACKBUFFER", RESOURCE_STATE::PRESENT}});
 		
 		
@@ -763,68 +1027,155 @@ namespace NK
 
 	void RenderLayer::InitScreenResources()
 	{
+		//--------SHADOW MAPS--------//
+		
 		//Shadow Map
 		TextureDesc shadowMapDesc{};
 		shadowMapDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		shadowMapDesc.format = DATA_FORMAT::D32_SFLOAT;
-		shadowMapDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.window->GetSize(), 1);
+		shadowMapDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
 		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY;
 		shadowMapDesc.arrayTexture = false;
-		shadowMapDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
+		shadowMapDesc.sampleCount = SAMPLE_COUNT::BIT_1;
 		m_shadowMap = m_device->CreateTexture(shadowMapDesc);
 		m_graphicsCommandBuffers[0]->TransitionBarrier(m_shadowMap.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
-		//Shadow Map Views
+		//MSAA Scene Colour
+		if (m_desc.enableMSAA)
+		{
+			shadowMapDesc.sampleCount = m_desc.msaaSampleCount;
+			m_shadowMapMSAA = m_device->CreateTexture(shadowMapDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_shadowMapMSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
+		}
+		
+		//SSAA Shadow Map
+		if (m_desc.enableSSAA)
+		{
+			shadowMapDesc.size = glm::ivec3(m_supersampleResolution, 1);
+			shadowMapDesc.usage |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT;
+			m_shadowMapSSAA = m_device->CreateTexture(shadowMapDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_shadowMapSSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
+		}
+		
+		//Shadow Map DSVs
 		TextureViewDesc shadowMapViewDesc{};
 		shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
 		shadowMapViewDesc.format = DATA_FORMAT::D32_SFLOAT;
 		shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
 		m_shadowMapDSV = m_device->CreateDepthStencilTextureView(m_shadowMap.get(), shadowMapViewDesc);
+		if (m_desc.enableMSAA) { m_shadowMapMSAADSV = m_device->CreateDepthStencilTextureView(m_shadowMapMSAA.get(), shadowMapViewDesc); }
+		if (m_desc.enableSSAA) { m_shadowMapSSAADSV = m_device->CreateDepthStencilTextureView(m_shadowMapSSAA.get(), shadowMapViewDesc); }
+		
+		//Shadow Map SRVs
 		shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 		m_shadowMapSRV = m_device->CreateShaderResourceTextureView(m_shadowMap.get(), shadowMapViewDesc);
+		if (m_desc.enableMSAA) { m_shadowMapMSAASRV = m_device->CreateShaderResourceTextureView(m_shadowMapMSAA.get(), shadowMapViewDesc); }
+		if (m_desc.enableSSAA) { m_shadowMapSSAASRV = m_device->CreateShaderResourceTextureView(m_shadowMapSSAA.get(), shadowMapViewDesc); }
+		
+		//--------END OF SHADOW MAPS--------//
+		
+		
+		//--------SCENE COLOUR--------//
+		
+		//Scene Colour
+		TextureDesc sceneColourDesc{};
+		sceneColourDesc.dimension = TEXTURE_DIMENSION::DIM_2;
+		sceneColourDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
+		sceneColourDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
+		sceneColourDesc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY;
+		sceneColourDesc.arrayTexture = false;
+		sceneColourDesc.sampleCount = SAMPLE_COUNT::BIT_1;
+		m_sceneColour = m_device->CreateTexture(sceneColourDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneColour.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
+		
+		//MSAA Scene Colour
+		if (m_desc.enableMSAA)
+		{
+			sceneColourDesc.sampleCount = m_desc.msaaSampleCount;
+			m_sceneColourMSAA = m_device->CreateTexture(sceneColourDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneColourMSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
+		}
+		
+		//SSAA Scene Colour
+		else if (m_desc.enableSSAA)
+		{
+			sceneColourDesc.size = glm::ivec3(m_supersampleResolution, 1);
+			sceneColourDesc.usage |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT;
+			m_sceneColourSSAA = m_device->CreateTexture(sceneColourDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneColourSSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
+		}
+		
+		//Scene Colour RTVs
+		TextureViewDesc sceneColourViewDesc{};
+		sceneColourViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
+		sceneColourViewDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
+		sceneColourViewDesc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
+		m_sceneColourRTV = m_device->CreateRenderTargetTextureView(m_sceneColour.get(), sceneColourViewDesc);
+		if (m_desc.enableMSAA) { m_sceneColourMSAARTV = m_device->CreateRenderTargetTextureView(m_sceneColourMSAA.get(), sceneColourViewDesc); }
+		if (m_desc.enableSSAA) { m_sceneColourSSAARTV = m_device->CreateRenderTargetTextureView(m_sceneColourSSAA.get(), sceneColourViewDesc); }
+		
+		//Scene Colour SRVs
+		sceneColourViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+		m_sceneColourSRV = m_device->CreateShaderResourceTextureView(m_sceneColour.get(), sceneColourViewDesc);
+		if (m_desc.enableMSAA) { m_sceneColourMSAASRV = m_device->CreateShaderResourceTextureView(m_sceneColourMSAA.get(), sceneColourViewDesc); }
+		if (m_desc.enableSSAA) { m_sceneColourSSAASRV = m_device->CreateShaderResourceTextureView(m_sceneColourSSAA.get(), sceneColourViewDesc); }
+		
+		//--------END OF SCENE COLOUR--------//
+		
 
-		//Render Target
-		TextureDesc renderTargetDesc{};
-		renderTargetDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-		renderTargetDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
-		renderTargetDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.window->GetSize(), 1);
-		renderTargetDesc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT; //Needs TRANSFER_SRC_BIT for supersampling algorithm
-		renderTargetDesc.arrayTexture = false;
-		renderTargetDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
-		m_intermediateRenderTarget = m_device->CreateTexture(renderTargetDesc);
-		m_graphicsCommandBuffers[0]->TransitionBarrier(m_intermediateRenderTarget.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
+		//--------SCENE DEPTH--------//
+		
+		//Shadow Map
+		TextureDesc sceneDepthDesc{};
+		sceneDepthDesc.dimension = TEXTURE_DIMENSION::DIM_2;
+		sceneDepthDesc.format = DATA_FORMAT::D32_SFLOAT;
+		sceneDepthDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
+		sceneDepthDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY;
+		sceneDepthDesc.arrayTexture = false;
+		sceneDepthDesc.sampleCount = SAMPLE_COUNT::BIT_1;
+		m_sceneDepth = m_device->CreateTexture(shadowMapDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneDepth.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
-		//Render Target View
-		TextureViewDesc renderTargetViewDesc{};
-		renderTargetViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
-		renderTargetViewDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
-		renderTargetViewDesc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
-		m_intermediateRenderTargetView = m_device->CreateRenderTargetTextureView(m_intermediateRenderTarget.get(), renderTargetViewDesc);
-
-		//Depth Buffer
-		TextureDesc depthBufferDesc{};
-		depthBufferDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-		depthBufferDesc.format = DATA_FORMAT::D32_SFLOAT;
-		depthBufferDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(m_desc.window->GetSize(), 1);
-		depthBufferDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT;
-		depthBufferDesc.arrayTexture = false;
-		depthBufferDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
-		m_intermediateDepthBuffer = m_device->CreateTexture(depthBufferDesc);
-		m_graphicsCommandBuffers[0]->TransitionBarrier(m_intermediateDepthBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
-
-		//Supersample Depth Buffer View
-		TextureViewDesc depthBufferViewDesc{};
-		depthBufferViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
-		depthBufferViewDesc.format = DATA_FORMAT::D32_SFLOAT;
-		depthBufferViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
-		m_intermediateDepthBufferView = m_device->CreateDepthStencilTextureView(m_intermediateDepthBuffer.get(), depthBufferViewDesc);
+		//MSAA Scene Colour
+		if (m_desc.enableMSAA)
+		{
+			sceneDepthDesc.sampleCount = m_desc.msaaSampleCount;
+			m_sceneDepthMSAA = m_device->CreateTexture(sceneDepthDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneDepthMSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
+		}
+		
+		//SSAA Scene Depth
+		if (m_desc.enableSSAA)
+		{
+			sceneDepthDesc.size = glm::ivec3(m_supersampleResolution, 1);
+			sceneDepthDesc.usage |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT;
+			m_sceneDepthSSAA = m_device->CreateTexture(sceneDepthDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneDepthSSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
+		}
+		
+		//Scene Depth DSVs
+		TextureViewDesc sceneDepthViewDesc{};
+		sceneDepthViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
+		sceneDepthViewDesc.format = DATA_FORMAT::D32_SFLOAT;
+		sceneDepthViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
+		m_sceneDepthDSV = m_device->CreateDepthStencilTextureView(m_sceneDepth.get(), sceneDepthViewDesc);
+		if (m_desc.enableMSAA) { m_shadowMapMSAADSV = m_device->CreateDepthStencilTextureView(m_sceneDepthMSAA.get(), sceneDepthViewDesc); }
+		if (m_desc.enableSSAA) { m_shadowMapSSAADSV = m_device->CreateDepthStencilTextureView(m_sceneDepthSSAA.get(), sceneDepthViewDesc); }
+		
+		//Shadow Map SRVs
+		sceneDepthViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+		m_sceneDepthSRV = m_device->CreateShaderResourceTextureView(m_sceneDepth.get(), sceneDepthViewDesc);
+		if (m_desc.enableMSAA) { m_sceneDepthMSAASRV = m_device->CreateShaderResourceTextureView(m_sceneDepthMSAA.get(), sceneDepthViewDesc); }
+		if (m_desc.enableSSAA) { m_sceneDepthSSAASRV = m_device->CreateShaderResourceTextureView(m_sceneDepthSSAA.get(), sceneDepthViewDesc); }
+		
+		//--------END OF SCENE DEPTH--------//
 	}
 
 
 
 	void RenderLayer::UpdateSkybox(CSkybox& _skybox)
 	{
-		std::array<std::string, 6> textureNames{ "right", "left", "top", "bottom", "front", "back" };
+		const std::array<std::string, 6> textureNames{ "right", "left", "top", "bottom", "front", "back" };
 		void* skyboxImageData[6];
 		std::string filepath{};
 		for (std::size_t i{ 0 }; i < 6; ++i)

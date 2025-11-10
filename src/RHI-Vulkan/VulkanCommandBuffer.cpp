@@ -154,11 +154,11 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
+	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _multisampleDepthAttachment, ITextureView* _outputDepthAttachment, ITextureView* _stencilAttachment)
 	{
-		if (_depthAttachment && _stencilAttachment)
+		if (_outputDepthAttachment && _stencilAttachment)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() called with valid _depthAttachment and _stencilAttachment. This is not supported for parity with D3D12 - if you would like both a depth attachment and a stencil attachment, please combine them into one texture and use the other BeginRendering() function.\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() called with valid _outputDepthAttachment and _stencilAttachment. This is not supported for parity with D3D12 - if you would like both a depth attachment and a stencil attachment, please combine them into one texture and use the other BeginRendering() function.\n");
 			throw std::runtime_error("");
 		}
 
@@ -189,11 +189,23 @@ namespace NK
 
 		//Depth attachment
 		VkRenderingAttachmentInfo depthAttachmentInfo{};
-		if (_depthAttachment)
+		if (_outputDepthAttachment)
 		{
 			depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 			depthAttachmentInfo.pNext = nullptr;
-			depthAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_depthAttachment)->GetImageView();
+			if (_multisampleDepthAttachment)
+			{
+				//Multisampling enabled, render into _multisampleDepthAttachment and resolve into _outputDepthAttachment
+				depthAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_multisampleDepthAttachment)->GetImageView();
+				depthAttachmentInfo.resolveImageView = dynamic_cast<VulkanTextureView*>(_outputDepthAttachment)->GetImageView();
+				depthAttachmentInfo.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+				depthAttachmentInfo.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+			}
+			else
+			{
+				//Multisampling disabled, ignore _multisampleDepthAttachments and just render straight into _outputDepthAttachments
+				depthAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_outputDepthAttachment)->GetImageView();
+			}
 			depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 			depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -218,9 +230,9 @@ namespace NK
 		{
 			renderArea = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[0]))->GetRenderArea();
 		}
-		else if (_depthAttachment)
+		else if (_outputDepthAttachment)
 		{
-			renderArea = dynamic_cast<VulkanTextureView*>(_depthAttachment)->GetRenderArea();
+			renderArea = dynamic_cast<VulkanTextureView*>(_outputDepthAttachment)->GetRenderArea();
 		}
 		else if (_stencilAttachment)
 		{
@@ -233,7 +245,7 @@ namespace NK
 		renderingInfo.layerCount = 1;
 		renderingInfo.colorAttachmentCount = static_cast<std::uint32_t>(_numColourAttachments);
 		renderingInfo.pColorAttachments = colourAttachmentInfos.data();
-		renderingInfo.pDepthAttachment = _depthAttachment ? &depthAttachmentInfo : nullptr;
+		renderingInfo.pDepthAttachment = _outputDepthAttachment ? &depthAttachmentInfo : nullptr;
 		renderingInfo.pStencilAttachment = _stencilAttachment ? &stencilAttachmentInfo : nullptr;
 
 		vkCmdBeginRendering(m_buffer, &renderingInfo);
@@ -339,6 +351,15 @@ namespace NK
 	void VulkanCommandBuffer::EndRendering(std::size_t _numColourAttachments, ITexture* _multisampleColourAttachments, ITexture* _outputColourAttachments)
 	{
 		vkCmdEndRendering(m_buffer);
+	}
+
+
+
+	void VulkanCommandBuffer::ResolveImage(ITexture* _multisampleTexture, ITexture* _outputTexture)
+	{
+		VkImageResolve region{};
+		region.
+		vkCmdResolveImage(m_buffer, dynamic_cast<VulkanTexture*>(_multisampleTexture)->GetTexture(), VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, dynamic_cast<VulkanTexture*>(_outputTexture)->GetTexture(), VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, 1);
 	}
 
 

@@ -116,7 +116,7 @@ public:
 		m_modelVisibilityLayer = NK::UniquePtr<NK::ModelVisibilityLayer>(NK_NEW(NK::ModelVisibilityLayer, m_scenes[m_activeScene]->m_reg));
 		NK::RenderLayerDesc renderLayerDesc{};
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
-		renderLayerDesc.enableMSAA = false;
+		renderLayerDesc.enableMSAA = true;
 		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
 		//renderLayerDesc.enableSSAA = true;
 		//renderLayerDesc.ssaaMultiplier = 4;

@@ -60,27 +60,26 @@ namespace NK
 		//Note: _numColourAttachments is not the size of the swapchain, it is used for rendering to multiple colour attachments in a single pass. For most scenarios, this value should be 1.
 		//
 		//If not using multisampling:
-		//- Leave _multiSampleColourAttachments as nullptr
-		//- Populate _outputColourAttachments with the final output attachment(s) with sample count = 1 (probably from ISwapchain::GetImageView())
+		//- Leave _multiSampleColourAttachments and _multisampleDepthAttachment as nullptr
+		//- Populate _outputColourAttachments and _depth with the final output attachment(s) with sample count = 1
 		//
 		//If using multisampling:
 		//- There should be as many _multisampleColourAttachments as _outputColourAttachments (_numColourAttachments)
-		//- _multisampleColourAttachments should be the offscreen attachment(s) with sample count > 1
-		//- _outputColourAttachments should be the final output attachment(s) with sample count = 1 (probably from ISwapchain::GetImageView())
-		//- _depthAttachment and _stencilAttachment must have a sample count equal to that of the _multisampleColourAttachment(s)
-		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment) = 0;
+		//- _multisampleColourAttachments and _multisampleDepthAttachment should be the offscreen attachments with sample count > 1
+		//- _outputColourAttachments and _outputDepthAttachment should be the final output attachments with sample count = 1
+		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _multisampleDepthAttachment, ITextureView* _outputDepthAttachment, ITextureView* _stencilAttachment) = 0;
 
 		//Used for combined depth-stencil attachments (_depthStencilAttachment, if provided, must be in a combined depth-stencil compatible data format) (_depthStencilAttachment can be set to nullptr if unused)
 		//Note: _numColourAttachments is not the size of the swapchain, it is used for rendering to multiple colour attachments in a single pass. For most scenarios, this value should be 1.
 		//
 		//If not using multisampling:
 		//- Leave _multiSampleColourAttachments as nullptr
-		//- Populate _outputColourAttachments with the final output attachment(s) with sample count = 1 (probably from ISwapchain::GetImageView())
+		//- Populate _outputColourAttachments with the final output attachment(s) with sample count = 1
 		//
 		//If using multisampling:
 		//- There should be as many _multisampleColourAttachments as _outputColourAttachments (_numColourAttachments)
 		//- _multisampleColourAttachments should be the offscreen attachment(s) with sample count > 1
-		//- _outputColourAttachments should be the final output attachment(s) with sample count = 1 (probably from ISwapchain::GetImageView())
+		//- _outputColourAttachments should be the final output attachment(s) with sample count = 1
 		//- _depthStencilAttachment must have a sample count equal to that of the _multisampleColourAttachment(s)
 		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment) = 0;
 
@@ -92,7 +91,8 @@ namespace NK
 		virtual void BlitTexture(ITexture* _srcTexture, TEXTURE_ASPECT _srcAspect, ITexture* _dstTexture, TEXTURE_ASPECT _dstAspect) = 0;
 		
 		virtual void EndRendering(std::size_t _numColourAttachments, ITexture* _multisampleColourAttachments, ITexture* _outputColourAttachments) = 0;
-
+		virtual void ResolveImage(ITexture* _multisampleTexture, ITexture* _outputTexture) = 0;
+		
 		virtual void BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides) = 0;
 		virtual void BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format) = 0;
 		virtual void BindPipeline(IPipeline* _pipeline, PIPELINE_BIND_POINT _bindPoint) = 0;

@@ -54,10 +54,12 @@ namespace NK
 		void InitCameraBuffer();
 		void InitLightCameraBuffer();
 		void InitSkybox();
+		void InitScreenQuad();
 		void InitShadersAndPipelines();
 		void InitShadowPipeline();
 		void InitSkyboxPipeline();
 		void InitGraphicsPipelines();
+		void InitPostprocessPipeline();
 		void InitRenderGraphs();
 		void InitScreenResources();
 
@@ -103,15 +105,25 @@ namespace NK
 		UniquePtr<ITextureView> m_skyboxTextureView; //Not created at startup
 		UniquePtr<IBuffer> m_skyboxVertBuffer;
 		UniquePtr<IBuffer> m_skyboxIndexBuffer;
+
+		struct ScreenQuadVertex
+		{
+			glm::vec3 pos;
+			glm::vec2 uv;
+		};
+		UniquePtr<IBuffer> m_screenQuadVertBuffer;
+		UniquePtr<IBuffer> m_screenQuadIndexBuffer;
 		
 		UniquePtr<IShader> m_shadowVertShader;
 		UniquePtr<IShader> m_meshVertShader;
 		UniquePtr<IShader> m_skyboxVertShader;
+		UniquePtr<IShader> m_screenQuadVertShader;
 
 		UniquePtr<IShader> m_shadowFragShader;
 		UniquePtr<IShader> m_skyboxFragShader;
 		UniquePtr<IShader> m_blinnPhongFragShader;
 		UniquePtr<IShader> m_pbrFragShader;
+		UniquePtr<IShader> m_postprocessFragShader;
 		
 		struct ShadowPassPushConstantData
 		{
@@ -130,23 +142,56 @@ namespace NK
 			SamplerIndex samplerIndex;
 		};
 		UniquePtr<IRootSignature> m_meshPassRootSignature;
+
+		struct PostprocessPassPushConstantData
+		{
+			ResourceIndex shadowMapIndex;
+			ResourceIndex sceneColourIndex;
+			ResourceIndex sceneDepthIndex;
+			SamplerIndex samplerIndex;
+		};
+		UniquePtr<IRootSignature> m_postprocessPassRootSignature;
 		
 		UniquePtr<IPipeline> m_shadowPipeline;
 		UniquePtr<IPipeline> m_skyboxPipeline;
 		UniquePtr<IPipeline> m_blinnPhongPipeline;
 		UniquePtr<IPipeline> m_pbrPipeline;
+		UniquePtr<IPipeline> m_postprocessPipeline;
 
 		UniquePtr<RenderGraph> m_meshRenderGraph;
 		RenderGraph* m_activeRenderGraph;
+
 		
 		//Screen Resources
 		UniquePtr<ITexture> m_shadowMap;
+		UniquePtr<ITexture> m_shadowMapMSAA;
+		UniquePtr<ITexture> m_shadowMapSSAA;
 		UniquePtr<ITextureView> m_shadowMapDSV;
 		UniquePtr<ITextureView> m_shadowMapSRV;
-		UniquePtr<ITexture> m_intermediateRenderTarget;
-		UniquePtr<ITextureView> m_intermediateRenderTargetView;
-		UniquePtr<ITexture> m_intermediateDepthBuffer;
-		UniquePtr<ITextureView> m_intermediateDepthBufferView;
+		UniquePtr<ITextureView> m_shadowMapMSAADSV;
+		UniquePtr<ITextureView> m_shadowMapMSAASRV;
+		UniquePtr<ITextureView> m_shadowMapSSAADSV;
+		UniquePtr<ITextureView> m_shadowMapSSAASRV;
+		
+		UniquePtr<ITexture> m_sceneColour;
+		UniquePtr<ITexture> m_sceneColourMSAA;
+		UniquePtr<ITexture> m_sceneColourSSAA;
+		UniquePtr<ITextureView> m_sceneColourRTV;
+		UniquePtr<ITextureView> m_sceneColourSRV;
+		UniquePtr<ITextureView> m_sceneColourMSAARTV;
+		UniquePtr<ITextureView> m_sceneColourMSAASRV;
+		UniquePtr<ITextureView> m_sceneColourSSAARTV;
+		UniquePtr<ITextureView> m_sceneColourSSAASRV;
+
+		UniquePtr<ITexture> m_sceneDepth;
+		UniquePtr<ITexture> m_sceneDepthMSAA;
+		UniquePtr<ITexture> m_sceneDepthSSAA;
+		UniquePtr<ITextureView> m_sceneDepthDSV;
+		UniquePtr<ITextureView> m_sceneDepthSRV;
+		UniquePtr<ITextureView> m_sceneDepthSSAADSV;
+		UniquePtr<ITextureView> m_sceneDepthSSAASRV;
+		UniquePtr<ITextureView> m_sceneDepthMSAADSV;
+		UniquePtr<ITextureView> m_sceneDepthMSAASRV;
 
 		
 		//RenderLayer owns and is responsible for all GPUModels - todo: move to out-of-core rendering with HLODs
