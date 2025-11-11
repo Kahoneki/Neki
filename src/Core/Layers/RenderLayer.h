@@ -205,8 +205,9 @@ namespace NK
 		std::unordered_map<std::string, UniquePtr<GPUModel>> m_gpuModelCache;
 
 		//A model can't be unloaded until it's done being used by the GPU, keep track of all models we need to unload for each frame in flight
-		//Once the appropriate fence has been signalled, unload all models in the corresponding queue
-		std::vector<std::queue<std::string>> m_modelUnloadQueues;
+		//Once the appropriate fence has been signalled, unload all models in the corresponding vector
+		//Note: a vector is used here instead of a queue to allow for searching the queue for a specific model
+		std::vector<std::vector<std::string>> m_modelUnloadQueues;
 	};
 
 }

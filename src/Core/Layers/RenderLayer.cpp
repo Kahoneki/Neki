@@ -130,8 +130,9 @@ namespace NK
 		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
 		while (!m_modelUnloadQueues[m_currentFrame].empty())
 		{
-			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].front());
-			m_modelUnloadQueues[m_currentFrame].pop();
+			ModelLoader::UnloadModel(m_modelUnloadQueues[m_currentFrame].back());
+			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
+			m_modelUnloadQueues[m_currentFrame].pop_back();
 		}
 		
 		
@@ -140,17 +141,34 @@ namespace NK
 		{
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
+				//If model is only queued for unload (and so hasn't yet been unloaded), we can just remove it from the unload queue
+				bool modelInUnloadQueue{ false };
+				for (std::vector<std::string>& q : m_modelUnloadQueues)
+				{
+					std::vector<std::string>::iterator it{ std::ranges::find(q, modelRenderer.modelPath) };
+					if (it != q.end())
+					{
+						modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
+						modelInUnloadQueue = true;
+						q.erase(it);
+					}
+				}
+				if (modelInUnloadQueue)
+				{
+					continue;
+				}
+				
 				//Model is visible but isn't loaded, load it
 				const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
 				m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
 				m_newGPUUploaderUpload = true;
 				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
 			}
+			
 			else if (!modelRenderer.visible && modelRenderer.model)
 			{
 				//Model isn't visible but is loaded, add it to the unload queue
-				m_modelUnloadQueues[m_currentFrame].push(modelRenderer.modelPath);
-				ModelLoader::UnloadModel(modelRenderer.modelPath);
+				m_modelUnloadQueues[(m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight].push_back(modelRenderer.modelPath);
 				modelRenderer.model = nullptr;
 			}
 		}
