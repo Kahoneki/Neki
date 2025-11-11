@@ -343,7 +343,18 @@ namespace NK
 		blitRegion.dstOffsets[0] = { 0, 0, 0 };
 		blitRegion.dstOffsets[1] = { dstSize.x, dstSize.y, dstSize.z };
 
-		vkCmdBlitImage(m_buffer, dynamic_cast<VulkanTexture*>(_srcTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dynamic_cast<VulkanTexture*>(_dstTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blitRegion, VK_FILTER_LINEAR);
+		const VkFilter filter{ _srcAspect == TEXTURE_ASPECT::COLOUR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST };
+
+		if (_srcTexture->GetState() != RESOURCE_STATE::COPY_SOURCE)
+		{
+			TransitionBarrier(_srcTexture, _srcTexture->GetState(), RESOURCE_STATE::COPY_SOURCE);
+		}
+		if (_dstTexture->GetState() != RESOURCE_STATE::COPY_DEST)
+		{
+			TransitionBarrier(_dstTexture, _dstTexture->GetState(), RESOURCE_STATE::COPY_DEST);
+		}
+		
+		vkCmdBlitImage(m_buffer, dynamic_cast<VulkanTexture*>(_srcTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dynamic_cast<VulkanTexture*>(_dstTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blitRegion, filter);
 	}
 
 

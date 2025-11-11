@@ -169,6 +169,7 @@ namespace NK
 		execDesc.commandBuffers["SHADOW_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		if (m_desc.enableMSAA) { execDesc.commandBuffers["MSAA_RESOLVE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
+		if (m_desc.enableSSAA) { execDesc.commandBuffers["SSAA_DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
 		execDesc.commandBuffers["POSTPROCESS_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 
@@ -938,23 +939,23 @@ namespace NK
 		//No AA: shadow map / scene colour / scene depth is stored in SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
 		//MSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP_MSAA / SCENE_COLOUR_MSAA / SCENE_DEPTH_MSAA
 		//SSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP_SSAA / SCENE_COLOUR_SSAA / SCENE_DEPTH_SSAA
-//		//If SSAA is enabled, add another pass to downsample SHADOW_MAP_SSAA / SCENE_COLOUR_SSAA / SCENE_DEPTH_SSAA into SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
-//		
-//		if (m_desc.enableSSAA)
-//		{
-//			meshDesc.AddNode(
-//			"DOWNSAMPLE_PASS",
-//			{{"SCENE_COLOUR_SSAA", RESOURCE_STATE::COPY_SOURCE},
-//			{"SCENE_COLOUR", RESOURCE_STATE::COPY_DEST},
-//			{"SCENE_DEPTH_SSAA", RESOURCE_STATE::COPY_SOURCE},
-//			{"SCENE_DEPTH", RESOURCE_STATE::COPY_DEST}},
-//			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
-//			{
-//				_cmdBuf->BlitTexture(_texs.Get("SCENE_COLOUR_SSAA"), TEXTURE_ASPECT::COLOUR, _texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR);
-//				_cmdBuf->BlitTexture(_texs.Get("SCENE_DEPTH_SSAA"), TEXTURE_ASPECT::DEPTH, _texs.Get("SCENE_DEPTH"), TEXTURE_ASPECT::DEPTH);
-//				_cmdBuf->BlitTexture(_texs.Get("SHADOW_MAP_SSAA"), TEXTURE_ASPECT::DEPTH, _texs.Get("SHADOW_MAP"), TEXTURE_ASPECT::DEPTH);
-//			});
-//		}
+		//If SSAA is enabled, add another pass to downsample SHADOW_MAP_SSAA / SCENE_COLOUR_SSAA / SCENE_DEPTH_SSAA into SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
+		
+		if (m_desc.enableSSAA)
+		{
+			meshDesc.AddNode(
+			"SSAA_DOWNSAMPLE_PASS",
+			{{"SCENE_COLOUR_SSAA", RESOURCE_STATE::COPY_SOURCE},
+			{"SCENE_COLOUR", RESOURCE_STATE::COPY_DEST},
+			{"SCENE_DEPTH_SSAA", RESOURCE_STATE::COPY_SOURCE},
+			{"SCENE_DEPTH", RESOURCE_STATE::COPY_DEST}},
+			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+			{
+				_cmdBuf->BlitTexture(_texs.Get("SCENE_COLOUR_SSAA"), TEXTURE_ASPECT::COLOUR, _texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR);
+				_cmdBuf->BlitTexture(_texs.Get("SCENE_DEPTH_SSAA"), TEXTURE_ASPECT::DEPTH, _texs.Get("SCENE_DEPTH"), TEXTURE_ASPECT::DEPTH);
+				_cmdBuf->BlitTexture(_texs.Get("SHADOW_MAP_SSAA"), TEXTURE_ASPECT::DEPTH, _texs.Get("SHADOW_MAP"), TEXTURE_ASPECT::DEPTH);
+			});
+		}
 
 //		//No AA: shadow map / scene colour / scene depth is stored in SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
 //		//MSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP_MSAA / SCENE_COLOUR / SCENE_DEPTH_MSAA
@@ -995,13 +996,13 @@ namespace NK
 			_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("BACKBUFFER_RTV"), nullptr, nullptr, nullptr);
 			_cmdBuf->BindRootSignature(m_postprocessPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
-			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.window->GetSize() });
+			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.window->GetSize() });
 
 			PostprocessPassPushConstantData pushConstantData{};
-			pushConstantData.sceneColourIndex = _texViews.Get(m_desc.enableSSAA ? "SCENE_COLOUR_SSAA_SRV" : "SCENE_COLOUR_SRV")->GetIndex();
-			pushConstantData.sceneDepthIndex = _texViews.Get(m_desc.enableSSAA ? "SCENE_DEPTH_SSAA_SRV" : "SCENE_DEPTH_SRV")->GetIndex();
-			pushConstantData.shadowMapIndex = _texViews.Get(m_desc.enableSSAA ? "SHADOW_MAP_SSAA_SRV" : "SHADOW_MAP_SRV")->GetIndex();
+			pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
+			pushConstantData.sceneDepthIndex = _texViews.Get("SCENE_DEPTH_SRV")->GetIndex();
+			pushConstantData.shadowMapIndex = _texViews.Get("SHADOW_MAP_SRV")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 
 			//Screen Quad
@@ -1141,7 +1142,7 @@ namespace NK
 		m_sceneDepth = m_device->CreateTexture(sceneDepthDesc);
 		m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneDepth.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
-		//MSAA Scene Colour
+		//MSAA Scene Depth
 		if (m_desc.enableMSAA)
 		{
 			sceneDepthDesc.sampleCount = m_desc.msaaSampleCount;

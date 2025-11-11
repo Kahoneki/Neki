@@ -84,10 +84,8 @@ namespace NK
 		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment) = 0;
 
 		//Blit _srcTexture to _dstTexture with linear downsampling
-		//Requires:
-		//- _srcTexture->GetSize() >= _dstTexture->GetSize()
-		//- _srcTexture is in RESOURCE_STATE::COPY_SOURCE state
-		//- _dstTexture is in RESOURCE_STATE::COPY_DEST state
+		//Requires _srcTexture->GetSize() >= _dstTexture->GetSize()
+		//After calling ResolveImage, _srcTexture will be in RESOURCE_STATE::COPY_SOURCE and _dstTexture will be in RESOURCE_STATE::COPY_DEST
 		virtual void BlitTexture(ITexture* _srcTexture, TEXTURE_ASPECT _srcAspect, ITexture* _dstTexture, TEXTURE_ASPECT _dstAspect) = 0;
 		
 		virtual void EndRendering(std::size_t _numColourAttachments, ITexture* _multisampleColourAttachments, ITexture* _outputColourAttachments) = 0;
