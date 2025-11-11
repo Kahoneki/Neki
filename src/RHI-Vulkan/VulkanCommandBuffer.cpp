@@ -199,7 +199,7 @@ namespace NK
 				depthAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_multisampleDepthAttachment)->GetImageView();
 				depthAttachmentInfo.resolveImageView = dynamic_cast<VulkanTextureView*>(_outputDepthAttachment)->GetImageView();
 				depthAttachmentInfo.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-				depthAttachmentInfo.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+				depthAttachmentInfo.resolveMode = VK_RESOLVE_MODE_MIN_BIT;
 			}
 			else
 			{
@@ -355,11 +355,42 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::ResolveImage(ITexture* _multisampleTexture, ITexture* _outputTexture)
+	void VulkanCommandBuffer::ResolveImage(ITexture* _multisampleTexture, ITexture* _outputTexture, TEXTURE_ASPECT _textureAspect)
 	{
-		VkImageResolve region{};
-		region.
-		vkCmdResolveImage(m_buffer, dynamic_cast<VulkanTexture*>(_multisampleTexture)->GetTexture(), VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, dynamic_cast<VulkanTexture*>(_outputTexture)->GetTexture(), VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, 1);
+		VkImageSubresourceLayers subresource;
+		subresource.aspectMask = VulkanUtils::GetVulkanImageAspectFlags(_textureAspect);
+		subresource.baseArrayLayer = 0;
+		subresource.layerCount = _multisampleTexture->IsArrayTexture() ? (_multisampleTexture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _multisampleTexture->GetSize().y : _multisampleTexture->GetSize().z) : 1;
+		subresource.mipLevel = 0;
+		
+		VkImageResolve2 region{};
+		region.sType = VK_STRUCTURE_TYPE_IMAGE_RESOLVE_2;
+		region.pNext = nullptr;
+		region.srcOffset = { 0,0,0 };
+		region.dstOffset = { 0,0,0 };
+		region.srcSubresource = subresource;
+		region.dstSubresource = subresource;
+		region.extent = { static_cast<std::uint32_t>(_multisampleTexture->GetSize().x), static_cast<std::uint32_t>(_multisampleTexture->GetSize().y), 1 };
+		
+		if (_multisampleTexture->GetState() != RESOURCE_STATE::COPY_SOURCE)
+		{
+			TransitionBarrier(_multisampleTexture, _multisampleTexture->GetState(), RESOURCE_STATE::COPY_SOURCE);
+		}
+		if (_outputTexture->GetState() != RESOURCE_STATE::COPY_DEST)
+		{
+			TransitionBarrier(_outputTexture, _outputTexture->GetState(), RESOURCE_STATE::COPY_DEST);
+		}
+
+		VkResolveImageInfo2 info{};
+		info.sType = VK_STRUCTURE_TYPE_RESOLVE_IMAGE_INFO_2;
+		info.pNext = nullptr;
+		info.srcImage = dynamic_cast<VulkanTexture*>(_multisampleTexture)->GetTexture();
+		info.dstImage = dynamic_cast<VulkanTexture*>(_outputTexture)->GetTexture();
+		info.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		info.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		info.regionCount = 1;
+		info.pRegions = &region;
+		vkCmdResolveImage2(m_buffer, &info);
 	}
 
 

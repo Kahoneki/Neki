@@ -30,13 +30,13 @@ public:
 		//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
 		//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath, true, true);
 		
-		m_playerEntity = m_reg.Create();
-		NK::CModelRenderer& modelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_playerEntity) };
+		m_helmetEntity = m_reg.Create();
+		NK::CModelRenderer& modelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
 		modelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
-		NK::CTransform& transform{ m_reg.AddComponent<NK::CTransform>(m_playerEntity) };
+		NK::CTransform& transform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
 		transform.SetPosition(glm::vec3(0, 0, 3));
 		transform.SetRotation({ glm::radians(70.0f), glm::radians(150.0f), glm::radians(180.0f) });
-		CPlayer& player{ m_reg.AddComponent<CPlayer>(m_playerEntity) };
+		CPlayer& player{ m_reg.AddComponent<CPlayer>(m_helmetEntity) };
 		player.movementSpeed = 10.0f;
 
 		m_cameraEntity = m_reg.Create();
@@ -54,7 +54,7 @@ public:
 		NK::Axis2DBinding moveBinding{ NK::Axis2DBinding({ moveHorizontalBinding, moveVerticalBinding }) };
 		NK::InputManager::BindActionToInput(PLAYER_ACTIONS::MOVE, moveBinding);
 		
-		NK::CInput& input{ m_reg.AddComponent<NK::CInput>(m_playerEntity) };
+		NK::CInput& input{ m_reg.AddComponent<NK::CInput>(m_helmetEntity) };
 		input.AddActionToMap(PLAYER_ACTIONS::MOVE);
 	}
 
@@ -65,7 +65,7 @@ public:
 
 
 private:
-	NK::Entity m_playerEntity;
+	NK::Entity m_helmetEntity;
 	NK::Entity m_cameraEntity;
 	NK::UniquePtr<NK::Camera> m_camera;
 };

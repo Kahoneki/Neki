@@ -1,8 +1,10 @@
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "RenderLayer.h"
 
 #include <Components/CModelRenderer.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
+#include <Managers/TimeManager.h>
 #include <RHI/IBuffer.h>
 #include <RHI/IBufferView.h>
 #include <RHI/IQueue.h>
@@ -114,6 +116,10 @@ namespace NK
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
 		}
+
+
+		//Update light
+		UpdateLightCameraBuffer();
 		
 
 		//Begin rendering
@@ -124,7 +130,6 @@ namespace NK
 		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
 		while (!m_modelUnloadQueues[m_currentFrame].empty())
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::APPLICATION, "bleh\n");
 			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].front());
 			m_modelUnloadQueues[m_currentFrame].pop();
 		}
@@ -387,16 +392,11 @@ namespace NK
 
 		m_lightCamDataBufferMap = m_lightCamDataBuffer->GetMap();
 
-		struct LightCameraShaderData
-		{
-			glm::mat4 viewMat;
-			glm::mat4 projMat;
-		};
-
 		//Todo: turn this into a loop for all lights and like ykno use a Light struct and whatnot
 		LightCameraShaderData lightCamShaderData{};
-		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(2, -2, 2), glm::vec3(0, 0, 0), glm::vec3(0,1,0));
-		lightCamShaderData.projMat = glm::orthoLH(-100.0f, 100.0f, -100.0f, 100.0f, 0.01f, 100.0f);
+		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(0,0,1));
+//		lightCamShaderData.projMat = glm::orthoLH(-10.0f, 10.0f, -10.0f, 10.0f, 0.01f, 100.0f);
+		lightCamShaderData.projMat = glm::perspectiveLH(glm::radians(90.0f), 16.0f / 9.0f, 0.01f, 100.0f);
 		memcpy(m_lightCamDataBufferMap, &lightCamShaderData, sizeof(LightCameraShaderData));
 	}
 
@@ -586,7 +586,7 @@ namespace NK
 		pipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
 		pipelineDesc.vertexShader = m_shadowVertShader.get();
 		pipelineDesc.fragmentShader = m_shadowFragShader.get();
-		pipelineDesc.rootSignature = m_meshPassRootSignature.get();
+		pipelineDesc.rootSignature = m_shadowPassRootSignature.get();
 		pipelineDesc.vertexInputDesc = vertexInputDesc;
 		pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
 		pipelineDesc.rasteriserDesc = rasteriserDesc;
@@ -772,7 +772,7 @@ namespace NK
 		pipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
 		pipelineDesc.vertexShader = m_screenQuadVertShader.get();
 		pipelineDesc.fragmentShader = m_postprocessFragShader.get();
-		pipelineDesc.rootSignature = m_meshPassRootSignature.get();
+		pipelineDesc.rootSignature = m_postprocessPassRootSignature.get();
 		pipelineDesc.vertexInputDesc = vertexInputDesc;
 		pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
 		pipelineDesc.rasteriserDesc = rasteriserDesc;
@@ -801,7 +801,7 @@ namespace NK
 			{
 				if (m_desc.enableMSAA)
 				{
-					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SHADOW_MAP_MSAA_DSV"), nullptr);
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SHADOW_MAP_MSAA_DSV"), _texViews.Get("SHADOW_MAP_DSV"), nullptr);
 				}
 				else if (m_desc.enableSSAA)
 				{
@@ -849,6 +849,7 @@ namespace NK
 		meshDesc.AddNode(
 		"SCENE_PASS",
 		{{ "CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
+		{ "LIGHT_CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
 		{ "SHADOW_MAP", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SHADOW_MAP_MSAA", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SHADOW_MAP_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
@@ -863,7 +864,7 @@ namespace NK
 		{
 			if (m_desc.enableMSAA)
 			{
-				_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("SCENE_COLOUR_MSAA_RTV"), nullptr, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), nullptr);
+				_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("SCENE_COLOUR_MSAA_RTV"), _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr);
 			}
 			else if (m_desc.enableSSAA)
 			{
@@ -880,8 +881,9 @@ namespace NK
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
 			MeshPassPushConstantData pushConstantData{};
-			pushConstantData.shadowMapIndex = _texViews.Get(m_desc.enableMSAA ? "SHADOW_MAP_MSAA_SRV" : (m_desc.enableSSAA ? "SHADOW_MAP_SSAA_SRV" : "SHADOW_MAP_SRV"))->GetIndex();
+			pushConstantData.shadowMapIndex = _texViews.Get("SHADOW_MAP_SRV")->GetIndex();
 			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
+			pushConstantData.lightCamDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.skyboxCubemapIndex = _texViews.Get("SKYBOX_VIEW") ? _texViews.Get("SKYBOX_VIEW")->GetIndex() : 0;
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 
@@ -963,18 +965,19 @@ namespace NK
 		{
 			meshDesc.AddNode(
 			"MSAA_RESOLVE_PASS",
-			{{"SCENE_COLOUR", RESOURCE_STATE::RENDER_TARGET},
-			{"SCENE_COLOUR_MSAA", RESOURCE_STATE::RENDER_TARGET},
-			{"SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE},
-			{"SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE},
-			{"SHADOW_MAP", RESOURCE_STATE::DEPTH_WRITE},
-			{"SHADOW_MAP_MSAA", RESOURCE_STATE::DEPTH_WRITE}},
+			{{"SCENE_COLOUR", RESOURCE_STATE::COPY_DEST},
+			{"SCENE_COLOUR_MSAA", RESOURCE_STATE::COPY_SOURCE},
+			{"SCENE_DEPTH", RESOURCE_STATE::COPY_DEST},
+			{"SCENE_DEPTH_MSAA", RESOURCE_STATE::COPY_SOURCE},
+			{"SHADOW_MAP", RESOURCE_STATE::COPY_DEST},
+			{"SHADOW_MAP_MSAA", RESOURCE_STATE::COPY_SOURCE}},
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
-				_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SHADOW_MAP_MSAA_DSV"), _texViews.Get("SHADOW_MAP_DSV"), nullptr);
-				_cmdBuf->EndRendering(0, nullptr, nullptr);
-				_cmdBuf->BeginRendering(0, _texViews.Get("SCENE_COLOUR_MSAA_RTV"), _texViews.Get("SCENE_COLOUR_RTV"), _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr);
-				_cmdBuf->EndRendering(0, nullptr, nullptr);
+				//todo fix this
+//				_cmdBuf->ResolveImage(_texs.Get("SHADOW_MAP_MSAA"), _texs.Get("SHADOW_MAP"), TEXTURE_ASPECT::DEPTH);
+//				_cmdBuf->ResolveImage(_texs.Get("SCENE_DEPTH_MSAA"), _texs.Get("SCENE_DEPTH"), TEXTURE_ASPECT::DEPTH);
+
+				_cmdBuf->ResolveImage(_texs.Get("SCENE_COLOUR_MSAA"), _texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR);
 			});
 		}
 		
@@ -1034,16 +1037,17 @@ namespace NK
 		shadowMapDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		shadowMapDesc.format = DATA_FORMAT::D32_SFLOAT;
 		shadowMapDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
-		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY;
+		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		shadowMapDesc.arrayTexture = false;
 		shadowMapDesc.sampleCount = SAMPLE_COUNT::BIT_1;
 		m_shadowMap = m_device->CreateTexture(shadowMapDesc);
 		m_graphicsCommandBuffers[0]->TransitionBarrier(m_shadowMap.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
-		//MSAA Scene Colour
+		//MSAA Shadow Map
 		if (m_desc.enableMSAA)
 		{
 			shadowMapDesc.sampleCount = m_desc.msaaSampleCount;
+			shadowMapDesc.usage |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT;
 			m_shadowMapMSAA = m_device->CreateTexture(shadowMapDesc);
 			m_graphicsCommandBuffers[0]->TransitionBarrier(m_shadowMapMSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 		}
@@ -1082,7 +1086,7 @@ namespace NK
 		sceneColourDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		sceneColourDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
 		sceneColourDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
-		sceneColourDesc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY;
+		sceneColourDesc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		sceneColourDesc.arrayTexture = false;
 		sceneColourDesc.sampleCount = SAMPLE_COUNT::BIT_1;
 		m_sceneColour = m_device->CreateTexture(sceneColourDesc);
@@ -1092,6 +1096,7 @@ namespace NK
 		if (m_desc.enableMSAA)
 		{
 			sceneColourDesc.sampleCount = m_desc.msaaSampleCount;
+			sceneColourDesc.usage |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT;
 			m_sceneColourMSAA = m_device->CreateTexture(sceneColourDesc);
 			m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneColourMSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
 		}
@@ -1125,21 +1130,22 @@ namespace NK
 
 		//--------SCENE DEPTH--------//
 		
-		//Shadow Map
+		//Scene Depth
 		TextureDesc sceneDepthDesc{};
 		sceneDepthDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		sceneDepthDesc.format = DATA_FORMAT::D32_SFLOAT;
 		sceneDepthDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
-		sceneDepthDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY;
+		sceneDepthDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		sceneDepthDesc.arrayTexture = false;
 		sceneDepthDesc.sampleCount = SAMPLE_COUNT::BIT_1;
-		m_sceneDepth = m_device->CreateTexture(shadowMapDesc);
+		m_sceneDepth = m_device->CreateTexture(sceneDepthDesc);
 		m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneDepth.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
 		//MSAA Scene Colour
 		if (m_desc.enableMSAA)
 		{
 			sceneDepthDesc.sampleCount = m_desc.msaaSampleCount;
+			sceneDepthDesc.usage |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT;
 			m_sceneDepthMSAA = m_device->CreateTexture(sceneDepthDesc);
 			m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneDepthMSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 		}
@@ -1159,8 +1165,8 @@ namespace NK
 		sceneDepthViewDesc.format = DATA_FORMAT::D32_SFLOAT;
 		sceneDepthViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
 		m_sceneDepthDSV = m_device->CreateDepthStencilTextureView(m_sceneDepth.get(), sceneDepthViewDesc);
-		if (m_desc.enableMSAA) { m_shadowMapMSAADSV = m_device->CreateDepthStencilTextureView(m_sceneDepthMSAA.get(), sceneDepthViewDesc); }
-		if (m_desc.enableSSAA) { m_shadowMapSSAADSV = m_device->CreateDepthStencilTextureView(m_sceneDepthSSAA.get(), sceneDepthViewDesc); }
+		if (m_desc.enableMSAA) { m_sceneDepthMSAADSV = m_device->CreateDepthStencilTextureView(m_sceneDepthMSAA.get(), sceneDepthViewDesc); }
+		if (m_desc.enableSSAA) { m_sceneDepthSSAADSV = m_device->CreateDepthStencilTextureView(m_sceneDepthSSAA.get(), sceneDepthViewDesc); }
 		
 		//Shadow Map SRVs
 		sceneDepthViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
@@ -1220,6 +1226,24 @@ namespace NK
 
 		//Set aspect ratio back to WIN_ASPECT_RATIO for future lookups (can't keep it as the window's current aspect ratio in case it changes)
 		_camera.camera->SetAspectRatio(WIN_ASPECT_RATIO);
+	}
+
+
+
+	void RenderLayer::UpdateLightCameraBuffer()
+	{
+		const double time{ TimeManager::GetTotalTime() };
+		constexpr float radius{ 10.0f };
+		constexpr float speed{ 3.0f };
+		constexpr glm::vec3 centre{ 0.0f, 10.0f, -3.0f };
+		
+		const double x{ centre.x + radius * cos(time * speed) };
+		const double z{ centre.z + radius * sin(time * speed) };
+
+		LightCameraShaderData lightCamShaderData{};
+		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(x, 10, z), glm::vec3(x, 0, z), glm::vec3(0,0,1));
+		lightCamShaderData.projMat = glm::perspectiveLH(glm::radians(120.0f), 16.0f / 9.0f, 0.01f, 100.0f);
+		memcpy(m_lightCamDataBufferMap, &lightCamShaderData, sizeof(LightCameraShaderData));
 	}
 
 }

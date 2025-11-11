@@ -21,5 +21,14 @@ PUSH_CONSTANTS_BLOCK(
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
 	SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
-    return g_textures[NonUniformResourceIndex(PC(sceneColourIndex))].Sample(linearSampler, vertexOutput.texCoord);
+
+	float4 sceneColour = g_textures[NonUniformResourceIndex(PC(sceneColourIndex))].Sample(linearSampler, vertexOutput.texCoord);
+	float sceneDepth = g_textures[NonUniformResourceIndex(PC(sceneDepthIndex))].Sample(linearSampler, vertexOutput.texCoord);
+	float shadowMap = g_textures[NonUniformResourceIndex(PC(shadowMapIndex))].Sample(linearSampler, vertexOutput.texCoord);
+	// if (shadowMap > 0.9999999)
+	// {
+	// 	return float4(0.0,0.0,0.0,1.0);
+	// }
+    // return float4(shadowMap, shadowMap, shadowMap, 1.0);
+	return sceneColour;
 }

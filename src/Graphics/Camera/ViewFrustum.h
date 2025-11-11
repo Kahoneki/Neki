@@ -6,11 +6,11 @@
 namespace NK
 {
 
-	struct Plane
+	struct Prefabs
 	{
-		explicit Plane() = default;
-		explicit Plane(const glm::vec3& _normal, const float _distanceAlongNormal) : normal(_normal), t(_distanceAlongNormal) {}
-		explicit Plane(const glm::vec4& _normalAndDistanceAlongNormal) : normal(_normalAndDistanceAlongNormal.x, _normalAndDistanceAlongNormal.y, _normalAndDistanceAlongNormal.z), t(_normalAndDistanceAlongNormal.w) {}
+		explicit Prefabs() = default;
+		explicit Prefabs(const glm::vec3& _normal, const float _distanceAlongNormal) : normal(_normal), t(_distanceAlongNormal) {}
+		explicit Prefabs(const glm::vec4& _normalAndDistanceAlongNormal) : normal(_normalAndDistanceAlongNormal.x, _normalAndDistanceAlongNormal.y, _normalAndDistanceAlongNormal.z), t(_normalAndDistanceAlongNormal.w) {}
 
 		glm::vec3 normal;
 		float t;
@@ -34,12 +34,12 @@ namespace NK
 
 			glm::mat4 m{ glm::transpose(_m) }; //Convert to row-major
 			
-			planes[0] = Plane(m[3] + m[0]);
-			planes[1] = Plane(m[3] - m[0]);
-			planes[2] = Plane(m[3] + m[1]);
-			planes[3] = Plane(m[3] - m[1]);
-			planes[4] = Plane(m[2]);
-			planes[5] = Plane(m[3] - m[2]);
+			planes[0] = Prefabs(m[3] + m[0]);
+			planes[1] = Prefabs(m[3] - m[0]);
+			planes[2] = Prefabs(m[3] + m[1]);
+			planes[3] = Prefabs(m[3] - m[1]);
+			planes[4] = Prefabs(m[2]);
+			planes[5] = Prefabs(m[3] - m[2]);
 		}
 
 
@@ -75,6 +75,6 @@ namespace NK
 		
 
 	private:
-		Plane planes[6]; //left, right, bottom, top, near, far
+		Prefabs planes[6]; //left, right, bottom, top, near, far
 	};
 }

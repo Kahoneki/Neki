@@ -25,12 +25,12 @@ class GameScene final : public NK::Scene
 public:
 	explicit GameScene() : Scene(1)
 	{
-		m_playerEntity = m_reg.Create();
-		NK::CInput& input{ m_reg.AddComponent<NK::CInput>(m_playerEntity) };
-		NK::CTransform& transform{ m_reg.AddComponent<NK::CTransform>(m_playerEntity) };
+		m_helmetEntity = m_reg.Create();
+		NK::CInput& input{ m_reg.AddComponent<NK::CInput>(m_helmetEntity) };
+		NK::CTransform& transform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
 		transform.SetPosition(glm::vec3(0, 0, 3));
 		transform.SetRotation({ glm::radians(70.0f), glm::radians(150.0f), glm::radians(180.0f) });
-		CPlayer& player{ m_reg.AddComponent<CPlayer>(m_playerEntity) };
+		CPlayer& player{ m_reg.AddComponent<CPlayer>(m_helmetEntity) };
 		player.movementSpeed = 10.0f;
 
 		NK::ButtonBinding aBinding{ NK::KEYBOARD::A };
@@ -54,7 +54,7 @@ public:
 
 
 private:
-	NK::Entity m_playerEntity;
+	NK::Entity m_helmetEntity;
 };
 
 

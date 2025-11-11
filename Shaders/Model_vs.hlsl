@@ -12,6 +12,7 @@ struct VertexInput
 struct VertexOutput
 {
 	float4 pos : SV_POSITION;
+	float3 worldPos : WORLD_POS;
 	float2 texCoord : TEXCOORD0;
 	float3 fragPos : FRAG_POS;
 	float3 worldNormal : WORLD_NORMAL;
@@ -49,6 +50,7 @@ VertexOutput VSMain(VertexInput input)
 	output.texCoord = input.texCoord;
 	
 	float4 worldPos = mul(PC(modelMat), float4(input.pos, 1.0));
+	output.worldPos = worldPos.xyz;
 	output.fragPos = float3(worldPos.xyz);
 	output.pos = mul(camData.projMat, mul(camData.viewMat, worldPos));
 

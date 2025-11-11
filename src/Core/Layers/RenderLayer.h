@@ -65,6 +65,7 @@ namespace NK
 
 		void UpdateSkybox(CSkybox& _skybox);
 		void UpdateCameraBuffer(const CCamera& _camera) const;
+		void UpdateLightCameraBuffer();
 		
 		
 		//Dependency injections
@@ -97,6 +98,11 @@ namespace NK
 		UniquePtr<IBufferView> m_camDataBufferView;
 		void* m_camDataBufferMap;
 
+		struct LightCameraShaderData
+		{
+			glm::mat4 viewMat;
+			glm::mat4 projMat;
+		};
 		UniquePtr<IBuffer> m_lightCamDataBuffer;
 		UniquePtr<IBufferView> m_lightCamDataBufferView;
 		void* m_lightCamDataBufferMap;
@@ -136,6 +142,7 @@ namespace NK
 		{
 			glm::mat4 modelMat;
 			ResourceIndex camDataBufferIndex;
+			ResourceIndex lightCamDataBufferIndex;
 			ResourceIndex shadowMapIndex;
 			ResourceIndex skyboxCubemapIndex;
 			ResourceIndex materialBufferIndex;

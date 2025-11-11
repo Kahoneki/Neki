@@ -19,7 +19,7 @@
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(3), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
+	explicit GameScene() : Scene(4), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
 	{
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
@@ -29,13 +29,22 @@ public:
 		//ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
 //		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
 //		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath, true, true);
+//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel") };
+//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Cube.gltf", serialisedModelOutputPath, true, true);
 		
-		m_playerEntity = m_reg.Create();
-		NK::CModelRenderer& modelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_playerEntity) };
-		modelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
-		NK::CTransform& transform{ m_reg.AddComponent<NK::CTransform>(m_playerEntity) };
-		transform.SetPosition(glm::vec3(0, 0, -3));
-		transform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
+		m_helmetEntity = m_reg.Create();
+		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
+		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
+		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
+		helmetTransform.SetPosition(glm::vec3(0, 0, -3));
+		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
+
+		m_groundEntity = m_reg.Create();
+		NK::CModelRenderer& groundModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_groundEntity) };
+		groundModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
+		NK::CTransform& groundTransform{ m_reg.AddComponent<NK::CTransform>(m_groundEntity) };
+		groundTransform.SetPosition(glm::vec3(0, -3, -3));
+		groundTransform.SetScale({ 50.0f, 0.2f, 50.0f });
 
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
@@ -62,7 +71,7 @@ public:
 	
 	virtual void Update() override
 	{
-		NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_playerEntity) };
+		NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		constexpr float speed{ 50.0f };
 		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
 		transform.SetRotation(transform.GetRotation() + glm::vec3(0, rotationAmount, 0));
@@ -71,7 +80,8 @@ public:
 
 private:
 	NK::Entity m_skyboxEntity;
-	NK::Entity m_playerEntity;
+	NK::Entity m_helmetEntity;
+	NK::Entity m_groundEntity;
 	NK::Entity m_cameraEntity;
 	NK::UniquePtr<NK::PlayerCamera> m_playerCamera;
 };

@@ -91,7 +91,8 @@ namespace NK
 		virtual void BlitTexture(ITexture* _srcTexture, TEXTURE_ASPECT _srcAspect, ITexture* _dstTexture, TEXTURE_ASPECT _dstAspect) = 0;
 		
 		virtual void EndRendering(std::size_t _numColourAttachments, ITexture* _multisampleColourAttachments, ITexture* _outputColourAttachments) = 0;
-		virtual void ResolveImage(ITexture* _multisampleTexture, ITexture* _outputTexture) = 0;
+		//After calling ResolveImage, _multisampleTexture will be in RESOURCE_STATE::COPY_SOURCE and _outputTexture will be in RESOURCE_STATE::COPY_DEST
+		virtual void ResolveImage(ITexture* _multisampleTexture, ITexture* _outputTexture, TEXTURE_ASPECT _textureAspect) = 0;
 		
 		virtual void BindVertexBuffers(std::uint32_t _firstBinding, std::uint32_t _bindingCount, IBuffer* _buffers, std::size_t* _strides) = 0;
 		virtual void BindIndexBuffer(IBuffer* _buffer, DATA_FORMAT _format) = 0;

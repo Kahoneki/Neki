@@ -6,6 +6,7 @@
 struct VertexOutput
 {
 	float4 pos : SV_POSITION;
+    float3 worldPos : WORLD_POS;
 	float2 texCoord : TEXCOORD0;
 	float3 fragPos : FRAG_POS;
 	float3 worldNormal : WORLD_NORMAL;
@@ -22,6 +23,7 @@ struct VertexOutput
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
 	uint camDataBufferIndex;
+    uint lightCamDataBufferIndex;
 	uint shadowMapIndex;
 	uint skyboxCubemapIndex;
 	uint materialBufferIndex;
