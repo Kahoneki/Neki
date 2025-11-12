@@ -2,6 +2,7 @@
 
 #include "FileUtils.h"
 #include "ImageLoader.h"
+#include "TextureCompressor.h"
 
 #include <filesystem>
 #include <fstream>
@@ -169,6 +170,7 @@ namespace NK
 				if (!texLoadData.first.empty())
 				{
 					model.materials[matIndex].allTextures[texIndex] = ImageLoader::LoadImage(texLoadData.first, serialisedModel.header.flipTextures, texLoadData.second);
+					TextureCompressor::BlockCompress(texLoadData.first, true, texLoadData.first + "/test.dds", DATA_FORMAT::BC7_RGBA_SRGB);
 					model.materials[matIndex].allTextures[texIndex]->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
 				}
 			}

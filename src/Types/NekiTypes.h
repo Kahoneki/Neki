@@ -103,6 +103,7 @@ namespace NK
 		D24_UNORM_S8_UINT,
 
 		//Block Compression / DXT Formats
+		START_OF_BLOCK_COMPRESSION_FORMATS,
 		BC1_RGB_UNORM,
 		BC1_RGB_SRGB,
 		BC3_RGBA_UNORM,
@@ -113,6 +114,7 @@ namespace NK
 		BC5_RG_SNORM,
 		BC7_RGBA_UNORM,
 		BC7_RGBA_SRGB,
+		END_OF_BLOCK_COMPRESSION_FORMATS,
 
 		//Integer Formats
 		R8_UINT,

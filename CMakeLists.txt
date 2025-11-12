@@ -46,7 +46,7 @@ target_compile_definitions(Neki PUBLIC NEKI_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\")
 
 
 
-#Propagate public dependencies
+#Dependencies
 include(FetchContent)
 
 #Vulkan
@@ -131,13 +131,15 @@ set(SKIP_PERFORMANCE_COMPARISON ON CACHE BOOL "" FORCE) #disables boost requirem
 FetchContent_MakeAvailable(cereal)
 target_link_libraries(Neki PUBLIC cereal)
 
-
-#Handle private dependencies
-
 #stb_image
 FetchContent_Declare(stb_image GIT_REPOSITORY https://github.com/nothings/stb.git GIT_TAG master)
 FetchContent_MakeAvailable(stb_image)
-target_include_directories(Neki PRIVATE ${stb_image_SOURCE_DIR})
+target_include_directories(Neki PUBLIC ${stb_image_SOURCE_DIR})
+
+#Nvidia Texture Tools (NVTT)
+target_include_directories(Neki PRIVATE vendor/nvtt)
+target_link_directories(Neki PRIVATE vendor/nvtt/lib64)
+target_link_libraries(Neki PRIVATE nvtt)
 
 #Assimp
 FetchContent_Declare(assimp GIT_REPOSITORY "https://github.com/assimp/assimp.git" GIT_TAG v5.4.1)
@@ -145,7 +147,7 @@ set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(assimp)
-target_link_libraries(Neki PRIVATE assimp)
+target_link_libraries(Neki PUBLIC assimp)
 
 
 
@@ -364,6 +366,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     add_executable(NKEngineSample_Rendering "Samples/Engine/Rendering/Rendering.cpp")
     target_include_directories(NKEngineSample_Rendering PUBLIC "${CMAKE_SOURCE_DIR}/src")
     target_link_libraries(NKEngineSample_Rendering PRIVATE Neki)
+    target_link_directories(NKEngineSample_Rendering PRIVATE vendor/nvtt/lib64)
     add_dependencies(NKEngineSample_Rendering Shaders)
 
     add_executable(NKEngineSample_Events "Samples/Engine/Events/Events.cpp")
