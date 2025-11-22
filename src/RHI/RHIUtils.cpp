@@ -82,6 +82,41 @@ namespace NK
 
 
 
+	bool RHIUtils::IsBlockCompressed(const DATA_FORMAT _format)
+	{
+		return (_format > DATA_FORMAT::START_OF_BLOCK_COMPRESSION_FORMATS) && (_format < DATA_FORMAT::END_OF_BLOCK_COMPRESSION_FORMATS);
+	}
+
+
+	
+	std::uint32_t RHIUtils::GetBlockByteSize(const DATA_FORMAT _format)
+	{
+		switch (_format)
+		{
+		//8 Bytes per block (64 bits)
+		case DATA_FORMAT::BC1_RGB_UNORM:
+		case DATA_FORMAT::BC1_RGB_SRGB:
+		case DATA_FORMAT::BC4_R_UNORM:
+		case DATA_FORMAT::BC4_R_SNORM:
+			return 8;
+
+		// 16 Bytes per block (128 bits)
+		case DATA_FORMAT::BC3_RGBA_UNORM:
+		case DATA_FORMAT::BC3_RGBA_SRGB:
+		case DATA_FORMAT::BC5_RG_UNORM:
+		case DATA_FORMAT::BC5_RG_SNORM:
+		case DATA_FORMAT::BC7_RGBA_UNORM:
+		case DATA_FORMAT::BC7_RGBA_SRGB:
+			return 16;
+
+		default:
+			//Not a BCn format
+			throw std::invalid_argument("GetBlockByteSize() default case reached. Format = " + std::to_string(std::to_underlying(_format)));
+		}
+	}
+
+
+
 	std::uint32_t RHIUtils::Convert8BitMaskTo32BitMask(const std::uint8_t _mask)
 	{
 		//For each set bit in the input mask, the corresponding 4 bits in the output mask will be set

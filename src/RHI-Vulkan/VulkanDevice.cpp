@@ -257,10 +257,25 @@ namespace NK
 	TextureCopyMemoryLayout VulkanDevice::GetRequiredMemoryLayoutForTextureCopy(ITexture* _texture)
 	{
 		TextureCopyMemoryLayout memLayout{};
-		const std::uint32_t bytesPerPixel{ RHIUtils::GetFormatBytesPerPixel(_texture->GetFormat()) };
-		const std::uint32_t numPixels{ static_cast<std::uint32_t>(_texture->GetSize().x * _texture->GetSize().y * _texture->GetSize().z) };
-		memLayout.totalBytes = numPixels * bytesPerPixel;
-		memLayout.rowPitch = _texture->GetSize().x * bytesPerPixel;
+		const DATA_FORMAT format{ _texture->GetFormat() };
+		const glm::uvec3 size{ _texture->GetSize() };
+
+		if (RHIUtils::IsBlockCompressed(format))
+		{
+			//Calculate dimensions in blocks
+			const std::uint32_t widthInBlocks{ (size.x + 3) / 4 };
+			const std::uint32_t heightInBlocks{ (size.y + 3) / 4 };
+
+			const std::uint32_t bytesPerBlock{ RHIUtils::GetBlockByteSize(format) };
+			memLayout.rowPitch = widthInBlocks * bytesPerBlock;
+			memLayout.totalBytes = memLayout.rowPitch * heightInBlocks * size.z;
+		}
+		else
+		{
+			const std::uint32_t bytesPerPixel{ RHIUtils::GetFormatBytesPerPixel(format) };
+			memLayout.rowPitch = size.x * bytesPerPixel;
+			memLayout.totalBytes = memLayout.rowPitch * size.y * size.z;
+		}
 
 		return memLayout;
 	}

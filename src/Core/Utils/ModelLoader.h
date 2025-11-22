@@ -150,7 +150,7 @@ namespace NK
 
 	private:
 		[[nodiscard]] static const CPUModel* LoadNKModel(const std::string& _filepath);
-		[[nodiscard]] static std::variant<CPUModel*, CPUModel_Serialised> LoadNonNKModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, bool _serialisedModelOutput);
+		[[nodiscard]] static std::variant<CPUModel*, CPUModel_Serialised> LoadNonNKModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, bool _serialisedModelOutput, const std::filesystem::path& _serialisedModelTextureOutputDirectory={});
 		
 		//Recursively process nodes in the Assimp scene graph
 		static void ProcessNode(aiNode* _node, const aiScene* _scene, std::variant<CPUModel*, CPUModel_Serialised*> _outModel, const std::string& _modelDirectory);

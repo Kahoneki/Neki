@@ -222,7 +222,15 @@ namespace NK
 		}
 		case TEXTURE_DIMENSION::DIM_2:
 		{
-			numRows = _dstTexture->GetSize().y;
+			if (RHIUtils::IsBlockCompressed(_dstTexture->GetFormat()))
+			{
+				const int height{ _dstTexture->GetSize().y };
+				numRows = (height + 3) / 4;
+			}
+			else
+			{
+				numRows = _dstTexture->GetSize().y;
+			}
 			break;
 		}
 		case TEXTURE_DIMENSION::DIM_3:

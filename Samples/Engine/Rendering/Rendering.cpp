@@ -51,7 +51,7 @@ public:
 		camera.camera = m_playerCamera.get();
 
 
-		//Inputs
+//		//Inputs
 		NK::ButtonBinding aBinding{ NK::KEYBOARD::A };
 		NK::ButtonBinding dBinding{ NK::KEYBOARD::D };
 		NK::ButtonBinding sBinding{ NK::KEYBOARD::S };

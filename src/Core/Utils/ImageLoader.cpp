@@ -12,7 +12,7 @@ namespace NK
 
 
 
-	ImageData* const ImageLoader::LoadImage(const std::string& _filepath, bool _flipImage, bool _srgb)
+	ImageData* ImageLoader::LoadImage(const std::string& _filepath, bool _flipImage, bool _srgb)
 	{
 		const std::unordered_map<std::string, ImageData>::iterator it{ m_filepathToImageDataCache.find(_filepath) };
 		if (it != m_filepathToImageDataCache.end())

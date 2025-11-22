@@ -120,7 +120,7 @@ namespace NK
 			throw std::runtime_error("ModelLoader::SerialiseNKModel() - failed to open _outputFilepath for writing. _outputFilepath (" + _outputFilepath + ")");
 		}
 		cereal::BinaryOutputArchive archive(os);
-		CPUModel_Serialised model{ std::get<CPUModel_Serialised>(LoadNonNKModel(_inputFilepath, _flipFaceWinding, _flipTextures, true)) };
+		CPUModel_Serialised model{ std::get<CPUModel_Serialised>(LoadNonNKModel(_inputFilepath, _flipFaceWinding, _flipTextures, true, outputDir)) };
 		model.header.flipTextures = _flipTextures;
 		archive(model);
 	}
@@ -169,8 +169,7 @@ namespace NK
 				const std::pair<std::string, bool> texLoadData{ serialisedModel.materials[matIndex].allTextures[texIndex] };
 				if (!texLoadData.first.empty())
 				{
-					model.materials[matIndex].allTextures[texIndex] = ImageLoader::LoadImage(texLoadData.first, serialisedModel.header.flipTextures, texLoadData.second);
-					TextureCompressor::BlockCompress(texLoadData.first, true, texLoadData.first + "/test.dds", DATA_FORMAT::BC7_RGBA_SRGB);
+					model.materials[matIndex].allTextures[texIndex] = TextureCompressor::LoadImage(texLoadData.first, serialisedModel.header.flipTextures, texLoadData.second);
 					model.materials[matIndex].allTextures[texIndex]->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
 				}
 			}
@@ -181,7 +180,7 @@ namespace NK
 
 
 
-	std::variant<CPUModel*, CPUModel_Serialised> ModelLoader::LoadNonNKModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, bool _serialisedModelOutput)
+	std::variant<CPUModel*, CPUModel_Serialised> ModelLoader::LoadNonNKModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, bool _serialisedModelOutput, const std::filesystem::path& _serialisedModelTextureOutputDirectory)
 	{
 		Assimp::Importer importer{};
 		const aiScene* scene{ importer.ReadFile(_filepath,
@@ -260,8 +259,23 @@ namespace NK
 
 			auto load{ [&](const MODEL_TEXTURE_TYPE _dst, const aiTextureType _src)
 			{
-				if (_serialisedModelOutput) { nekiMaterialSerialised.allTextures[std::to_underlying(_dst)] = GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory); }
-				else { nekiMaterial.allTextures[std::to_underlying(_dst)] = LoadMaterialTexture(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory, _flipTextures); }
+				if (_serialisedModelOutput)
+				{
+					nekiMaterialSerialised.allTextures[std::to_underlying(_dst)] = GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory);
+
+					if (!nekiMaterialSerialised.allTextures.at(std::to_underlying(_dst)).first.empty())
+					{
+						//Compress to .ktx2
+						std::string& filepath{ nekiMaterialSerialised.allTextures.at(std::to_underlying(_dst)).first };
+						const std::string newFilepath{ (_serialisedModelTextureOutputDirectory / std::filesystem::path(filepath).filename()).replace_extension(".ktx2") };
+						TextureCompressor::KTXCompress(filepath, nekiMaterialSerialised.allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
+						filepath = newFilepath; //filepath is reference so this is modifying the lookup entry to point to the new ktx2 texture
+					}
+				}
+				else
+				{
+					nekiMaterial.allTextures[std::to_underlying(_dst)] = LoadMaterialTexture(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory, _flipTextures);
+				}
 			}};
 			
 			load(MODEL_TEXTURE_TYPE::DIFFUSE          , aiTextureType_DIFFUSE);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ImageLoader.h"
+
 #include <Types/NekiTypes.h>
 
 #ifdef NEKI_VULKAN_SUPPORTED
@@ -14,8 +16,9 @@ namespace NK
 	class TextureCompressor
 	{
 	public:
-		//Takes the file at _inputFilepath and compresses it to the _outputFormat provided (must be BC_ format), saving the result to a .dds at _outputFilepath
-		static void BlockCompress(const std::string& _inputFilepath, const bool _srgb, const std::string& _outputFilepath, const DATA_FORMAT _outputFormat);
+		//Takes the file at _inputFilepath and compresses it to a .ktx2, saving the result to _outputFilepath
+		static void KTXCompress(const std::string& _inputFilepath, const bool _srgb, const bool _flipImage, const std::string& _outputFilepath);
+		[[nodiscard]] static ImageData* LoadImage(const std::string& _filepath, bool _flipImage, bool _srgb);
 
 
 	private:
@@ -306,7 +309,13 @@ namespace NK
 			} VkFormat;
 		#endif
 
+		
 		[[nodiscard]] static VkFormat GetVulkanFormat(const DATA_FORMAT _format);
+		[[nodiscard]] static DATA_FORMAT GetRHIFormat(const VkFormat _format);
+
+
+		//To avoid unnecessary duplicate loads
+		static std::unordered_map<std::string, ImageData> m_filepathToImageDataCache;
 	};
 	
 }
