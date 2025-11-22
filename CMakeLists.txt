@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(Neki LANGUAGES CXX)
+project(Neki LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -136,10 +136,13 @@ FetchContent_Declare(stb_image GIT_REPOSITORY https://github.com/nothings/stb.gi
 FetchContent_MakeAvailable(stb_image)
 target_include_directories(Neki PUBLIC ${stb_image_SOURCE_DIR})
 
-#Nvidia Texture Tools (NVTT)
-target_include_directories(Neki PRIVATE vendor/nvtt)
-target_link_directories(Neki PRIVATE vendor/nvtt/lib64)
-target_link_libraries(Neki PRIVATE nvtt)
+#KTX
+FetchContent_Declare(ktx GIT_REPOSITORY https://github.com/KhronosGroup/KTX-Software.git GIT_TAG v4.4.2)
+set(KTX_FEATURE_TOOLS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_TESTS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_DOC OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(ktx)
+target_link_libraries(Neki PUBLIC ktx)
 
 #Assimp
 FetchContent_Declare(assimp GIT_REPOSITORY "https://github.com/assimp/assimp.git" GIT_TAG v5.4.1)
@@ -366,7 +369,6 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     add_executable(NKEngineSample_Rendering "Samples/Engine/Rendering/Rendering.cpp")
     target_include_directories(NKEngineSample_Rendering PUBLIC "${CMAKE_SOURCE_DIR}/src")
     target_link_libraries(NKEngineSample_Rendering PRIVATE Neki)
-    target_link_directories(NKEngineSample_Rendering PRIVATE vendor/nvtt/lib64)
     add_dependencies(NKEngineSample_Rendering Shaders)
 
     add_executable(NKEngineSample_Events "Samples/Engine/Events/Events.cpp")

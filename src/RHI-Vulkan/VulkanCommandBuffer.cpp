@@ -122,7 +122,7 @@ namespace NK
 		barrier.subresourceRange.baseMipLevel = 0;
 		barrier.subresourceRange.levelCount = 1;
 		barrier.subresourceRange.baseArrayLayer = 0;
-		barrier.subresourceRange.layerCount = _texture->IsArrayTexture() ? (_texture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _texture->GetSize().y : _texture->GetSize().z) : 1;;
+		barrier.subresourceRange.layerCount = _texture->IsArrayTexture() ? (_texture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _texture->GetSize().y : _texture->GetSize().z) : 1;
 
 		barrier.srcAccessMask = src.accessMask;
 		barrier.dstAccessMask = dst.accessMask;
