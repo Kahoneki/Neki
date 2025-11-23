@@ -542,6 +542,8 @@ namespace NK
 
 		VkPhysicalDeviceFeatures2 deviceFeatures2{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
 		deviceFeatures2.features.samplerAnisotropy = VK_TRUE;
+		deviceFeatures2.features.fragmentStoresAndAtomics = VK_TRUE;
+		deviceFeatures2.features.vertexPipelineStoresAndAtomics = VK_TRUE;
 		deviceFeatures2.pNext = &dynamicRenderingFeatures;
 
 		VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutableTypeFeatures{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT };
@@ -851,7 +853,7 @@ namespace NK
 		VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES, .pNext = &features12 };
 		VkPhysicalDeviceFeatures2 supportedFeatures{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, .pNext = &dynamicRenderingFeatures };
 		vkGetPhysicalDeviceFeatures2(_device, &supportedFeatures);
-		if (!supportedFeatures.features.samplerAnisotropy || !dynamicRenderingFeatures.dynamicRendering || !features12.descriptorIndexing)
+		if (!supportedFeatures.features.samplerAnisotropy || !supportedFeatures.features.fragmentStoresAndAtomics || !supportedFeatures.features.vertexPipelineStoresAndAtomics || !dynamicRenderingFeatures.dynamicRendering || !features12.descriptorIndexing)
 		{
 			m_logger.Unindent();
 			return false;

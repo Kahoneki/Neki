@@ -67,7 +67,7 @@ namespace NK
 		//- There should be as many _multisampleColourAttachments as _outputColourAttachments (_numColourAttachments)
 		//- _multisampleColourAttachments and _multisampleDepthAttachment should be the offscreen attachments with sample count > 1
 		//- _outputColourAttachments and _outputDepthAttachment should be the final output attachments with sample count = 1
-		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _multisampleDepthAttachment, ITextureView* _outputDepthAttachment, ITextureView* _stencilAttachment) = 0;
+		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _multisampleDepthAttachment, ITextureView* _outputDepthAttachment, ITextureView* _stencilAttachment, bool _clearRTVs=true, bool _clearDSV=true) = 0;
 
 		//Used for combined depth-stencil attachments (_depthStencilAttachment, if provided, must be in a combined depth-stencil compatible data format) (_depthStencilAttachment can be set to nullptr if unused)
 		//Note: _numColourAttachments is not the size of the swapchain, it is used for rendering to multiple colour attachments in a single pass. For most scenarios, this value should be 1.
@@ -81,7 +81,7 @@ namespace NK
 		//- _multisampleColourAttachments should be the offscreen attachment(s) with sample count > 1
 		//- _outputColourAttachments should be the final output attachment(s) with sample count = 1
 		//- _depthStencilAttachment must have a sample count equal to that of the _multisampleColourAttachment(s)
-		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment) = 0;
+		virtual void BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment, bool _clearRTVs=true, bool _clearDSV=true) = 0;
 
 		//Blit _srcTexture to _dstTexture with linear downsampling
 		//Requires _srcTexture->GetSize() >= _dstTexture->GetSize()

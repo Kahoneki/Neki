@@ -32,12 +32,12 @@ public:
 //		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel") };
 //		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Cube.gltf", serialisedModelOutputPath, true, true);
 		
-		m_helmetEntity = m_reg.Create();
-		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
-		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
-		helmetTransform.SetPosition(glm::vec3(0, 0, -3));
-		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
+//		m_helmetEntity = m_reg.Create();
+//		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
+//		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
+//		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
+//		helmetTransform.SetPosition(glm::vec3(0, 0, -3));
+//		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 
 		m_groundEntity = m_reg.Create();
 		NK::CModelRenderer& groundModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_groundEntity) };
@@ -71,10 +71,10 @@ public:
 	
 	virtual void Update() override
 	{
-		NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
-		constexpr float speed{ 50.0f };
-		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
-		transform.SetRotation(transform.GetRotation() + glm::vec3(0, rotationAmount, 0));
+//		NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+//		constexpr float speed{ 50.0f };
+//		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
+//		transform.SetRotation(transform.GetRotation() + glm::vec3(0, rotationAmount, 0));
 	}
 
 
@@ -133,7 +133,7 @@ public:
 		renderLayerDesc.window = m_window.get();
 		m_renderLayer = NK::UniquePtr<NK::RenderLayer>(NK_NEW(NK::RenderLayer, m_scenes[m_activeScene]->m_reg,  renderLayerDesc));
 
-		m_postAppLayers.push_back(m_modelVisibilityLayer.get());
+//		m_postAppLayers.push_back(m_modelVisibilityLayer.get());
 		m_postAppLayers.push_back(m_renderLayer.get());
 	}
 

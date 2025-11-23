@@ -154,7 +154,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _multisampleDepthAttachment, ITextureView* _outputDepthAttachment, ITextureView* _stencilAttachment)
+	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _multisampleDepthAttachment, ITextureView* _outputDepthAttachment, ITextureView* _stencilAttachment, bool _clearRTVs, bool _clearDSV)
 	{
 		if (_outputDepthAttachment && _stencilAttachment)
 		{
@@ -182,7 +182,7 @@ namespace NK
 				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
 			}
 
-			colourAttachmentInfos[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			colourAttachmentInfos[i].loadOp = _clearRTVs ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
 			colourAttachmentInfos[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			colourAttachmentInfos[i].clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 		}
@@ -207,7 +207,7 @@ namespace NK
 				depthAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_outputDepthAttachment)->GetImageView();
 			}
 			depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-			depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			depthAttachmentInfo.loadOp = _clearDSV ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
 			depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			depthAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
 		}
@@ -253,7 +253,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment)
+	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment, bool _clearRTVs, bool _clearDSV)
 	{
 		if (_depthStencilAttachment)
 		{
@@ -284,7 +284,7 @@ namespace NK
 				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
 			}
 
-			colourAttachmentInfos[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			colourAttachmentInfos[i].loadOp = _clearRTVs ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;;
 			colourAttachmentInfos[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			colourAttachmentInfos[i].clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 		}
@@ -297,7 +297,7 @@ namespace NK
 			depthStencilAttachmentInfo.pNext = nullptr;
 			depthStencilAttachmentInfo.imageView = dynamic_cast<VulkanTextureView*>(_depthStencilAttachment)->GetImageView();
 			depthStencilAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			depthStencilAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			depthStencilAttachmentInfo.loadOp = _clearDSV ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;;
 			depthStencilAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			depthStencilAttachmentInfo.clearValue.depthStencil = { 1.0f, 0 };
 		}

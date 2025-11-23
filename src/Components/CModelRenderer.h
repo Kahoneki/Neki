@@ -15,9 +15,9 @@ namespace NK
 	public:
 		std::string modelPath;
 
-		//Volume in world space
-		glm::vec3 worldBoundaryPosition;
-		glm::vec3 worldBoundaryHalfExtents;
+		//Volume in local space
+		glm::vec3 localSpaceOrigin;
+		glm::vec3 localSpaceHalfExtents;
 
 		
 	private:

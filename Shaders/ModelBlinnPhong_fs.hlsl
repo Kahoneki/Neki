@@ -49,6 +49,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 		if (currentPixelDepthInLightSpace > shadow)
 		{
 			//Current pixel is further away than closest depth recorded in the map - hence it is in shadow
+			return float4(1.0,0.0,0.0,1.0);
 			shadowFactor = 0.0f;
 		}
 	}

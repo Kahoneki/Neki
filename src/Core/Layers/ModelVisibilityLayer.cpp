@@ -46,16 +46,16 @@ namespace NK
 		for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 		{
 			constexpr float epsilon{ 1e-3 };
-			if (modelRenderer.worldBoundaryHalfExtents.x < epsilon && modelRenderer.worldBoundaryHalfExtents.y < epsilon && modelRenderer.worldBoundaryHalfExtents.z < epsilon)
+			if (modelRenderer.localSpaceHalfExtents.x < epsilon && modelRenderer.localSpaceHalfExtents.y < epsilon && modelRenderer.localSpaceHalfExtents.z < epsilon)
 			{
 				//Model boundary hasn't been set yet
 				CPUModel_SerialisedHeader header{ ModelLoader::GetNKModelHeader(modelRenderer.modelPath) };
-				modelRenderer.worldBoundaryHalfExtents = header.halfExtents;
-				modelRenderer.worldBoundaryPosition = glm::vec3(0);
+				modelRenderer.localSpaceHalfExtents = header.halfExtents;
+				modelRenderer.localSpaceOrigin = glm::vec3(0);
 			}
 			
-			glm::vec3 minPoint{ modelRenderer.worldBoundaryPosition - modelRenderer.worldBoundaryHalfExtents };
-			glm::vec3 maxPoint{ modelRenderer.worldBoundaryPosition + modelRenderer.worldBoundaryHalfExtents };
+			glm::vec3 minPoint{ modelRenderer.localSpaceOrigin - modelRenderer.localSpaceHalfExtents };
+			glm::vec3 maxPoint{ modelRenderer.localSpaceOrigin + modelRenderer.localSpaceHalfExtents };
 			minPoint = glm::vec3(transform.GetModelMatrix() * glm::vec4(minPoint, 1.0));
 			maxPoint = glm::vec3(transform.GetModelMatrix() * glm::vec4(maxPoint, 1.0));
 			modelRenderer.visible = m_frustum.BoxVisible(minPoint, maxPoint);

@@ -20,8 +20,8 @@ namespace NK
 
 	struct RenderLayerDesc
 	{
-		explicit RenderLayerDesc(const GRAPHICS_BACKEND _backend, const bool _enableMSAA, const SAMPLE_COUNT _msaaSampleCount, const bool _enableSSAA, const std::uint32_t _ssaaMultiplier, Window* _window, std::uint32_t _framesInFlight)
-		: backend(_backend), enableMSAA(_enableMSAA), msaaSampleCount(_msaaSampleCount), enableSSAA(_enableSSAA), ssaaMultiplier(_ssaaMultiplier), window(_window), framesInFlight(_framesInFlight) {}
+		explicit RenderLayerDesc(const GRAPHICS_BACKEND _backend, const bool _enableMSAA, const SAMPLE_COUNT _msaaSampleCount, const bool _enableSSAA, const std::uint32_t _ssaaMultiplier, Window* _window, const std::uint32_t _framesInFlight, const std::uint32_t _maxModels)
+		: backend(_backend), enableMSAA(_enableMSAA), msaaSampleCount(_msaaSampleCount), enableSSAA(_enableSSAA), ssaaMultiplier(_ssaaMultiplier), window(_window), framesInFlight(_framesInFlight), maxModels(_maxModels) {}
 
 		RenderLayerDesc() {}
 
@@ -36,6 +36,8 @@ namespace NK
 		Window* window{ nullptr };
 
 		std::uint32_t framesInFlight{ 3 };
+
+		std::uint32_t maxModels{ 10'000 };
 	};
 
 	
@@ -53,9 +55,12 @@ namespace NK
 		void InitBaseResources();
 		void InitCameraBuffer();
 		void InitLightCameraBuffer();
-		void InitSkybox();
+		void InitModelMatricesBuffer();
+		void InitModelVisibilityBuffers();
+		void InitCube();
 		void InitScreenQuad();
 		void InitShadersAndPipelines();
+		void InitModelVisibilityPipeline();
 		void InitShadowPipeline();
 		void InitSkyboxPipeline();
 		void InitGraphicsPipelines();
@@ -66,6 +71,7 @@ namespace NK
 		void UpdateSkybox(CSkybox& _skybox);
 		void UpdateCameraBuffer(const CCamera& _camera) const;
 		void UpdateLightCameraBuffer();
+		void UpdateModelMatricesBuffer();
 		
 		
 		//Dependency injections
@@ -106,11 +112,25 @@ namespace NK
 		UniquePtr<IBuffer> m_lightCamDataBuffer;
 		UniquePtr<IBufferView> m_lightCamDataBufferView;
 		void* m_lightCamDataBufferMap;
+
+		//Stores the model matrices for all models - regardless of whether the model is loaded or not
+		//(parallel to m_modelVisibilityBuffers)
+		//(one for each frame in flight)
+		std::vector<UniquePtr<IBuffer>> m_modelMatricesBuffers;
+		std::vector<UniquePtr<IBufferView>> m_modelMatricesBufferViews;
+		std::vector<void*> m_modelMatricesBufferMaps;
+
+		//Stores a 32-bit uint for every model in the scene indicating whether it's visible or not - regardless of whether the model is loaded or not
+		//(all vectors parallel to m_modelMatricesBuffers)
+		//(one for each frame in flight)
+		std::vector<UniquePtr<IBuffer>> m_modelVisibilityBuffers;
+		std::vector<UniquePtr<IBufferView>> m_modelVisibilityBufferViews;
+		std::vector<void*> m_modelVisibilityBufferMaps;
 		
 		UniquePtr<ITexture> m_skyboxTexture; //Not created at startup
 		UniquePtr<ITextureView> m_skyboxTextureView; //Not created at startup
-		UniquePtr<IBuffer> m_skyboxVertBuffer;
-		UniquePtr<IBuffer> m_skyboxIndexBuffer;
+		UniquePtr<IBuffer> m_cubeVertBuffer;
+		UniquePtr<IBuffer> m_cubeIndexBuffer;
 
 		struct ScreenQuadVertex
 		{
@@ -124,12 +144,22 @@ namespace NK
 		UniquePtr<IShader> m_meshVertShader;
 		UniquePtr<IShader> m_skyboxVertShader;
 		UniquePtr<IShader> m_screenQuadVertShader;
+		UniquePtr<IShader> m_modelVisibilityVertShader;
 
 		UniquePtr<IShader> m_shadowFragShader;
 		UniquePtr<IShader> m_skyboxFragShader;
 		UniquePtr<IShader> m_blinnPhongFragShader;
 		UniquePtr<IShader> m_pbrFragShader;
 		UniquePtr<IShader> m_postprocessFragShader;
+		UniquePtr<IShader> m_modelVisibilityFragShader;
+
+		struct ModelVisibilityPassPushConstantData
+		{
+			ResourceIndex camDataBufferIndex;
+			ResourceIndex modelMatricesBufferIndex;
+			ResourceIndex modelVisibilityBufferIndex;
+		};
+		UniquePtr<IRootSignature> m_modelVisibilityPassRootSignature;
 		
 		struct ShadowPassPushConstantData
 		{
@@ -159,6 +189,7 @@ namespace NK
 		};
 		UniquePtr<IRootSignature> m_postprocessPassRootSignature;
 		
+		UniquePtr<IPipeline> m_modelVisibilityPipeline;
 		UniquePtr<IPipeline> m_shadowPipeline;
 		UniquePtr<IPipeline> m_skyboxPipeline;
 		UniquePtr<IPipeline> m_blinnPhongPipeline;
@@ -200,6 +231,14 @@ namespace NK
 		UniquePtr<ITextureView> m_sceneDepthMSAADSV;
 		UniquePtr<ITextureView> m_sceneDepthMSAASRV;
 
+		
+		//Stores the model matrices for all models - regardless of whether the model is loaded or not
+		//(used to populate m_modelMatricesBuffer)
+		std::vector<glm::mat4> m_modelMatrices;
+		//(parallel to m_modelMatrices)
+		//(one for each frame in flight)
+		std::vector<std::vector<Entity>> m_modelMatricesEntitiesLookups;
+		
 		
 		//RenderLayer owns and is responsible for all GPUModels - todo: move to out-of-core rendering with HLODs
 		std::unordered_map<std::string, UniquePtr<GPUModel>> m_gpuModelCache;

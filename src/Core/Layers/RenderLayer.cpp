@@ -40,7 +40,9 @@ namespace NK
 
 		InitCameraBuffer();
 		InitLightCameraBuffer();
-		InitSkybox();
+		InitModelMatricesBuffer();
+		InitModelVisibilityBuffers();
+		InitCube();
 		InitScreenQuad();
 		InitShadersAndPipelines();
 		InitRenderGraphs();
@@ -54,6 +56,7 @@ namespace NK
 		m_gpuUploader->Reset();
 
 		m_modelUnloadQueues.resize(m_desc.framesInFlight);
+		m_modelMatricesEntitiesLookups.resize(m_desc.framesInFlight);
 
 		
 		m_logger.Unindent();
@@ -118,7 +121,6 @@ namespace NK
 		}
 
 
-		//Update light
 		UpdateLightCameraBuffer();
 		
 
@@ -134,11 +136,16 @@ namespace NK
 			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
 			m_modelUnloadQueues[m_currentFrame].pop_back();
 		}
-		
+
+		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityBufferMaps[m_currentFrame]) };
 		
 		//Model Loading Phase
-		for (auto&& [modelRenderer] : m_reg.get().View<CModelRenderer>())
+		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++i)
 		{
+			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
+			modelRenderer.visible = visibilityMap[i] == 1;
+			m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::APPLICATION, std::to_string(i) + ": " + std::to_string(modelRenderer.visible) + "\n");
+
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
 				//If model is only queued for unload (and so hasn't yet been unloaded), we can just remove it from the unload queue
@@ -178,12 +185,18 @@ namespace NK
 			m_gpuUploader->Flush(false, m_gpuUploaderFlushFence.get(), nullptr);
 		}
 
+		//Clear the visibility buffer
+		std::memset(visibilityMap, 0, m_desc.maxModels * sizeof(std::uint32_t));
+
+		UpdateModelMatricesBuffer();
+		
 
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
 		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
 
 		
 		RenderGraphExecutionDesc execDesc{};
+		execDesc.commandBuffers["MODEL_VISIBILITY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SHADOW_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		if (m_desc.enableMSAA) { execDesc.commandBuffers["MSAA_RESOLVE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
@@ -191,9 +204,11 @@ namespace NK
 		execDesc.commandBuffers["POSTPROCESS_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 
-		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", m_lightCamDataBuffer.get());
 		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffer.get());
-
+		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", m_lightCamDataBuffer.get());
+		execDesc.buffers.Set("MODEL_MATRICES_BUFFER", m_modelMatricesBuffers[m_currentFrame].get());
+		execDesc.buffers.Set("MODEL_VISIBILITY_BUFFER", m_modelVisibilityBuffers[m_currentFrame].get());
+		
 		execDesc.textures.Set("SHADOW_MAP", m_shadowMap.get());
 		execDesc.textures.Set("SHADOW_MAP_MSAA", m_shadowMapMSAA.get());
 		execDesc.textures.Set("SHADOW_MAP_SSAA", m_shadowMapSSAA.get());
@@ -211,6 +226,8 @@ namespace NK
 
 		execDesc.bufferViews.Set("LIGHT_CAMERA_BUFFER_VIEW", m_lightCamDataBufferView.get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferView.get());
+		execDesc.bufferViews.Set("MODEL_MATRICES_BUFFER_VIEW", m_modelMatricesBufferViews[m_currentFrame].get());
+		execDesc.bufferViews.Set("MODEL_VISIBILITY_BUFFER_VIEW", m_modelVisibilityBufferViews[m_currentFrame].get());
 
 		execDesc.textureViews.Set("SHADOW_MAP_DSV", m_shadowMapDSV.get());
 		execDesc.textureViews.Set("SHADOW_MAP_SRV", m_shadowMapSRV.get());
@@ -268,7 +285,7 @@ namespace NK
 		{
 			#ifdef NEKI_VULKAN_SUPPORTED
 				m_device = UniquePtr<IDevice>(NK_NEW(VulkanDevice, m_logger, m_allocator));
-				#else
+			#else
 				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::VULKAN but compiler definition NEKI_VULKAN_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
 				throw std::invalid_argument("");
 			#endif
@@ -277,10 +294,10 @@ namespace NK
 		case GRAPHICS_BACKEND::D3D12:
 		{
 			#ifdef NEKI_D3D12_SUPPORTED
-			m_device = UniquePtr<IDevice>(NK_NEW(D3D12Device, m_logger, m_allocator));
+				m_device = UniquePtr<IDevice>(NK_NEW(D3D12Device, m_logger, m_allocator));
 			#else
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::D3D12 but compiler definition NEKI_D3D12_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
-			throw std::invalid_argument("");
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::D3D12 but compiler definition NEKI_D3D12_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
+				throw std::invalid_argument("");
 			#endif
 			break;
 		}
@@ -421,27 +438,80 @@ namespace NK
 
 
 
-	void RenderLayer::InitSkybox()
+	void RenderLayer::InitModelMatricesBuffer()
 	{
-		//Creating m_skyboxTexture and m_skyboxTextureView requires knowing the size of the skybox which cannot be known at startup, skip its creation
+		m_modelMatricesBuffers.resize(m_desc.framesInFlight);
+		m_modelMatricesBufferViews.resize(m_desc.framesInFlight);
+		m_modelMatricesBufferMaps.resize(m_desc.framesInFlight);
 
+		for (std::size_t i = 0; i < m_desc.framesInFlight; ++i)
+		{
+			BufferDesc modelMatricesBufferDesc{};
+			modelMatricesBufferDesc.size = m_desc.maxModels * sizeof(glm::mat4);
+			modelMatricesBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
+			modelMatricesBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT;
+			m_modelMatricesBuffers[i] = m_device->CreateBuffer(modelMatricesBufferDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelMatricesBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::SHADER_RESOURCE);
+
+			BufferViewDesc modelMatricesBufferViewDesc{};
+			modelMatricesBufferViewDesc.size = m_desc.maxModels * sizeof(glm::mat4);
+			modelMatricesBufferViewDesc.offset = 0;
+			modelMatricesBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
+			m_modelMatricesBufferViews[i] = m_device->CreateBufferView(m_modelMatricesBuffers[i].get(), modelMatricesBufferViewDesc);
+
+			m_modelMatricesBufferMaps[i] = m_modelMatricesBuffers[i]->GetMap();
+		}
+	}
+
+
+
+	void RenderLayer::InitModelVisibilityBuffers()
+	{
+		m_modelVisibilityBuffers.resize(m_desc.framesInFlight);
+		m_modelVisibilityBufferViews.resize(m_desc.framesInFlight);
+		m_modelVisibilityBufferMaps.resize(m_desc.framesInFlight);
+
+		for (std::uint32_t i = 0; i < m_desc.framesInFlight; ++i)
+		{
+			BufferDesc modelVisibilityBufferDesc{};
+			modelVisibilityBufferDesc.size = m_desc.maxModels * sizeof(std::uint32_t);
+			modelVisibilityBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
+			modelVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT;
+			m_modelVisibilityBuffers[i] = m_device->CreateBuffer(modelVisibilityBufferDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::UNORDERED_ACCESS);
+
+			BufferViewDesc modelVisibilityBufferViewDesc{};
+			modelVisibilityBufferViewDesc.size = m_desc.maxModels * sizeof(std::uint32_t);
+			modelVisibilityBufferViewDesc.offset = 0;
+			modelVisibilityBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_WRITE;
+			m_modelVisibilityBufferViews[i] = m_device->CreateBufferView(m_modelVisibilityBuffers[i].get(), modelVisibilityBufferViewDesc);
+
+			m_modelVisibilityBufferMaps[i] = m_modelVisibilityBuffers[i]->GetMap();
+			std::memset(m_modelVisibilityBufferMaps[i], 0, m_desc.maxModels * sizeof(std::uint32_t));
+		}
+	}
+
+
+
+	void RenderLayer::InitCube()
+	{
 		//Vertex Buffer
 		constexpr glm::vec3 vertices[8] =
 		{
-			glm::vec3(-1.0f, -1.0f, 1.0f), //0: Front-Left-Bottom
-			glm::vec3(1.0f, -1.0f, 1.0f), //1: Front-Right-Bottom
-			glm::vec3(1.0f, 1.0f, 1.0f), //2: Front-Right-Top
-			glm::vec3(-1.0f, 1.0f, 1.0f), //3: Front-Left-Top
-			glm::vec3(-1.0f, -1.0f, -1.0f), //4: Back-Left-Bottom
-			glm::vec3(1.0f, -1.0f, -1.0f), //5: Back-Right-Bottom
-			glm::vec3(1.0f, 1.0f, -1.0f), //6: Back-Right-Top
-			glm::vec3(-1.0f, 1.0f, -1.0f)  //7: Back-Left-Top
+			glm::vec3(-0.5f, -0.5f, 0.5f), //0: Front-Left-Bottom
+			glm::vec3(0.5f, -0.5f, 0.5f), //1: Front-Right-Bottom
+			glm::vec3(0.5f, 0.5f, 0.5f), //2: Front-Right-Top
+			glm::vec3(-0.5f, 0.5f, 0.5f), //3: Front-Left-Top
+			glm::vec3(-0.5f, -0.5f, -0.5f), //4: Back-Left-Bottom
+			glm::vec3(0.5f, -0.5f, -0.5f), //5: Back-Right-Bottom
+			glm::vec3(0.5f, 0.5f, -0.5f), //6: Back-Right-Top
+			glm::vec3(-0.5f, 0.5f, -0.5f)  //7: Back-Left-Top
 		};
 		BufferDesc skyboxVertBufferDesc{};
 		skyboxVertBufferDesc.size = sizeof(glm::vec3) * 8;
 		skyboxVertBufferDesc.type = MEMORY_TYPE::DEVICE;
 		skyboxVertBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
-		m_skyboxVertBuffer = m_device->CreateBuffer(skyboxVertBufferDesc);
+		m_cubeVertBuffer = m_device->CreateBuffer(skyboxVertBufferDesc);
 
 		//Index Buffer
 		const std::uint32_t indices[36] =
@@ -474,14 +544,14 @@ namespace NK
 		indexBufferDesc.size = sizeof(std::uint32_t) * 36;
 		indexBufferDesc.type = MEMORY_TYPE::DEVICE;
 		indexBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::INDEX_BUFFER_BIT;
-		m_skyboxIndexBuffer = m_device->CreateBuffer(indexBufferDesc);
+		m_cubeIndexBuffer = m_device->CreateBuffer(indexBufferDesc);
 
 		//Upload vertex and index buffers
-		m_gpuUploader->EnqueueBufferDataUpload(vertices, m_skyboxVertBuffer.get(), RESOURCE_STATE::UNDEFINED);
-		m_gpuUploader->EnqueueBufferDataUpload(indices, m_skyboxIndexBuffer.get(), RESOURCE_STATE::UNDEFINED);
+		m_gpuUploader->EnqueueBufferDataUpload(vertices, m_cubeVertBuffer.get(), RESOURCE_STATE::UNDEFINED);
+		m_gpuUploader->EnqueueBufferDataUpload(indices, m_cubeIndexBuffer.get(), RESOURCE_STATE::UNDEFINED);
 
-		m_graphicsCommandBuffers[0]->TransitionBarrier(m_skyboxVertBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::VERTEX_BUFFER);
-		m_graphicsCommandBuffers[0]->TransitionBarrier(m_skyboxIndexBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::INDEX_BUFFER);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_cubeVertBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::VERTEX_BUFFER);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_cubeIndexBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::INDEX_BUFFER);
 	}
 
 
@@ -529,6 +599,8 @@ namespace NK
 		//Vertex Shaders
 		ShaderDesc vertShaderDesc{};
 		vertShaderDesc.type = SHADER_TYPE::VERTEX;
+		vertShaderDesc.filepath = "Shaders/ModelVisibility_vs";
+		m_modelVisibilityVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/Shadow_vs";
 		m_shadowVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/Model_vs";
@@ -541,6 +613,8 @@ namespace NK
 		//Fragment Shaders
 		ShaderDesc fragShaderDesc{};
 		fragShaderDesc.type = SHADER_TYPE::FRAGMENT;
+		fragShaderDesc.filepath = "Shaders/ModelVisibility_fs";
+		m_modelVisibilityFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Shadow_fs";
 		m_shadowFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/ModelBlinnPhong_fs";
@@ -551,24 +625,87 @@ namespace NK
 		m_skyboxFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Postprocess_fs";
 		m_postprocessFragShader = m_device->CreateShader(fragShaderDesc);
-
+		
 
 		//Root Signatures
 		RootSignatureDesc rootSigDesc{};
+		rootSigDesc.num32BitPushConstantValues = sizeof(ModelVisibilityPassPushConstantData) / 4;
+		m_modelVisibilityPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.num32BitPushConstantValues = sizeof(ShadowPassPushConstantData) / 4;
 		m_shadowPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
-		
 		rootSigDesc.num32BitPushConstantValues = sizeof(MeshPassPushConstantData) / 4;
 		m_meshPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
-
 		rootSigDesc.num32BitPushConstantValues = sizeof(PostprocessPassPushConstantData) / 4;
 		m_postprocessPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		
 
+		InitModelVisibilityPipeline();
 		InitShadowPipeline();
 		InitSkyboxPipeline();
 		InitGraphicsPipelines();
 		InitPostprocessPipeline();
+	}
+
+
+
+	void RenderLayer::InitModelVisibilityPipeline()
+	{
+		std::vector<VertexAttributeDesc> vertexAttributes;
+		VertexAttributeDesc posAttribute{};
+		posAttribute.attribute = SHADER_ATTRIBUTE::POSITION;
+		posAttribute.binding = 0;
+		posAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		posAttribute.offset = 0;
+		vertexAttributes.push_back(posAttribute);
+		std::vector<VertexBufferBindingDesc> bufferBindings;
+		VertexBufferBindingDesc bufferBinding{};
+		bufferBinding.binding = 0;
+		bufferBinding.inputRate = VERTEX_INPUT_RATE::VERTEX;
+		bufferBinding.stride = sizeof(glm::vec3);
+		bufferBindings.push_back(bufferBinding);
+		VertexInputDesc vertexInputDesc{};
+		vertexInputDesc.attributeDescriptions = vertexAttributes;
+		vertexInputDesc.bufferBindingDescriptions = bufferBindings;
+
+		InputAssemblyDesc inputAssemblyDesc{};
+		inputAssemblyDesc.topology = INPUT_TOPOLOGY::TRIANGLE_LIST;
+
+		RasteriserDesc rasteriserDesc{};
+		rasteriserDesc.cullMode = CULL_MODE::BACK;
+		rasteriserDesc.frontFace = WINDING_DIRECTION::CLOCKWISE;
+		rasteriserDesc.depthBiasEnable = false;
+
+		DepthStencilDesc depthStencilDesc{};
+		depthStencilDesc.depthTestEnable = true;
+		depthStencilDesc.depthWriteEnable = false;
+		depthStencilDesc.depthCompareOp = COMPARE_OP::LESS_OR_EQUAL;
+		depthStencilDesc.stencilTestEnable = false;
+
+		MultisamplingDesc multisamplingDesc{};
+		multisamplingDesc.sampleCount = SAMPLE_COUNT::BIT_1;
+		multisamplingDesc.sampleMask = UINT32_MAX;
+		multisamplingDesc.alphaToCoverageEnable = false;
+
+		std::vector<ColourBlendAttachmentDesc> colourBlendAttachments{};
+		ColourBlendDesc colourBlendDesc{};
+		colourBlendDesc.logicOpEnable = false;
+		colourBlendDesc.attachments = colourBlendAttachments;
+
+		PipelineDesc pipelineDesc{};
+		pipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
+		pipelineDesc.vertexShader = m_modelVisibilityVertShader.get();
+		pipelineDesc.fragmentShader = m_modelVisibilityFragShader.get();
+		pipelineDesc.rootSignature = m_modelVisibilityPassRootSignature.get();
+		pipelineDesc.vertexInputDesc = vertexInputDesc;
+		pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
+		pipelineDesc.rasteriserDesc = rasteriserDesc;
+		pipelineDesc.depthStencilDesc = depthStencilDesc;
+		pipelineDesc.multisamplingDesc = multisamplingDesc;
+		pipelineDesc.colourBlendDesc = colourBlendDesc;
+		pipelineDesc.colourAttachmentFormats = {};
+		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
+
+		m_modelVisibilityPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
 
 
@@ -811,6 +948,49 @@ namespace NK
 		RenderGraphDesc meshDesc{};
 
 		meshDesc.AddNode(
+			"MODEL_VISIBILITY_PASS",
+			{{ "CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
+			{ "MODEL_MATRICES_BUFFER", RESOURCE_STATE::SHADER_RESOURCE },
+			{ "MODEL_VISIBILITY_BUFFER", RESOURCE_STATE::UNORDERED_ACCESS },
+			{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
+			{ "SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE },
+			{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE }},
+			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+			{
+				if (m_desc.enableMSAA)
+				{
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, false);
+				}
+				else if (m_desc.enableSSAA)
+				{
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_SSAA_DSV"), nullptr, true, false);
+				}
+				else
+				{
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, false);
+				}
+
+				_cmdBuf->BindRootSignature(m_modelVisibilityPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+
+				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+				_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+
+				ModelVisibilityPassPushConstantData pushConstantData{};
+				pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
+				pushConstantData.modelMatricesBufferIndex = _bufViews.Get("MODEL_MATRICES_BUFFER_VIEW")->GetIndex();
+				pushConstantData.modelVisibilityBufferIndex = _bufViews.Get("MODEL_VISIBILITY_BUFFER_VIEW")->GetIndex();
+								
+				//Models
+				std::size_t cubeVertexBufferStride{ sizeof(glm::vec3) };
+				_cmdBuf->PushConstants(m_modelVisibilityPassRootSignature.get(), &pushConstantData);
+				_cmdBuf->BindPipeline(m_modelVisibilityPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+				_cmdBuf->BindVertexBuffers(0, 1, m_cubeVertBuffer.get(), &cubeVertexBufferStride);
+				_cmdBuf->BindIndexBuffer(m_cubeIndexBuffer.get(), DATA_FORMAT::R32_UINT);
+				_cmdBuf->DrawIndexed(36, m_modelMatrices.size(), 0, 0);
+				_cmdBuf->EndRendering(0, nullptr, nullptr);
+			});
+		
+		meshDesc.AddNode(
 			"SHADOW_PASS",
 			{{ "LIGHT_CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
 			{ "SHADOW_MAP", RESOURCE_STATE::DEPTH_WRITE },
@@ -844,10 +1024,11 @@ namespace NK
 				for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 				{
 					if (!modelRenderer.visible) { continue; } //todo: this is obviously wrong
+					const GPUModel* const model{ modelRenderer.model };
+					if (!model) { continue; }
 					pushConstantData.modelMat = transform.GetModelMatrix();
 
 
-					const GPUModel* const model{ modelRenderer.model };
 					for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
 					{
 						const GPUMesh* mesh{ model->meshes[i].get() };
@@ -912,8 +1093,8 @@ namespace NK
 				std::size_t skyboxVertexBufferStride{ sizeof(glm::vec3) };
 				_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
 				_cmdBuf->BindPipeline(m_skyboxPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
-				_cmdBuf->BindVertexBuffers(0, 1, m_skyboxVertBuffer.get(), &skyboxVertexBufferStride);
-				_cmdBuf->BindIndexBuffer(m_skyboxIndexBuffer.get(), DATA_FORMAT::R32_UINT);
+				_cmdBuf->BindVertexBuffers(0, 1, m_cubeVertBuffer.get(), &skyboxVertexBufferStride);
+				_cmdBuf->BindIndexBuffer(m_cubeIndexBuffer.get(), DATA_FORMAT::R32_UINT);
 				_cmdBuf->DrawIndexed(36, 1, 0, 0);
 			}
 
@@ -922,10 +1103,11 @@ namespace NK
 			for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 			{
 				if (!modelRenderer.visible) { continue; }
+				const GPUModel* const model{ modelRenderer.model };
+				if (!model) { continue; }
 				pushConstantData.modelMat = transform.GetModelMatrix();
 
 
-				const GPUModel* const model{ modelRenderer.model };
 				for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
 				{
 					const GPUMesh* mesh{ model->meshes[i].get() };
@@ -953,11 +1135,6 @@ namespace NK
 				_cmdBuf->EndRendering(1, nullptr, _texs.Get("SCENE_COLOUR"));
 			}
 		});
-
-		//No AA: shadow map / scene colour / scene depth is stored in SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
-		//MSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP_MSAA / SCENE_COLOUR_MSAA / SCENE_DEPTH_MSAA
-		//SSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP_SSAA / SCENE_COLOUR_SSAA / SCENE_DEPTH_SSAA
-		//If SSAA is enabled, add another pass to downsample SHADOW_MAP_SSAA / SCENE_COLOUR_SSAA / SCENE_DEPTH_SSAA into SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
 		
 		if (m_desc.enableSSAA)
 		{
@@ -966,7 +1143,9 @@ namespace NK
 			{{"SCENE_COLOUR_SSAA", RESOURCE_STATE::COPY_SOURCE},
 			{"SCENE_COLOUR", RESOURCE_STATE::COPY_DEST},
 			{"SCENE_DEPTH_SSAA", RESOURCE_STATE::COPY_SOURCE},
-			{"SCENE_DEPTH", RESOURCE_STATE::COPY_DEST}},
+			{"SCENE_DEPTH", RESOURCE_STATE::COPY_DEST},
+			{"SHADOW_MAP_SSAA", RESOURCE_STATE::COPY_SOURCE},
+			{"SHADOW_MAP", RESOURCE_STATE::COPY_DEST}},
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
 				_cmdBuf->BlitTexture(_texs.Get("SCENE_COLOUR_SSAA"), TEXTURE_ASPECT::COLOUR, _texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR);
@@ -974,10 +1153,6 @@ namespace NK
 				_cmdBuf->BlitTexture(_texs.Get("SHADOW_MAP_SSAA"), TEXTURE_ASPECT::DEPTH, _texs.Get("SHADOW_MAP"), TEXTURE_ASPECT::DEPTH);
 			});
 		}
-
-//		//No AA: shadow map / scene colour / scene depth is stored in SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
-//		//MSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP_MSAA / SCENE_COLOUR / SCENE_DEPTH_MSAA
-//		//SSAA: shadow map / scene colour / scene depth is stored in SHADOW_MAP / SCENE_COLOUR / SCENE_DEPTH
 
 		//If MSAA is enabled, SHADOW_MAP_MSAA, SCENE_COLOUR_MSAA, and SCENE_DEPTH_MSAA need to be resolved into SHADOW_MAP, SCENE_COLOUR, and SCENE_DEPTH before being sampled in the postprocess shader
 		if (m_desc.enableMSAA)
@@ -1033,10 +1208,6 @@ namespace NK
 
 			_cmdBuf->EndRendering(1, nullptr, _texs.Get("BACKBUFFER"));
 		});
-
-		//No AA: scene colour is stored in BACKBUFFER
-		//MSAA: scene colour is stored in BACKBUFFER
-		//SSAA: scene colour is stored in BACKBUFFER
 
 		//Transition backbuffer to present state
 		meshDesc.AddNode("PRESENT_TRANSITION_PASS", {{"BACKBUFFER", RESOURCE_STATE::PRESENT}});
@@ -1263,6 +1434,33 @@ namespace NK
 		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(x, 10, z), glm::vec3(x, 0, z), glm::vec3(0,0,1));
 		lightCamShaderData.projMat = glm::perspectiveLH(glm::radians(120.0f), 16.0f / 9.0f, 0.01f, 100.0f);
 		memcpy(m_lightCamDataBufferMap, &lightCamShaderData, sizeof(LightCameraShaderData));
+	}
+
+
+
+	void RenderLayer::UpdateModelMatricesBuffer()
+	{
+		m_modelMatrices.clear();
+		m_modelMatricesEntitiesLookups[m_currentFrame].clear();
+
+		for (auto&& [transform, model] : m_reg.get().View<CTransform, CModelRenderer>())
+		{
+			constexpr float epsilon{ 1e-3 };
+			if (model.localSpaceHalfExtents.x < epsilon && model.localSpaceHalfExtents.y < epsilon && model.localSpaceHalfExtents.z < epsilon)
+			{
+				//Model boundary hasn't been set yet
+				const CPUModel_SerialisedHeader header{ ModelLoader::GetNKModelHeader(model.modelPath) };
+				model.localSpaceHalfExtents = header.halfExtents;
+				model.localSpaceOrigin = glm::vec3(0);
+			}
+
+			constexpr float scaleBuffer{ 1.05f }; //Used as a scalar multiplier to the AABB's scale so that it's a bit larger than the model (eliminates z-fighting issues)
+			const glm::mat4 aabbMatrix{ transform.GetModelMatrix() * glm::translate(glm::mat4(1.0f), model.localSpaceOrigin) * glm::scale(glm::mat4(1.0f), model.localSpaceHalfExtents * 2.0f * scaleBuffer) };
+			m_modelMatrices.push_back(aabbMatrix);
+			m_modelMatricesEntitiesLookups[m_currentFrame].push_back(m_reg.get().GetEntity(transform));
+		}
+		
+		memcpy(m_modelMatricesBufferMaps[m_currentFrame], m_modelMatrices.data(), m_modelMatrices.size() * sizeof(glm::mat4));
 	}
 
 }
