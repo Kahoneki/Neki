@@ -93,7 +93,7 @@ int main()
 	NK::PlayerCamera camera{ NK::PlayerCamera(glm::vec3(0, 0, 3), -90.0f, 0, 0.1f, 5000.0f, 90.0f, static_cast<float>(SCREEN_DIMENSIONS.x) / SCREEN_DIMENSIONS.y, 300.0f, 0.05f) };
 
 	//Camera Data Buffer
-	NK::CameraShaderData initialCamShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
+	NK::CameraShaderData initialCamShaderData{ camera.GetCurrentCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
 	NK::BufferDesc camDataBufferDesc{};
 	camDataBufferDesc.size = sizeof(initialCamShaderData);
 	camDataBufferDesc.type = NK::MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
@@ -414,7 +414,7 @@ int main()
 
 		//Update player camera
 		camera.Update(window.get());
-		NK::CameraShaderData camShaderData{ camera.GetCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
+		NK::CameraShaderData camShaderData{ camera.GetCurrentCameraShaderData(NK::PROJECTION_METHOD::PERSPECTIVE) };
 		memcpy(camDataBufferMap, &camShaderData, sizeof(camShaderData));
 
 

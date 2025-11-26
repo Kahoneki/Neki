@@ -103,7 +103,10 @@ namespace NK
 		UniquePtr<IBuffer> m_camDataBuffer;
 		UniquePtr<IBufferView> m_camDataBufferView;
 		void* m_camDataBufferMap;
-
+		//To avoid temporal artifacts because last frame's depth buffer is being used for the model visibility pass
+		UniquePtr<IBuffer> m_camDataBufferPreviousFrame;
+		UniquePtr<IBufferView> m_camDataBufferPreviousFrameView;
+		
 		struct LightCameraShaderData
 		{
 			glm::mat4 viewMat;
@@ -247,6 +250,8 @@ namespace NK
 		//Once the appropriate fence has been signalled, unload all models in the corresponding vector
 		//Note: a vector is used here instead of a queue to allow for searching the queue for a specific model
 		std::vector<std::vector<std::string>> m_modelUnloadQueues;
+
+		bool m_firstFrame;
 	};
 
 }

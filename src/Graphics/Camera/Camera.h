@@ -24,7 +24,7 @@ namespace NK
 		virtual ~Camera() = default;
 		
 		//Matrices are cached and only updated when necessary - virtually no overhead in calling this function
-		[[nodiscard]] CameraShaderData GetCameraShaderData(const PROJECTION_METHOD _method);
+		[[nodiscard]] CameraShaderData GetCurrentCameraShaderData(const PROJECTION_METHOD _method);
 		
 		[[nodiscard]] inline glm::vec3 GetPosition() const { return m_pos; }
 		[[nodiscard]] inline float GetYaw() const { return m_yaw; }

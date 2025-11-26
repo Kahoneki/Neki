@@ -73,7 +73,7 @@ namespace NK
 
 
 
-	CameraShaderData Camera::GetCameraShaderData(const PROJECTION_METHOD _method)
+	CameraShaderData Camera::GetCurrentCameraShaderData(const PROJECTION_METHOD _method)
 	{
 		CameraShaderData camData{};
 		camData.viewMat = GetViewMatrix();
