@@ -37,21 +37,31 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 
 	float shadowFactor = 1.0f;
-	LightCamData lightCamData = g_lightCamData[NonUniformResourceIndex(PC(lightCamDataBufferIndex))];
-	float4 posInLightClipSpace = mul(lightCamData.projMat, mul(lightCamData.viewMat, float4(vertexOutput.worldPos, 1.0)));
-	float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
-	float2 shadowMapUV = float2(posInLightNDC.x * 0.5f + 0.5f, posInLightNDC.y * -0.5f + 0.5f);
-	if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f)
+
+	float3 lightDir = float3(0,-1,0);
+	float nDotL = dot(vertexOutput.worldNormal, lightDir);
+	if (nDotL > -1e-5)
 	{
-		float shadow = g_textures[NonUniformResourceIndex(PC(shadowMapIndex))].Sample(linearSampler, shadowMapUV).r;
-		float currentPixelDepthInLightSpace = posInLightNDC.z;
-		float bias = 0.05f; //Prevent shadow acne
-		if (currentPixelDepthInLightSpace > shadow)
+		shadowFactor = 0.0f;
+	}
+	else
+	{
+		LightCamData lightCamData = g_lightCamData[NonUniformResourceIndex(PC(lightCamDataBufferIndex))];
+		float4 posInLightClipSpace = mul(lightCamData.projMat, mul(lightCamData.viewMat, float4(vertexOutput.worldPos, 1.0)));
+		float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
+		float2 shadowMapUV = float2(posInLightNDC.x * 0.5f + 0.5f, posInLightNDC.y * -0.5f + 0.5f);
+		if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f)
 		{
-			//Current pixel is further away than closest depth recorded in the map - hence it is in shadow
-			return float4(1.0,0.0,0.0,1.0);
-			shadowFactor = 0.0f;
+			float shadow = g_textures[NonUniformResourceIndex(PC(shadowMapIndex))].Sample(linearSampler, shadowMapUV).r;
+			float currentPixelDepthInLightSpace = posInLightNDC.z;
+			float bias = 0.00001f; //Prevent shadow acne
+			if (currentPixelDepthInLightSpace > shadow)
+			{
+				//Current pixel is further away than closest depth recorded in the map - hence it is in shadow
+				shadowFactor = 0.0f;
+			}
 		}
 	}
+
 	return float4(1.0, 1.0, 1.0, 1.0) * shadowFactor;
 }

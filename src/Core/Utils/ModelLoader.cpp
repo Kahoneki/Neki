@@ -189,6 +189,7 @@ namespace NK
 		                                        /*aiProcess_FlipUVs |*/			//Flip UVs to match Vulkan's top left texcoord system
 		                                        aiProcess_CalcTangentSpace |	//Calculate tangents and bitangents (required for TBN in normal mapping)
 		                                        aiProcess_MakeLeftHanded |
+		                                        aiProcess_JoinIdenticalVertices |
 		                                        (_flipFaceWinding ? aiProcess_FlipWindingOrder : 0)
 		                                       ) };
 

@@ -32,19 +32,19 @@ public:
 //		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel") };
 //		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Cube.gltf", serialisedModelOutputPath, true, true);
 		
-//		m_helmetEntity = m_reg.Create();
-//		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-//		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
-//		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
-//		helmetTransform.SetPosition(glm::vec3(0, 0, -3));
-//		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
+		m_helmetEntity = m_reg.Create();
+		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
+		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
+		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
+		helmetTransform.SetPosition(glm::vec3(0, 0, -3));
+		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 
 		m_groundEntity = m_reg.Create();
 		NK::CModelRenderer& groundModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_groundEntity) };
 		groundModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
 		NK::CTransform& groundTransform{ m_reg.AddComponent<NK::CTransform>(m_groundEntity) };
 		groundTransform.SetPosition(glm::vec3(0, -3, -3));
-		groundTransform.SetScale({ 50.0f, 0.2f, 50.0f });
+		groundTransform.SetScale({ 30.0f, 0.2f, 30.0f });
 
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };

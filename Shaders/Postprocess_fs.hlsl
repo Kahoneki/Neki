@@ -30,5 +30,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	// 	return float4(0.0,0.0,0.0,1.0);
 	// }
     //return float4(shadowMap, shadowMap, shadowMap, 1.0);
+    //return float4(sceneColour.g, sceneColour.g, sceneColour.g, 1.0);
+    //return float4(sceneDepth, sceneDepth, sceneDepth, 1.0);
 	return sceneColour;
 }

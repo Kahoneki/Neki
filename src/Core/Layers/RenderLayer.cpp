@@ -358,6 +358,7 @@ namespace NK
 		SamplerDesc samplerDesc{};
 		samplerDesc.minFilter = FILTER_MODE::LINEAR;
 		samplerDesc.magFilter = FILTER_MODE::LINEAR;
+		samplerDesc.maxAnisotropy = 16.0f;
 		m_linearSampler = m_device->CreateSampler(samplerDesc);
 
 		//Graphics Command Buffers
@@ -431,7 +432,7 @@ namespace NK
 		//Todo: turn this into a loop for all lights and like ykno use a Light struct and whatnot
 		LightCameraShaderData lightCamShaderData{};
 		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(0,0,1));
-//		lightCamShaderData.projMat = glm::orthoLH(-10.0f, 10.0f, -10.0f, 10.0f, 0.01f, 100.0f);
+		//lightCamShaderData.projMat = glm::orthoLH(-10.0f, 10.0f, -10.0f, 10.0f, 0.01f, 100.0f);
 		lightCamShaderData.projMat = glm::perspectiveLH(glm::radians(90.0f), 16.0f / 9.0f, 0.01f, 100.0f);
 		memcpy(m_lightCamDataBufferMap, &lightCamShaderData, sizeof(LightCameraShaderData));
 	}
@@ -507,11 +508,11 @@ namespace NK
 			glm::vec3(0.5f, 0.5f, -0.5f), //6: Back-Right-Top
 			glm::vec3(-0.5f, 0.5f, -0.5f)  //7: Back-Left-Top
 		};
-		BufferDesc skyboxVertBufferDesc{};
-		skyboxVertBufferDesc.size = sizeof(glm::vec3) * 8;
-		skyboxVertBufferDesc.type = MEMORY_TYPE::DEVICE;
-		skyboxVertBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
-		m_cubeVertBuffer = m_device->CreateBuffer(skyboxVertBufferDesc);
+		BufferDesc cubeVertBufferDesc{};
+		cubeVertBufferDesc.size = sizeof(glm::vec3) * 8;
+		cubeVertBufferDesc.type = MEMORY_TYPE::DEVICE;
+		cubeVertBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::VERTEX_BUFFER_BIT;
+		m_cubeVertBuffer = m_device->CreateBuffer(cubeVertBufferDesc);
 
 		//Index Buffer
 		const std::uint32_t indices[36] =
@@ -989,6 +990,8 @@ namespace NK
 				_cmdBuf->DrawIndexed(36, m_modelMatrices.size(), 0, 0);
 				_cmdBuf->EndRendering(0, nullptr, nullptr);
 			});
+
+		
 		
 		meshDesc.AddNode(
 			"SHADOW_PASS",
@@ -1081,7 +1084,7 @@ namespace NK
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
 			MeshPassPushConstantData pushConstantData{};
-			pushConstantData.shadowMapIndex = _texViews.Get("SHADOW_MAP_SRV")->GetIndex();
+			pushConstantData.shadowMapIndex = _texViews.Get(m_desc.enableSSAA ? "SHADOW_MAP_SSAA_SRV" : (m_desc.enableMSAA ? "SHADOW_MAP_MSAA_SRV" : "SHADOW_MAP_SRV"))->GetIndex();
 			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.lightCamDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.skyboxCubemapIndex = _texViews.Get("SKYBOX_VIEW") ? _texViews.Get("SKYBOX_VIEW")->GetIndex() : 0;
@@ -1107,11 +1110,9 @@ namespace NK
 				if (!model) { continue; }
 				pushConstantData.modelMat = transform.GetModelMatrix();
 
-
 				for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
 				{
 					const GPUMesh* mesh{ model->meshes[i].get() };
-
 					pushConstantData.materialBufferIndex = model->materials[mesh->materialIndex]->bufferIndex;
 					_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
 					IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
@@ -1425,14 +1426,15 @@ namespace NK
 		const double time{ TimeManager::GetTotalTime() };
 		constexpr float radius{ 10.0f };
 		constexpr float speed{ 3.0f };
-		constexpr glm::vec3 centre{ 0.0f, 10.0f, -3.0f };
+		constexpr glm::vec3 centre{ 0.0f, 25.0f, -3.0f };
 		
 		const double x{ centre.x + radius * cos(time * speed) };
 		const double z{ centre.z + radius * sin(time * speed) };
 
 		LightCameraShaderData lightCamShaderData{};
-		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(x, 10, z), glm::vec3(x, 0, z), glm::vec3(0,0,1));
-		lightCamShaderData.projMat = glm::perspectiveLH(glm::radians(120.0f), 16.0f / 9.0f, 0.01f, 100.0f);
+		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(x, centre.y, z), glm::vec3(x, 0, z), glm::vec3(0,0,1));
+		lightCamShaderData.projMat = glm::perspectiveLH(glm::radians(120.0f), 1.0f, 0.01f, 100.0f);
+//		lightCamShaderData.projMat = glm::orthoLH(-30.0f, 30.0f, -30.0f, 30.0f, 0.1f, 30.0f);
 		memcpy(m_lightCamDataBufferMap, &lightCamShaderData, sizeof(LightCameraShaderData));
 	}
 
