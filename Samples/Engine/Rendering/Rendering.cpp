@@ -128,9 +128,10 @@ public:
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 //		renderLayerDesc.enableMSAA = true;
 //		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
-		renderLayerDesc.enableSSAA = true;
+		renderLayerDesc.enableSSAA = false;
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.window = m_window.get();
+		renderLayerDesc.framesInFlight = 1;
 		m_renderLayer = NK::UniquePtr<NK::RenderLayer>(NK_NEW(NK::RenderLayer, m_scenes[m_activeScene]->m_reg,  renderLayerDesc));
 
 //		m_postAppLayers.push_back(m_modelVisibilityLayer.get());

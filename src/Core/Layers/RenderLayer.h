@@ -53,7 +53,7 @@ namespace NK
 	private:
 		//Init sub-functions
 		void InitBaseResources();
-		void InitCameraBuffer();
+		void InitCameraBuffers();
 		void InitLightCameraBuffer();
 		void InitModelMatricesBuffer();
 		void InitModelVisibilityBuffers();
@@ -100,12 +100,14 @@ namespace NK
 		std::vector<UniquePtr<ISemaphore>> m_renderFinishedSemaphores;
 		std::vector<UniquePtr<IFence>> m_inFlightFences;
 
-		UniquePtr<IBuffer> m_camDataBuffer;
-		UniquePtr<IBufferView> m_camDataBufferView;
-		void* m_camDataBufferMap;
+		//(one for each frame in flight)
+		std::vector<UniquePtr<IBuffer>> m_camDataBuffers;
+		std::vector<UniquePtr<IBufferView>> m_camDataBufferViews;
+		std::vector<void*> m_camDataBufferMaps;
 		//To avoid temporal artifacts because last frame's depth buffer is being used for the model visibility pass
-		UniquePtr<IBuffer> m_camDataBufferPreviousFrame;
-		UniquePtr<IBufferView> m_camDataBufferPreviousFrameView;
+		//(one for each frame in flight)
+		std::vector<UniquePtr<IBuffer>> m_camDataBuffersPreviousFrame;
+		std::vector<UniquePtr<IBufferView>> m_camDataBufferPreviousFrameViews;
 		
 		struct LightCameraShaderData
 		{

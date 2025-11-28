@@ -38,7 +38,7 @@ namespace NK
 		//For resource transition
 		m_graphicsCommandBuffers[0]->Begin();
 
-		InitCameraBuffer();
+		InitCameraBuffers();
 		InitLightCameraBuffer();
 		InitModelMatricesBuffer();
 		InitModelVisibilityBuffers();
@@ -80,6 +80,9 @@ namespace NK
 
 	void RenderLayer::Update()
 	{
+		//Begin rendering
+		m_inFlightFences[m_currentFrame]->Wait();
+		m_inFlightFences[m_currentFrame]->Reset();
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
 		
 		
@@ -125,11 +128,6 @@ namespace NK
 
 
 		UpdateLightCameraBuffer();
-		
-
-		//Begin rendering
-		m_inFlightFences[m_currentFrame]->Wait();
-		m_inFlightFences[m_currentFrame]->Reset();
 
 
 		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
@@ -201,14 +199,15 @@ namespace NK
 		execDesc.commandBuffers["MODEL_VISIBILITY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["CAMERA_BUFFER_PREVIOUS_FRAME_COPY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SHADOW_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["DEPTH_BARRIER"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		if (m_desc.enableMSAA) { execDesc.commandBuffers["MSAA_RESOLVE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
 		if (m_desc.enableSSAA) { execDesc.commandBuffers["SSAA_DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
 		execDesc.commandBuffers["POSTPROCESS_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 
-		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffer.get());
-		execDesc.buffers.Set("CAMERA_BUFFER_PREVIOUS_FRAME", m_camDataBufferPreviousFrame.get());
+		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffers[m_currentFrame].get());
+		execDesc.buffers.Set("CAMERA_BUFFER_PREVIOUS_FRAME", m_camDataBuffersPreviousFrame[m_currentFrame].get());
 		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", m_lightCamDataBuffer.get());
 		execDesc.buffers.Set("MODEL_MATRICES_BUFFER", m_modelMatricesBuffers[m_currentFrame].get());
 		execDesc.buffers.Set("MODEL_VISIBILITY_BUFFER", m_modelVisibilityBuffers[m_currentFrame].get());
@@ -229,8 +228,8 @@ namespace NK
 		execDesc.textures.Set("SKYBOX", m_skyboxTexture.get());
 
 		execDesc.bufferViews.Set("LIGHT_CAMERA_BUFFER_VIEW", m_lightCamDataBufferView.get());
-		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferView.get());
-		execDesc.bufferViews.Set("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW", m_camDataBufferPreviousFrameView.get());
+		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferViews[m_currentFrame].get());
+		execDesc.bufferViews.Set("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW", m_camDataBufferPreviousFrameViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("MODEL_MATRICES_BUFFER_VIEW", m_modelMatricesBufferViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("MODEL_VISIBILITY_BUFFER_VIEW", m_modelVisibilityBufferViews[m_currentFrame].get());
 
@@ -279,6 +278,8 @@ namespace NK
 		m_currentFrame = (m_currentFrame + 1) % m_desc.framesInFlight;
 
 		m_firstFrame = false;
+
+		m_graphicsQueue->WaitIdle();
 	}
 
 
@@ -399,25 +400,37 @@ namespace NK
 
 
 
-	void RenderLayer::InitCameraBuffer()
+	void RenderLayer::InitCameraBuffers()
 	{
+		m_camDataBuffers.resize(m_desc.framesInFlight);
+		m_camDataBufferViews.resize(m_desc.framesInFlight);
+		m_camDataBufferMaps.resize(m_desc.framesInFlight);
+		m_camDataBuffersPreviousFrame.resize(m_desc.framesInFlight);
+		m_camDataBufferPreviousFrameViews.resize(m_desc.framesInFlight);
+		
 		BufferDesc camDataBufferDesc{};
 		camDataBufferDesc.size = sizeof(CameraShaderData);
 		camDataBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
 		camDataBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
-		m_camDataBuffer = m_device->CreateBuffer(camDataBufferDesc);
-		m_camDataBufferPreviousFrame = m_device->CreateBuffer(camDataBufferDesc);
-		m_graphicsCommandBuffers[0]->TransitionBarrier(m_camDataBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::CONSTANT_BUFFER);
-		m_graphicsCommandBuffers[0]->TransitionBarrier(m_camDataBufferPreviousFrame.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::CONSTANT_BUFFER);
+		for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
+		{
+			m_camDataBuffers[i] = m_device->CreateBuffer(camDataBufferDesc);
+			m_camDataBuffersPreviousFrame[i] = m_device->CreateBuffer(camDataBufferDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_camDataBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::CONSTANT_BUFFER);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_camDataBuffersPreviousFrame[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::CONSTANT_BUFFER);
+		}
 		
 		BufferViewDesc camDataBufferViewDesc{};
 		camDataBufferViewDesc.size = sizeof(CameraShaderData);
 		camDataBufferViewDesc.offset = 0;
 		camDataBufferViewDesc.type = BUFFER_VIEW_TYPE::UNIFORM;
-		m_camDataBufferView = m_device->CreateBufferView(m_camDataBuffer.get(), camDataBufferViewDesc);
-		m_camDataBufferPreviousFrameView = m_device->CreateBufferView(m_camDataBufferPreviousFrame.get(), camDataBufferViewDesc);
+		for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
+		{
+			m_camDataBufferViews[i] = m_device->CreateBufferView(m_camDataBuffers[i].get(), camDataBufferViewDesc);
+			m_camDataBufferPreviousFrameViews[i] = m_device->CreateBufferView(m_camDataBuffersPreviousFrame[i].get(), camDataBufferViewDesc);
 
-		m_camDataBufferMap = m_camDataBuffer->GetMap();
+			m_camDataBufferMaps[i] = m_camDataBuffers[i]->GetMap();
+		}
 	}
 
 
@@ -682,7 +695,7 @@ namespace NK
 		inputAssemblyDesc.topology = INPUT_TOPOLOGY::TRIANGLE_LIST;
 
 		RasteriserDesc rasteriserDesc{};
-		rasteriserDesc.cullMode = CULL_MODE::BACK;
+		rasteriserDesc.cullMode = CULL_MODE::NONE;
 		rasteriserDesc.frontFace = WINDING_DIRECTION::CLOCKWISE;
 		rasteriserDesc.depthBiasEnable = false;
 
@@ -962,7 +975,7 @@ namespace NK
 		
 		meshDesc.AddNode(
 		"MODEL_VISIBILITY_PASS",
-		{{ "CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
+		{{ "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::CONSTANT_BUFFER },
 		{ "MODEL_MATRICES_BUFFER", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "MODEL_VISIBILITY_BUFFER", RESOURCE_STATE::UNORDERED_ACCESS },
 		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
@@ -989,7 +1002,7 @@ namespace NK
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
 			ModelVisibilityPassPushConstantData pushConstantData{};
-			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
+			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW")->GetIndex();
 			pushConstantData.modelMatricesBufferIndex = _bufViews.Get("MODEL_MATRICES_BUFFER_VIEW")->GetIndex();
 			pushConstantData.modelVisibilityBufferIndex = _bufViews.Get("MODEL_VISIBILITY_BUFFER_VIEW")->GetIndex();
 							
@@ -1005,16 +1018,25 @@ namespace NK
 
 
 
-		meshDesc.AddNode(
-		"CAMERA_BUFFER_PREVIOUS_FRAME_COPY_PASS",
-		{{ "CAMERA_BUFFER", RESOURCE_STATE::COPY_SOURCE },
-		{ "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::COPY_DEST }},
-		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
-		{
-			_cmdBuf->CopyBufferToBuffer(_bufs.Get("CAMERA_BUFFER"), _bufs.Get("CAMERA_BUFFER_PREVIOUS_FRAME"), 0, 0, sizeof(CameraShaderData));
-		});
+//		meshDesc.AddNode(
+//		"CAMERA_BUFFER_PREVIOUS_FRAME_COPY_PASS",
+//		{{ "CAMERA_BUFFER", RESOURCE_STATE::COPY_SOURCE },
+//		{ "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::COPY_DEST }},
+//		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+//		{
+//			_cmdBuf->CopyBufferToBuffer(_bufs.Get("CAMERA_BUFFER"), _bufs.Get("CAMERA_BUFFER_PREVIOUS_FRAME"), 0, 0, sizeof(CameraShaderData));
+//		});
+
 
 		
+		meshDesc.AddNode(
+		"DEPTH_BARRIER",
+		{{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
+		 { "SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_READ },
+		 { "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_READ }}
+		);
+
+
 		
 		meshDesc.AddNode(
 		"SHADOW_PASS",
@@ -1437,10 +1459,13 @@ namespace NK
 
 		//Update m_camDataBufferMap with the camera data from this frame
 		const CameraShaderData camShaderData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
-		memcpy(m_camDataBufferMap, &camShaderData, sizeof(CameraShaderData));
+		memcpy(m_camDataBufferMaps[m_currentFrame], &camShaderData, sizeof(CameraShaderData));
 		if (m_firstFrame)
 		{
-			m_graphicsCommandBuffers[0]->CopyBufferToBuffer(m_camDataBuffer.get(), m_camDataBufferPreviousFrame.get(), 0, 0, sizeof(CameraShaderData));
+			for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
+			{
+				m_graphicsCommandBuffers[0]->CopyBufferToBuffer(m_camDataBuffers[i].get(), m_camDataBuffersPreviousFrame[i].get(), 0, 0, sizeof(CameraShaderData));
+			}
 		}
 
 		//Set aspect ratio back to WIN_ASPECT_RATIO for future lookups (can't keep it as the window's current aspect ratio in case it changes)
