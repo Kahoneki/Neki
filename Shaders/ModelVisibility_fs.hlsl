@@ -1,5 +1,7 @@
 #include <Types/ShaderMacros.hlsli>
 
+#pragma enable_dxc_extensions
+
 struct VertexOutput
 {
 	float4 pos : SV_POSITION;
@@ -24,4 +26,6 @@ void FSMain(VertexOutput vertexOutput)
 	//This fragment shader is ran for each visible fragment, usually this would result in a race condition when trying to write to the buffer like this
 	//However, in this instance it's okay since every thread is just writing the same constant value
 	g_modelVisibility[NonUniformResourceIndex(PC(modelVisibilityBufferIndex))][vertexOutput.instanceID] = 1u;
+
+	//printf("hey");
 }

@@ -138,14 +138,14 @@ namespace NK
 			m_modelUnloadQueues[m_currentFrame].pop_back();
 		}
 
-		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityBufferMaps[m_currentFrame]) };
+		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityBufferMaps[(m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight]) };
 		
 		//Model Loading Phase
 		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++i)
 		{
 			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
 			modelRenderer.visible = visibilityMap[i] == 1;
-			m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::APPLICATION, std::to_string(i) + ": " + std::to_string(modelRenderer.visible) + "\n");
+//			m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::APPLICATION, std::to_string(i) + ": " + std::to_string(modelRenderer.visible) + "\n");
 
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
@@ -1018,14 +1018,14 @@ namespace NK
 
 
 
-//		meshDesc.AddNode(
-//		"CAMERA_BUFFER_PREVIOUS_FRAME_COPY_PASS",
-//		{{ "CAMERA_BUFFER", RESOURCE_STATE::COPY_SOURCE },
-//		{ "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::COPY_DEST }},
-//		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
-//		{
-//			_cmdBuf->CopyBufferToBuffer(_bufs.Get("CAMERA_BUFFER"), _bufs.Get("CAMERA_BUFFER_PREVIOUS_FRAME"), 0, 0, sizeof(CameraShaderData));
-//		});
+		meshDesc.AddNode(
+		"CAMERA_BUFFER_PREVIOUS_FRAME_COPY_PASS",
+		{{ "CAMERA_BUFFER", RESOURCE_STATE::COPY_SOURCE },
+		{ "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::COPY_DEST }},
+		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+		{
+			_cmdBuf->CopyBufferToBuffer(_bufs.Get("CAMERA_BUFFER"), _bufs.Get("CAMERA_BUFFER_PREVIOUS_FRAME"), 0, 0, sizeof(CameraShaderData));
+		}, true);
 
 
 		

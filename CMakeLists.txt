@@ -121,7 +121,7 @@ FetchContent_MakeAvailable(glfw)
 target_link_libraries(Neki PUBLIC glfw)
 
 #SFML
-FetchContent_Declare(sfml GIT_REPOSITORY https://github.com/SFML/SFML.git .gitignore TAG 2.6.1)
+FetchContent_Declare(sfml GIT_REPOSITORY https://github.com/SFML/SFML.git GIT_TAG 3.0.2)
 FetchContent_MakeAvailable(sfml)
 target_link_libraries(Neki PUBLIC sfml-network)
 

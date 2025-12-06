@@ -14,10 +14,14 @@ namespace NK
 	typedef std::string BINDING_NAME;
 	struct Node
 	{
-		explicit Node(const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resources)
-		: resources(_resources) {}
+		explicit Node(const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resources, const bool _forceRequire)
+		: resources(_resources), forceRequire(_forceRequire) {}
 
 		std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>> resources; //Pair of resource semantic name and state the node needs it to be in prior to execution
+
+		//kind of a hacky workaround for multi-frame graphs
+		//^todo: get a better system for handling this
+		bool forceRequire;
 	};
 	
 
@@ -46,14 +50,17 @@ namespace NK
 
 	
 	typedef std::string NODE_NAME;
+	
 	struct RenderGraphDesc final
 	{
 		friend class RenderGraph;
 
 
 	public:
-		RenderGraphDesc* AddNode(const NODE_NAME& _name, const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resourceStates, const std::function<void(ICommandBuffer*, const BindingMap<IBuffer>&, const BindingMap<ITexture>&, const BindingMap<IBufferView>&, const BindingMap<ITextureView>&, const BindingMap<ISampler>&)>& _execFunc);
-		RenderGraphDesc* AddNode(const NODE_NAME& _name, const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resourceStates); //For transitions only
+		//_forceRequire flag is kind of a hacky workaround for multi-frame graphs
+		//^todo: get a better system for handling this
+		RenderGraphDesc* AddNode(const NODE_NAME& _name, const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resourceStates, const std::function<void(ICommandBuffer*, const BindingMap<IBuffer>&, const BindingMap<ITexture>&, const BindingMap<IBufferView>&, const BindingMap<ITextureView>&, const BindingMap<ISampler>&)>& _execFunc, bool _forceRequire = false);
+		RenderGraphDesc* AddNode(const NODE_NAME& _name, const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resourceStates, bool _forceRequire = false); //For transitions only
 
 
 	private:

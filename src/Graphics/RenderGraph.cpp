@@ -7,9 +7,9 @@
 namespace NK
 {
 
-	RenderGraphDesc* RenderGraphDesc::AddNode(const NODE_NAME& _name, const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resourceStates, const std::function<void(ICommandBuffer*, const BindingMap<IBuffer>&, const BindingMap<ITexture>&, const BindingMap<IBufferView>&, const BindingMap<ITextureView>&, const BindingMap<ISampler>&)>& _execFunc)
+	RenderGraphDesc* RenderGraphDesc::AddNode(const NODE_NAME& _name, const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resourceStates, const std::function<void(ICommandBuffer*, const BindingMap<IBuffer>&, const BindingMap<ITexture>&, const BindingMap<IBufferView>&, const BindingMap<ITextureView>&, const BindingMap<ISampler>&)>& _execFunc, bool _forceRequire)
 	{
-		nodes.push_back({ _name, Node(_resourceStates) });
+		nodes.push_back({ _name, Node(_resourceStates, _forceRequire) });
 		resources[_name] = _resourceStates;
 		executionFunctions[_name] = _execFunc;
 		return this; //For chaining
@@ -17,9 +17,9 @@ namespace NK
 
 
 
-	RenderGraphDesc* RenderGraphDesc::AddNode(const NODE_NAME& _name, const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resourceStates)
+	RenderGraphDesc* RenderGraphDesc::AddNode(const NODE_NAME& _name, const std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>& _resourceStates, bool _forceRequire)
 	{
-		nodes.push_back({ _name, Node(_resourceStates) });
+		nodes.push_back({ _name, Node(_resourceStates, _forceRequire) });
 		resources[_name] = _resourceStates;
 		return this; //For chaining
 	}
@@ -52,24 +52,28 @@ namespace NK
 		for (std::vector<std::pair<NODE_NAME, Node>>::reverse_iterator nodeIt{ _desc.nodes.rbegin() + 1 }; nodeIt != _desc.nodes.rend(); ++nodeIt)
 		{
 			//Whether or not the node is required
-			bool required{ false };
+			//Initialise to forceRequire then only run requirement check logic if forceRequire is false
+			bool required{ nodeIt->second.forceRequire };
 
-			//Go through all required resources and see if the current node writes to any of them
-			for (std::unordered_map<NODE_NAME, std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>>::const_iterator allReqResIt{ m_requiredResources.begin() }; allReqResIt != m_requiredResources.end(); ++allReqResIt)
+			if (!nodeIt->second.forceRequire)
 			{
-				for (const std::pair<BINDING_NAME, RESOURCE_STATE> requiredResource : allReqResIt->second)
+				//Go through all required resources and see if the current node writes to any of them
+				for (std::unordered_map<NODE_NAME, std::vector<std::pair<BINDING_NAME, RESOURCE_STATE>>>::const_iterator allReqResIt{ m_requiredResources.begin() }; allReqResIt != m_requiredResources.end(); ++allReqResIt)
 				{
-					//starting to heavily consider those bitwise operations....
-					for (const std::pair<BINDING_NAME, RESOURCE_STATE>& nodeRes : _desc.resources[nodeIt->first])
+					for (const std::pair<BINDING_NAME, RESOURCE_STATE> requiredResource : allReqResIt->second)
 					{
-						if (nodeRes.first == requiredResource.first)
+						//starting to heavily consider those bitwise operations....
+						for (const std::pair<BINDING_NAME, RESOURCE_STATE>& nodeRes : _desc.resources[nodeIt->first])
 						{
-							//Current node uses a resource in the required resource list, is it writing to it?
-							const RESOURCE_ACCESS_TYPE accessType{ RHIUtils::GetResourceAccessType(nodeRes.second) };
-							if (accessType == RESOURCE_ACCESS_TYPE::WRITE || accessType == RESOURCE_ACCESS_TYPE::READ_WRITE)
+							if (nodeRes.first == requiredResource.first)
 							{
-								//Node is writing to a resource in the required resource list, which means it itself is required
-								required = true;
+								//Current node uses a resource in the required resource list, is it writing to it?
+								const RESOURCE_ACCESS_TYPE accessType{ RHIUtils::GetResourceAccessType(nodeRes.second) };
+								if (accessType == RESOURCE_ACCESS_TYPE::WRITE || accessType == RESOURCE_ACCESS_TYPE::READ_WRITE)
+								{
+									//Node is writing to a resource in the required resource list, which means it itself is required
+									required = true;
+								}
 							}
 						}
 					}
