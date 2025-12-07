@@ -85,8 +85,12 @@ namespace NK
 			throw std::runtime_error("");
 		}
 		
+		const std::size_t unalignedOffset{ m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size };
+		constexpr std::size_t alignment{ 16 };
+		const std::size_t alignedOffset{ (unalignedOffset + alignment - 1) & ~(alignment - 1) };
+		
 		BufferSubregion subregion{};
-		subregion.offset = (m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size);
+		subregion.offset = alignedOffset;
 		subregion.size = _dstBuffer->GetSize();
 
 		if (subregion.offset + subregion.size > m_stagingBufferSize)
@@ -121,8 +125,12 @@ namespace NK
 
 		const TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
 
+		const std::size_t unalignedOffset{ m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size };
+		constexpr std::size_t alignment{ 16 };
+		const std::size_t alignedOffset{ (unalignedOffset + alignment - 1) & ~(alignment - 1) };
+		
 		BufferSubregion subregion{};
-		subregion.offset = (m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size);
+		subregion.offset = alignedOffset;
 		subregion.size = memLayout.totalBytes;
 
 		if (subregion.offset + subregion.size > m_stagingBufferSize)
@@ -196,8 +204,12 @@ namespace NK
 		
 		const TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
 
+		const std::size_t unalignedOffset{ m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size };
+		constexpr std::size_t alignment{ 16 };
+		const std::size_t alignedOffset{ (unalignedOffset + alignment - 1) & ~(alignment - 1) };
+		
 		BufferSubregion subregion{};
-		subregion.offset = (m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size);
+		subregion.offset = alignedOffset;
 		subregion.size = memLayout.totalBytes;
 
 		if (subregion.offset + subregion.size > m_stagingBufferSize)

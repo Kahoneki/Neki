@@ -31,20 +31,23 @@ public:
 //		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath, true, true);
 //		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel") };
 //		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Cube.gltf", serialisedModelOutputPath, true, true);
+//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel") };
+//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath, true, true);
 		
 		m_helmetEntity = m_reg.Create();
-		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
-		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
-		helmetTransform.SetPosition(glm::vec3(0, 0, -3));
-		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
+//		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
+//		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
+//		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
+//		helmetTransform.SetPosition(glm::vec3(0, 0, -3));
+//		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 
 		m_groundEntity = m_reg.Create();
 		NK::CModelRenderer& groundModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_groundEntity) };
-		groundModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
+		groundModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel";
 		NK::CTransform& groundTransform{ m_reg.AddComponent<NK::CTransform>(m_groundEntity) };
-		groundTransform.SetPosition(glm::vec3(0, -3, -3));
-		groundTransform.SetScale({ 30.0f, 0.2f, 30.0f });
+		groundTransform.SetScale({ 0.01f, 0.01f, 0.01f });
+//		groundTransform.SetPosition(glm::vec3(0, -3, -3));
+//		groundTransform.SetScale({ 30.0f, 0.2f, 30.0f });
 
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
@@ -127,14 +130,13 @@ public:
 		NK::RenderLayerDesc renderLayerDesc{};
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 //		renderLayerDesc.enableMSAA = true;
-//		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
-		renderLayerDesc.enableSSAA = false;
+		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
+		renderLayerDesc.enableSSAA = true;
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.window = m_window.get();
-		renderLayerDesc.framesInFlight = 1;
+		renderLayerDesc.framesInFlight = 3;
 		m_renderLayer = NK::UniquePtr<NK::RenderLayer>(NK_NEW(NK::RenderLayer, m_scenes[m_activeScene]->m_reg,  renderLayerDesc));
-
-//		m_postAppLayers.push_back(m_modelVisibilityLayer.get());
+		
 		m_postAppLayers.push_back(m_renderLayer.get());
 	}
 

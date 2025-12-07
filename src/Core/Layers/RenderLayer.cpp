@@ -144,8 +144,8 @@ namespace NK
 		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++i)
 		{
 			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
-			modelRenderer.visible = visibilityMap[i] == 1;
-//			m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::APPLICATION, std::to_string(i) + ": " + std::to_string(modelRenderer.visible) + "\n");
+//			modelRenderer.visible = visibilityMap[i] == 1;
+			modelRenderer.visible = true;
 
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
@@ -706,7 +706,7 @@ namespace NK
 		depthStencilDesc.stencilTestEnable = false;
 
 		MultisamplingDesc multisamplingDesc{};
-		multisamplingDesc.sampleCount = SAMPLE_COUNT::BIT_1;
+		multisamplingDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
 		multisamplingDesc.sampleMask = UINT32_MAX;
 		multisamplingDesc.alphaToCoverageEnable = false;
 

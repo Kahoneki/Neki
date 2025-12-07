@@ -1,5 +1,6 @@
 #include <Types/ShaderMacros.hlsli>
 
+#pragma enable_dxc_extensions
 
 struct VertexInput
 {
@@ -41,7 +42,7 @@ PUSH_CONSTANTS_BLOCK(
 );
 
 
-VertexOutput VSMain(VertexInput input)
+VertexOutput VSMain(VertexInput input, uint vertexID : SV_VertexID)
 {
     VertexOutput output;
 	CamData camData = g_camData[NonUniformResourceIndex(PC(camDataBufferIndex))];

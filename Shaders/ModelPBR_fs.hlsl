@@ -134,10 +134,14 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
     //Ambient
-	float ambientStrength = 0.5f;
+	float ambientStrength = 0.1f;
 	float3 reflectionDir = reflect(-viewDir, normal);
     float4 skyboxSample = g_skyboxes[NonUniformResourceIndex(PC(skyboxCubemapIndex))].Sample(linearSampler, reflectionDir);
-	float3 ambient = skyboxSample.rgb * albedo * ao * ambientStrength;
+	float3 ambient = skyboxSample.rgb * albedo * ambientStrength;
+	if (material.hasAO)
+	{
+		ambient *= ao;
+	}
 
 
     float3 colour = ambient + emissive + outgoingRadiance;
