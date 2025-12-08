@@ -20,8 +20,8 @@ namespace NK
 
 	struct RenderLayerDesc
 	{
-		explicit RenderLayerDesc(const GRAPHICS_BACKEND _backend, const bool _enableMSAA, const SAMPLE_COUNT _msaaSampleCount, const bool _enableSSAA, const std::uint32_t _ssaaMultiplier, Window* _window, const std::uint32_t _framesInFlight, const std::uint32_t _maxModels)
-		: backend(_backend), enableMSAA(_enableMSAA), msaaSampleCount(_msaaSampleCount), enableSSAA(_enableSSAA), ssaaMultiplier(_ssaaMultiplier), window(_window), framesInFlight(_framesInFlight), maxModels(_maxModels) {}
+		explicit RenderLayerDesc(const GRAPHICS_BACKEND _backend, const bool _enableMSAA, const SAMPLE_COUNT _msaaSampleCount, const bool _enableSSAA, const std::uint32_t _ssaaMultiplier, Window* _window, const std::uint32_t _framesInFlight, const std::uint32_t _maxModels, const std::uint32_t _maxLights)
+		: backend(_backend), enableMSAA(_enableMSAA), msaaSampleCount(_msaaSampleCount), enableSSAA(_enableSSAA), ssaaMultiplier(_ssaaMultiplier), window(_window), framesInFlight(_framesInFlight), maxModels(_maxModels), maxLights(_maxLights) {}
 
 		RenderLayerDesc() {}
 
@@ -38,6 +38,7 @@ namespace NK
 		std::uint32_t framesInFlight{ 3 };
 
 		std::uint32_t maxModels{ 10'000 };
+		std::uint32_t maxLights{ 16 };
 	};
 
 	
@@ -54,7 +55,7 @@ namespace NK
 		//Init sub-functions
 		void InitBaseResources();
 		void InitCameraBuffers();
-		void InitLightCameraBuffer();
+		void InitLightDataBuffer();
 		void InitModelMatricesBuffer();
 		void InitModelVisibilityBuffers();
 		void InitCube();
@@ -70,7 +71,7 @@ namespace NK
 
 		void UpdateSkybox(CSkybox& _skybox);
 		void UpdateCameraBuffer(const CCamera& _camera) const;
-		void UpdateLightCameraBuffer();
+		void UpdateLightDataBuffer();
 		void UpdateModelMatricesBuffer();
 		
 		
@@ -109,14 +110,26 @@ namespace NK
 		std::vector<UniquePtr<IBuffer>> m_camDataBuffersPreviousFrame;
 		std::vector<UniquePtr<IBufferView>> m_camDataBufferPreviousFrameViews;
 		
-		struct LightCameraShaderData
+		struct LightShaderData
 		{
-			glm::mat4 viewMat;
-			glm::mat4 projMat;
+			//Do not reorder - aligned for hlsl
+			
+			glm::mat4 viewProjMat; //For shadow mapping
+			glm::vec3 colour;
+			float intensity;
+			glm::vec3 position;
+			LIGHT_TYPE type;
+			glm::vec3 direction;
+			float innerAngle;
+			float outerAngle;
+			float constantAttenuation;
+			float linearAttenuation;
+			float quadraticAttenuation;
 		};
-		UniquePtr<IBuffer> m_lightCamDataBuffer;
-		UniquePtr<IBufferView> m_lightCamDataBufferView;
-		void* m_lightCamDataBufferMap;
+		std::vector<LightShaderData> m_cpuLightData;
+		UniquePtr<IBuffer> m_lightDataBuffer;
+		UniquePtr<IBufferView> m_lightDataBufferView; //SRV
+		void* m_lightDataBufferMap;
 
 		//Stores the model matrices for all models - regardless of whether the model is loaded or not
 		//(parallel to m_modelVisibilityBuffers)
@@ -169,7 +182,8 @@ namespace NK
 		struct ShadowPassPushConstantData
 		{
 			glm::mat4 modelMat;
-			ResourceIndex lightCamDataBufferIndex;
+			std::size_t numLights;
+			ResourceIndex lightDataBufferIndex;
 		};
 		UniquePtr<IRootSignature> m_shadowPassRootSignature;
 		
@@ -177,7 +191,8 @@ namespace NK
 		{
 			glm::mat4 modelMat;
 			ResourceIndex camDataBufferIndex;
-			ResourceIndex lightCamDataBufferIndex;
+			std::size_t numLights;
+			ResourceIndex lightDataBufferIndex;
 			ResourceIndex shadowMapIndex;
 			ResourceIndex skyboxCubemapIndex;
 			ResourceIndex materialBufferIndex;

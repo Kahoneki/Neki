@@ -787,5 +787,14 @@ namespace NK
 		WRITE,
 		READ_WRITE,
 	};
+
+
+	enum class LIGHT_TYPE : std::uint32_t
+	{
+		UNDEFINED = 0,
+		DIRECTIONAL = 1,
+		POINT = 2,
+		SPOT = 3,
+	};
 	
 }

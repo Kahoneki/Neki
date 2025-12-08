@@ -1,6 +1,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "RenderLayer.h"
 
+#include <Components/CLight.h>
 #include <Components/CModelRenderer.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
@@ -12,6 +13,10 @@
 #include <RHI/ISemaphore.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
+
+#include "Graphics/Lights/DirectionalLight.h"
+#include "Graphics/Lights/PointLight.h"
+#include "Graphics/Lights/SpotLight.h"
 
 #ifdef NEKI_VULKAN_SUPPORTED
 	#include <RHI-Vulkan/VulkanDevice.h>
@@ -39,7 +44,7 @@ namespace NK
 		m_graphicsCommandBuffers[0]->Begin();
 
 		InitCameraBuffers();
-		InitLightCameraBuffer();
+		InitLightDataBuffer();
 		InitModelMatricesBuffer();
 		InitModelVisibilityBuffers();
 		InitCube();
@@ -127,7 +132,7 @@ namespace NK
 		}
 
 
-		UpdateLightCameraBuffer();
+		UpdateLightDataBuffer();
 
 
 		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
@@ -208,7 +213,7 @@ namespace NK
 
 		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffers[m_currentFrame].get());
 		execDesc.buffers.Set("CAMERA_BUFFER_PREVIOUS_FRAME", m_camDataBuffersPreviousFrame[m_currentFrame].get());
-		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", m_lightCamDataBuffer.get());
+		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", m_lightDataBuffer.get());
 		execDesc.buffers.Set("MODEL_MATRICES_BUFFER", m_modelMatricesBuffers[m_currentFrame].get());
 		execDesc.buffers.Set("MODEL_VISIBILITY_BUFFER", m_modelVisibilityBuffers[m_currentFrame].get());
 		
@@ -227,7 +232,7 @@ namespace NK
 		execDesc.textures.Set("BACKBUFFER", m_swapchain->GetImage(imageIndex));
 		execDesc.textures.Set("SKYBOX", m_skyboxTexture.get());
 
-		execDesc.bufferViews.Set("LIGHT_CAMERA_BUFFER_VIEW", m_lightCamDataBufferView.get());
+		execDesc.bufferViews.Set("LIGHT_CAMERA_BUFFER_VIEW", m_lightDataBufferView.get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW", m_camDataBufferPreviousFrameViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("MODEL_MATRICES_BUFFER_VIEW", m_modelMatricesBufferViews[m_currentFrame].get());
@@ -435,29 +440,22 @@ namespace NK
 
 
 
-	void RenderLayer::InitLightCameraBuffer()
+	void RenderLayer::InitLightDataBuffer()
 	{
-		BufferDesc lightCamDataBufferDesc{};
-		lightCamDataBufferDesc.size = sizeof(CameraShaderData);
-		lightCamDataBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
-		lightCamDataBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
-		m_lightCamDataBuffer = m_device->CreateBuffer(lightCamDataBufferDesc);
-		m_graphicsCommandBuffers[0]->TransitionBarrier(m_lightCamDataBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::CONSTANT_BUFFER);
+		BufferDesc lightDataBufferDesc{};
+		lightDataBufferDesc.size = sizeof(LightShaderData) * m_desc.maxLights;
+		lightDataBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
+		lightDataBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT;
+		m_lightDataBuffer = m_device->CreateBuffer(lightDataBufferDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_lightDataBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::SHADER_RESOURCE);
 
-		BufferViewDesc lightCamDataBufferViewDesc{};
-		lightCamDataBufferViewDesc.size = sizeof(CameraShaderData);
-		lightCamDataBufferViewDesc.offset = 0;
-		lightCamDataBufferViewDesc.type = BUFFER_VIEW_TYPE::UNIFORM;
-		m_lightCamDataBufferView = m_device->CreateBufferView(m_lightCamDataBuffer.get(), lightCamDataBufferViewDesc);
+		BufferViewDesc lightDataBufferViewDesc{};
+		lightDataBufferViewDesc.size = sizeof(LightShaderData);
+		lightDataBufferViewDesc.offset = 0;
+		lightDataBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
+		m_lightDataBufferView = m_device->CreateBufferView(m_lightDataBuffer.get(), lightDataBufferViewDesc);
 
-		m_lightCamDataBufferMap = m_lightCamDataBuffer->GetMap();
-
-		//Todo: turn this into a loop for all lights and like ykno use a Light struct and whatnot
-		LightCameraShaderData lightCamShaderData{};
-		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(0,0,1));
-		//lightCamShaderData.projMat = glm::orthoLH(-10.0f, 10.0f, -10.0f, 10.0f, 0.01f, 100.0f);
-		lightCamShaderData.projMat = glm::perspectiveLH(glm::radians(90.0f), 16.0f / 9.0f, 0.01f, 100.0f);
-		memcpy(m_lightCamDataBufferMap, &lightCamShaderData, sizeof(LightCameraShaderData));
+		m_lightDataBufferMap = m_lightDataBuffer->GetMap();
 	}
 
 
@@ -1065,7 +1063,8 @@ namespace NK
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
 			ShadowPassPushConstantData pushConstantData{};
-			pushConstantData.lightCamDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
+			pushConstantData.numLights = m_cpuLightData.size();
+			pushConstantData.lightDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
 			
 			//Models
 			std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
@@ -1131,7 +1130,8 @@ namespace NK
 			MeshPassPushConstantData pushConstantData{};
 			pushConstantData.shadowMapIndex = _texViews.Get(m_desc.enableSSAA ? "SHADOW_MAP_SSAA_SRV" : (m_desc.enableMSAA ? "SHADOW_MAP_MSAA_SRV" : "SHADOW_MAP_SRV"))->GetIndex();
 			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
-			pushConstantData.lightCamDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
+			pushConstantData.numLights = m_cpuLightData.size();
+			pushConstantData.lightDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.skyboxCubemapIndex = _texViews.Get("SKYBOX_VIEW") ? _texViews.Get("SKYBOX_VIEW")->GetIndex() : 0;
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 
@@ -1474,21 +1474,91 @@ namespace NK
 
 
 
-	void RenderLayer::UpdateLightCameraBuffer()
+	void RenderLayer::UpdateLightDataBuffer()
 	{
-		const double time{ TimeManager::GetTotalTime() };
-		constexpr float radius{ 10.0f };
-		constexpr float speed{ 3.0f };
-		constexpr glm::vec3 centre{ 0.0f, 25.0f, -3.0f };
-		
-		const double x{ centre.x + radius * cos(time * speed) };
-		const double z{ centre.z + radius * sin(time * speed) };
+		bool bufferDirty{ false };
+		m_cpuLightData.clear();
+		for (auto&& [transform, light] : m_reg.get().View<CTransform, CLight>())
+		{
+			//Buffer is dirty if either transform.lightBufferDirty or light.light->dirty
+			if (transform.lightBufferDirty || light.light->GetDirty())
+			{
+				bufferDirty = true;
+			}
 
-		LightCameraShaderData lightCamShaderData{};
-		lightCamShaderData.viewMat = glm::lookAtLH(glm::vec3(x, centre.y, z), glm::vec3(x, 0, z), glm::vec3(0,0,1));
-		lightCamShaderData.projMat = glm::perspectiveLH(glm::radians(120.0f), 1.0f, 0.01f, 100.0f);
-//		lightCamShaderData.projMat = glm::orthoLH(-30.0f, 30.0f, -30.0f, 30.0f, 0.1f, 30.0f);
-		memcpy(m_lightCamDataBufferMap, &lightCamShaderData, sizeof(LightCameraShaderData));
+			LightShaderData shaderData{};
+			shaderData.colour = light.light->GetColour();
+			shaderData.intensity = light.light->GetIntensity();
+			shaderData.position = transform.GetPosition();
+			shaderData.type = light.lightType;
+
+			//Calculate direction and view matrix from rotation
+			const glm::quat orientation{ glm::quat(transform.GetRotation()) };
+			shaderData.direction = glm::normalize(orientation * glm::vec3(0, 0, 1));
+			const glm::vec3 forward{ glm::normalize(orientation * glm::vec3(0, 0, 1)) };
+			const glm::vec3 up{ glm::normalize(orientation * glm::vec3(0, 1, 0)) };
+			const glm::mat4 viewMat{ glm::lookAtLH(transform.GetPosition(), transform.GetPosition() + forward, up) };
+			
+			switch (light.lightType)
+			{
+			case LIGHT_TYPE::UNDEFINED:
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "UpdateLightDataBuffer() - light.lightType = LIGHT_TYPE::UNDEFINED\n");
+				throw std::runtime_error("");
+				break;
+			}
+			case LIGHT_TYPE::DIRECTIONAL:
+			{
+				const DirectionalLight* dirLight{ dynamic_cast<DirectionalLight*>(light.light.get()) };
+
+				const glm::vec3& d{ dirLight->GetDimensions() };
+				const glm::mat4 projMat{ glm::orthoLH(-d.x, d.x, -d.y, d.y, -d.z, d.z) };
+				shaderData.viewProjMat = projMat * viewMat;
+				
+				break;
+			}
+			case LIGHT_TYPE::POINT:
+			{
+				const PointLight* pointLight{ dynamic_cast<PointLight*>(light.light.get()) };
+
+				//Shadow mapping for point lights requires 6 draw calls to create a cubemap
+				//View matrices are aligned to the world axes
+				//Projection matrix is constant for all point lights
+				//Matrices are calculated at draw time for point lights
+
+				shaderData.constantAttenuation = pointLight->GetConstantAttenuation();
+				shaderData.linearAttenuation = pointLight->GetLinearAttenuation();
+				shaderData.quadraticAttenuation = pointLight->GetQuadraticAttenuation();
+				
+				break;
+			}
+			case LIGHT_TYPE::SPOT:
+			{
+				const SpotLight* spotLight{ dynamic_cast<SpotLight*>(light.light.get()) };
+
+				const glm::mat4 projMat{ glm::perspectiveLH(glm::radians(spotLight->GetOuterAngle()), 1.0f, 0.01f, 100.0f) }; //todo: add range parameters for spot light shadow mapping
+				shaderData.viewProjMat = projMat * viewMat;
+				
+				shaderData.constantAttenuation = spotLight->GetConstantAttenuation();
+				shaderData.linearAttenuation = spotLight->GetLinearAttenuation();
+				shaderData.quadraticAttenuation = spotLight->GetQuadraticAttenuation();
+
+				shaderData.innerAngle = spotLight->GetInnerAngle();
+				shaderData.outerAngle = spotLight->GetOuterAngle();
+				
+				break;
+			}
+			}
+
+			transform.lightBufferDirty = false;
+			light.light->SetDirty(false);
+			m_cpuLightData.push_back(std::move(shaderData));
+		}
+
+		if (bufferDirty)
+		{
+			memcpy(m_lightDataBufferMap, m_cpuLightData.data(), sizeof(LightShaderData) * m_cpuLightData.size());
+		}
 	}
 
 

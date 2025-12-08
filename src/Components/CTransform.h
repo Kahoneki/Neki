@@ -19,7 +19,7 @@ namespace NK
 		[[nodiscard]] inline glm::vec3 GetScale() const { return scale; }
 		[[nodiscard]] inline glm::mat4 GetModelMatrix()
 		{
-			if (!dirty) { return modelMat; }
+			if (!modelMatDirty) { return modelMat; }
 			//Scale -> Rotation -> Translation
 			//Because matrix multiplication order is reversed, do trans * rot * scale
 
@@ -29,22 +29,26 @@ namespace NK
 
 			modelMat = transMat * rotMat * scaleMat;
 
-			dirty = false;
+			modelMatDirty = false;
 
 			return modelMat;
 		}
 
-		inline void SetPosition(const glm::vec3 _val) { pos = _val; dirty = true; }
+		inline void SetPosition(const glm::vec3 _val) { pos = _val; modelMatDirty = true; lightBufferDirty = true; }
 		//Set euler rotation in radians
-		inline void SetRotation(const glm::vec3 _val) { rot = _val; dirty = true; }
-		inline void SetScale(const glm::vec3 _val) { scale = _val; dirty = true; }
+		inline void SetRotation(const glm::vec3 _val) { rot = _val; modelMatDirty = true; lightBufferDirty = true; }
+		inline void SetScale(const glm::vec3 _val) { scale = _val; modelMatDirty = true; lightBufferDirty = true; }
 		
 		
 	private:
 		glm::mat4 modelMat{ glm::mat4(1.0f) };
 
 		//True if pos, rot, and/or scale have been changed but modelMat hasn't been updated yet
-		bool dirty{ true };
+		bool modelMatDirty{ true };
+
+		//For lights
+		//True if pos, rot, and/or scale have been changed but the light buffer hasn't been updated yet by RenderLayer
+		bool lightBufferDirty{ true };
 		
 		glm::vec3 pos{ glm::vec3(0.0f) };
 		glm::vec3 rot{ glm::vec3(0.0f) }; //Euler in radians

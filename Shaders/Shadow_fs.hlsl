@@ -8,12 +8,12 @@ struct VertexOutput
 
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
+	uint numLights;
 	uint lightCamDataBufferIndex;
 );
 
 
 [shader("pixel")]
-float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
+void FSMain(VertexOutput vertexOutput)
 {
-    return float4(0, 0, 0, 0);
 }

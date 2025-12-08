@@ -15,10 +15,19 @@ struct VertexOutput
 };
 
 
-struct LightCamData
-{
-	float4x4 viewMat;
-	float4x4 projMat;
+struct LightData
+{		
+	float4x4 viewProjMat; //For shadow mapping
+	float3 colour;
+	float intensity;
+	float3 position;
+	uint type;
+	float3 direction;
+	float innerAngle;
+	float outerAngle;
+	float constantAttenuation;
+	float linearAttenuation;
+	float quadraticAttenuation;
 };
 
 [[vk::binding(0,0)]] ConstantBuffer<LightCamData> g_lightCamData[] : register(b0, space0);
@@ -26,6 +35,7 @@ struct LightCamData
 
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
+	uint numLights;
 	uint lightCamDataBufferIndex;
 );
 

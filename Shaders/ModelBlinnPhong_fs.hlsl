@@ -11,20 +11,30 @@ struct VertexOutput
 	float3x3 TBN : TBN;	
 };
 
-struct LightCamData
-{
-	float4x4 viewMat;
-	float4x4 projMat;
+struct LightData
+{		
+	float4x4 viewProjMat; //For shadow mapping
+	float3 colour;
+	float intensity;
+	float3 position;
+	uint type;
+	float3 direction;
+	float innerAngle;
+	float outerAngle;
+	float constantAttenuation;
+	float linearAttenuation;
+	float quadraticAttenuation;
 };
 
-[[vk::binding(0,0)]] ConstantBuffer<LightCamData> g_lightCamData[] : register(b0, space0);
+[[vk::binding(0,0)]] StructuredBuffer<LightData> g_lightData[] : register(t0, space0);
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
 
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
 	uint camDataBufferIndex;
-	uint lightCamDataBufferIndex;
+	uint numLights;
+	uint lightDataBufferIndex;
 	uint shadowMapIndex;
 	uint skyboxCubemapIndex;
 	uint materialBufferIndex;
@@ -46,8 +56,8 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	}
 	else
 	{
-		LightCamData lightCamData = g_lightCamData[NonUniformResourceIndex(PC(lightCamDataBufferIndex))];
-		float4 posInLightClipSpace = mul(lightCamData.projMat, mul(lightCamData.viewMat, float4(vertexOutput.worldPos, 1.0)));
+		LightData lightData = g_lightData[NonUniformResourceIndex(PC(lightDataBufferIndex))];
+		float4 posInLightClipSpace = mul(lightData.projViewMat, float4(vertexOutput.worldPos, 1.0));
 		float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
 		float2 shadowMapUV = float2(posInLightNDC.x * 0.5f + 0.5f, posInLightNDC.y * -0.5f + 0.5f);
 		if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f)
