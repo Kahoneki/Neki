@@ -36,7 +36,13 @@ PUSH_CONSTANTS_BLOCK(
 	uint numLights;
 	uint lightDataBufferIndex;
 	uint shadowMapIndex;
+
 	uint skyboxCubemapIndex;
+	uint irradianceCubemapIndex;
+	uint prefilterCubemapIndex;
+	uint brdfLUTIndex;
+	uint brdfLUTSamplerIndex;
+
 	uint materialBufferIndex;
 	uint samplerIndex;
 );
@@ -56,8 +62,8 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	}
 	else
 	{
-		LightData lightData = g_lightData[NonUniformResourceIndex(PC(lightDataBufferIndex))];
-		float4 posInLightClipSpace = mul(lightData.projViewMat, float4(vertexOutput.worldPos, 1.0));
+		LightData lightData = g_lightData[NonUniformResourceIndex(PC(lightDataBufferIndex))][0];
+		float4 posInLightClipSpace = mul(lightData.viewProjMat, float4(vertexOutput.worldPos, 1.0));
 		float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
 		float2 shadowMapUV = float2(posInLightNDC.x * 0.5f + 0.5f, posInLightNDC.y * -0.5f + 0.5f);
 		if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f)

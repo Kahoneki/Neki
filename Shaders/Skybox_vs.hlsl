@@ -26,6 +26,9 @@ struct CamData
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
 	uint camDataBufferIndex;
+	uint numLights;
+	uint lightDataBufferIndex;
+	uint shadowMapIndex;
 	uint skyboxCubemapIndex;
 	uint materialBufferIndex;
 	uint samplerIndex;

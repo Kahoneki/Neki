@@ -5,6 +5,10 @@
 #include <Components/CModelRenderer.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
+#include <Core/Utils/TextureCompressor.h>
+#include <Graphics/Lights/DirectionalLight.h>
+#include <Graphics/Lights/PointLight.h>
+#include <Graphics/Lights/SpotLight.h>
 #include <Managers/TimeManager.h>
 #include <RHI/IBuffer.h>
 #include <RHI/IBufferView.h>
@@ -13,10 +17,6 @@
 #include <RHI/ISemaphore.h>
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
-
-#include "Graphics/Lights/DirectionalLight.h"
-#include "Graphics/Lights/PointLight.h"
-#include "Graphics/Lights/SpotLight.h"
 
 #ifdef NEKI_VULKAN_SUPPORTED
 	#include <RHI-Vulkan/VulkanDevice.h>
@@ -52,6 +52,7 @@ namespace NK
 		InitShadersAndPipelines();
 		InitRenderGraphs();
 		InitScreenResources();
+		InitBRDFLut();
 
 		m_graphicsCommandBuffers[0]->End();
 		m_graphicsQueue->Submit(m_graphicsCommandBuffers[0].get(), nullptr, nullptr, nullptr);
@@ -102,10 +103,7 @@ namespace NK
 				break;
 			}
 			found = true;
-			if (skybox.dirty)
-			{
-				UpdateSkybox(skybox);
-			}
+			UpdateSkybox(skybox);
 		}
 		if (!found)
 		{
@@ -231,6 +229,9 @@ namespace NK
 
 		execDesc.textures.Set("BACKBUFFER", m_swapchain->GetImage(imageIndex));
 		execDesc.textures.Set("SKYBOX", m_skyboxTexture.get());
+		execDesc.textures.Set("IRRADIANCE_MAP", m_irradianceMap.get());
+		execDesc.textures.Set("PREFILTER_MAP", m_prefilterMap.get());
+		execDesc.textures.Set("BRDF_LUT", m_brdfLUT.get());
 
 		execDesc.bufferViews.Set("LIGHT_CAMERA_BUFFER_VIEW", m_lightDataBufferView.get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferViews[m_currentFrame].get());
@@ -261,9 +262,13 @@ namespace NK
 
 		execDesc.textureViews.Set("BACKBUFFER_RTV", m_swapchain->GetImageView(imageIndex));
 		execDesc.textureViews.Set("SKYBOX_VIEW", m_skyboxTextureView.get());
+		execDesc.textureViews.Set("IRRADIANCE_MAP_VIEW", m_skyboxTextureView.get());
+		execDesc.textureViews.Set("PREFILTER_MAP_VIEW", m_skyboxTextureView.get());
+		execDesc.textureViews.Set("BRDF_LUT_VIEW", m_skyboxTextureView.get());
 
 		execDesc.samplers.Set("SAMPLER", m_linearSampler.get());
-
+		execDesc.samplers.Set("BRDF_LUT_SAMPLER", m_linearSampler.get());
+		
 		m_meshRenderGraph->Execute(execDesc);
 
 		
@@ -367,13 +372,21 @@ namespace NK
 		swapchainDesc.presentQueue = m_graphicsQueue.get();
 		m_swapchain = m_device->CreateSwapchain(swapchainDesc);
 
-		//Sampler
+		
+		//Samplers
 		SamplerDesc samplerDesc{};
 		samplerDesc.minFilter = FILTER_MODE::LINEAR;
 		samplerDesc.magFilter = FILTER_MODE::LINEAR;
+		samplerDesc.mipmapFilter = FILTER_MODE::LINEAR;
 		samplerDesc.maxAnisotropy = 16.0f;
 		m_linearSampler = m_device->CreateSampler(samplerDesc);
 
+		samplerDesc.maxAnisotropy = 1.0f;
+		samplerDesc.addressModeU = ADDRESS_MODE::CLAMP_TO_EDGE;
+		samplerDesc.addressModeV = ADDRESS_MODE::CLAMP_TO_EDGE;
+		m_brdfLUTSampler = m_device->CreateSampler(samplerDesc);
+		
+		
 		//Graphics Command Buffers
 		m_graphicsCommandBuffers.resize(m_desc.framesInFlight);
 		for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
@@ -835,7 +848,7 @@ namespace NK
 		pipelineDesc.depthStencilDesc = depthStencilDesc;
 		pipelineDesc.multisamplingDesc = multisamplingDesc;
 		pipelineDesc.colourBlendDesc = colourBlendDesc;
-		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R8G8B8A8_SRGB };
+		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R16G16B16A16_SFLOAT };
 		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
 
 		m_skyboxPipeline = m_device->CreatePipeline(pipelineDesc);
@@ -884,7 +897,7 @@ namespace NK
 		pipelineDesc.depthStencilDesc = depthStencilDesc;
 		pipelineDesc.multisamplingDesc = multisamplingDesc;
 		pipelineDesc.colourBlendDesc = colourBlendDesc;
-		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R8G8B8A8_SRGB };
+		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R16G16B16A16_SFLOAT };
 		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
 
 		m_blinnPhongPipeline = m_device->CreatePipeline(pipelineDesc);
@@ -1106,7 +1119,10 @@ namespace NK
 		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
 		{ "SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE },
 		{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE },
-		{ "SKYBOX", RESOURCE_STATE::SHADER_RESOURCE }},
+		{ "SKYBOX", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "IRRADIANCE_MAP", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "PREFILTER_MAP", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "BRDF_LUT", RESOURCE_STATE::SHADER_RESOURCE }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
 			if (m_desc.enableMSAA)
@@ -1133,6 +1149,10 @@ namespace NK
 			pushConstantData.numLights = m_cpuLightData.size();
 			pushConstantData.lightDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.skyboxCubemapIndex = _texViews.Get("SKYBOX_VIEW") ? _texViews.Get("SKYBOX_VIEW")->GetIndex() : 0;
+			pushConstantData.irradianceCubemapIndex = _texViews.Get("IRRADIANCE_MAP_VIEW") ? _texViews.Get("IRRADIANCE_MAP_VIEW")->GetIndex() : 0;
+			pushConstantData.prefilterCubemapIndex = _texViews.Get("PREFILTER_MAP_VIEW") ? _texViews.Get("PREFILTER_MAP_VIEW")->GetIndex() : 0;
+			pushConstantData.brdfLUTIndex = _texViews.Get("BRDF_LUT_VIEW")->GetIndex();
+			pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 
 			//Skybox
@@ -1320,7 +1340,7 @@ namespace NK
 		//Scene Colour
 		TextureDesc sceneColourDesc{};
 		sceneColourDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-		sceneColourDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
+		sceneColourDesc.format = DATA_FORMAT::R16G16B16A16_SFLOAT;
 		sceneColourDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
 		sceneColourDesc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		sceneColourDesc.arrayTexture = false;
@@ -1349,7 +1369,7 @@ namespace NK
 		//Scene Colour RTVs
 		TextureViewDesc sceneColourViewDesc{};
 		sceneColourViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
-		sceneColourViewDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
+		sceneColourViewDesc.format = DATA_FORMAT::R16G16B16A16_SFLOAT;
 		sceneColourViewDesc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
 		m_sceneColourRTV = m_device->CreateRenderTargetTextureView(m_sceneColour.get(), sceneColourViewDesc);
 		if (m_desc.enableMSAA) { m_sceneColourMSAARTV = m_device->CreateRenderTargetTextureView(m_sceneColourMSAA.get(), sceneColourViewDesc); }
@@ -1415,35 +1435,67 @@ namespace NK
 
 
 
+	void RenderLayer::InitBRDFLut()
+	{
+		ImageData* brdfLutImageData{ ImageLoader::LoadImage("Samples/Resource-Files/Skyboxes/brdf_lut.png", true, false) };
+		brdfLutImageData->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
+		m_brdfLUT = m_device->CreateTexture(brdfLutImageData->desc);
+		m_gpuUploader->EnqueueTextureDataUpload(brdfLutImageData->data, m_brdfLUT.get(), RESOURCE_STATE::UNDEFINED);
+
+		TextureViewDesc brdfLutTextureViewDesc{};
+		brdfLutTextureViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
+		brdfLutTextureViewDesc.format = DATA_FORMAT::R8G8B8A8_UNORM;
+		brdfLutTextureViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+		m_brdfLUTView = m_device->CreateShaderResourceTextureView(m_brdfLUT.get(), brdfLutTextureViewDesc);
+	}
+
+
+
 	void RenderLayer::UpdateSkybox(CSkybox& _skybox)
 	{
-		const std::array<std::string, 6> textureNames{ "right", "left", "top", "bottom", "front", "back" };
-		void* skyboxImageData[6];
-		std::string filepath{};
-		for (std::size_t i{ 0 }; i < 6; ++i)
+		TextureViewDesc textureViewDesc{};
+		textureViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_CUBE;
+		textureViewDesc.format = DATA_FORMAT::R16G16B16A16_SFLOAT;
+		textureViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+		textureViewDesc.baseArrayLayer = 0;
+		textureViewDesc.arrayLayerCount = 6;
+		
+		
+		if (_skybox.skyboxFilepathDirty)
 		{
-			filepath = _skybox.GetTextureDirectory() + "/" + textureNames[i] + "." + _skybox.GetFileExtension();
-			skyboxImageData[i] = ImageLoader::LoadImage(filepath, false, true)->data;
+			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetSkyboxFilepath(), false, true) };
+			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
+			m_skyboxTexture = m_device->CreateTexture(data->desc);
+			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_skyboxTexture.get(), RESOURCE_STATE::UNDEFINED);
+			m_skyboxTextureView = m_device->CreateShaderResourceTextureView(m_skyboxTexture.get(), textureViewDesc);
+			m_newGPUUploaderUpload = true;
+			_skybox.skyboxFilepathDirty = false;
+		}
+
+		
+		if (_skybox.irradianceFilepathDirty)
+		{
+			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetIrradianceFilepath(), false, true) };
+			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
+			m_irradianceMap = m_device->CreateTexture(data->desc);
+			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_irradianceMap.get(), RESOURCE_STATE::UNDEFINED);
+			m_irradianceMapView = m_device->CreateShaderResourceTextureView(m_irradianceMap.get(), textureViewDesc);
+			m_newGPUUploaderUpload = true;
+			_skybox.irradianceFilepathDirty = false;
+		}
+
+		
+		if (_skybox.prefilterFilepathDirty)
+		{
+			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetSkyboxFilepath(), false, true) };
+			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
+			m_prefilterMap = m_device->CreateTexture(data->desc);
+			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_prefilterMap.get(), RESOURCE_STATE::UNDEFINED);
+			m_prefilterMapView = m_device->CreateShaderResourceTextureView(m_prefilterMap.get(), textureViewDesc);
+			m_newGPUUploaderUpload = true;
+			_skybox.prefilterFilepathDirty = false;
 		}
 		
-		TextureDesc skyboxTextureDesc{ ImageLoader::LoadImage(filepath, false, true)->desc }; //cached, very inexpensive load
-		skyboxTextureDesc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
-		skyboxTextureDesc.arrayTexture = true;
-		skyboxTextureDesc.size.z = 6;
-		skyboxTextureDesc.cubemap = true;
-		m_skyboxTexture = m_device->CreateTexture(skyboxTextureDesc);
-		m_gpuUploader->EnqueueArrayTextureDataUpload(skyboxImageData, m_skyboxTexture.get(), RESOURCE_STATE::UNDEFINED);
-		m_newGPUUploaderUpload = true;
-
-		TextureViewDesc skyboxTextureViewDesc{};
-		skyboxTextureViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_CUBE;
-		skyboxTextureViewDesc.format = DATA_FORMAT::R8G8B8A8_SRGB;
-		skyboxTextureViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
-		skyboxTextureViewDesc.baseArrayLayer = 0;
-		skyboxTextureViewDesc.arrayLayerCount = 6;
-		m_skyboxTextureView = m_device->CreateShaderResourceTextureView(m_skyboxTexture.get(), skyboxTextureViewDesc);
-		
-		_skybox.dirty = false;
 	}
 
 

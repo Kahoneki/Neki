@@ -43,7 +43,7 @@ namespace NK
 		imageInfo.extent.width = m_size.x;
 		imageInfo.extent.height = m_size.y;
 		imageInfo.extent.depth = m_arrayTexture ? 1 : m_size.z;
-		imageInfo.mipLevels = 1;
+		imageInfo.mipLevels = _desc.mipLevels;
 
 		if (m_arrayTexture)
 		{

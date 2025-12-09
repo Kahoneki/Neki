@@ -39,7 +39,13 @@ PUSH_CONSTANTS_BLOCK(
 	uint numLights;
 	uint lightDataBufferIndex;
 	uint shadowMapIndex;
+
 	uint skyboxCubemapIndex;
+	uint irradianceCubemapIndex;
+	uint prefilterCubemapIndex;
+	uint brdfLUTIndex;
+	uint brdfLUTSamplerIndex;
+
 	uint materialBufferIndex;
 	uint samplerIndex;
 );

@@ -60,9 +60,9 @@ namespace NK
 		}
 		}
 		m_resourceDesc.Alignment = 0;
-		m_resourceDesc.MipLevels = 1;
+		m_resourceDesc.MipLevels = _desc.mipLevels;
 		m_resourceDesc.Format = GetDXGIFormat(m_format);
-		m_resourceDesc.SampleDesc.Count = GetSampleCount();
+		m_resourceDesc.SampleDesc.Count = GetD3D12SampleCount();
 		m_resourceDesc.SampleDesc.Quality = 0;
 		m_resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		m_resourceDesc.Flags = GetCreationFlags();
@@ -109,7 +109,7 @@ namespace NK
 
 
 
-	UINT D3D12Texture::GetSampleCount() const
+	UINT D3D12Texture::GetD3D12SampleCount() const
 	{
 		switch (m_sampleCount)
 		{

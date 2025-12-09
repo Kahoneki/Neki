@@ -133,32 +133,36 @@ namespace NK
 			return &(it->second);
 		}
 		
-		ktxTexture2* texture;
-		ktx_error_code_e ktxResult{ ktxTexture2_CreateFromNamedFile(_filepath.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture) };
+		ktxTexture* texture;
+		ktx_error_code_e ktxResult{ ktxTexture_CreateFromNamedFile(_filepath.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture) };
 		if (ktxResult != KTX_SUCCESS)
 		{
-			ktxTexture2_Destroy(texture);
+			ktxTexture_Destroy(texture);
 			throw std::runtime_error("TextureCompressor::LoadImage() - ktxTexture2_CreateFromNamedFile for filepath " + _filepath + " failed: " + std::string(ktxErrorString(ktxResult)));
 		}
-		
-		if (ktxTexture2_NeedsTranscoding(texture))
+
+		if (texture->classId == ktxTexture2_c)
 		{
-			//Transcode to appropriate bcn
-			
-			ktx_transcode_fmt_e targetFormat{ KTX_TTF_NOSELECTION };
-
-			//Select correct bcn format based on channel count
-			const std::uint32_t numComponents{ ktxTexture2_GetNumComponents(texture) };
-			if (numComponents == 1) { targetFormat = KTX_TTF_BC4_R; } //R8 -> BC4
-			else if (numComponents == 2) { targetFormat = KTX_TTF_BC5_RG; } //RG8 -> BC5
-			else { targetFormat = KTX_TTF_BC7_RGBA; } //RGB8 / RGBA8 -> BC7
-
-			//Transcode from UASTC to BCn
-			ktxResult = ktxTexture2_TranscodeBasis(texture, targetFormat, 0);
-			if (ktxResult != KTX_SUCCESS)
+			ktxTexture2* texture2{ reinterpret_cast<ktxTexture2*>(texture) };
+			if (ktxTexture2_NeedsTranscoding(texture2))
 			{
-				ktxTexture2_Destroy(texture);
-				throw std::runtime_error("TextureCompressor::LoadImage() - ktxTexture2_TranscodeBasis failed: " + std::string(ktxErrorString(ktxResult)));
+				//Transcode to appropriate bcn
+			
+				ktx_transcode_fmt_e targetFormat{ KTX_TTF_NOSELECTION };
+
+				//Select correct bcn format based on channel count
+				const std::uint32_t numComponents{ ktxTexture2_GetNumComponents(texture2) };
+				if (numComponents == 1) { targetFormat = KTX_TTF_BC4_R; } //R8 -> BC4
+				else if (numComponents == 2) { targetFormat = KTX_TTF_BC5_RG; } //RG8 -> BC5
+				else { targetFormat = KTX_TTF_BC7_RGBA; } //RGB8 / RGBA8 -> BC7
+
+				//Transcode from UASTC to BCn
+				ktxResult = ktxTexture2_TranscodeBasis(texture2, targetFormat, 0);
+				if (ktxResult != KTX_SUCCESS)
+				{
+					ktxTexture2_Destroy(texture2);
+					throw std::runtime_error("TextureCompressor::LoadImage() - ktxTexture2_TranscodeBasis failed: " + std::string(ktxErrorString(ktxResult)));
+				}
 			}
 		}
 
@@ -166,11 +170,54 @@ namespace NK
 		ImageData imageData{};
 		imageData.desc.size.x = texture->baseWidth;
 		imageData.desc.size.y = texture->baseHeight;
-		imageData.desc.size.z = 1; //todo: 3d texture support, array support
+		if (texture->isCubemap)
+		{
+			//Cubemap
+			imageData.desc.cubemap = true;
+			imageData.desc.arrayTexture = true;
+			imageData.desc.size.z = 6;
+		}
+		else if (texture->numLayers > 1)
+		{
+			//Non-cubemap array texture
+			imageData.desc.cubemap = false;
+			imageData.desc.arrayTexture = true;
+			imageData.desc.size.z = texture->numLayers;
+		}
+		else
+		{
+			//Regular 2d texture - todo: 3d texture support
+			imageData.desc.cubemap = false;
+			imageData.desc.arrayTexture = false;
+			imageData.desc.size.z = 1;
+		}
 		imageData.numBytes = texture->dataSize;
 		imageData.desc.dimension = TEXTURE_DIMENSION::DIM_2; //todo: 3d texture support
-		imageData.desc.arrayTexture = false; //todo: array support
-		imageData.desc.format = GetRHIFormat(static_cast<VkFormat>(texture->vkFormat));
+		imageData.desc.mipLevels = texture->numLevels;
+
+		//todo: there has to be a better way of doing this.... oh almighty khronos group why must you force vulkan upon us
+		if (texture->classId == ktxTexture2_c)
+		{
+			ktxTexture2* texture2{ reinterpret_cast<ktxTexture2*>(texture) };
+			imageData.desc.format = GetRHIFormat(static_cast<VkFormat>(texture2->vkFormat));
+		}
+		else
+		{
+			const ktxTexture1* t1{ reinterpret_cast<ktxTexture1*>(texture) };
+			if (t1->glInternalformat == 0x881A) //opengl bytecode for the rgba16sf format
+			{
+				imageData.desc.format = DATA_FORMAT::R16G16B16A16_SFLOAT;
+			}
+			else if (t1->glInternalformat == 0x8058) //opengl bytecode for the rgba8 format
+			{
+				imageData.desc.format = _srgb ? DATA_FORMAT::R8G8B8A8_SRGB : DATA_FORMAT::R8G8B8A8_UNORM;
+			}
+			else //good luck lmao
+			{
+				throw std::runtime_error("TextureCompressor::LoadImage() - Unsupported KTX1 OGL Format: " + std::to_string(t1->glInternalformat));
+			}
+		}
+		
 		imageData.desc.usage = TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		imageData.data = texture->pData;
 

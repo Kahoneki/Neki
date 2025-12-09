@@ -34,43 +34,43 @@ namespace NK
 			case TEXTURE_VIEW_DIMENSION::DIM_1:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D;
-				desc.Texture1D.MipLevels = 1;
+				desc.Texture1D.MipLevels = _texture->GetMipLevels();
 				break;
 			}
 			case TEXTURE_VIEW_DIMENSION::DIM_2:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				desc.Texture2D.MipLevels = 1;
+				desc.Texture2D.MipLevels = _texture->GetMipLevels();
 				break;
 			}
 			case TEXTURE_VIEW_DIMENSION::DIM_3:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-				desc.Texture3D.MipLevels = 1;
+				desc.Texture3D.MipLevels = _texture->GetMipLevels();
 				break;
 			}
 			case TEXTURE_VIEW_DIMENSION::DIM_CUBE:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-				desc.TextureCube.MipLevels = 1;
+				desc.TextureCube.MipLevels = _texture->GetMipLevels();
 				break;
 			}
 			case TEXTURE_VIEW_DIMENSION::DIM_1D_ARRAY:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
-				desc.Texture1DArray.MipLevels = 1;
+				desc.Texture1DArray.MipLevels = _texture->GetMipLevels();
 				break;
 			}
 			case TEXTURE_VIEW_DIMENSION::DIM_2D_ARRAY:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-				desc.Texture2DArray.MipLevels = 1;
+				desc.Texture2DArray.MipLevels = _texture->GetMipLevels();
 				break;
 			}
 			case TEXTURE_VIEW_DIMENSION::DIM_CUBE_ARRAY:
 			{
 				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
-				desc.TextureCubeArray.MipLevels = 1;
+				desc.TextureCubeArray.MipLevels = _texture->GetMipLevels();
 				break;
 			}
 			}

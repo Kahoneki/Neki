@@ -24,6 +24,8 @@ namespace NK
 		DATA_FORMAT format;
 		TEXTURE_DIMENSION dimension; //Dimensionality of the image. If arrayTexture = true, this should be the dimensionality of the composing images (i.e.: max = TEXTURE_DIMENSION::DIM_2)
 
+		std::uint32_t mipLevels{ 1 };
+
 		bool cubemap; //If true, arrayTexture must also be true
 
 		SAMPLE_COUNT sampleCount{ SAMPLE_COUNT::BIT_1 }; //If sampleCount > SAMPLE_COUNT::BIT_1, multisampling will be enabled
@@ -43,13 +45,14 @@ namespace NK
 		[[nodiscard]] inline SAMPLE_COUNT GetSampleCount() const { return m_sampleCount; }
 		[[nodiscard]] inline bool IsArrayTexture() const { return m_arrayTexture; }
 		[[nodiscard]] inline TEXTURE_DIMENSION GetDimension() const { return m_dimension; }
+		[[nodiscard]] inline std::uint32_t GetMipLevels() const { return m_mipLevels; }
 		[[nodiscard]] inline RESOURCE_STATE GetState() const { return m_state; }
 
 
 	protected:
 		explicit ITexture(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const TextureDesc& _desc, bool _isOwned)
 		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
-		  m_size(_desc.size), m_arrayTexture(_desc.arrayTexture), m_usage(_desc.usage), m_format(_desc.format), m_dimension(_desc.dimension), m_cubeMap(_desc.cubemap), m_sampleCount(_desc.sampleCount),
+		  m_size(_desc.size), m_arrayTexture(_desc.arrayTexture), m_usage(_desc.usage), m_format(_desc.format), m_dimension(_desc.dimension), m_mipLevels(_desc.mipLevels), m_cubeMap(_desc.cubemap), m_sampleCount(_desc.sampleCount),
 		  m_isOwned(_isOwned), m_state(RESOURCE_STATE::UNDEFINED)
 		{
 			if (m_cubeMap && !m_arrayTexture)
@@ -71,6 +74,7 @@ namespace NK
 		TEXTURE_USAGE_FLAGS m_usage;
 		DATA_FORMAT m_format;
 		TEXTURE_DIMENSION m_dimension;
+		std::uint32_t m_mipLevels;
 		bool m_cubeMap;
 		SAMPLE_COUNT m_sampleCount;
 

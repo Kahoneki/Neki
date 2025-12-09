@@ -30,22 +30,22 @@ struct LightData
 	float quadraticAttenuation;
 };
 
-[[vk::binding(0,0)]] ConstantBuffer<LightCamData> g_lightCamData[] : register(b0, space0);
+[[vk::binding(0,0)]] StructuredBuffer<LightData> g_lightData[] : register(t0, space0);
 
 
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
 	uint numLights;
-	uint lightCamDataBufferIndex;
+	uint lightDataBufferIndex;
 );
 
 
 VertexOutput VSMain(VertexInput input)
 {
     VertexOutput output;
-	LightCamData lightCamData = g_lightCamData[NonUniformResourceIndex(PC(lightCamDataBufferIndex))];
+	LightData lightData = g_lightData[NonUniformResourceIndex(PC(lightDataBufferIndex))][0];
 	
-    output.pos = mul(lightCamData.projMat, mul(lightCamData.viewMat, mul(PC(modelMat), float4(input.pos, 1.0))));
+    output.pos = mul(lightData.viewProjMat, mul(PC(modelMat), float4(input.pos, 1.0)));
 
     return output;
 }

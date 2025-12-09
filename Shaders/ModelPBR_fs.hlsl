@@ -26,7 +26,13 @@ PUSH_CONSTANTS_BLOCK(
 	uint numLights;
 	uint lightDataBufferIndex;
 	uint shadowMapIndex;
+
 	uint skyboxCubemapIndex;
+	uint irradianceCubemapIndex;
+	uint prefilterCubemapIndex;
+	uint brdfLUTIndex;
+	uint brdfLUTSamplerIndex;
+
 	uint materialBufferIndex;
 	uint samplerIndex;
 );
@@ -37,11 +43,11 @@ float DistributionGGX(float3 _normal, float3 _halfway, float _roughness)
 {
     float a = _roughness*_roughness;
     float a2 = a*a;
-    float cosWeighting = max(dot(_normal, _halfway), 0.0);
-    float cosWeighting2 = cosWeighting * cosWeighting;
+    float nDotH = max(dot(_normal, _halfway), 0.0);
+    float nDotH2 = nDotH * nDotH;
 
     float numerator = a2;
-    float denominator = (cosWeighting2 * (a2 - 1.0) + 1.0);
+    float denominator = (nDotH2 * (a2 - 1.0) + 1.0);
     denominator = max(3.141592653589 * denominator * denominator, 0.001);
 
     return numerator / denominator;
@@ -49,25 +55,25 @@ float DistributionGGX(float3 _normal, float3 _halfway, float _roughness)
 
 
 
-float GeometrySchlickGGX(float _cosWeighting, float _roughness)
+float GeometrySchlickGGX(float _NDotV, float _roughness)
 {
     float r = _roughness + 1.0;
     float k = (r*r) / 8.0;
 
-    float numerator = _cosWeighting;
-    float denominator = _cosWeighting * (1.0 - k) + k;
+    float numerator = _NDotV;
+    float denominator = _NDotV * (1.0 - k) + k;
 
     return numerator / denominator;
 }
 
 
 
-float GeometrySmith(float3 _normal, float3 _viewDirection, float3 _incomingLightDirection, float _roughness)
+float GeometrySmith(float3 _N, float3 _V, float3 _L, float _roughness)
 {
-    float viewCosWeighting = max(dot(_normal, _viewDirection), 0.0);
-    float lightCosWeighting = max(dot(_normal, -_incomingLightDirection), 0.0);
-    float ggx2 = GeometrySchlickGGX(viewCosWeighting, _roughness);
-    float ggx1 = GeometrySchlickGGX(lightCosWeighting, _roughness);
+    float nDotV = max(dot(_N, _V), 0.0);
+    float nDotL = max(dot(_N, _L), 0.0);
+    float ggx2 = GeometrySchlickGGX(nDotV, _roughness);
+    float ggx1 = GeometrySchlickGGX(nDotL, _roughness);
     return ggx1 * ggx2;
 }
 
@@ -79,72 +85,122 @@ float3 FresnelSchlick(float _cosTheta, float3 _F0)
 }
 
 
+
+float3 CalculateDirectLight(float3 _albedo, float _metallic, float _roughness, float3 _F0, float3 _N, float3 _V, float3 _L, float3 _lightColour)
+{
+	//Intermediate vectors
+    float3 H = normalize(_V + _L);
+    float NDotL = max(dot(_N, _L), 0.0);
+    float NDotV = max(dot(_N, _V), 0.0);
+    float HDotV = max(dot(H, _V), 0.0);
+
+
+	//----SPECULAR----//
+	//DGF
+	float D = DistributionGGX(_N, H, _roughness);
+	float G = GeometrySmith(_N, _V, _L, _roughness);
+	float3 F = FresnelSchlick(HDotV, _F0);
+
+	//Cook-Torrance Specular BRDF
+	float3 numerator = D * G * F;
+	float denominator = max(4.0 * NDotV * NDotL, 0.0001); //Prevent divide by zero
+	float3 specular = numerator / denominator;
+
+	
+	//----DIFFUSE----//
+	float3 kS = F; //specular power determined by fresnel
+	float3 kD = 1.0 - kS; //gotta conserve that energy
+	kD *= (1.0 - _metallic); //metals absorb all refracted light and convert to heat
+	float3 diffuse = kD * _albedo / 3.141592653589; //todo: read this https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
+
+
+	float angleAttenuation = NDotL;
+	return (diffuse + specular) * _lightColour * NDotL;
+}
+
+
+
+float3 FresnelSchlickRoughness(float _cosTheta, float3 _F0, float _roughness)
+{
+	//For smooth surfaces, reflectivity at 90 degrees is 1.0 (pure white)
+	//For rough surfaces, dampen the 1.0 based on roughness
+	//I.e.: reflectivity increases as angle increases and decreases as roughness increases
+    return _F0 + (max(1.0 - _roughness, _F0) - _F0) * pow(clamp(1.0 - _cosTheta, 0.0, 1.0), 5.0);
+}
+
+
+
+float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F0, float3 _N, float3 _V)
+{
+	float NDotV = max(dot(_N, _V), 0.0);
+	float3 R = reflect(-_V, _N);
+	
+	//Specular IBL (prefiltered environment map + brdf lut)
+	const float MAX_REFLECTION_LOD = 4.0; //todo: use the actual number of mip levels
+	float3 prefilteredColour = g_skyboxes[NonUniformResourceIndex(PC(prefilterCubemapIndex))].SampleLevel(g_samplers[NonUniformResourceIndex(PC(samplerIndex))], R, _roughness * MAX_REFLECTION_LOD).rgb;
+	float2 brdfLUT = g_textures[NonUniformResourceIndex(PC(brdfLUTIndex))].Sample(g_samplers[NonUniformResourceIndex(PC(brdfLUTSamplerIndex))], float2(NDotV, _roughness)).rg;
+	float3 specularIBL = prefilteredColour * (_F0 * brdfLUT.x + brdfLUT.y);
+
+	//Energy conservation
+	float3 kS = FresnelSchlickRoughness(max(dot(_N, _V), 0.0), _F0, _roughness);
+	float3 kD = 1.0 - kS;
+	kD *= (1.0 - _metallic);	
+
+	//Diffuse IBL (irradiance)
+	float3 irradiance = g_skyboxes[NonUniformResourceIndex(PC(irradianceCubemapIndex))].Sample(g_samplers[NonUniformResourceIndex(PC(samplerIndex))], _N).rgb;
+	float3 diffuseIBL = irradiance * _albedo * kD;
+
+	return diffuseIBL + specularIBL;
+}
+
+
+
 [shader("pixel")]
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
-	NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
-	SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
+    NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
+    SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 
     float4 albedoSample = g_textures[NonUniformResourceIndex(material.baseColourIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 normalSample = g_textures[NonUniformResourceIndex(material.normalIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 metallicSample = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 roughnessSample = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
-	float4 aoSample = g_textures[NonUniformResourceIndex(material.aoIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 emissiveSample = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(linearSampler, vertexOutput.texCoord);
 
-    float3 albedo = albedoSample.rgb;
+    float3 albedo = pow(albedoSample.rgb, 2.2); //srgb -> linear
     float3 normal = normalize(mul(vertexOutput.TBN, normalSample.rgb * 2.0 - 1.0));
     float metallic = metallicSample.g;
     float roughness = roughnessSample.b;
-    float ao = aoSample.r;
-    float3 emissive = emissiveSample.rgb;
-
-    //Base reflectance
-    float3 F0 = float3(0.04, 0.04, 0.04);
-    F0 = lerp(F0, albedo, metallic);
+    float3 emissive = pow(emissiveSample.rgb, 2.2); //srgb -> linear
 
 
-    //Calculate incoming radiance
-    float3 lightPos = float3(2,-2,2);
-    float3 radiantFlux = float3(23.47, 21.31, 20.79);
-    float distance2 = dot(vertexOutput.fragPos - lightPos, vertexOutput.fragPos - lightPos);
-    float attenuation = 1.0 / distance2;
-    float3 incomingRadiance = radiantFlux * attenuation;
+    float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); //frag pos to camera
+
+	//Base reflectance
+	float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 
 
-    //Calculate outgoing radiance
-    float3 incomingDirection = normalize(vertexOutput.fragPos - lightPos);
-    float3 viewDir = normalize(vertexOutput.camPos - vertexOutput.fragPos);
-    float3 halfwayDir = normalize(-incomingDirection + viewDir);
+    //Test light - todo: replace with loop over actual lights
+    float3 lightPos = float3(2, 2, -2);
+    float3 lightColor = float3(23.47, 21.31, 20.79); //radiance (colour * intensity)
+    float3 L = normalize(lightPos - vertexOutput.fragPos); //frag pos to light source
 
-    //Cook-Torrance BRDF
-    float NDF = DistributionGGX(normal, halfwayDir, roughness);
-    float G = GeometrySmith(normal, viewDir, incomingDirection, roughness);
-    float3 F = FresnelSchlick(max(dot(halfwayDir, viewDir), 0.0), F0);
-
-    float3 specularStrength = F;
-    float3 diffuseStrength = float3(1.0, 1.0, 1.0) - specularStrength;
-    diffuseStrength *= 1.0 - metallic; //Conductors (metals) don't have any diffuse reflectance
-
-    float3 numerator = NDF * G * F;
-    float denominator = max(4.0 * max(dot(normal, viewDir), 0.0) * max(dot(normal, -incomingDirection), 0.0), 0.001);
-    float3 specular = numerator / denominator;
-
-    float cosWeighting = max(dot(normal, -incomingDirection), 0.0);
-    float3 outgoingRadiance = (diffuseStrength * albedo / 3.141592653589 + specular) * incomingRadiance * cosWeighting;
+	//Direct lighting
+    float3 directLighting = CalculateDirectLight(albedo, metallic, roughness, F0, normal, V, L, lightColor);
+	float distance = length(lightPos - vertexOutput.fragPos);
+	float attenuation = 1.0 / (distance * distance); //todo: replace with actual attenuation values
+	directLighting *= attenuation;
 
 
-    //Ambient
-	float ambientStrength = 0.1f;
-	float3 reflectionDir = reflect(-viewDir, normal);
-    float4 skyboxSample = g_skyboxes[NonUniformResourceIndex(PC(skyboxCubemapIndex))].Sample(linearSampler, reflectionDir);
-	float3 ambient = skyboxSample.rgb * albedo * ambientStrength;
+	float3 ambientLighting = CalculateIBL(albedo, roughness, metallic, F0, normal, V);
 	if (material.hasAO)
 	{
-		ambient *= ao;
+		ambientLighting *= g_textures[NonUniformResourceIndex(material.aoIdx)].Sample(linearSampler, vertexOutput.texCoord).r;
 	}
 
 
-    float3 colour = ambient + emissive + outgoingRadiance;
-	return float4(colour, 1.0);
+	//Skip ambient for now
+    float3 colour = directLighting + ambientLighting + emissive;
+
+    return float4(colour, 1.0);
 }

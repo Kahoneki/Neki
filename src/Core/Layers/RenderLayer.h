@@ -68,6 +68,7 @@ namespace NK
 		void InitPostprocessPipeline();
 		void InitRenderGraphs();
 		void InitScreenResources();
+		void InitBRDFLut();
 
 		void UpdateSkybox(CSkybox& _skybox);
 		void UpdateCameraBuffer(const CCamera& _camera) const;
@@ -96,6 +97,7 @@ namespace NK
 		UniquePtr<ISwapchain> m_swapchain;
 		std::uint32_t m_swapchainImageIndex;
 		UniquePtr<ISampler> m_linearSampler;
+		UniquePtr<ISampler> m_brdfLUTSampler;
 		std::vector<UniquePtr<ICommandBuffer>> m_graphicsCommandBuffers;
 		std::vector<UniquePtr<ISemaphore>> m_imageAvailableSemaphores;
 		std::vector<UniquePtr<ISemaphore>> m_renderFinishedSemaphores;
@@ -147,6 +149,12 @@ namespace NK
 		
 		UniquePtr<ITexture> m_skyboxTexture; //Not created at startup
 		UniquePtr<ITextureView> m_skyboxTextureView; //Not created at startup
+		UniquePtr<ITexture> m_irradianceMap;
+		UniquePtr<ITextureView> m_irradianceMapView;
+		UniquePtr<ITexture> m_prefilterMap;
+		UniquePtr<ITextureView> m_prefilterMapView;
+		UniquePtr<ITexture> m_brdfLUT;
+		UniquePtr<ITextureView> m_brdfLUTView;
 		UniquePtr<IBuffer> m_cubeVertBuffer;
 		UniquePtr<IBuffer> m_cubeIndexBuffer;
 
@@ -191,10 +199,16 @@ namespace NK
 		{
 			glm::mat4 modelMat;
 			ResourceIndex camDataBufferIndex;
-			std::size_t numLights;
+			std::uint32_t numLights;
 			ResourceIndex lightDataBufferIndex;
 			ResourceIndex shadowMapIndex;
+			
 			ResourceIndex skyboxCubemapIndex;
+			ResourceIndex irradianceCubemapIndex;
+			ResourceIndex prefilterCubemapIndex;
+			ResourceIndex brdfLUTIndex;
+			SamplerIndex brdfLUTSamplerIndex;
+			
 			ResourceIndex materialBufferIndex;
 			SamplerIndex samplerIndex;
 		};

@@ -12,26 +12,29 @@ namespace NK
 		
 		
 	public:
-		[[nodiscard]] inline std::string GetTextureDirectory() { return textureDirectory; }
-		[[nodiscard]] inline std::string GetFileExtension() { return fileExtension; }
+		[[nodiscard]] inline std::string GetSkyboxFilepath() { return skyboxFilepath; }
+		[[nodiscard]] inline std::string GetIrradianceFilepath() { return irradianceFilepath; }
+		[[nodiscard]] inline std::string GetPrefilterFilepath() { return prefilterFilepath; }
 
-		inline void SetTextureDirectory(const std::string& _val) { textureDirectory = _val; dirty = true; }
-		inline void SetFileExtension(const std::string& _val) { fileExtension = _val; dirty = true; }
+		inline void SetSkyboxFilepath(const std::string& _val) { skyboxFilepath = _val; skyboxFilepathDirty = true; }
+		inline void SetIrradianceFilepath(const std::string& _val) { irradianceFilepath = _val; irradianceFilepathDirty = true; }
+		inline void SetPrefilterFilepath(const std::string& _val) { prefilterFilepath = _val; prefilterFilepathDirty = true; }
 		
 		
 	private:
-		//Inside textureDirectory, there should be 6 images named:
-		//- right.fileExtension
-		//- left.fileExtension,
-		//- top.fileExtension,
-		//- bottom.fileExtension,
-		//- front.fileExtension,
-		//- back.fileExtension,
-		std::string textureDirectory;
-		std::string fileExtension;
+		//Should be an R16G16B16A16_SFLOAT .ktx cubemap
+		std::string skyboxFilepath;
+		//Should be an R16G16B16A16_SFLOAT .ktx cubemap
+		std::string irradianceFilepath;
+		//Should be an R16G16B16A16_SFLOAT .ktx cubemap
+		std::string prefilterFilepath;
 
-		//True if textureDirectory or fileExtension has been modified and the skybox hasn't yet been updated by RenderLayer
-		bool dirty{ true };
+		//True if skyboxFilepath has been modified and the skybox hasn't yet been updated by RenderLayer
+		bool skyboxFilepathDirty{ true };
+		//True if irradianceFilepath has been modified and the skybox hasn't yet been updated by RenderLayer
+		bool irradianceFilepathDirty{ true };
+		//True if prefilterFilepath has been modified and the skybox hasn't yet been updated by RenderLayer
+		bool prefilterFilepathDirty{ true };
 	};
 	
 }

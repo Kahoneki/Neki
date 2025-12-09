@@ -242,6 +242,10 @@ namespace NK
 			else
 			{
 				numRows = _dstTexture->GetSize().y;
+				if (_dstTexture->IsArrayTexture())
+				{
+					numRows *= _dstTexture->GetSize().z;
+				}
 			}
 			break;
 		}

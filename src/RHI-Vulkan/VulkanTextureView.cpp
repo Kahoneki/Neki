@@ -31,11 +31,9 @@ namespace NK
 		viewInfo.viewType = VulkanUtils::GetVulkanImageViewType(m_dimension);
 		viewInfo.format = VulkanUtils::GetVulkanFormat(m_format);
 		viewInfo.subresourceRange.aspectMask = VulkanUtils::GetVulkanAspectFromRHIFormat(m_format);
-
 		
-		//todo: add mip support
 		viewInfo.subresourceRange.baseMipLevel = 0;
-		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.levelCount = _texture->GetMipLevels();
 
 		viewInfo.subresourceRange.baseArrayLayer = m_baseArrayLayer;
 		viewInfo.subresourceRange.layerCount = m_arrayLayerCount;

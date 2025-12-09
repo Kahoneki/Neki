@@ -541,14 +541,14 @@ namespace NK
 		//Input validation
 
 		//Ensure source buffer is transfer src capable
-		if (!EnumUtils::Contains(_srcBuffer->GetUsageFlags(), NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT))
+		if (!EnumUtils::Contains(_srcBuffer->GetUsageFlags(), BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT))
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToTexture() - _srcBuffer wasn't created with NK::BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT\n");
 			throw std::runtime_error("");
 		}
 
 		//Ensure destination texture is transfer dst capable
-		if (!EnumUtils::Contains(_dstTexture->GetUsageFlags(), NK::TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT))
+		if (!EnumUtils::Contains(_dstTexture->GetUsageFlags(), TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT))
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "In CopyBufferToTexture() - _dstTexture wasn't created with NK::TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT\n");
 			throw std::runtime_error("");
@@ -574,7 +574,8 @@ namespace NK
 		copyRegion.imageSubresource.baseArrayLayer = 0;
 		copyRegion.imageSubresource.layerCount = _dstTexture->IsArrayTexture() ? (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _dstTexture->GetSize().y : _dstTexture->GetSize().z) : 1;
 		copyRegion.imageOffset = { _dstOffset.x, _dstOffset.y, _dstOffset.z };
-		copyRegion.imageExtent = { static_cast<std::uint32_t>(_dstExtent.x), static_cast<std::uint32_t>(_dstExtent.y), static_cast<std::uint32_t>(_dstExtent.z) };
+		const std::uint32_t depth{ (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_3) ? static_cast<std::uint32_t>(_dstExtent.z) : 1 };
+		copyRegion.imageExtent = { static_cast<std::uint32_t>(_dstExtent.x), static_cast<std::uint32_t>(_dstExtent.y), depth };
 
 		vkCmdCopyBufferToImage(m_buffer, dynamic_cast<VulkanBuffer*>(_srcBuffer)->GetBuffer(), dynamic_cast<VulkanTexture*>(_dstTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 	}
