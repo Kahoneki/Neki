@@ -37,7 +37,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 	float3 sceneColour = g_textures[NonUniformResourceIndex(PC(sceneColourIndex))].Sample(linearSampler, vertexOutput.texCoord).rgb;
 	
-	float exposure = 0.3f;
+	float exposure = 0.6f;
 	sceneColour *= exposure;
 	
 	sceneColour = ACESFilm(sceneColour);

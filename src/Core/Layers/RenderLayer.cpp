@@ -86,6 +86,7 @@ namespace NK
 
 	void RenderLayer::Update()
 	{
+		
 		//Begin rendering
 		m_inFlightFences[m_currentFrame]->Wait();
 		m_inFlightFences[m_currentFrame]->Reset();

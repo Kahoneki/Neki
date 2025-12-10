@@ -21,7 +21,7 @@ namespace NK
 		
 		
 	protected:
-		explicit Light();
+		explicit Light() = default;
 
 		glm::vec3 m_colour;
 		float m_intensity;

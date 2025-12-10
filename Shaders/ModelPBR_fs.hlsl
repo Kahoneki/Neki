@@ -15,14 +15,34 @@ struct VertexOutput
 	float3 bitangent : BITANGENT;
 };
 
+
+struct LightData
+{
+	float4x4 viewProjMat; //For shadow mapping
+	float3 colour;
+	float intensity;
+	float3 position;
+	uint type;
+	float3 direction;
+	float innerAngle;
+	float outerAngle;
+	float constantAttenuation;
+	float linearAttenuation;
+	float quadraticAttenuation;
+};
+
+
+[[vk::binding(0,0)]] StructuredBuffer<LightData> g_lightData[] : register(t0, space0);
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
 [[vk::binding(0,0)]] TextureCube g_skyboxes[] : register(t0, space1);
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
 [[vk::binding(0,0)]] ConstantBuffer<NK::PBRMaterial> g_materials[] : register(b0, space0);
 
+
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
 	uint camDataBufferIndex;
+
 	uint numLights;
 	uint lightDataBufferIndex;
 	uint shadowMapIndex;
@@ -86,7 +106,7 @@ float3 FresnelSchlick(float _cosTheta, float3 _F0)
 
 
 
-float3 CalculateDirectLight(float3 _albedo, float _metallic, float _roughness, float3 _F0, float3 _N, float3 _V, float3 _L, float3 _lightColour)
+float3 CalculateDirectLight(float3 _albedo, float _metallic, float _roughness, float3 _F0, float3 _N, float3 _V, float3 _L, float3 _radiance)
 {
 	//Intermediate vectors
     float3 H = normalize(_V + _L);
@@ -115,7 +135,7 @@ float3 CalculateDirectLight(float3 _albedo, float _metallic, float _roughness, f
 
 
 	float angleAttenuation = NDotL;
-	return (diffuse + specular) * _lightColour * NDotL;
+	return (diffuse + specular) * _radiance * NDotL;
 }
 
 
@@ -160,6 +180,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
     NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
     SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
+	StructuredBuffer<LightData> lightBuffer = g_lightData[NonUniformResourceIndex(PC(lightDataBufferIndex))];
 
     float4 albedoSample = g_textures[NonUniformResourceIndex(material.baseColourIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 normalSample = g_textures[NonUniformResourceIndex(material.normalIdx)].Sample(linearSampler, vertexOutput.texCoord);
@@ -186,10 +207,49 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
     float3 L = normalize(lightPos - vertexOutput.fragPos); //frag pos to light source
 
 	//Direct lighting
-    float3 directLighting = CalculateDirectLight(albedo, metallic, roughness, F0, normal, V, L, lightColor);
-	float distance = length(lightPos - vertexOutput.fragPos);
-	float attenuation = 1.0 / (distance * distance); //todo: replace with actual attenuation values
-	directLighting *= attenuation;
+	float3 totalDirectLighting = float3(0.0f, 0.0f, 0.0f);
+	for (uint i = 0; i < PC(numLights); ++i)
+	{
+		LightData light = lightBuffer[i];
+
+		float3 lightDirToFragPos;
+		float attenuation = 1.0;
+
+		//todo: replace with enums that match c++ side
+		if (light.type == 1) //Directional
+		{
+			lightDirToFragPos = normalize(-light.direction);
+		}
+		else //Point / Spot
+		{
+			float3 fragPosToLightPos = light.position - vertexOutput.worldPos;
+			float dist = length(fragPosToLightPos);
+			lightDirToFragPos = normalize(fragPosToLightPos);
+
+			attenuation = 1.0 / (light.constantAttenuation + light.linearAttenuation * dist + light.quadraticAttenuation * dist * dist);
+
+			if (light.type == 3) //Spot
+			{
+				float theta = dot(lightDirToFragPos, normalize(-light.direction));
+				float innerCos = cos(light.innerAngle);
+				float outerCos = cos(light.outerAngle);
+				float epsilon = innerCos - outerCos;
+				float intensity = clamp((theta - outerCos) / epsilon, 0.0f, 1.0f);
+				attenuation *= intensity;
+			}
+		}
+
+		if (attenuation > 0.0001)
+		{
+			float NdotL = dot(normal, lightDirToFragPos);
+			if (NdotL > 0.0f)
+			{
+				float3 radiance = light.colour * light.intensity;
+				float3 directLighting = CalculateDirectLight(albedo, metallic, roughness, F0, normal, V, L, radiance);
+				totalDirectLighting += directLighting * attenuation;
+			}
+		}
+	}
 
 
 	float3 ambientLighting = CalculateIBL(albedo, roughness, metallic, F0, normal, V);
@@ -200,7 +260,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
 	//Skip ambient for now
-    float3 colour = directLighting + ambientLighting + emissive;
+    float3 colour = totalDirectLighting + ambientLighting + emissive;
 
     return float4(colour, 1.0);
 }
