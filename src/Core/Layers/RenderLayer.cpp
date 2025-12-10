@@ -64,6 +64,8 @@ namespace NK
 		m_modelUnloadQueues.resize(m_desc.framesInFlight);
 		m_modelMatricesEntitiesLookups.resize(m_desc.framesInFlight);
 
+		m_pointLightProjMatrix = glm::perspectiveLH(glm::radians(90.0f), 1.0f, 0.01f, 1000.0f);
+
 		
 		m_logger.Unindent();
 	}
@@ -212,13 +214,9 @@ namespace NK
 
 		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffers[m_currentFrame].get());
 		execDesc.buffers.Set("CAMERA_BUFFER_PREVIOUS_FRAME", m_camDataBuffersPreviousFrame[m_currentFrame].get());
-		execDesc.buffers.Set("LIGHT_CAMERA_BUFFER", m_lightDataBuffer.get());
+		execDesc.buffers.Set("LIGHT_DATA_BUFFER", m_lightDataBuffer.get());
 		execDesc.buffers.Set("MODEL_MATRICES_BUFFER", m_modelMatricesBuffers[m_currentFrame].get());
 		execDesc.buffers.Set("MODEL_VISIBILITY_BUFFER", m_modelVisibilityBuffers[m_currentFrame].get());
-		
-		execDesc.textures.Set("SHADOW_MAP", m_shadowMap.get());
-		execDesc.textures.Set("SHADOW_MAP_MSAA", m_shadowMapMSAA.get());
-		execDesc.textures.Set("SHADOW_MAP_SSAA", m_shadowMapSSAA.get());
 
 		execDesc.textures.Set("SCENE_COLOUR", m_sceneColour.get());
 		execDesc.textures.Set("SCENE_COLOUR_MSAA", m_sceneColourMSAA.get());
@@ -234,18 +232,11 @@ namespace NK
 		execDesc.textures.Set("PREFILTER_MAP", m_prefilterMap.get());
 		execDesc.textures.Set("BRDF_LUT", m_brdfLUT.get());
 
-		execDesc.bufferViews.Set("LIGHT_CAMERA_BUFFER_VIEW", m_lightDataBufferView.get());
+		execDesc.bufferViews.Set("LIGHT_DATA_BUFFER_VIEW", m_lightDataBufferView.get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW", m_camDataBufferPreviousFrameViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("MODEL_MATRICES_BUFFER_VIEW", m_modelMatricesBufferViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("MODEL_VISIBILITY_BUFFER_VIEW", m_modelVisibilityBufferViews[m_currentFrame].get());
-
-		execDesc.textureViews.Set("SHADOW_MAP_DSV", m_shadowMapDSV.get());
-		execDesc.textureViews.Set("SHADOW_MAP_SRV", m_shadowMapSRV.get());
-		execDesc.textureViews.Set("SHADOW_MAP_MSAA_DSV", m_shadowMapMSAADSV.get());
-		execDesc.textureViews.Set("SHADOW_MAP_MSAA_SRV", m_shadowMapMSAASRV.get());
-		execDesc.textureViews.Set("SHADOW_MAP_SSAA_DSV", m_shadowMapSSAADSV.get());
-		execDesc.textureViews.Set("SHADOW_MAP_SSAA_SRV", m_shadowMapSSAASRV.get());
 
 		execDesc.textureViews.Set("SCENE_COLOUR_RTV", m_sceneColourRTV.get());
 		execDesc.textureViews.Set("SCENE_COLOUR_SRV", m_sceneColourSRV.get());
@@ -1052,68 +1043,77 @@ namespace NK
 		
 		meshDesc.AddNode(
 		"SHADOW_PASS",
-		{{ "LIGHT_CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
-		{ "SHADOW_MAP", RESOURCE_STATE::DEPTH_WRITE },
-		{ "SHADOW_MAP_MSAA", RESOURCE_STATE::DEPTH_WRITE },
-		{ "SHADOW_MAP_SSAA", RESOURCE_STATE::DEPTH_WRITE }},
+		{{ "LIGHT_DATA_BUFFER", RESOURCE_STATE::SHADER_RESOURCE }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
-			if (m_desc.enableMSAA)
-			{
-				_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SHADOW_MAP_MSAA_DSV"), _texViews.Get("SHADOW_MAP_DSV"), nullptr);
-			}
-			else if (m_desc.enableSSAA)
-			{
-				_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SHADOW_MAP_SSAA_DSV"), nullptr);
-			}
-			else
-			{
-				_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SHADOW_MAP_DSV"), nullptr);
-			}
-			
+			_cmdBuf->BindPipeline(m_shadowPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
 			_cmdBuf->BindRootSignature(m_shadowPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
-			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
-
-			ShadowPassPushConstantData pushConstantData{};
-			pushConstantData.numLights = m_cpuLightData.size();
-			pushConstantData.lightDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
-			
-			//Models
 			std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
-			for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
+			
+			ShadowPassPushConstantData pushConstantData{};
+
+			
+			auto drawModels{ [&]()
 			{
-				if (!modelRenderer.visible) { continue; } //todo: this is obviously wrong
-				const GPUModel* const model{ modelRenderer.model };
-				if (!model) { continue; }
-				pushConstantData.modelMat = transform.GetModelMatrix();
-
-
-				for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
+				for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 				{
-					const GPUMesh* mesh{ model->meshes[i].get() };
+					if (!modelRenderer.visible) { continue; }
+					const GPUModel* const model{ modelRenderer.model };
+					if (!model) { continue; }
+					pushConstantData.modelMat = transform.GetModelMatrix();
 
-					_cmdBuf->PushConstants(m_shadowPassRootSignature.get(), &pushConstantData);
-					_cmdBuf->BindPipeline(m_shadowPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
-					_cmdBuf->BindVertexBuffers(0, 1, mesh->vertexBuffer.get(), &modelVertexBufferStride);
-					_cmdBuf->BindIndexBuffer(mesh->indexBuffer.get(), DATA_FORMAT::R32_UINT);
-					_cmdBuf->DrawIndexed(mesh->indexCount, 1, 0, 0);
+					for (std::size_t meshIndex{ 0 }; meshIndex < modelRenderer.model->meshes.size(); ++meshIndex)
+					{
+						const GPUMesh* mesh{ model->meshes[meshIndex].get() };
+						_cmdBuf->PushConstants(m_shadowPassRootSignature.get(), &pushConstantData);
+						IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
+						_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
+						_cmdBuf->BindVertexBuffers(0, 1, mesh->vertexBuffer.get(), &modelVertexBufferStride);
+						_cmdBuf->BindIndexBuffer(mesh->indexBuffer.get(), DATA_FORMAT::R32_UINT);
+						_cmdBuf->DrawIndexed(mesh->indexCount, 1, 0, 0);
+					}
 				}
-			}
+			} };
 
-			_cmdBuf->EndRendering(0, nullptr, nullptr);
-		}
-		);
+			
+			//Loop through all lights
+			for (std::size_t i{ 0 }; i < m_cpuLightData.size(); ++i)
+			{
+				ITexture* shadowMap{ nullptr };
+				const LightShaderData& lightData{ m_cpuLightData[i] };
+				if (lightData.type == LIGHT_TYPE::POINT)
+				{
+					shadowMap = m_shadowMapsCube[m_cpuLightData[i].shadowMapIndex].get();
+					_cmdBuf->TransitionBarrier(shadowMap, shadowMap->GetState(), RESOURCE_STATE::DEPTH_WRITE);
+					
+					//shadow cubemap - need to render scene 6 times from all faces and set view matrix between each one
+					for (std::uint32_t faceIndex{ 0 }; faceIndex < 6; ++faceIndex)
+					{
+						pushConstantData.viewProjMat = m_pointLightProjMatrix * GetPointLightViewMatrix(lightData.position, faceIndex);
+						drawModels();
+					}
+				}
+				else
+				{
+					shadowMap = m_shadowMaps2D[m_cpuLightData[i].shadowMapIndex].get();
+					_cmdBuf->TransitionBarrier(shadowMap, shadowMap->GetState(), RESOURCE_STATE::DEPTH_WRITE);
+					
+					//2d shadow map
+					pushConstantData.viewProjMat = lightData.viewProjMat; //todo: this is so ugly, why is it being duplicated? find a better way of doing this !!
+					drawModels();
+				}
+
+				_cmdBuf->TransitionBarrier(shadowMap, RESOURCE_STATE::DEPTH_WRITE, RESOURCE_STATE::SHADER_RESOURCE); //prepare for next pass
+			}
+			
+		});
 
 
 		meshDesc.AddNode(
 		"SCENE_PASS",
 		{{ "CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
-		{ "LIGHT_CAMERA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
-		{ "SHADOW_MAP", RESOURCE_STATE::SHADER_RESOURCE },
-		{ "SHADOW_MAP_MSAA", RESOURCE_STATE::SHADER_RESOURCE },
-		{ "SHADOW_MAP_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "LIGHT_DATA_BUFFER", RESOURCE_STATE::CONSTANT_BUFFER },
 		{ "SCENE_COLOUR", RESOURCE_STATE::RENDER_TARGET },
 		{ "SCENE_COLOUR_MSAA", RESOURCE_STATE::RENDER_TARGET },
 		{ "SCENE_COLOUR_SSAA", RESOURCE_STATE::RENDER_TARGET },
@@ -1145,10 +1145,9 @@ namespace NK
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
 
 			MeshPassPushConstantData pushConstantData{};
-			pushConstantData.shadowMapIndex = _texViews.Get(m_desc.enableSSAA ? "SHADOW_MAP_SSAA_SRV" : (m_desc.enableMSAA ? "SHADOW_MAP_MSAA_SRV" : "SHADOW_MAP_SRV"))->GetIndex();
 			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.numLights = m_cpuLightData.size();
-			pushConstantData.lightDataBufferIndex = _bufViews.Get("LIGHT_CAMERA_BUFFER_VIEW")->GetIndex();
+			pushConstantData.lightDataBufferIndex = _bufViews.Get("LIGHT_DATA_BUFFER_VIEW")->GetIndex();
 			pushConstantData.skyboxCubemapIndex = _texViews.Get("SKYBOX_VIEW") ? _texViews.Get("SKYBOX_VIEW")->GetIndex() : 0;
 			pushConstantData.irradianceCubemapIndex = _texViews.Get("IRRADIANCE_MAP_VIEW") ? _texViews.Get("IRRADIANCE_MAP_VIEW")->GetIndex() : 0;
 			pushConstantData.prefilterCubemapIndex = _texViews.Get("PREFILTER_MAP_VIEW") ? _texViews.Get("PREFILTER_MAP_VIEW")->GetIndex() : 0;
@@ -1210,14 +1209,11 @@ namespace NK
 			{{"SCENE_COLOUR_SSAA", RESOURCE_STATE::COPY_SOURCE},
 			{"SCENE_COLOUR", RESOURCE_STATE::COPY_DEST},
 			{"SCENE_DEPTH_SSAA", RESOURCE_STATE::COPY_SOURCE},
-			{"SCENE_DEPTH", RESOURCE_STATE::COPY_DEST},
-			{"SHADOW_MAP_SSAA", RESOURCE_STATE::COPY_SOURCE},
-			{"SHADOW_MAP", RESOURCE_STATE::COPY_DEST}},
+			{"SCENE_DEPTH", RESOURCE_STATE::COPY_DEST}},
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
 				_cmdBuf->BlitTexture(_texs.Get("SCENE_COLOUR_SSAA"), TEXTURE_ASPECT::COLOUR, _texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR);
 				_cmdBuf->BlitTexture(_texs.Get("SCENE_DEPTH_SSAA"), TEXTURE_ASPECT::DEPTH, _texs.Get("SCENE_DEPTH"), TEXTURE_ASPECT::DEPTH);
-				_cmdBuf->BlitTexture(_texs.Get("SHADOW_MAP_SSAA"), TEXTURE_ASPECT::DEPTH, _texs.Get("SHADOW_MAP"), TEXTURE_ASPECT::DEPTH);
 			});
 		}
 
@@ -1229,14 +1225,11 @@ namespace NK
 			{{"SCENE_COLOUR", RESOURCE_STATE::COPY_DEST},
 			{"SCENE_COLOUR_MSAA", RESOURCE_STATE::COPY_SOURCE},
 			{"SCENE_DEPTH", RESOURCE_STATE::COPY_DEST},
-			{"SCENE_DEPTH_MSAA", RESOURCE_STATE::COPY_SOURCE},
-			{"SHADOW_MAP", RESOURCE_STATE::COPY_DEST},
-			{"SHADOW_MAP_MSAA", RESOURCE_STATE::COPY_SOURCE}},
+			{"SCENE_DEPTH_MSAA", RESOURCE_STATE::COPY_SOURCE}},
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
 				//todo fix this
-//				_cmdBuf->ResolveImage(_texs.Get("SHADOW_MAP_MSAA"), _texs.Get("SHADOW_MAP"), TEXTURE_ASPECT::DEPTH);
-//				_cmdBuf->ResolveImage(_texs.Get("SCENE_DEPTH_MSAA"), _texs.Get("SCENE_DEPTH"), TEXTURE_ASPECT::DEPTH);
+				//_cmdBuf->ResolveImage(_texs.Get("SCENE_DEPTH_MSAA"), _texs.Get("SCENE_DEPTH"), TEXTURE_ASPECT::DEPTH);
 
 				_cmdBuf->ResolveImage(_texs.Get("SCENE_COLOUR_MSAA"), _texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR);
 			});
@@ -1244,9 +1237,7 @@ namespace NK
 		
 		meshDesc.AddNode(
 		"POSTPROCESS_PASS",
-		{{ "SHADOW_MAP", RESOURCE_STATE::SHADER_RESOURCE },
-		{ "SHADOW_MAP_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
-		{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
+		{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SCENE_COLOUR_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SCENE_DEPTH", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
@@ -1262,7 +1253,6 @@ namespace NK
 			PostprocessPassPushConstantData pushConstantData{};
 			pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
 			pushConstantData.sceneDepthIndex = _texViews.Get("SCENE_DEPTH_SRV")->GetIndex();
-			pushConstantData.shadowMapIndex = _texViews.Get("SHADOW_MAP_SRV")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 
 			//Screen Quad
@@ -1276,6 +1266,7 @@ namespace NK
 			_cmdBuf->EndRendering(1, nullptr, _texs.Get("BACKBUFFER"));
 		});
 
+		
 		//Transition backbuffer to present state
 		meshDesc.AddNode("PRESENT_TRANSITION_PASS", {{"BACKBUFFER", RESOURCE_STATE::PRESENT}});
 		
@@ -1289,49 +1280,7 @@ namespace NK
 	{
 		//--------SHADOW MAPS--------//
 		
-		//Shadow Map
-		TextureDesc shadowMapDesc{};
-		shadowMapDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-		shadowMapDesc.format = DATA_FORMAT::D32_SFLOAT;
-		shadowMapDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
-		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
-		shadowMapDesc.arrayTexture = false;
-		shadowMapDesc.sampleCount = SAMPLE_COUNT::BIT_1;
-		m_shadowMap = m_device->CreateTexture(shadowMapDesc);
-		m_graphicsCommandBuffers[0]->TransitionBarrier(m_shadowMap.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
 
-		//MSAA Shadow Map
-		if (m_desc.enableMSAA)
-		{
-			shadowMapDesc.sampleCount = m_desc.msaaSampleCount;
-			shadowMapDesc.usage |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT;
-			m_shadowMapMSAA = m_device->CreateTexture(shadowMapDesc);
-			m_graphicsCommandBuffers[0]->TransitionBarrier(m_shadowMapMSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
-		}
-		
-		//SSAA Shadow Map
-		if (m_desc.enableSSAA)
-		{
-			shadowMapDesc.size = glm::ivec3(m_supersampleResolution, 1);
-			shadowMapDesc.usage |= TEXTURE_USAGE_FLAGS::TRANSFER_SRC_BIT;
-			m_shadowMapSSAA = m_device->CreateTexture(shadowMapDesc);
-			m_graphicsCommandBuffers[0]->TransitionBarrier(m_shadowMapSSAA.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
-		}
-		
-		//Shadow Map DSVs
-		TextureViewDesc shadowMapViewDesc{};
-		shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
-		shadowMapViewDesc.format = DATA_FORMAT::D32_SFLOAT;
-		shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
-		m_shadowMapDSV = m_device->CreateDepthStencilTextureView(m_shadowMap.get(), shadowMapViewDesc);
-		if (m_desc.enableMSAA) { m_shadowMapMSAADSV = m_device->CreateDepthStencilTextureView(m_shadowMapMSAA.get(), shadowMapViewDesc); }
-		if (m_desc.enableSSAA) { m_shadowMapSSAADSV = m_device->CreateDepthStencilTextureView(m_shadowMapSSAA.get(), shadowMapViewDesc); }
-		
-		//Shadow Map SRVs
-		shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
-		m_shadowMapSRV = m_device->CreateShaderResourceTextureView(m_shadowMap.get(), shadowMapViewDesc);
-		if (m_desc.enableMSAA) { m_shadowMapMSAASRV = m_device->CreateShaderResourceTextureView(m_shadowMapMSAA.get(), shadowMapViewDesc); }
-		if (m_desc.enableSSAA) { m_shadowMapSSAASRV = m_device->CreateShaderResourceTextureView(m_shadowMapSSAA.get(), shadowMapViewDesc); }
 		
 		//--------END OF SHADOW MAPS--------//
 		
@@ -1452,6 +1401,65 @@ namespace NK
 
 
 
+	void RenderLayer::InitShadowMapForLight(const CLight& _light)
+	{
+		//Shadow Map
+		TextureDesc shadowMapDesc{};
+		shadowMapDesc.dimension = TEXTURE_DIMENSION::DIM_2;
+		shadowMapDesc.format = DATA_FORMAT::D32_SFLOAT;
+		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
+		shadowMapDesc.sampleCount = SAMPLE_COUNT::BIT_1;
+		if (_light.lightType == LIGHT_TYPE::POINT)
+		{
+			shadowMapDesc.size = glm::ivec3(m_shadowMapBaseResolution * glm::ivec2(m_desc.enableSSAA ? m_desc.ssaaMultiplier : 1), 6);
+			shadowMapDesc.arrayTexture = true;
+			shadowMapDesc.cubemap = true;
+			m_shadowMapsCube.push_back(m_device->CreateTexture(shadowMapDesc));
+			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_shadowMapsCube[m_shadowMapsCube.size() - 1].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
+		}
+		else
+		{
+			shadowMapDesc.size = glm::ivec3(m_shadowMapBaseResolution * glm::ivec2(m_desc.enableSSAA ? m_desc.ssaaMultiplier : 1), 1);
+			m_shadowMaps2D.push_back(m_device->CreateTexture(shadowMapDesc));
+			m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_shadowMaps2D[m_shadowMaps2D.size() - 1].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::DEPTH_WRITE);
+		}
+
+		
+		//DSV(s) and SRV
+		TextureViewDesc shadowMapViewDesc{};
+		shadowMapViewDesc.format = DATA_FORMAT::D32_SFLOAT;
+		shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
+		if (_light.lightType == LIGHT_TYPE::POINT)
+		{
+			shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2D_ARRAY;
+			
+			//DSVs
+			shadowMapViewDesc.arrayLayerCount = 1;
+			m_shadowMapCube_FaceDSVs.push_back({});
+			m_shadowMapCube_FaceDSVs[m_shadowMapCube_FaceDSVs.size() - 1].resize(6);
+			for (std::size_t i{ 0 }; i < 6; ++i)
+			{
+				shadowMapViewDesc.baseArrayLayer = i;
+				m_shadowMapCube_FaceDSVs[m_shadowMapCube_FaceDSVs.size() - 1][i] = m_device->CreateDepthStencilTextureView(m_shadowMapsCube[m_shadowMapsCube.size() - 1].get(), shadowMapViewDesc);
+			}
+
+			//SRV
+			shadowMapViewDesc.baseArrayLayer = 0;
+			shadowMapViewDesc.arrayLayerCount = 6;
+			shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+			m_shadowMapCubeSRVs.push_back(m_device->CreateShaderResourceTextureView(m_shadowMapsCube[m_shadowMapsCube.size() - 1].get(), shadowMapViewDesc));
+		}
+		else
+		{
+			shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
+			m_shadowMap2DDSVs.push_back(m_device->CreateDepthStencilTextureView(m_shadowMaps2D[m_shadowMaps2D.size() - 1].get(), shadowMapViewDesc));
+			shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+			m_shadowMap2DSRVs.push_back(m_device->CreateShaderResourceTextureView(m_shadowMaps2D[m_shadowMaps2D.size() - 1].get(), shadowMapViewDesc));
+		}
+	}
+
+
+
 	void RenderLayer::UpdateSkybox(CSkybox& _skybox)
 	{
 		TextureViewDesc textureViewDesc{};
@@ -1539,6 +1547,19 @@ namespace NK
 				bufferDirty = true;
 			}
 
+			if (light.light->GetShadowMapDirty())
+			{
+				InitShadowMapForLight(light);
+				if (light.lightType == LIGHT_TYPE::POINT)
+				{
+					light.light->SetShadowMapIndex(m_shadowMapsCube.size() - 1);
+				}
+				else
+				{
+					light.light->SetShadowMapIndex(m_shadowMaps2D.size() - 1);
+				}
+			}
+
 			LightShaderData shaderData{};
 			shaderData.colour = light.light->GetColour();
 			shaderData.intensity = light.light->GetIntensity();
@@ -1575,9 +1596,8 @@ namespace NK
 				const PointLight* pointLight{ dynamic_cast<PointLight*>(light.light.get()) };
 
 				//Shadow mapping for point lights requires 6 draw calls to create a cubemap
-				//View matrices are aligned to the world axes
-				//Projection matrix is constant for all point lights
-				//Matrices are calculated at draw time for point lights
+				//View matrices are aligned to the world axes for point lights and are calculated at draw time
+				//Projection matrix for all faces of all point light draw calls is constant - we use m_pointLightProjMatrix
 
 				shaderData.constantAttenuation = pointLight->GetConstantAttenuation();
 				shaderData.linearAttenuation = pointLight->GetLinearAttenuation();
@@ -1639,6 +1659,23 @@ namespace NK
 		}
 		
 		memcpy(m_modelMatricesBufferMaps[m_currentFrame], m_modelMatrices.data(), m_modelMatrices.size() * sizeof(glm::mat4));
+	}
+
+
+
+	glm::mat4 RenderLayer::GetPointLightViewMatrix(const glm::vec3& _lightPos, const std::size_t _faceIndex)
+	{
+		//Standard cubemap face order: +X, -X, +Y, -Y, +Z, -Z
+		switch (_faceIndex)
+		{
+		case 0:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 1.0f,  0.0f)); } //+X
+		case 1:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 1.0f,  0.0f)); } //-X
+		case 2:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f, 0.0f, -1.0f)); } //+Y
+		case 3:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f, 0.0f,  1.0f)); } //-Y
+		case 4:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, 1.0f,  0.0f)); } //+Z
+		case 5:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, 1.0f,  0.0f)); } //-Z
+		default:	{ throw std::invalid_argument("RenderLayer::GetPointLightViewMatrix() - _faceIndex (" + std::to_string(_faceIndex) + ")" + " is not in the allowed range of 0 to 5"); }
+		}
 	}
 
 }

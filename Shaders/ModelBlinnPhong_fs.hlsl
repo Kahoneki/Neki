@@ -4,6 +4,10 @@
 #pragma enable_dxc_extensions
 
 
+static const float LIGHT_NEAR = 0.01f;
+static const float LIGHT_FAR = 1000.0f;
+
+
 struct VertexOutput
 {
 	float4 pos : SV_POSITION;
@@ -18,7 +22,7 @@ struct VertexOutput
 
 struct LightData
 {
-	float4x4 viewProjMat; //For shadow mapping
+	float4x4 viewProjMat;
 	float3 colour;
 	float intensity;
 	float3 position;
@@ -29,11 +33,13 @@ struct LightData
 	float constantAttenuation;
 	float linearAttenuation;
 	float quadraticAttenuation;
+	uint shadowMapIndex;
 };
 
 
 [[vk::binding(0,0)]] StructuredBuffer<LightData> g_lightData[] : register(t0, space0);
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
+[[vk::binding(0,0)]] TextureCube g_cubemaps[] : register(t0, space1);
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
 [[vk::binding(0,0)]] ConstantBuffer<NK::BlinnPhongMaterial> g_materials[] : register(b0, space0);
 
@@ -41,10 +47,10 @@ struct LightData
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
 	uint camDataBufferIndex;
+
 	uint numLights;
 	uint lightDataBufferIndex;
-	uint shadowMapIndex;
-	
+
 	uint skyboxCubemapIndex;
 	uint irradianceCubemapIndex;
 	uint prefilterCubemapIndex;
@@ -54,6 +60,23 @@ PUSH_CONSTANTS_BLOCK(
 	uint materialBufferIndex;
 	uint samplerIndex;
 );
+
+
+
+bool PointInPointLightShadow(float3 _fragPos, float3 _lightPos, uint _shadowIndex, SamplerState _samplerState)
+{
+	float3 lightToFrag = _fragPos - _lightPos;
+	float3 absVec = abs(lightToFrag);
+	float localZ = max(absVec.x, max(absVec.y, absVec.z));
+	
+	//Convert linear distance to non-linear depth (0..1) based on perspective projection
+	float normDepth = (LIGHT_FAR / (LIGHT_FAR - LIGHT_NEAR)) - ((LIGHT_FAR * LIGHT_NEAR) / (LIGHT_FAR - LIGHT_NEAR)) / localZ;
+
+	float closestDepth = g_cubemaps[NonUniformResourceIndex(_shadowIndex)].Sample(_samplerState, lightToFrag).r;
+
+	float bias = 0.0005f;
+	return (normDepth - bias) > closestDepth;
+}
 
 
 
@@ -101,20 +124,59 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 	float3 viewDir = normalize(vertexOutput.camPos - vertexOutput.worldPos);
 
-	
+
 	//Lighting
 	float3 diffuse = float3(0.0f, 0.0f, 0.0f);
 	float3 specular = float3(0.0f, 0.0f, 0.0f);
-
 
 	for (uint i = 0; i < PC(numLights); ++i)
 	{
 		LightData light = lightBuffer[i];
 
+		//Shadows - if point is in shadow from this light, just skip this light
+		if (light.type == 2) //Point Light
+		{
+			if (PointInPointLightShadow(vertexOutput.worldPos, light.position, light.shadowMapIndex, linearSampler))
+			{
+				//continue;
+			}
+		}
+		else //Directional / Spot
+		{
+			float4 posInLightClipSpace = mul(light.viewProjMat, float4(vertexOutput.worldPos, 1.0));
+			float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
+			float2 shadowMapUV = float2(posInLightNDC.x * 0.5f + 0.5f, posInLightNDC.y * -0.5f + 0.5f);
+
+			if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f && posInLightNDC.z <= 1.0f)
+			{
+				float shadowDepth = g_textures[NonUniformResourceIndex(light.shadowMapIndex)].Sample(linearSampler, shadowMapUV).r;
+
+				return float4(shadowDepth, shadowDepth, shadowDepth, 1.0f);
+
+				float currentPixelDepth = posInLightNDC.z;
+				
+				float bias = 0.0005f; 
+				if ((currentPixelDepth - bias) > shadowDepth)
+				{
+					return float4(0.0, 1.0, 0.0, 1.0);
+				}
+				else
+				{
+					return float4(0.0, 0.0, 1.0, 1.0);
+				}
+			}
+			else
+			{
+				return float4(0.0, 1.0, 1.0, 1.0);
+			}
+		}
+
+
+		//Point is not in shadow from this light source - add up its contribution
+
 		float3 lightDirToFragPos;
 		float attenuation = 1.0;
 
-		//todo: replace with enums that match c++ side
 		if (light.type == 1) //Directional
 		{
 			lightDirToFragPos = normalize(-light.direction);
@@ -165,5 +227,6 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
 	float3 result = ambient + (diffuse * diffuseSample.rgb) + specular + emissive;
+	return float4(1.0, 0.0, 1.0, 1.0);	
 	return float4(result, 1.0f);
 }

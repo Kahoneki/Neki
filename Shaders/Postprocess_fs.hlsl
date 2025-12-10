@@ -10,7 +10,6 @@ struct VertexOutput
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
 
 PUSH_CONSTANTS_BLOCK(
-	uint shadowMapIndex;
 	uint sceneColourIndex;
 	uint sceneDepthIndex;
 	uint samplerIndex;

@@ -27,39 +27,40 @@ public:
 	{
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
-		skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/Neon Photostudio/skybox.ktx");
-		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/Neon Photostudio/irradiance.ktx");
-		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/Neon Photostudio/prefilter.ktx");
+		skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
+		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
+		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
 
 		
 		m_redLightEntity = m_reg.Create();
 		NK::CLight& redLight{ m_reg.AddComponent<NK::CLight>(m_redLightEntity) };
-		redLight.lightType = NK::LIGHT_TYPE::POINT;
-		redLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
+		redLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
+		redLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
 		redLight.light->SetColour({ 1,0,0 });
 		redLight.light->SetIntensity(1.0f);
-		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetConstantAttenuation(1.0f);
-		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetLinearAttenuation(0.1f);
-		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetQuadraticAttenuation(0.01f);
+		dynamic_cast<NK::DirectionalLight*>(redLight.light.get())->SetDimensions({ 10, 10, 10 });
+//		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetConstantAttenuation(1.0f);
+//		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetLinearAttenuation(0.1f);
+//		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetQuadraticAttenuation(0.01f);
 
 		NK::CTransform& redLightTransform{ m_reg.AddComponent<NK::CTransform>(m_redLightEntity) };
 		redLightTransform.SetPosition({ 0, 0, -3 });
-		redLightTransform.SetRotation({ glm::radians(90.0f), 0.0f, glm::radians(30.0f) });
+		redLightTransform.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
 
 		
 		m_greenLightEntity = m_reg.Create();
-		NK::CLight& greenLight{ m_reg.AddComponent<NK::CLight>(m_greenLightEntity) };
-		greenLight.lightType = NK::LIGHT_TYPE::POINT;
-		greenLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
-		greenLight.light->SetColour({ 0,1,0 });
-		greenLight.light->SetIntensity(1.0f);
-		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetConstantAttenuation(1.0f);
-		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetLinearAttenuation(0.1f);
-		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetQuadraticAttenuation(0.01f);
-		
-		NK::CTransform& greenLightTransform{ m_reg.AddComponent<NK::CTransform>(m_greenLightEntity) };
-		greenLightTransform.SetPosition({ 0, 0, -3 });
-		greenLightTransform.SetRotation({ glm::radians(90.0f), 0.0f, glm::radians(30.0f) });
+//		NK::CLight& greenLight{ m_reg.AddComponent<NK::CLight>(m_greenLightEntity) };
+//		greenLight.lightType = NK::LIGHT_TYPE::POINT;
+//		greenLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
+//		greenLight.light->SetColour({ 0,1,0 });
+//		greenLight.light->SetIntensity(1.0f);
+//		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetConstantAttenuation(1.0f);
+//		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetLinearAttenuation(0.1f);
+//		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetQuadraticAttenuation(0.01f);
+//		
+//		NK::CTransform& greenLightTransform{ m_reg.AddComponent<NK::CTransform>(m_greenLightEntity) };
+//		greenLightTransform.SetPosition({ 0, 0, -3 });
+//		greenLightTransform.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
 		
 		
 		//preprocessing step - ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
@@ -114,22 +115,23 @@ public:
 		//		constexpr float speed{ 50.0f };
 		//		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
 		//		transform.SetPosition(transform.GetPosition() + glm::vec3(0,1,0));
-		
-		const double time{ NK::TimeManager::GetTotalTime() };
-		constexpr float radius{ 10.0f };
-		constexpr float speed{ 3.0f };
-		constexpr glm::vec3 centre{ 0.0f, 0.0f, -3.0f };
-		
-		const double xRed{ centre.x + radius * cos(time * speed) };
-		const double zRed{ centre.z + radius * sin(time * speed) };
-		const double xGreen{ centre.x - radius * cos(time * speed) };
-		const double zGreen{ centre.z - radius * sin(time * speed) };
 
-		NK::CTransform& redLightTransform{ m_reg.GetComponent<NK::CTransform>(m_redLightEntity) };
-		redLightTransform.SetPosition({ xRed, centre.y, zRed });
-
-		NK::CTransform& greenLightTransform{ m_reg.GetComponent<NK::CTransform>(m_greenLightEntity) };
-		greenLightTransform.SetPosition({ xGreen, centre.y, zGreen });
+		
+//		const double time{ NK::TimeManager::GetTotalTime() };
+//		constexpr float radius{ 10.0f };
+//		constexpr float speed{ 3.0f };
+//		constexpr glm::vec3 centre{ 0.0f, 0.0f, -3.0f };
+//		
+//		const double xRed{ centre.x + radius * cos(time * speed) };
+//		const double zRed{ centre.z + radius * sin(time * speed) };
+//		const double xGreen{ centre.x - radius * cos(time * speed) };
+//		const double zGreen{ centre.z - radius * sin(time * speed) };
+//
+//		NK::CTransform& redLightTransform{ m_reg.GetComponent<NK::CTransform>(m_redLightEntity) };
+//		redLightTransform.SetPosition({ xRed, centre.y, zRed });
+//
+//		NK::CTransform& greenLightTransform{ m_reg.GetComponent<NK::CTransform>(m_greenLightEntity) };
+//		greenLightTransform.SetPosition({ xGreen, centre.y, zGreen });
 	}
 
 

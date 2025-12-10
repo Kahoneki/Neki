@@ -3,6 +3,7 @@
 #include "ILayer.h"
 
 #include <Components/CCamera.h>
+#include <Components/CLight.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <Components/CWindow.h>
@@ -70,10 +71,15 @@ namespace NK
 		void InitScreenResources();
 		void InitBRDFLut();
 
+		//Automatically determines whether to make a 2d texture or a cubemap based on light type
+		void InitShadowMapForLight(const CLight& _light);
+		
 		void UpdateSkybox(CSkybox& _skybox);
 		void UpdateCameraBuffer(const CCamera& _camera) const;
 		void UpdateLightDataBuffer();
 		void UpdateModelMatricesBuffer();
+
+		static glm::mat4 GetPointLightViewMatrix(const glm::vec3& _lightPos, const std::size_t _faceIndex);
 		
 		
 		//Dependency injections
@@ -111,12 +117,12 @@ namespace NK
 		//(one for each frame in flight)
 		std::vector<UniquePtr<IBuffer>> m_camDataBuffersPreviousFrame;
 		std::vector<UniquePtr<IBufferView>> m_camDataBufferPreviousFrameViews;
+
 		
-		struct LightShaderData
+		struct alignas(16) LightShaderData
 		{
 			//Do not reorder - aligned for hlsl
-			
-			glm::mat4 viewProjMat; //For shadow mapping
+			glm::mat4 viewProjMat;
 			glm::vec3 colour;
 			float intensity;
 			glm::vec3 position;
@@ -127,6 +133,7 @@ namespace NK
 			float constantAttenuation;
 			float linearAttenuation;
 			float quadraticAttenuation;
+			ResourceIndex shadowMapIndex;
 		};
 		std::vector<LightShaderData> m_cpuLightData;
 		UniquePtr<IBuffer> m_lightDataBuffer;
@@ -189,9 +196,8 @@ namespace NK
 		
 		struct ShadowPassPushConstantData
 		{
+			glm::mat4 viewProjMat;
 			glm::mat4 modelMat;
-			std::size_t numLights;
-			ResourceIndex lightDataBufferIndex;
 		};
 		UniquePtr<IRootSignature> m_shadowPassRootSignature;
 		
@@ -201,7 +207,6 @@ namespace NK
 			ResourceIndex camDataBufferIndex;
 			std::uint32_t numLights;
 			ResourceIndex lightDataBufferIndex;
-			ResourceIndex shadowMapIndex;
 			
 			ResourceIndex skyboxCubemapIndex;
 			ResourceIndex irradianceCubemapIndex;
@@ -216,7 +221,6 @@ namespace NK
 
 		struct PostprocessPassPushConstantData
 		{
-			ResourceIndex shadowMapIndex;
 			ResourceIndex sceneColourIndex;
 			ResourceIndex sceneDepthIndex;
 			SamplerIndex samplerIndex;
@@ -233,18 +237,20 @@ namespace NK
 		UniquePtr<RenderGraph> m_meshRenderGraph;
 		RenderGraph* m_activeRenderGraph;
 
+
+		//Shadow maps
+		static constexpr glm::ivec2 m_shadowMapBaseResolution{ 2048, 2048 };
+		std::vector<UniquePtr<ITexture>> m_shadowMaps2D;
+		std::vector<UniquePtr<ITextureView>> m_shadowMap2DDSVs;
+		std::vector<UniquePtr<ITextureView>> m_shadowMap2DSRVs;
+
+		glm::mat4 m_pointLightProjMatrix;
+		std::vector<UniquePtr<ITexture>> m_shadowMapsCube;
+		std::vector<std::vector<UniquePtr<ITextureView>>> m_shadowMapCube_FaceDSVs; //Each inner vector is 6 DSVs (1 for each face in the shadow cubemap)
+		std::vector<UniquePtr<ITextureView>> m_shadowMapCubeSRVs;
+
 		
 		//Screen Resources
-		UniquePtr<ITexture> m_shadowMap;
-		UniquePtr<ITexture> m_shadowMapMSAA;
-		UniquePtr<ITexture> m_shadowMapSSAA;
-		UniquePtr<ITextureView> m_shadowMapDSV;
-		UniquePtr<ITextureView> m_shadowMapSRV;
-		UniquePtr<ITextureView> m_shadowMapMSAADSV;
-		UniquePtr<ITextureView> m_shadowMapMSAASRV;
-		UniquePtr<ITextureView> m_shadowMapSSAADSV;
-		UniquePtr<ITextureView> m_shadowMapSSAASRV;
-		
 		UniquePtr<ITexture> m_sceneColour;
 		UniquePtr<ITexture> m_sceneColourMSAA;
 		UniquePtr<ITexture> m_sceneColourSSAA;

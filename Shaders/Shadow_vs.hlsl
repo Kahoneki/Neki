@@ -15,37 +15,15 @@ struct VertexOutput
 };
 
 
-struct LightData
-{		
-	float4x4 viewProjMat; //For shadow mapping
-	float3 colour;
-	float intensity;
-	float3 position;
-	uint type;
-	float3 direction;
-	float innerAngle;
-	float outerAngle;
-	float constantAttenuation;
-	float linearAttenuation;
-	float quadraticAttenuation;
-};
-
-[[vk::binding(0,0)]] StructuredBuffer<LightData> g_lightData[] : register(t0, space0);
-
-
 PUSH_CONSTANTS_BLOCK(
+	float4x4 viewProjMat;
 	float4x4 modelMat;
-	uint numLights;
-	uint lightDataBufferIndex;
 );
 
 
 VertexOutput VSMain(VertexInput input)
 {
     VertexOutput output;
-	LightData lightData = g_lightData[NonUniformResourceIndex(PC(lightDataBufferIndex))][0];
-	
-    output.pos = mul(lightData.viewProjMat, mul(PC(modelMat), float4(input.pos, 1.0)));
-
+    output.pos = mul(PC(viewProjMat), mul(PC(modelMat), float4(input.pos, 1.0)));
     return output;
 }
