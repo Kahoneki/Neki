@@ -1067,8 +1067,6 @@ namespace NK
 					{
 						const GPUMesh* mesh{ model->meshes[meshIndex].get() };
 						_cmdBuf->PushConstants(m_shadowPassRootSignature.get(), &pushConstantData);
-						IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
-						_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
 						_cmdBuf->BindVertexBuffers(0, 1, mesh->vertexBuffer.get(), &modelVertexBufferStride);
 						_cmdBuf->BindIndexBuffer(mesh->indexBuffer.get(), DATA_FORMAT::R32_UINT);
 						_cmdBuf->DrawIndexed(mesh->indexCount, 1, 0, 0);
@@ -1078,36 +1076,49 @@ namespace NK
 
 			
 			//Loop through all lights
-			for (std::size_t i{ 0 }; i < m_cpuLightData.size(); ++i)
+			//View is parallel to vector
+			//^todo: there's almost definitely a better way of handling this
+			ComponentView<CLight, CTransform> lightView{ m_reg.get().View<CLight, CTransform>() };
+			ComponentView<CLight, CTransform>::iterator lightIt{ lightView.begin() };
+			for (std::size_t i{ 0 }; i < m_cpuLightData.size(); ++i, ++lightIt)
 			{
+				auto [light, transform] = *lightIt;
 				ITexture* shadowMap{ nullptr };
 				const LightShaderData& lightData{ m_cpuLightData[i] };
 				if (lightData.type == LIGHT_TYPE::POINT)
 				{
-					shadowMap = m_shadowMapsCube[m_cpuLightData[i].shadowMapIndex].get();
+					shadowMap = m_shadowMapsCube[light.light->GetShadowMapVectorIndex()].get();
 					_cmdBuf->TransitionBarrier(shadowMap, shadowMap->GetState(), RESOURCE_STATE::DEPTH_WRITE);
 					
 					//shadow cubemap - need to render scene 6 times from all faces and set view matrix between each one
 					for (std::uint32_t faceIndex{ 0 }; faceIndex < 6; ++faceIndex)
 					{
 						pushConstantData.viewProjMat = m_pointLightProjMatrix * GetPointLightViewMatrix(lightData.position, faceIndex);
+						_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, m_shadowMapCube_FaceDSVs[light.light->GetShadowMapVectorIndex()][faceIndex].get(), nullptr, true, true);
+						_cmdBuf->SetViewport({ 0, 0 }, { shadowMap->GetSize().x, shadowMap->GetSize().y });
+						_cmdBuf->SetScissor({ 0, 0 }, { shadowMap->GetSize().x, shadowMap->GetSize().y });
 						drawModels();
+						_cmdBuf->EndRendering(0, nullptr, nullptr);
 					}
 				}
 				else
 				{
-					shadowMap = m_shadowMaps2D[m_cpuLightData[i].shadowMapIndex].get();
+					shadowMap = m_shadowMaps2D[light.light->GetShadowMapVectorIndex()].get();
 					_cmdBuf->TransitionBarrier(shadowMap, shadowMap->GetState(), RESOURCE_STATE::DEPTH_WRITE);
 					
 					//2d shadow map
 					pushConstantData.viewProjMat = lightData.viewProjMat; //todo: this is so ugly, why is it being duplicated? find a better way of doing this !!
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, m_shadowMap2DDSVs[light.light->GetShadowMapVectorIndex()].get(), nullptr, true, true);
+					_cmdBuf->SetViewport({ 0, 0 }, { shadowMap->GetSize().x, shadowMap->GetSize().y });
+					_cmdBuf->SetScissor({ 0, 0 }, { shadowMap->GetSize().x, shadowMap->GetSize().y });
 					drawModels();
+					_cmdBuf->EndRendering(0, nullptr, nullptr);
 				}
 
 				_cmdBuf->TransitionBarrier(shadowMap, RESOURCE_STATE::DEPTH_WRITE, RESOURCE_STATE::SHADER_RESOURCE); //prepare for next pass
 			}
 			
-		});
+		}, true);
 
 
 		meshDesc.AddNode(
@@ -1447,6 +1458,7 @@ namespace NK
 			shadowMapViewDesc.baseArrayLayer = 0;
 			shadowMapViewDesc.arrayLayerCount = 6;
 			shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+			shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_CUBE;
 			m_shadowMapCubeSRVs.push_back(m_device->CreateShaderResourceTextureView(m_shadowMapsCube[m_shadowMapsCube.size() - 1].get(), shadowMapViewDesc));
 		}
 		else
@@ -1552,11 +1564,15 @@ namespace NK
 				InitShadowMapForLight(light);
 				if (light.lightType == LIGHT_TYPE::POINT)
 				{
-					light.light->SetShadowMapIndex(m_shadowMapsCube.size() - 1);
+					const std::size_t vecIdx = m_shadowMapsCube.size() - 1;
+					light.light->SetShadowMapVectorIndex(vecIdx);
+					light.light->SetShadowMapIndex(m_shadowMapCubeSRVs.back()->GetIndex());
 				}
 				else
 				{
-					light.light->SetShadowMapIndex(m_shadowMaps2D.size() - 1);
+					const std::size_t vecIdx = m_shadowMaps2D.size() - 1;
+					light.light->SetShadowMapVectorIndex(vecIdx);
+					light.light->SetShadowMapIndex(m_shadowMap2DSRVs.back()->GetIndex());
 				}
 			}
 
@@ -1565,6 +1581,7 @@ namespace NK
 			shaderData.intensity = light.light->GetIntensity();
 			shaderData.position = transform.GetPosition();
 			shaderData.type = light.lightType;
+			shaderData.shadowMapIndex = light.light->GetShadowMapIndex();
 
 			//Calculate direction and view matrix from rotation
 			const glm::quat orientation{ glm::quat(transform.GetRotation()) };
@@ -1668,12 +1685,12 @@ namespace NK
 		//Standard cubemap face order: +X, -X, +Y, -Y, +Z, -Z
 		switch (_faceIndex)
 		{
-		case 0:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 1.0f,  0.0f)); } //+X
-		case 1:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 1.0f,  0.0f)); } //-X
-		case 2:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f, 0.0f, -1.0f)); } //+Y
-		case 3:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f, 0.0f,  1.0f)); } //-Y
-		case 4:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, 1.0f,  0.0f)); } //+Z
-		case 5:		{ return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, 1.0f,  0.0f)); } //-Z
+		case 0: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 1.0f,  0.0f)); //+X
+		case 1: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 1.0f,  0.0f)); //-X
+		case 2: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)); //+Y
+		case 3: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)); //-Y
+		case 4: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, 1.0f,  0.0f)); //+Z
+		case 5: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, 1.0f,  0.0f)); //-Z
 		default:	{ throw std::invalid_argument("RenderLayer::GetPointLightViewMatrix() - _faceIndex (" + std::to_string(_faceIndex) + ")" + " is not in the allowed range of 0 to 5"); }
 		}
 	}

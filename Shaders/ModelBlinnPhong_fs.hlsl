@@ -136,9 +136,13 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 		//Shadows - if point is in shadow from this light, just skip this light
 		if (light.type == 2) //Point Light
 		{
+float3 lightToFrag = vertexOutput.worldPos - light.position;
+float debugDepth = g_cubemaps[NonUniformResourceIndex(light.shadowMapIndex)].Sample(linearSampler, float3(-1,0,0)).r;
+return float4(debugDepth, debugDepth, debugDepth, 1.0f);
+
 			if (PointInPointLightShadow(vertexOutput.worldPos, light.position, light.shadowMapIndex, linearSampler))
 			{
-				//continue;
+				return float4(1.0, 0.0, 1.0, 1.0);
 			}
 		}
 		else //Directional / Spot
@@ -151,23 +155,17 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 			{
 				float shadowDepth = g_textures[NonUniformResourceIndex(light.shadowMapIndex)].Sample(linearSampler, shadowMapUV).r;
 
-				return float4(shadowDepth, shadowDepth, shadowDepth, 1.0f);
-
 				float currentPixelDepth = posInLightNDC.z;
 				
 				float bias = 0.0005f; 
 				if ((currentPixelDepth - bias) > shadowDepth)
 				{
-					return float4(0.0, 1.0, 0.0, 1.0);
-				}
-				else
-				{
-					return float4(0.0, 0.0, 1.0, 1.0);
+					continue;
 				}
 			}
 			else
 			{
-				return float4(0.0, 1.0, 1.0, 1.0);
+				continue;
 			}
 		}
 
@@ -227,6 +225,5 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
 	float3 result = ambient + (diffuse * diffuseSample.rgb) + specular + emissive;
-	return float4(1.0, 0.0, 1.0, 1.0);	
 	return float4(result, 1.0f);
 }

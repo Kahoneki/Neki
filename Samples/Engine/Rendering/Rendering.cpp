@@ -34,18 +34,17 @@ public:
 		
 		m_redLightEntity = m_reg.Create();
 		NK::CLight& redLight{ m_reg.AddComponent<NK::CLight>(m_redLightEntity) };
-		redLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
-		redLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
+		redLight.lightType = NK::LIGHT_TYPE::POINT;
+		redLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
 		redLight.light->SetColour({ 1,0,0 });
 		redLight.light->SetIntensity(1.0f);
-		dynamic_cast<NK::DirectionalLight*>(redLight.light.get())->SetDimensions({ 10, 10, 10 });
-//		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetConstantAttenuation(1.0f);
-//		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetLinearAttenuation(0.1f);
-//		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetQuadraticAttenuation(0.01f);
+		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetConstantAttenuation(1.0f);
+		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetLinearAttenuation(0.1f);
+		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetQuadraticAttenuation(0.01f);
 
 		NK::CTransform& redLightTransform{ m_reg.AddComponent<NK::CTransform>(m_redLightEntity) };
 		redLightTransform.SetPosition({ 0, 0, -3 });
-		redLightTransform.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
+		//redLightTransform.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
 
 		
 		m_greenLightEntity = m_reg.Create();

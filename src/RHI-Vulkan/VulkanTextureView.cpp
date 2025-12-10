@@ -165,8 +165,8 @@ namespace NK
 		}
 
 
-		//Populate m_renderArea if _texture is 2D
-		if (m_dimension == TEXTURE_VIEW_DIMENSION::DIM_2)
+		//Populate m_renderArea if _texture is 2D / CUBE
+		if (m_dimension == TEXTURE_VIEW_DIMENSION::DIM_2 || m_dimension == TEXTURE_VIEW_DIMENSION::DIM_2D_ARRAY || m_dimension == TEXTURE_VIEW_DIMENSION::DIM_CUBE)
 		{
 			m_renderArea.offset = { 0, 0 };
 			m_renderArea.extent = { static_cast<std::uint32_t>(_texture->GetSize().x), static_cast<std::uint32_t>(_texture->GetSize().y) };
