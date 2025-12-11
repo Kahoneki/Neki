@@ -136,13 +136,9 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 		//Shadows - if point is in shadow from this light, just skip this light
 		if (light.type == 2) //Point Light
 		{
-float3 lightToFrag = vertexOutput.worldPos - light.position;
-float debugDepth = g_cubemaps[NonUniformResourceIndex(light.shadowMapIndex)].Sample(linearSampler, float3(-1,0,0)).r;
-return float4(debugDepth, debugDepth, debugDepth, 1.0f);
-
 			if (PointInPointLightShadow(vertexOutput.worldPos, light.position, light.shadowMapIndex, linearSampler))
 			{
-				return float4(1.0, 0.0, 1.0, 1.0);
+				continue;
 			}
 		}
 		else //Directional / Spot

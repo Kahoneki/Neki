@@ -23,7 +23,7 @@
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(6), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
+	explicit GameScene() : Scene(7), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
 	{
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
@@ -37,29 +37,27 @@ public:
 		redLight.lightType = NK::LIGHT_TYPE::POINT;
 		redLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
 		redLight.light->SetColour({ 1,0,0 });
-		redLight.light->SetIntensity(1.0f);
+		redLight.light->SetIntensity(0.75f);
 		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetConstantAttenuation(1.0f);
 		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetLinearAttenuation(0.1f);
 		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetQuadraticAttenuation(0.01f);
 
 		NK::CTransform& redLightTransform{ m_reg.AddComponent<NK::CTransform>(m_redLightEntity) };
-		redLightTransform.SetPosition({ 0, 0, -3 });
-		//redLightTransform.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
+		redLightTransform.SetPosition({ 0, 3, -3 });
 
 		
 		m_greenLightEntity = m_reg.Create();
-//		NK::CLight& greenLight{ m_reg.AddComponent<NK::CLight>(m_greenLightEntity) };
-//		greenLight.lightType = NK::LIGHT_TYPE::POINT;
-//		greenLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
-//		greenLight.light->SetColour({ 0,1,0 });
-//		greenLight.light->SetIntensity(1.0f);
-//		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetConstantAttenuation(1.0f);
-//		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetLinearAttenuation(0.1f);
-//		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetQuadraticAttenuation(0.01f);
-//		
-//		NK::CTransform& greenLightTransform{ m_reg.AddComponent<NK::CTransform>(m_greenLightEntity) };
-//		greenLightTransform.SetPosition({ 0, 0, -3 });
-//		greenLightTransform.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
+		NK::CLight& greenLight{ m_reg.AddComponent<NK::CLight>(m_greenLightEntity) };
+		greenLight.lightType = NK::LIGHT_TYPE::POINT;
+		greenLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
+		greenLight.light->SetColour({ 0,1,0 });
+		greenLight.light->SetIntensity(1.0f);
+		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetConstantAttenuation(1.0f);
+		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetLinearAttenuation(0.1f);
+		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetQuadraticAttenuation(0.01f);
+		
+		NK::CTransform& greenLightTransform{ m_reg.AddComponent<NK::CTransform>(m_greenLightEntity) };
+		greenLightTransform.SetPosition({ 0, 0, -3 });
 		
 		
 		//preprocessing step - ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
@@ -74,7 +72,7 @@ public:
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
 		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
 		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
-		helmetTransform.SetPosition(glm::vec3(0, 0, -3));
+		helmetTransform.SetPosition(glm::vec3(0, 0, -5));
 		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 
 		m_groundEntity = m_reg.Create();
@@ -83,7 +81,17 @@ public:
 		NK::CTransform& groundTransform{ m_reg.AddComponent<NK::CTransform>(m_groundEntity) };
 //		groundTransform.SetScale({ 0.01f, 0.01f, 0.01f });
 		groundTransform.SetPosition(glm::vec3(0, -3, -3));
-		groundTransform.SetScale({ 30.0f, 0.2f, 30.0f });
+		groundTransform.SetScale({ 5.0f, 0.2f, 5.0f });
+
+		m_wallEntity = m_reg.Create();
+		NK::CModelRenderer& groundModelRenderer2{ m_reg.AddComponent<NK::CModelRenderer>(m_wallEntity) };
+		groundModelRenderer2.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
+		NK::CTransform& groundTransform2{ m_reg.AddComponent<NK::CTransform>(m_wallEntity) };
+		//		groundTransform.SetScale({ 0.01f, 0.01f, 0.01f });
+		groundTransform2.SetPosition(glm::vec3(0, 1.8, -8));
+		groundTransform2.SetScale({ 5.0f, 0.2f, 5.0f });
+		groundTransform2.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
+		
 
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
@@ -138,6 +146,7 @@ private:
 	NK::Entity m_skyboxEntity;
 	NK::Entity m_helmetEntity;
 	NK::Entity m_groundEntity;
+	NK::Entity m_wallEntity;
 	NK::Entity m_redLightEntity;
 	NK::Entity m_greenLightEntity;
 	NK::Entity m_cameraEntity;

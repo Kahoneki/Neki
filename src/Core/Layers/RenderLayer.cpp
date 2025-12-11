@@ -139,19 +139,23 @@ namespace NK
 		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
 		while (!m_modelUnloadQueues[m_currentFrame].empty())
 		{
-			ModelLoader::UnloadModel(m_modelUnloadQueues[m_currentFrame].back());
-			m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
+			if (m_gpuModelReferenceCounter[m_modelUnloadQueues[m_currentFrame].back()] == 0)
+			{
+				ModelLoader::UnloadModel(m_modelUnloadQueues[m_currentFrame].back());
+				m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
+			}
 			m_modelUnloadQueues[m_currentFrame].pop_back();
 		}
 
-		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityBufferMaps[(m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight]) };
+		const std::size_t prevFrameIndex{ (m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight };
+		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityBufferMaps[prevFrameIndex]) };
 		
 		//Model Loading Phase
-		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++i)
+		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[prevFrameIndex].size(); ++i)
 		{
-			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
-//			modelRenderer.visible = visibilityMap[i] == 1;
-			modelRenderer.visible = true;
+			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[prevFrameIndex][i]) };
+			modelRenderer.visible = visibilityMap[i] == 1;
+//			modelRenderer.visible = true;
 
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
@@ -169,21 +173,35 @@ namespace NK
 				}
 				if (modelInUnloadQueue)
 				{
+					++m_gpuModelReferenceCounter[modelRenderer.modelPath];
 					continue;
 				}
-				
-				//Model is visible but isn't loaded, load it
-				const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
-				m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
-				m_newGPUUploaderUpload = true;
+
+				//Model is visible but isn't assigned, assign it
+				if (!m_gpuModelCache.contains(modelRenderer.modelPath))
+				{
+					//Model isn't loaded, load it
+					const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
+					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
+					m_newGPUUploaderUpload = true;
+					m_gpuModelReferenceCounter[modelRenderer.modelPath] = 0;
+				}
 				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
+				++m_gpuModelReferenceCounter[modelRenderer.modelPath];
 			}
 			
 			else if (!modelRenderer.visible && modelRenderer.model)
 			{
-				//Model isn't visible but is loaded, add it to the unload queue
-				m_modelUnloadQueues[(m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight].push_back(modelRenderer.modelPath);
+				//Model isn't visible but is loaded, decrement reference counter and unassign
+				--m_gpuModelReferenceCounter[modelRenderer.modelPath];
+				std::cout << m_gpuModelReferenceCounter[modelRenderer.modelPath] << '\n';
 				modelRenderer.model = nullptr;
+
+				if (m_gpuModelReferenceCounter[modelRenderer.modelPath] == 0)
+				{
+					//No CModelRenderers are currently visible that use this model, add it to the unload queue
+					m_modelUnloadQueues[prevFrameIndex].push_back(modelRenderer.modelPath);
+				}
 			}
 		}
 		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the fence to wait on before drawing
@@ -514,7 +532,7 @@ namespace NK
 			m_modelVisibilityBufferViews[i] = m_device->CreateBufferView(m_modelVisibilityBuffers[i].get(), modelVisibilityBufferViewDesc);
 
 			m_modelVisibilityBufferMaps[i] = m_modelVisibilityBuffers[i]->GetMap();
-			std::memset(m_modelVisibilityBufferMaps[i], 1, m_desc.maxModels * sizeof(std::uint32_t));
+			std::fill_n(static_cast<std::uint32_t*>(m_modelVisibilityBufferMaps[i]), m_desc.maxModels, 1u);
 		}
 	}
 
@@ -1065,6 +1083,9 @@ namespace NK
 
 					for (std::size_t meshIndex{ 0 }; meshIndex < modelRenderer.model->meshes.size(); ++meshIndex)
 					{
+//						if (model->meshes[meshIndex] == nullptr) { continue; }
+//						if (model->meshes[meshIndex]->vertexBuffer == nullptr) { continue; }
+//						if (model->meshes[meshIndex]->indexBuffer == nullptr) { continue; }
 						const GPUMesh* mesh{ model->meshes[meshIndex].get() };
 						_cmdBuf->PushConstants(m_shadowPassRootSignature.get(), &pushConstantData);
 						_cmdBuf->BindVertexBuffers(0, 1, mesh->vertexBuffer.get(), &modelVertexBufferStride);
@@ -1685,12 +1706,12 @@ namespace NK
 		//Standard cubemap face order: +X, -X, +Y, -Y, +Z, -Z
 		switch (_faceIndex)
 		{
-		case 0: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 1.0f,  0.0f)); //+X
-		case 1: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, 1.0f,  0.0f)); //-X
-		case 2: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)); //+Y
-		case 3: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)); //-Y
-		case 4: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, 1.0f,  0.0f)); //+Z
-		case 5: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, 1.0f,  0.0f)); //-Z
+		case 0: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 1, 0, 0), glm::vec3(0, 1, 0)); // +X
+		case 1: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3(-1, 0, 0), glm::vec3(0, 1, 0)); // -X
+		case 2: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0, 1, 0), glm::vec3(0, 0,-1)); // +Y (Top) - Up is -Z
+		case 3: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0,-1, 0), glm::vec3(0, 0, 1)); // -Y (Bottom) - Up is +Z
+		case 4: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0, 0, 1), glm::vec3(0, 1, 0)); // +Z
+		case 5: return glm::lookAtLH(_lightPos, _lightPos + glm::vec3( 0, 0,-1), glm::vec3(0, 1, 0)); // -Z
 		default:	{ throw std::invalid_argument("RenderLayer::GetPointLightViewMatrix() - _faceIndex (" + std::to_string(_faceIndex) + ")" + " is not in the allowed range of 0 to 5"); }
 		}
 	}
