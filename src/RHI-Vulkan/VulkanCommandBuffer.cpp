@@ -571,9 +571,9 @@ namespace NK
 		copyRegion.bufferImageHeight = 0; //Tightly packed
 		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		copyRegion.imageSubresource.mipLevel = 0;
-		copyRegion.imageSubresource.baseArrayLayer = 0;
-		copyRegion.imageSubresource.layerCount = _dstTexture->IsArrayTexture() ? (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _dstTexture->GetSize().y : _dstTexture->GetSize().z) : 1;
-		copyRegion.imageOffset = { _dstOffset.x, _dstOffset.y, _dstOffset.z };
+		copyRegion.imageSubresource.baseArrayLayer = _dstOffset.z;
+		copyRegion.imageSubresource.layerCount = (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_3) ? 1 : static_cast<std::uint32_t>(_dstExtent.z);
+		copyRegion.imageOffset = { _dstOffset.x, _dstOffset.y, 0 };
 		const std::uint32_t depth{ (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_3) ? static_cast<std::uint32_t>(_dstExtent.z) : 1 };
 		copyRegion.imageExtent = { static_cast<std::uint32_t>(_dstExtent.x), static_cast<std::uint32_t>(_dstExtent.y), depth };
 

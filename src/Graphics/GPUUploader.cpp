@@ -204,10 +204,33 @@ namespace NK
 
 		const TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
 
-		const std::size_t unalignedOffset{ m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size };
-		constexpr std::size_t alignment{ 16 };
-		const std::size_t alignedOffset{ (unalignedOffset + alignment - 1) & ~(alignment - 1) };
+		constexpr std::size_t TEXTURE_COPY_ALIGNMENT{ 512u };
 
+		std::size_t rowsPerLayer{};
+		if (RHIUtils::IsBlockCompressed(_dstTexture->GetFormat()))
+		{
+			const std::uint32_t height{ static_cast<std::uint32_t>(_dstTexture->GetSize().y) };
+			rowsPerLayer = (height + 3) / 4;
+		}
+		else
+		{
+			rowsPerLayer = _dstTexture->GetSize().y;
+		}
+
+		//Pad each layer in the staging buffer so the next one starts at an aligned offset
+		const std::size_t unalignedBytesPerLayer{ rowsPerLayer * memLayout.rowPitch };
+		const std::size_t alignedBytesPerLayer{ (unalignedBytesPerLayer + TEXTURE_COPY_ALIGNMENT - 1) & ~(TEXTURE_COPY_ALIGNMENT - 1) };
+
+		std::size_t numLayers{ 1 };
+		if (_dstTexture->IsArrayTexture())
+		{
+			numLayers = (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _dstTexture->GetSize().y : _dstTexture->GetSize().z);
+		}
+
+		//Global offset into the staging buffer
+		const std::size_t unalignedOffset{ m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size };
+		const std::size_t alignedOffset{ (unalignedOffset + TEXTURE_COPY_ALIGNMENT - 1) & ~(TEXTURE_COPY_ALIGNMENT - 1) };
+		
 		BufferSubregion subregion{};
 		subregion.offset = alignedOffset;
 		subregion.size = memLayout.totalBytes;
@@ -232,50 +255,18 @@ namespace NK
 		}
 
 		const unsigned char* srcPtr{ static_cast<const unsigned char*>(_data) };
-		unsigned char* dstPtr{ m_stagingBufferMap + subregion.offset };
-		std::size_t numRows{};
-		std::size_t rowsPerLayer{};
+		unsigned char* baseDstPtr{ m_stagingBufferMap + subregion.offset };
 
-		switch (_dstTexture->GetDimension())
+		//Loop through all layers and copy all rows
+		for (std::size_t layer{ 0 }; layer < numLayers; ++layer)
 		{
-		case TEXTURE_DIMENSION::DIM_1:
-		{
-			numRows = 1;
-			rowsPerLayer = 1;
-			break;
-		}
-		case TEXTURE_DIMENSION::DIM_2:
-		{
-			if (RHIUtils::IsBlockCompressed(_dstTexture->GetFormat()))
+			unsigned char* layerDstPtr{ baseDstPtr + (layer * alignedBytesPerLayer) };
+			for (std::size_t row{ 0 }; row < rowsPerLayer; ++row)
 			{
-				const std::uint32_t height{ static_cast<std::uint32_t>(_dstTexture->GetSize().y) };
-				rowsPerLayer = (height + 3) / 4;
+				memcpy(layerDstPtr, srcPtr, std::min(memLayout.rowPitch, static_cast<std::uint32_t>(sourceRowPitch)));
+				srcPtr += sourceRowPitch;
+				layerDstPtr += memLayout.rowPitch;
 			}
-			else
-			{
-				rowsPerLayer = _dstTexture->GetSize().y;
-			}
-
-			numRows = rowsPerLayer;
-			if (_dstTexture->IsArrayTexture())
-			{
-				numRows *= _dstTexture->GetSize().z;
-			}
-			break;
-		}
-		case TEXTURE_DIMENSION::DIM_3:
-		{
-			numRows = _dstTexture->GetSize().z;
-			rowsPerLayer = numRows;
-			break;
-		}
-		}
-
-		for (std::size_t row{ 0 }; row < numRows; ++row)
-		{
-			memcpy(dstPtr, srcPtr, std::min(memLayout.rowPitch, static_cast<std::uint32_t>(sourceRowPitch)));
-			srcPtr += sourceRowPitch;
-			dstPtr += memLayout.rowPitch;
 		}
 		m_stagingBufferSubregions.push_back(subregion);
 
@@ -286,10 +277,9 @@ namespace NK
 
 		if (_dstTexture->IsArrayTexture() && _dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_2)
 		{
-			const std::size_t bytesPerLayer{ rowsPerLayer * memLayout.rowPitch };
 			for (std::uint32_t i{ 0 }; i < _dstTexture->GetSize().z; ++i)
 			{
-				m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset + (i * bytesPerLayer), { 0, 0, 0 }, { _dstTexture->GetSize().x, _dstTexture->GetSize().y, 1 });
+				m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset + (i * alignedBytesPerLayer), { 0, 0, static_cast<std::int32_t>(i) }, { _dstTexture->GetSize().x, _dstTexture->GetSize().y, 1 });
 			}
 		}
 		else
