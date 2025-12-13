@@ -338,7 +338,7 @@ namespace NK
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating D3D12MA allocator\n");
 
 		D3D12MA::ALLOCATOR_DESC allocDesc{};
-		allocDesc.Flags = D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS; //todo: look into ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED
+		allocDesc.Flags = D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED; //todo: look into ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED
 		allocDesc.PreferredBlockSize = 0; //0 = default - todo: look into needing to fine tune this?
 		allocDesc.pDevice = m_device.Get();
 		allocDesc.pAdapter = m_adapter.Get();

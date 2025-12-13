@@ -289,7 +289,7 @@ namespace NK
 			const std::size_t bytesPerLayer{ rowsPerLayer * memLayout.rowPitch };
 			for (std::uint32_t i{ 0 }; i < _dstTexture->GetSize().z; ++i)
 			{
-				m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset + (i * bytesPerLayer), { 0, 0, i }, { _dstTexture->GetSize().x, _dstTexture->GetSize().y, 1 });
+				m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset + (i * bytesPerLayer), { 0, 0, 0 }, { _dstTexture->GetSize().x, _dstTexture->GetSize().y, 1 });
 			}
 		}
 		else

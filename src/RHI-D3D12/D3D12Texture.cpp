@@ -68,11 +68,32 @@ namespace NK
 		m_resourceDesc.Flags = GetCreationFlags();
 
 
+		D3D12_CLEAR_VALUE clearValue{};
+		D3D12_CLEAR_VALUE* pClearValue = nullptr;
+
+		if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT))
+		{
+			clearValue.Format = (m_resourceDesc.Format == DXGI_FORMAT_R32_TYPELESS ? DXGI_FORMAT_D32_FLOAT : m_resourceDesc.Format);
+			clearValue.DepthStencil.Depth = 1.0f;
+			clearValue.DepthStencil.Stencil = 0;
+			pClearValue = &clearValue;
+		}
+		else if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT))
+		{
+			clearValue.Format = (m_resourceDesc.Format == DXGI_FORMAT_R32_TYPELESS ? DXGI_FORMAT_R32_FLOAT : m_resourceDesc.Format);
+			clearValue.Color[0] = 0.0f;
+			clearValue.Color[1] = 0.0f;
+			clearValue.Color[2] = 0.0f;
+			clearValue.Color[3] = 0.0f;
+			pClearValue = &clearValue;
+		}
+
+
 		D3D12MA::ALLOCATION_DESC allocDesc{};
 		allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 		//todo: D3D12MA::ALLOCATION_FLAGS has some really cool stuff i wanna play around with
 
-		HRESULT hr{ dynamic_cast<D3D12Device&>(m_device).GetD3D12MAAllocator()->CreateResource(&allocDesc, &m_resourceDesc, D3D12_RESOURCE_STATE_COMMON, NULL, &m_allocation, IID_PPV_ARGS(&m_texture)) };
+		HRESULT hr{ dynamic_cast<D3D12Device&>(m_device).GetD3D12MAAllocator()->CreateResource(&allocDesc, &m_resourceDesc, D3D12_RESOURCE_STATE_COMMON, pClearValue, &m_allocation, IID_PPV_ARGS(&m_texture)) };
 		if (SUCCEEDED(hr))
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::BUFFER, "ID3D12Resource initialisation and allocation successful\n");

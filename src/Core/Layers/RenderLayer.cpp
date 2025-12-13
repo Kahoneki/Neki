@@ -154,8 +154,8 @@ namespace NK
 		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[prevFrameIndex].size(); ++i)
 		{
 			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[prevFrameIndex][i]) };
-			modelRenderer.visible = visibilityMap[i] == 1;
-//			modelRenderer.visible = true;
+			//modelRenderer.visible = visibilityMap[i] == 1;
+			modelRenderer.visible = true;
 
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
@@ -299,8 +299,6 @@ namespace NK
 		m_currentFrame = (m_currentFrame + 1) % m_desc.framesInFlight;
 
 		m_firstFrame = false;
-
-		m_graphicsQueue->WaitIdle();
 	}
 
 
@@ -1016,15 +1014,15 @@ namespace NK
 			{
 				if (m_desc.enableMSAA)
 				{
-					_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, false);
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, m_firstFrame);
 				}
 				else if (m_desc.enableSSAA)
 				{
-					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_SSAA_DSV"), nullptr, true, false);
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_SSAA_DSV"), nullptr, true, m_firstFrame);
 				}
 				else
 				{
-					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, false);
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, m_firstFrame);
 				}
 
 				_cmdBuf->BindRootSignature(m_modelVisibilityPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
@@ -1380,7 +1378,7 @@ namespace NK
 		//Scene Depth
 		TextureDesc sceneDepthDesc{};
 		sceneDepthDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-		sceneDepthDesc.format = DATA_FORMAT::R32_TYPELESS;
+		sceneDepthDesc.format = (m_desc.backend == GRAPHICS_BACKEND::D3D12 ? DATA_FORMAT::R32_TYPELESS : DATA_FORMAT::D32_SFLOAT);
 		sceneDepthDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
 		sceneDepthDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		sceneDepthDesc.arrayTexture = false;
@@ -1416,7 +1414,7 @@ namespace NK
 		if (m_desc.enableSSAA) { m_sceneDepthSSAADSV = m_device->CreateDepthStencilTextureView(m_sceneDepthSSAA.get(), sceneDepthViewDesc); }
 		
 		//Shadow Map SRVs
-		sceneDepthViewDesc.format = DATA_FORMAT::R32_SFLOAT;
+		if (m_desc.backend == GRAPHICS_BACKEND::D3D12) { sceneDepthViewDesc.format = DATA_FORMAT::R32_SFLOAT; }
 		sceneDepthViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 		m_sceneDepthSRV = m_device->CreateShaderResourceTextureView(m_sceneDepth.get(), sceneDepthViewDesc);
 		if (m_desc.enableMSAA) { m_sceneDepthMSAASRV = m_device->CreateShaderResourceTextureView(m_sceneDepthMSAA.get(), sceneDepthViewDesc); }
@@ -1448,7 +1446,7 @@ namespace NK
 		//Shadow Map
 		TextureDesc shadowMapDesc{};
 		shadowMapDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-		shadowMapDesc.format = DATA_FORMAT::R32_TYPELESS;
+		shadowMapDesc.format = (m_desc.backend == GRAPHICS_BACKEND::D3D12 ? DATA_FORMAT::R32_TYPELESS : DATA_FORMAT::D32_SFLOAT);
 		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		shadowMapDesc.sampleCount = SAMPLE_COUNT::BIT_1;
 		if (_light.lightType == LIGHT_TYPE::POINT)
@@ -1488,7 +1486,7 @@ namespace NK
 			//SRV
 			shadowMapViewDesc.baseArrayLayer = 0;
 			shadowMapViewDesc.arrayLayerCount = 6;
-			shadowMapViewDesc.format = DATA_FORMAT::R32_SFLOAT;
+			if (m_desc.backend == GRAPHICS_BACKEND::D3D12) { shadowMapViewDesc.format = DATA_FORMAT::R32_SFLOAT; }
 			shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 			shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_CUBE;
 			m_shadowMapCubeSRVs.push_back(m_device->CreateShaderResourceTextureView(m_shadowMapsCube[m_shadowMapsCube.size() - 1].get(), shadowMapViewDesc));

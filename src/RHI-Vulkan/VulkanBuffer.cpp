@@ -61,7 +61,7 @@ namespace NK
 			throw std::runtime_error("");
 		}
 
-		if (m_memType == MEMORY_TYPE::HOST)
+		if (m_memType != MEMORY_TYPE::DEVICE)
 		{
 			m_map = allocResultInfo.pMappedData;
 		}

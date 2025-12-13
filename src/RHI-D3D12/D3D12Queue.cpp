@@ -64,7 +64,10 @@ namespace NK
 		if (_waitSemaphore)
 		{
 			D3D12Semaphore* d3d12WaitSemaphore{ dynamic_cast<D3D12Semaphore*>(_waitSemaphore) };
-			m_queue->Wait(d3d12WaitSemaphore->GetFence(), d3d12WaitSemaphore->GetFenceValue());
+			if (d3d12WaitSemaphore->GetFenceValue() > 0)
+			{
+				m_queue->Wait(d3d12WaitSemaphore->GetFence(), d3d12WaitSemaphore->GetFenceValue());
+			}
 		}
 
 		//Execute command list
