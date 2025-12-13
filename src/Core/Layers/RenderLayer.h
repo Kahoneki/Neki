@@ -117,6 +117,7 @@ namespace NK
 		//(one for each frame in flight)
 		std::vector<UniquePtr<IBuffer>> m_camDataBuffersPreviousFrame;
 		std::vector<UniquePtr<IBufferView>> m_camDataBufferPreviousFrameViews;
+		std::vector<void*> m_camDataBufferPreviousFrameMaps;
 
 		
 		struct alignas(16) LightShaderData
@@ -150,9 +151,10 @@ namespace NK
 		//Stores a 32-bit uint for every model in the scene indicating whether it's visible or not - regardless of whether the model is loaded or not
 		//(all vectors parallel to m_modelMatricesBuffers)
 		//(one for each frame in flight)
-		std::vector<UniquePtr<IBuffer>> m_modelVisibilityBuffers;
-		std::vector<UniquePtr<IBufferView>> m_modelVisibilityBufferViews;
-		std::vector<void*> m_modelVisibilityBufferMaps;
+		std::vector<UniquePtr<IBuffer>> m_modelVisibilityDeviceBuffers;
+		std::vector<UniquePtr<IBuffer>> m_modelVisibilityReadbackBuffers;
+		std::vector<UniquePtr<IBufferView>> m_modelVisibilityDeviceBufferViews;
+		std::vector<void*> m_modelVisibilityReadbackBufferMaps;
 		
 		UniquePtr<ITexture> m_skyboxTexture; //Not created at startup
 		UniquePtr<ITextureView> m_skyboxTextureView; //Not created at startup

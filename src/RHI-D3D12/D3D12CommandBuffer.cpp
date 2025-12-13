@@ -113,9 +113,11 @@ namespace NK
 		barrierInfo.Transition.StateBefore = GetD3D12ResourceState(_oldState);
 		barrierInfo.Transition.StateAfter = GetD3D12ResourceState(_newState);
 
-		m_buffer->ResourceBarrier(1, &barrierInfo);
 
-		
+		if (barrierInfo.Transition.StateBefore != barrierInfo.Transition.StateAfter)
+		{
+			m_buffer->ResourceBarrier(1, &barrierInfo);
+		}
 	}
 
 
@@ -132,17 +134,21 @@ namespace NK
 		barrierInfo.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		barrierInfo.Transition.pResource = dynamic_cast<D3D12Buffer*>(_buffer)->GetBuffer();
 		barrierInfo.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		barrierInfo.Transition.StateBefore = GetD3D12ResourceState(_oldState);
-		barrierInfo.Transition.StateAfter = GetD3D12ResourceState(_newState);
+		barrierInfo.Transition.StateBefore = (_buffer->GetMemoryType() == MEMORY_TYPE::DEVICE ? GetD3D12ResourceState(_oldState) : D3D12_RESOURCE_STATE_GENERIC_READ);
+		barrierInfo.Transition.StateAfter = (_buffer->GetMemoryType() == MEMORY_TYPE::DEVICE ? GetD3D12ResourceState(_newState) : D3D12_RESOURCE_STATE_GENERIC_READ);
 
-		m_buffer->ResourceBarrier(1, &barrierInfo);
+		//Possible because of D3D12_RESOURCE_STATE_GENERIC_READ default value for non-device memory types
+		if (barrierInfo.Transition.StateBefore != barrierInfo.Transition.StateAfter)
+		{
+			m_buffer->ResourceBarrier(1, &barrierInfo);
+		}
 	}
 
 
 
-	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthAttachment, ITextureView* _stencilAttachment)
+	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _multisampleDepthAttachment, ITextureView* _outputDepthAttachment, ITextureView* _stencilAttachment, bool _clearRTVs, bool _clearDSV)
 	{
-		if (_depthAttachment && _stencilAttachment)
+		if (_outputDepthAttachment && _stencilAttachment)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() called with valid _depthAttachment and _stencilAttachment. This is not supported in D3D12 - if you would like both a depth attachment and a stencil attachment, please combine them into one texture and use the other BeginRendering() function.\n");
 			throw std::runtime_error("");
@@ -165,7 +171,7 @@ namespace NK
 			}
 
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
-			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+			beg.Type = (_clearRTVs ? D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR : D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE);
 			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat((_multisampleColourAttachments ? _multisampleColourAttachments[i] : _outputColourAttachments[i]).GetFormat());
 			beg.Clear.ClearValue.Color[0] = 0.0f;
 			beg.Clear.ClearValue.Color[1] = 0.0f;
@@ -179,11 +185,11 @@ namespace NK
 
 		//Depth-stencil attachment
 		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC depthStencilAttachmentInfo{};
-		if (_depthAttachment || _stencilAttachment)
+		if (_outputDepthAttachment || _stencilAttachment)
 		{
-			if (_depthAttachment && _depthAttachment->GetParentTexture()->GetState() != RESOURCE_STATE::DEPTH_WRITE)
+			if (_outputDepthAttachment && _outputDepthAttachment->GetParentTexture()->GetState() != RESOURCE_STATE::DEPTH_WRITE)
 			{
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _depthAttachment's current state is " + std::to_string(std::to_underlying(_depthAttachment->GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::DEPTH_WRITE\n");
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _depthAttachment's current state is " + std::to_string(std::to_underlying(_outputDepthAttachment->GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::DEPTH_WRITE\n");
 				throw std::runtime_error("");
 			}
 
@@ -193,26 +199,41 @@ namespace NK
 				throw std::runtime_error("");
 			}
 
-			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
-			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
-			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_depthAttachment ? _depthAttachment->GetFormat() : _stencilAttachment->GetFormat());
-			beg.Clear.ClearValue.DepthStencil.Depth = 1.0f;
-			beg.Clear.ClearValue.DepthStencil.Stencil = 0;
+			if (_outputDepthAttachment)
+			{
+				D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
+				beg.Type = (_clearDSV ? D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR : D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE);
+				beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_outputDepthAttachment->GetFormat());
+				beg.Clear.ClearValue.DepthStencil.Depth = 1.0f;
+				depthStencilAttachmentInfo.DepthBeginningAccess = beg;
+			}
 
-			depthStencilAttachmentInfo.DepthBeginningAccess = beg;
-			depthStencilAttachmentInfo.StencilBeginningAccess = beg;
+			if (_stencilAttachment)
+			{
+				D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
+				beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+				beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_stencilAttachment->GetFormat());
+				beg.Clear.ClearValue.DepthStencil.Stencil = 0;
+				depthStencilAttachmentInfo.StencilBeginningAccess = beg;
+				depthStencilAttachmentInfo.StencilEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
+			}
+			else
+			{
+				depthStencilAttachmentInfo.StencilBeginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS;
+				depthStencilAttachmentInfo.StencilEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS;
+			}
+
 			depthStencilAttachmentInfo.DepthEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
-			depthStencilAttachmentInfo.StencilEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
-			depthStencilAttachmentInfo.cpuDescriptor = dynamic_cast<D3D12TextureView*>(_depthAttachment ? _depthAttachment : _stencilAttachment)->GetCPUDescriptorHandle();
+			depthStencilAttachmentInfo.cpuDescriptor = dynamic_cast<D3D12TextureView*>(_outputDepthAttachment ? _outputDepthAttachment : _stencilAttachment)->GetCPUDescriptorHandle();
 		}
 
 		//todo: look into allow uav write flag?
-		m_buffer->BeginRenderPass(_numColourAttachments, colourAttachmentInfos.data(), (_depthAttachment || _stencilAttachment) ? &depthStencilAttachmentInfo : nullptr, D3D12_RENDER_PASS_FLAG_NONE);
+		m_buffer->BeginRenderPass(_numColourAttachments, colourAttachmentInfos.data(), (_outputDepthAttachment || _stencilAttachment) ? &depthStencilAttachmentInfo : nullptr, D3D12_RENDER_PASS_FLAG_NONE);
 	}
 
 
 
-	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment)
+	void D3D12CommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment, bool _clearRTVs, bool _clearDSV)
 	{
 		if (_depthStencilAttachment)
 		{
@@ -223,7 +244,6 @@ namespace NK
 			}
 		}
 
-		//Colour attachments
 		std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> colourAttachmentInfos(_numColourAttachments);
 		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
 		{
@@ -240,19 +260,18 @@ namespace NK
 			}
 
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
-			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+			beg.Type = (_clearRTVs ? D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR : D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE);
 			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_outputColourAttachments[i].GetFormat());
 			beg.Clear.ClearValue.Color[0] = 0.0f;
 			beg.Clear.ClearValue.Color[1] = 0.0f;
 			beg.Clear.ClearValue.Color[2] = 0.0f;
 			beg.Clear.ClearValue.Color[3] = 1.0f;
-			
+
 			colourAttachmentInfos[i].BeginningAccess = beg;
 			colourAttachmentInfos[i].EndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
 			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_outputColourAttachments[i]))->GetCPUDescriptorHandle();
 		}
 
-		//Depth-stencil attachment
 		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC depthStencilAttachmentInfo{};
 		if (_depthStencilAttachment)
 		{
@@ -263,19 +282,28 @@ namespace NK
 			}
 
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
-			beg.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+			beg.Type = (_clearDSV ? D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR : D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE);
 			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_depthStencilAttachment->GetFormat());
 			beg.Clear.ClearValue.DepthStencil.Depth = 1.0f;
 			beg.Clear.ClearValue.DepthStencil.Stencil = 0;
-			
+
 			depthStencilAttachmentInfo.DepthBeginningAccess = beg;
-			depthStencilAttachmentInfo.StencilBeginningAccess = beg;
 			depthStencilAttachmentInfo.DepthEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
-			depthStencilAttachmentInfo.StencilEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
+
+			if (_depthStencilAttachment->GetFormat() == DATA_FORMAT::D24_UNORM_S8_UINT)
+			{
+				depthStencilAttachmentInfo.StencilBeginningAccess = beg;
+				depthStencilAttachmentInfo.StencilEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
+			}
+			else
+			{
+				depthStencilAttachmentInfo.StencilBeginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS;
+				depthStencilAttachmentInfo.StencilEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS;
+			}
+
 			depthStencilAttachmentInfo.cpuDescriptor = dynamic_cast<D3D12TextureView*>(_depthStencilAttachment)->GetCPUDescriptorHandle();
 		}
 
-		//todo: look into allow uav write flag?
 		m_buffer->BeginRenderPass(_numColourAttachments, colourAttachmentInfos.data(), _depthStencilAttachment ? &depthStencilAttachmentInfo : nullptr, D3D12_RENDER_PASS_FLAG_NONE);
 	}
 
@@ -294,36 +322,36 @@ namespace NK
 	void D3D12CommandBuffer::EndRendering(std::size_t _numColourAttachments, ITexture* _multisampleColourAttachments, ITexture* _outputColourAttachments)
 	{
 		m_buffer->EndRenderPass();
-		if (_multisampleColourAttachments)
+	}
+
+
+
+	void D3D12CommandBuffer::ResolveImage(ITexture* _multisampleTexture, ITexture* _outputTexture, TEXTURE_ASPECT _textureAspect)
+	{
+		//Resolve
+		RESOURCE_STATE srcState{ _multisampleTexture->GetState() };
+		RESOURCE_STATE dstState{ _outputTexture->GetState() };
+		if (srcState != RESOURCE_STATE::RESOLVE_SOURCE)
 		{
-			//Resolve
-			for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
-			{
-				RESOURCE_STATE srcState{ _multisampleColourAttachments[i].GetState() };
-				RESOURCE_STATE dstState{ _outputColourAttachments[i].GetState() };
-				if (srcState != RESOURCE_STATE::RESOLVE_SOURCE)
-				{
-					TransitionBarrier(&(_multisampleColourAttachments[i]), _multisampleColourAttachments[i].GetState(), RESOURCE_STATE::RESOLVE_SOURCE);
-				}
-				if (dstState != RESOURCE_STATE::RESOLVE_DEST)
-				{
-					TransitionBarrier(&(_outputColourAttachments[i]), _outputColourAttachments[i].GetState(), RESOURCE_STATE::RESOLVE_DEST);
-				}
+			TransitionBarrier(_multisampleTexture, srcState, RESOURCE_STATE::RESOLVE_SOURCE);
+		}
+		if (dstState != RESOURCE_STATE::RESOLVE_DEST)
+		{
+			TransitionBarrier(_outputTexture, dstState, RESOURCE_STATE::RESOLVE_DEST);
+		}
 
-				ID3D12Resource* srcTex{ dynamic_cast<D3D12Texture*>(&(_multisampleColourAttachments[i]))->GetResource() };
-				ID3D12Resource* dstTex{ dynamic_cast<D3D12Texture*>(&(_outputColourAttachments[i]))->GetResource() };
-				m_buffer->ResolveSubresource(dstTex, 0, srcTex, 0, D3D12Texture::GetDXGIFormat(_outputColourAttachments[i].GetFormat()));
+		ID3D12Resource* srcTex{ dynamic_cast<D3D12Texture*>(_multisampleTexture)->GetResource() };
+		ID3D12Resource* dstTex{ dynamic_cast<D3D12Texture*>(_outputTexture)->GetResource() };
+		m_buffer->ResolveSubresource(dstTex, 0, srcTex, 0, D3D12Texture::GetDXGIFormat(_outputTexture->GetFormat()));
 
-				//If we've transitioned the states, transition them back
-				if (srcState != RESOURCE_STATE::RESOLVE_SOURCE)
-				{
-					TransitionBarrier(&(_multisampleColourAttachments[i]), RESOURCE_STATE::RESOLVE_SOURCE, srcState);
-				}
-				if (dstState != RESOURCE_STATE::RESOLVE_DEST)
-				{
-					TransitionBarrier(&(_outputColourAttachments[i]), RESOURCE_STATE::RESOLVE_DEST, dstState);
-				}
-			}
+		//If we've transitioned the states, transition them back
+		if (srcState != RESOURCE_STATE::RESOLVE_SOURCE)
+		{
+			TransitionBarrier(_multisampleTexture, RESOURCE_STATE::RESOLVE_SOURCE, srcState);
+		}
+		if (dstState != RESOURCE_STATE::RESOLVE_DEST)
+		{
+			TransitionBarrier(_outputTexture, RESOURCE_STATE::RESOLVE_DEST, dstState);
 		}
 	}
 
@@ -409,11 +437,6 @@ namespace NK
 	{
 		D3D12RootSignature* d3d12RootSig{ dynamic_cast<D3D12RootSignature*>(_rootSignature) };
 		ID3D12DescriptorHeap* heaps[2]{ d3d12RootSig->GetResourceDescriptorHeap(), d3d12RootSig->GetSamplerDescriptorHeap() };
-		D3D12RootSignature::RootDescriptorTable cbvDescriptorTable{ d3d12RootSig->GetCBVDescriptorTable() };
-		D3D12RootSignature::RootDescriptorTable tex2DSRVDescriptorTable{ d3d12RootSig->GetTexture2DSRVDescriptorTable() };
-		D3D12RootSignature::RootDescriptorTable texCubeSRVDescriptorTable{ d3d12RootSig->GetTextureCubeSRVDescriptorTable() };
-		D3D12RootSignature::RootDescriptorTable uavDescriptorTable{ d3d12RootSig->GetUAVDescriptorTable() };
-		D3D12RootSignature::RootDescriptorTable samplerDescriptorTable{ d3d12RootSig->GetSamplerDescriptorTable() };
 
 		//Bind root signature
 		switch (_bindPoint)
@@ -422,22 +445,23 @@ namespace NK
 		{
 			m_buffer->SetGraphicsRootSignature(d3d12RootSig->GetRootSignature());
 			m_buffer->SetDescriptorHeaps(2, heaps);
-			m_buffer->SetGraphicsRootDescriptorTable(cbvDescriptorTable.rootParamIndex, cbvDescriptorTable.gpuHandle);
-			m_buffer->SetGraphicsRootDescriptorTable(tex2DSRVDescriptorTable.rootParamIndex, tex2DSRVDescriptorTable.gpuHandle);
-			m_buffer->SetGraphicsRootDescriptorTable(texCubeSRVDescriptorTable.rootParamIndex, texCubeSRVDescriptorTable.gpuHandle);
-			m_buffer->SetGraphicsRootDescriptorTable(uavDescriptorTable.rootParamIndex, uavDescriptorTable.gpuHandle);
-			m_buffer->SetGraphicsRootDescriptorTable(samplerDescriptorTable.rootParamIndex, samplerDescriptorTable.gpuHandle);
+			for (std::size_t i{ 0 }; i < d3d12RootSig->GetNumResourceDescriptorTables(); ++i)
+			{
+				m_buffer->SetGraphicsRootDescriptorTable(i, d3d12RootSig->GetResourceDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
+			}
+			m_buffer->SetGraphicsRootDescriptorTable(d3d12RootSig->GetNumResourceDescriptorTables(), d3d12RootSig->GetSamplerDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
 			break;
 		}
 		case PIPELINE_BIND_POINT::COMPUTE:
 		{
 			m_buffer->SetComputeRootSignature(d3d12RootSig->GetRootSignature());
 			m_buffer->SetDescriptorHeaps(2, heaps);
-			m_buffer->SetComputeRootDescriptorTable(cbvDescriptorTable.rootParamIndex, cbvDescriptorTable.gpuHandle);
-			m_buffer->SetComputeRootDescriptorTable(tex2DSRVDescriptorTable.rootParamIndex, tex2DSRVDescriptorTable.gpuHandle);
-			m_buffer->SetComputeRootDescriptorTable(texCubeSRVDescriptorTable.rootParamIndex, texCubeSRVDescriptorTable.gpuHandle);
-			m_buffer->SetComputeRootDescriptorTable(uavDescriptorTable.rootParamIndex, uavDescriptorTable.gpuHandle);
-			m_buffer->SetComputeRootDescriptorTable(samplerDescriptorTable.rootParamIndex, samplerDescriptorTable.gpuHandle);
+			for (std::size_t i{ 0 }; i < d3d12RootSig->GetNumResourceDescriptorTables(); ++i)
+			{
+				m_buffer->SetComputeRootDescriptorTable(i, d3d12RootSig->GetResourceDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
+			}
+			m_buffer->SetComputeRootDescriptorTable(d3d12RootSig->GetNumResourceDescriptorTables(), d3d12RootSig->GetSamplerDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
+			break;
 		}
 		}
 	}
@@ -449,8 +473,8 @@ namespace NK
 		D3D12RootSignature* d3d12RootSig{ dynamic_cast<D3D12RootSignature*>(_rootSignature) };
 		switch (d3d12RootSig->GetBindPoint())
 		{
-		case PIPELINE_BIND_POINT::GRAPHICS: m_buffer->SetGraphicsRoot32BitConstants(5, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
-		case PIPELINE_BIND_POINT::COMPUTE: m_buffer->SetComputeRoot32BitConstants(5, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
+		case PIPELINE_BIND_POINT::GRAPHICS: m_buffer->SetGraphicsRoot32BitConstants(d3d12RootSig->GetNumResourceDescriptorTables() + 1, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
+		case PIPELINE_BIND_POINT::COMPUTE: m_buffer->SetComputeRoot32BitConstants(d3d12RootSig->GetNumResourceDescriptorTables() + 1, d3d12RootSig->GetNum32BitValues(), _data, 0); break;
 		}
 		
 	}

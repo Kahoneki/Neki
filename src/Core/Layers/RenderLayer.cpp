@@ -148,7 +148,7 @@ namespace NK
 		}
 
 		const std::size_t prevFrameIndex{ (m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight };
-		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityBufferMaps[prevFrameIndex]) };
+		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[prevFrameIndex]) };
 		
 		//Model Loading Phase
 		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[prevFrameIndex].size(); ++i)
@@ -221,7 +221,7 @@ namespace NK
 		
 		RenderGraphExecutionDesc execDesc{};
 		execDesc.commandBuffers["MODEL_VISIBILITY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		execDesc.commandBuffers["CAMERA_BUFFER_PREVIOUS_FRAME_COPY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["MODEL_VISIBILITY_BUFFER_COPY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SHADOW_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["DEPTH_BARRIER"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
@@ -234,7 +234,8 @@ namespace NK
 		execDesc.buffers.Set("CAMERA_BUFFER_PREVIOUS_FRAME", m_camDataBuffersPreviousFrame[m_currentFrame].get());
 		execDesc.buffers.Set("LIGHT_DATA_BUFFER", m_lightDataBuffer.get());
 		execDesc.buffers.Set("MODEL_MATRICES_BUFFER", m_modelMatricesBuffers[m_currentFrame].get());
-		execDesc.buffers.Set("MODEL_VISIBILITY_BUFFER", m_modelVisibilityBuffers[m_currentFrame].get());
+		execDesc.buffers.Set("MODEL_VISIBILITY_DEVICE_BUFFER", m_modelVisibilityDeviceBuffers[m_currentFrame].get());
+		execDesc.buffers.Set("MODEL_VISIBILITY_READBACK_BUFFER", m_modelVisibilityReadbackBuffers[m_currentFrame].get());
 
 		execDesc.textures.Set("SCENE_COLOUR", m_sceneColour.get());
 		execDesc.textures.Set("SCENE_COLOUR_MSAA", m_sceneColourMSAA.get());
@@ -254,7 +255,7 @@ namespace NK
 		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW", m_camDataBufferPreviousFrameViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("MODEL_MATRICES_BUFFER_VIEW", m_modelMatricesBufferViews[m_currentFrame].get());
-		execDesc.bufferViews.Set("MODEL_VISIBILITY_BUFFER_VIEW", m_modelVisibilityBufferViews[m_currentFrame].get());
+		execDesc.bufferViews.Set("MODEL_VISIBILITY_DEVICE_BUFFER_VIEW", m_modelVisibilityDeviceBufferViews[m_currentFrame].get());
 
 		execDesc.textureViews.Set("SCENE_COLOUR_RTV", m_sceneColourRTV.get());
 		execDesc.textureViews.Set("SCENE_COLOUR_SRV", m_sceneColourSRV.get());
@@ -435,6 +436,7 @@ namespace NK
 		m_camDataBufferMaps.resize(m_desc.framesInFlight);
 		m_camDataBuffersPreviousFrame.resize(m_desc.framesInFlight);
 		m_camDataBufferPreviousFrameViews.resize(m_desc.framesInFlight);
+		m_camDataBufferPreviousFrameMaps.resize(m_desc.framesInFlight);
 		
 		BufferDesc camDataBufferDesc{};
 		camDataBufferDesc.size = sizeof(CameraShaderData);
@@ -444,8 +446,8 @@ namespace NK
 		{
 			m_camDataBuffers[i] = m_device->CreateBuffer(camDataBufferDesc);
 			m_camDataBuffersPreviousFrame[i] = m_device->CreateBuffer(camDataBufferDesc);
-			m_graphicsCommandBuffers[0]->TransitionBarrier(m_camDataBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::CONSTANT_BUFFER);
-			m_graphicsCommandBuffers[0]->TransitionBarrier(m_camDataBuffersPreviousFrame[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::CONSTANT_BUFFER);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_camDataBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_SOURCE);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_camDataBuffersPreviousFrame[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
 		}
 		
 		BufferViewDesc camDataBufferViewDesc{};
@@ -458,6 +460,7 @@ namespace NK
 			m_camDataBufferPreviousFrameViews[i] = m_device->CreateBufferView(m_camDataBuffersPreviousFrame[i].get(), camDataBufferViewDesc);
 
 			m_camDataBufferMaps[i] = m_camDataBuffers[i]->GetMap();
+			m_camDataBufferPreviousFrameMaps[i] = m_camDataBuffersPreviousFrame[i]->GetMap();
 		}
 	}
 
@@ -468,7 +471,7 @@ namespace NK
 		BufferDesc lightDataBufferDesc{};
 		lightDataBufferDesc.size = sizeof(LightShaderData) * m_desc.maxLights;
 		lightDataBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
-		lightDataBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT;
+		lightDataBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
 		m_lightDataBuffer = m_device->CreateBuffer(lightDataBufferDesc);
 		m_graphicsCommandBuffers[0]->TransitionBarrier(m_lightDataBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::SHADER_RESOURCE);
 
@@ -494,7 +497,7 @@ namespace NK
 			BufferDesc modelMatricesBufferDesc{};
 			modelMatricesBufferDesc.size = m_desc.maxModels * sizeof(glm::mat4);
 			modelMatricesBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
-			modelMatricesBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT;
+			modelMatricesBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
 			m_modelMatricesBuffers[i] = m_device->CreateBuffer(modelMatricesBufferDesc);
 			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelMatricesBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::SHADER_RESOURCE);
 
@@ -512,27 +515,35 @@ namespace NK
 
 	void RenderLayer::InitModelVisibilityBuffers()
 	{
-		m_modelVisibilityBuffers.resize(m_desc.framesInFlight);
-		m_modelVisibilityBufferViews.resize(m_desc.framesInFlight);
-		m_modelVisibilityBufferMaps.resize(m_desc.framesInFlight);
+		m_modelVisibilityDeviceBuffers.resize(m_desc.framesInFlight);
+		m_modelVisibilityReadbackBuffers.resize(m_desc.framesInFlight);
+		m_modelVisibilityDeviceBufferViews.resize(m_desc.framesInFlight);
+		m_modelVisibilityReadbackBufferMaps.resize(m_desc.framesInFlight);
 
 		for (std::uint32_t i = 0; i < m_desc.framesInFlight; ++i)
 		{
+			//Need to create a host-visible readback buffer and a device-local buffer for the uav
+			//Todo^: look into device-local host-accessible memory type (uma, resizeable bar, etc. etc.)
 			BufferDesc modelVisibilityBufferDesc{};
 			modelVisibilityBufferDesc.size = m_desc.maxModels * sizeof(std::uint32_t);
-			modelVisibilityBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
-			modelVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT;
-			m_modelVisibilityBuffers[i] = m_device->CreateBuffer(modelVisibilityBufferDesc);
-			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::UNORDERED_ACCESS);
+			modelVisibilityBufferDesc.type = MEMORY_TYPE::READBACK;
+			modelVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT;
+			m_modelVisibilityReadbackBuffers[i] = m_device->CreateBuffer(modelVisibilityBufferDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityReadbackBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
+
+			modelVisibilityBufferDesc.type = MEMORY_TYPE::DEVICE;
+			modelVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_WRITE_BIT;
+			m_modelVisibilityDeviceBuffers[i] = m_device->CreateBuffer(modelVisibilityBufferDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityDeviceBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::UNORDERED_ACCESS);
 
 			BufferViewDesc modelVisibilityBufferViewDesc{};
 			modelVisibilityBufferViewDesc.size = m_desc.maxModels * sizeof(std::uint32_t);
 			modelVisibilityBufferViewDesc.offset = 0;
 			modelVisibilityBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_WRITE;
-			m_modelVisibilityBufferViews[i] = m_device->CreateBufferView(m_modelVisibilityBuffers[i].get(), modelVisibilityBufferViewDesc);
+			m_modelVisibilityDeviceBufferViews[i] = m_device->CreateBufferView(m_modelVisibilityDeviceBuffers[i].get(), modelVisibilityBufferViewDesc);
 
-			m_modelVisibilityBufferMaps[i] = m_modelVisibilityBuffers[i]->GetMap();
-			std::fill_n(static_cast<std::uint32_t*>(m_modelVisibilityBufferMaps[i]), m_desc.maxModels, 1u);
+			m_modelVisibilityReadbackBufferMaps[i] = m_modelVisibilityReadbackBuffers[i]->GetMap();
+			std::fill_n(static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[i]), m_desc.maxModels, 1u);
 		}
 	}
 
@@ -952,9 +963,8 @@ namespace NK
 		rasteriserDesc.depthBiasEnable = false;
 
 		DepthStencilDesc depthStencilDesc{};
-		depthStencilDesc.depthTestEnable = true;
-		depthStencilDesc.depthWriteEnable = true;
-		depthStencilDesc.depthCompareOp = COMPARE_OP::LESS_OR_EQUAL;
+		depthStencilDesc.depthTestEnable = false;
+		depthStencilDesc.depthWriteEnable = false;
 		depthStencilDesc.stencilTestEnable = false;
 
 		MultisamplingDesc multisamplingDesc{};
@@ -981,7 +991,7 @@ namespace NK
 		pipelineDesc.multisamplingDesc = multisamplingDesc;
 		pipelineDesc.colourBlendDesc = colourBlendDesc;
 		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R8G8B8A8_SRGB };
-		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
+		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::UNDEFINED;
 
 		m_postprocessPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
@@ -993,59 +1003,58 @@ namespace NK
 		RenderGraphDesc meshDesc{};
 
 
-		
-		meshDesc.AddNode(
-		"MODEL_VISIBILITY_PASS",
-		{{ "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::CONSTANT_BUFFER },
-		{ "MODEL_MATRICES_BUFFER", RESOURCE_STATE::SHADER_RESOURCE },
-		{ "MODEL_VISIBILITY_BUFFER", RESOURCE_STATE::UNORDERED_ACCESS },
-		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
-		{ "SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE },
-		{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE }},
-		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
-		{
-			if (m_desc.enableMSAA)
-			{
-				_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, false);
-			}
-			else if (m_desc.enableSSAA)
-			{
-				_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_SSAA_DSV"), nullptr, true, false);
-			}
-			else
-			{
-				_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, false);
-			}
-
-			_cmdBuf->BindRootSignature(m_modelVisibilityPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
-
-			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
-			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
-
-			ModelVisibilityPassPushConstantData pushConstantData{};
-			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW")->GetIndex();
-			pushConstantData.modelMatricesBufferIndex = _bufViews.Get("MODEL_MATRICES_BUFFER_VIEW")->GetIndex();
-			pushConstantData.modelVisibilityBufferIndex = _bufViews.Get("MODEL_VISIBILITY_BUFFER_VIEW")->GetIndex();
-							
-			//Models
-			std::size_t cubeVertexBufferStride{ sizeof(glm::vec3) };
-			_cmdBuf->PushConstants(m_modelVisibilityPassRootSignature.get(), &pushConstantData);
-			_cmdBuf->BindPipeline(m_modelVisibilityPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
-			_cmdBuf->BindVertexBuffers(0, 1, m_cubeVertBuffer.get(), &cubeVertexBufferStride);
-			_cmdBuf->BindIndexBuffer(m_cubeIndexBuffer.get(), DATA_FORMAT::R32_UINT);
-			_cmdBuf->DrawIndexed(36, m_modelMatrices.size(), 0, 0);
-			_cmdBuf->EndRendering(0, nullptr, nullptr);
-		});
-
-
 
 		meshDesc.AddNode(
-		"CAMERA_BUFFER_PREVIOUS_FRAME_COPY_PASS",
-		{{ "CAMERA_BUFFER", RESOURCE_STATE::COPY_SOURCE },
-		{ "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::COPY_DEST }},
+			"MODEL_VISIBILITY_PASS",
+			{ { "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::CONSTANT_BUFFER },
+			{ "MODEL_MATRICES_BUFFER", RESOURCE_STATE::SHADER_RESOURCE },
+			{ "MODEL_VISIBILITY_DEVICE_BUFFER", RESOURCE_STATE::UNORDERED_ACCESS },
+			{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
+			{ "SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE },
+			{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE } },
+			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+			{
+				if (m_desc.enableMSAA)
+				{
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, false);
+				}
+				else if (m_desc.enableSSAA)
+				{
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_SSAA_DSV"), nullptr, true, false);
+				}
+				else
+				{
+					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, false);
+				}
+
+				_cmdBuf->BindRootSignature(m_modelVisibilityPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+
+				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+				_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+
+				ModelVisibilityPassPushConstantData pushConstantData{};
+				pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW")->GetIndex();
+				pushConstantData.modelMatricesBufferIndex = _bufViews.Get("MODEL_MATRICES_BUFFER_VIEW")->GetIndex();
+				pushConstantData.modelVisibilityBufferIndex = _bufViews.Get("MODEL_VISIBILITY_DEVICE_BUFFER_VIEW")->GetIndex();
+
+				//Models
+				std::size_t cubeVertexBufferStride{ sizeof(glm::vec3) };
+				_cmdBuf->PushConstants(m_modelVisibilityPassRootSignature.get(), &pushConstantData);
+				_cmdBuf->BindPipeline(m_modelVisibilityPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+				_cmdBuf->BindVertexBuffers(0, 1, m_cubeVertBuffer.get(), &cubeVertexBufferStride);
+				_cmdBuf->BindIndexBuffer(m_cubeIndexBuffer.get(), DATA_FORMAT::R32_UINT);
+				_cmdBuf->DrawIndexed(36, m_modelMatrices.size(), 0, 0);
+				_cmdBuf->EndRendering(0, nullptr, nullptr);
+			});
+
+
+		meshDesc.AddNode(
+		"MODEL_VISIBILITY_BUFFER_COPY_PASS",
+		{{ "MODEL_VISIBILITY_DEVICE_BUFFER", RESOURCE_STATE::COPY_SOURCE },
+		{ "MODEL_VISIBILITY_READBACK_BUFFER", RESOURCE_STATE::COPY_DEST }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
-			_cmdBuf->CopyBufferToBuffer(_bufs.Get("CAMERA_BUFFER"), _bufs.Get("CAMERA_BUFFER_PREVIOUS_FRAME"), 0, 0, sizeof(CameraShaderData));
+			_cmdBuf->CopyBufferToBuffer(_bufs.Get("MODEL_VISIBILITY_DEVICE_BUFFER"), _bufs.Get("MODEL_VISIBILITY_READBACK_BUFFER"), 0, 0, m_desc.maxModels * sizeof(std::uint32_t));
 		}, true);
 
 
@@ -1371,7 +1380,7 @@ namespace NK
 		//Scene Depth
 		TextureDesc sceneDepthDesc{};
 		sceneDepthDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-		sceneDepthDesc.format = DATA_FORMAT::D32_SFLOAT;
+		sceneDepthDesc.format = DATA_FORMAT::R32_TYPELESS;
 		sceneDepthDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
 		sceneDepthDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		sceneDepthDesc.arrayTexture = false;
@@ -1407,6 +1416,7 @@ namespace NK
 		if (m_desc.enableSSAA) { m_sceneDepthSSAADSV = m_device->CreateDepthStencilTextureView(m_sceneDepthSSAA.get(), sceneDepthViewDesc); }
 		
 		//Shadow Map SRVs
+		sceneDepthViewDesc.format = DATA_FORMAT::R32_SFLOAT;
 		sceneDepthViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 		m_sceneDepthSRV = m_device->CreateShaderResourceTextureView(m_sceneDepth.get(), sceneDepthViewDesc);
 		if (m_desc.enableMSAA) { m_sceneDepthMSAASRV = m_device->CreateShaderResourceTextureView(m_sceneDepthMSAA.get(), sceneDepthViewDesc); }
@@ -1438,7 +1448,7 @@ namespace NK
 		//Shadow Map
 		TextureDesc shadowMapDesc{};
 		shadowMapDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-		shadowMapDesc.format = DATA_FORMAT::D32_SFLOAT;
+		shadowMapDesc.format = DATA_FORMAT::R32_TYPELESS;
 		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		shadowMapDesc.sampleCount = SAMPLE_COUNT::BIT_1;
 		if (_light.lightType == LIGHT_TYPE::POINT)
@@ -1478,6 +1488,7 @@ namespace NK
 			//SRV
 			shadowMapViewDesc.baseArrayLayer = 0;
 			shadowMapViewDesc.arrayLayerCount = 6;
+			shadowMapViewDesc.format = DATA_FORMAT::R32_SFLOAT;
 			shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 			shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_CUBE;
 			m_shadowMapCubeSRVs.push_back(m_device->CreateShaderResourceTextureView(m_shadowMapsCube[m_shadowMapsCube.size() - 1].get(), shadowMapViewDesc));
@@ -1551,15 +1562,17 @@ namespace NK
 			_camera.camera->SetAspectRatio(static_cast<float>(m_desc.window->GetSize().x) / m_desc.window->GetSize().y);
 		}
 
+
 		//Update m_camDataBufferMap with the camera data from this frame
 		const CameraShaderData camShaderData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
 		memcpy(m_camDataBufferMaps[m_currentFrame], &camShaderData, sizeof(CameraShaderData));
 		if (m_firstFrame)
 		{
-			for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
-			{
-				m_graphicsCommandBuffers[0]->CopyBufferToBuffer(m_camDataBuffers[i].get(), m_camDataBuffersPreviousFrame[i].get(), 0, 0, sizeof(CameraShaderData));
-			}
+			memcpy(m_camDataBufferPreviousFrameMaps[m_currentFrame], &camShaderData, sizeof(CameraShaderData));
+		}
+		else
+		{
+			memcpy(m_camDataBufferPreviousFrameMaps[m_currentFrame], m_camDataBufferMaps[(m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight], sizeof(CameraShaderData));
 		}
 
 		//Set aspect ratio back to WIN_ASPECT_RATIO for future lookups (can't keep it as the window's current aspect ratio in case it changes)

@@ -23,22 +23,15 @@ namespace NK
 		[[nodiscard]] inline ID3D12RootSignature* GetRootSignature() const { return m_rootSig.Get(); }
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetResourceDescriptorHeap() const { return m_resourceDescriptorHeap; }
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetSamplerDescriptorHeap() const { return m_samplerDescriptorHeap; }
-		[[nodiscard]] inline RootDescriptorTable GetCBVDescriptorTable() const { return m_cbvDescriptorTable; }
-		[[nodiscard]] inline RootDescriptorTable GetTexture2DSRVDescriptorTable() const { return m_tex2DSRVDescriptorTable; }
-		[[nodiscard]] inline RootDescriptorTable GetTextureCubeSRVDescriptorTable() const { return m_texCubeSRVDescriptorTable; }
-		[[nodiscard]] inline RootDescriptorTable GetUAVDescriptorTable() const { return m_uavDescriptorTable; }
-		[[nodiscard]] inline RootDescriptorTable GetSamplerDescriptorTable() const { return m_samplerDescriptorTable; }
+		[[nodiscard]] inline const std::vector<RootDescriptorTable>& GetDescriptorTables() const { return m_descriptorTables; }
+		[[nodiscard]] inline std::size_t GetNumResourceDescriptorTables() const { return m_descriptorTables.size() - 1; }
 		
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSig;
 		ID3D12DescriptorHeap* m_resourceDescriptorHeap; //Owned by D3D12Device
 		ID3D12DescriptorHeap* m_samplerDescriptorHeap; //Owned by D3D12Device
-		RootDescriptorTable m_cbvDescriptorTable;
-		RootDescriptorTable m_tex2DSRVDescriptorTable;
-		RootDescriptorTable m_texCubeSRVDescriptorTable;
-		RootDescriptorTable m_uavDescriptorTable;
-		RootDescriptorTable m_samplerDescriptorTable;
+		std::vector<RootDescriptorTable> m_descriptorTables;
 	};
 
 }

@@ -137,7 +137,6 @@ namespace NK
 		ktx_error_code_e ktxResult{ ktxTexture_CreateFromNamedFile(_filepath.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture) };
 		if (ktxResult != KTX_SUCCESS)
 		{
-			ktxTexture_Destroy(texture);
 			throw std::runtime_error("TextureCompressor::LoadImage() - ktxTexture2_CreateFromNamedFile for filepath " + _filepath + " failed: " + std::string(ktxErrorString(ktxResult)));
 		}
 

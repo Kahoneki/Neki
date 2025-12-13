@@ -201,13 +201,13 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "EnqueueTextureDataUploaded() called while m_flushing was true. Did you forget to call Reset()?\n");
 			throw std::runtime_error("");
 		}
-		
+
 		const TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
 
 		const std::size_t unalignedOffset{ m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size };
 		constexpr std::size_t alignment{ 16 };
 		const std::size_t alignedOffset{ (unalignedOffset + alignment - 1) & ~(alignment - 1) };
-		
+
 		BufferSubregion subregion{};
 		subregion.offset = alignedOffset;
 		subregion.size = memLayout.totalBytes;
@@ -220,46 +220,61 @@ namespace NK
 
 			subregion.offset = 0;
 		}
-		
-		//memcpy data one row at a time, advancing ptr by memLayout.rowPitch after each row
+
+		std::size_t sourceRowPitch{};
+		if (RHIUtils::IsBlockCompressed(_dstTexture->GetFormat()))
+		{
+			sourceRowPitch = ((_dstTexture->GetSize().x + 3) / 4) * RHIUtils::GetBlockByteSize(_dstTexture->GetFormat());
+		}
+		else
+		{
+			sourceRowPitch = _dstTexture->GetSize().x * RHIUtils::GetFormatBytesPerPixel(_dstTexture->GetFormat());
+		}
+
 		const unsigned char* srcPtr{ static_cast<const unsigned char*>(_data) };
 		unsigned char* dstPtr{ m_stagingBufferMap + subregion.offset };
 		std::size_t numRows{};
+		std::size_t rowsPerLayer{};
+
 		switch (_dstTexture->GetDimension())
 		{
 		case TEXTURE_DIMENSION::DIM_1:
 		{
 			numRows = 1;
+			rowsPerLayer = 1;
 			break;
 		}
 		case TEXTURE_DIMENSION::DIM_2:
 		{
 			if (RHIUtils::IsBlockCompressed(_dstTexture->GetFormat()))
 			{
-				const int height{ _dstTexture->GetSize().y };
-				numRows = (height + 3) / 4;
+				const std::uint32_t height{ static_cast<std::uint32_t>(_dstTexture->GetSize().y) };
+				rowsPerLayer = (height + 3) / 4;
 			}
 			else
 			{
-				numRows = _dstTexture->GetSize().y;
-				if (_dstTexture->IsArrayTexture())
-				{
-					numRows *= _dstTexture->GetSize().z;
-				}
+				rowsPerLayer = _dstTexture->GetSize().y;
+			}
+
+			numRows = rowsPerLayer;
+			if (_dstTexture->IsArrayTexture())
+			{
+				numRows *= _dstTexture->GetSize().z;
 			}
 			break;
 		}
 		case TEXTURE_DIMENSION::DIM_3:
 		{
 			numRows = _dstTexture->GetSize().z;
+			rowsPerLayer = numRows;
 			break;
 		}
 		}
-		
+
 		for (std::size_t row{ 0 }; row < numRows; ++row)
 		{
-			memcpy(dstPtr, srcPtr, memLayout.rowPitch);
-			srcPtr += memLayout.rowPitch;
+			memcpy(dstPtr, srcPtr, std::min(memLayout.rowPitch, static_cast<std::uint32_t>(sourceRowPitch)));
+			srcPtr += sourceRowPitch;
 			dstPtr += memLayout.rowPitch;
 		}
 		m_stagingBufferSubregions.push_back(subregion);
@@ -269,7 +284,18 @@ namespace NK
 			m_commandBuffer->TransitionBarrier(_dstTexture, _dstTextureInitialState, RESOURCE_STATE::COPY_DEST);
 		}
 
-		m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset, { 0, 0, 0 }, _dstTexture->GetSize());
+		if (_dstTexture->IsArrayTexture() && _dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_2)
+		{
+			const std::size_t bytesPerLayer{ rowsPerLayer * memLayout.rowPitch };
+			for (std::uint32_t i{ 0 }; i < _dstTexture->GetSize().z; ++i)
+			{
+				m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset + (i * bytesPerLayer), { 0, 0, i }, { _dstTexture->GetSize().x, _dstTexture->GetSize().y, 1 });
+			}
+		}
+		else
+		{
+			m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset, { 0, 0, 0 }, _dstTexture->GetSize());
+		}
 	}
 
 

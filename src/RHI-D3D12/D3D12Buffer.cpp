@@ -43,6 +43,7 @@ namespace NK
 		{
 		case MEMORY_TYPE::HOST:		allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;	break;
 		case MEMORY_TYPE::DEVICE:	allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;	break;
+		case MEMORY_TYPE::READBACK: allocDesc.HeapType = D3D12_HEAP_TYPE_READBACK;	break;
 		}
 		//todo: D3D12MA::ALLOCATION_FLAGS has some really cool stuff i wanna play around with
 
@@ -58,7 +59,8 @@ namespace NK
 		}
 
 
-		if (m_memType == MEMORY_TYPE::HOST)
+		//Map if host visible
+		if (m_memType == MEMORY_TYPE::HOST || m_memType == MEMORY_TYPE::READBACK)
 		{
 			hr = m_buffer->Map(0, nullptr, &m_map);
 			if (SUCCEEDED(hr))
@@ -99,7 +101,7 @@ namespace NK
 	{
 		D3D12_RESOURCE_FLAGS d3d12Flags{ D3D12_RESOURCE_FLAG_NONE };
 
-		if ((m_usage & BUFFER_USAGE_FLAGS::STORAGE_BUFFER_BIT) != BUFFER_USAGE_FLAGS::NONE) { d3d12Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS; }
+		if ((m_usage & BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_WRITE_BIT) != BUFFER_USAGE_FLAGS::NONE) { d3d12Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS; }
 	
 		return d3d12Flags;
 	}

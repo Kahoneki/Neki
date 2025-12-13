@@ -169,7 +169,7 @@ namespace NK
 				const std::pair<std::string, bool> texLoadData{ serialisedModel.materials[matIndex].allTextures[texIndex] };
 				if (!texLoadData.first.empty())
 				{
-					model.materials[matIndex].allTextures[texIndex] = TextureCompressor::LoadImage(texLoadData.first, serialisedModel.header.flipTextures, texLoadData.second);
+					model.materials[matIndex].allTextures[texIndex] = TextureCompressor::LoadImage(std::filesystem::path(_filepath).parent_path().string() + "/" + texLoadData.first, serialisedModel.header.flipTextures, texLoadData.second);
 					model.materials[matIndex].allTextures[texIndex]->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
 				}
 			}
@@ -268,9 +268,9 @@ namespace NK
 					{
 						//Compress to .ktx2
 						std::string& filepath{ nekiMaterialSerialised.allTextures.at(std::to_underlying(_dst)).first };
-						const std::string newFilepath{ (_serialisedModelTextureOutputDirectory / std::filesystem::path(filepath).filename()).replace_extension(".ktx2") };
+						const std::string newFilepath{ (_serialisedModelTextureOutputDirectory / std::filesystem::path(filepath).filename()).replace_extension(".ktx2").string() };
 						TextureCompressor::KTXCompress(filepath, nekiMaterialSerialised.allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
-						filepath = newFilepath; //filepath is reference so this is modifying the lookup entry to point to the new ktx2 texture
+						filepath = std::filesystem::path(newFilepath).filename().string(); //filepath is reference so this is modifying the lookup entry to point to the new ktx2 texture - just store the path relative to the model (so just the filename)
 					}
 				}
 				else

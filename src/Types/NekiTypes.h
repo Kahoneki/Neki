@@ -25,17 +25,19 @@ namespace NK
 		TRANSFER_SRC_BIT    = 1 << 0,
 		TRANSFER_DST_BIT    = 1 << 1,
 		UNIFORM_BUFFER_BIT  = 1 << 2,
-		STORAGE_BUFFER_BIT  = 1 << 3,
-		VERTEX_BUFFER_BIT   = 1 << 4,
-		INDEX_BUFFER_BIT    = 1 << 5,
-		INDIRECT_BUFFER_BIT = 1 << 6,
+		STORAGE_BUFFER_READ_ONLY_BIT  = 1 << 3,
+		STORAGE_BUFFER_READ_WRITE_BIT = 1 << 4,
+		VERTEX_BUFFER_BIT   = 1 << 5,
+		INDEX_BUFFER_BIT    = 1 << 6,
+		INDIRECT_BUFFER_BIT = 1 << 7,
 	};
 	ENABLE_BITMASK_OPERATORS(BUFFER_USAGE_FLAGS)
 
-		enum class MEMORY_TYPE
+	enum class MEMORY_TYPE
 	{
 		HOST,
 		DEVICE,
+		READBACK,
 	};
 
 	enum class BUFFER_VIEW_TYPE
@@ -73,6 +75,8 @@ namespace NK
 	enum class DATA_FORMAT : std::uint32_t
 	{
 		UNDEFINED = 0,
+
+		R32_TYPELESS,
 
 		//8-bit Colour Formats
 		R8_UNORM,
