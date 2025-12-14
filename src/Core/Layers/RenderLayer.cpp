@@ -279,7 +279,7 @@ namespace NK
 			initInfo.ApiVersion = VK_API_VERSION_1_4;
 			initInfo.Allocator = Context::GetAllocator()->GetVulkanCallbacks();
 			initInfo.UseDynamicRendering = true;
-			initInfo.PipelineInfoMain.MSAASamples = m_desc.enableMSAA ? VulkanUtils::GetVulkanSampleCount(m_desc.msaaSampleCount) : VK_SAMPLE_COUNT_1_BIT;
+			initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 			constexpr VkFormat colourAttachmentFormat{ VK_FORMAT_R8G8B8A8_SRGB };
 			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
 			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &colourAttachmentFormat;
@@ -662,7 +662,7 @@ namespace NK
 		depthStencilDesc.stencilTestEnable = false;
 
 		MultisamplingDesc multisamplingDesc{};
-		multisamplingDesc.sampleCount = m_desc.enableMSAA ? m_desc.msaaSampleCount : SAMPLE_COUNT::BIT_1;
+		multisamplingDesc.sampleCount = SAMPLE_COUNT::BIT_1;
 		multisamplingDesc.sampleMask = UINT32_MAX;
 		multisamplingDesc.alphaToCoverageEnable = false;
 
@@ -1378,7 +1378,7 @@ namespace NK
 		satDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		satDesc.format = DATA_FORMAT::R32G32B32A32_SFLOAT;
 		glm::ivec2 winDimensions{ m_desc.window->GetSize().x, m_desc.window->GetSize().y };
-		satDesc.size = glm::ivec3(winDimensions.y, winDimensions.x, 1);
+		satDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(winDimensions.y, winDimensions.x, 1);
 		satDesc.usage = TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::READ_WRITE | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		satDesc.arrayTexture = false;
 		satDesc.sampleCount = SAMPLE_COUNT::BIT_1;

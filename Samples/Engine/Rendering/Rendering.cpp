@@ -272,9 +272,9 @@ public:
 		m_inputLayer = NK::UniquePtr<NK::InputLayer>(NK_NEW(NK::InputLayer, m_scenes[m_activeScene]->m_reg, inputLayerDesc));
 		NK::RenderLayerDesc renderLayerDesc{};
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
-//		renderLayerDesc.enableMSAA = true;
+		renderLayerDesc.enableMSAA = false;
 		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
-		renderLayerDesc.enableSSAA = false;
+		renderLayerDesc.enableSSAA = true;
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.window = m_window.get();
 		renderLayerDesc.framesInFlight = 3;

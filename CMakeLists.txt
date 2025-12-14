@@ -154,7 +154,7 @@ target_link_libraries(Neki PUBLIC assimp)
 
 
 # ImGui
-FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG docking)
+FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG v1.92.5-docking)
 FetchContent_MakeAvailable(imgui)
 
 set(IMGUI_DIR ${imgui_SOURCE_DIR})
