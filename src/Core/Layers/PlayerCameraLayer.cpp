@@ -32,6 +32,11 @@ namespace NK
 
 	void PlayerCameraLayer::Update()
 	{
+		if (Context::GetEditorActive())
+		{
+			return;
+		}
+		
 		if (InputManager::GetActionInputType(PLAYER_CAMERA_ACTIONS::MOVE) != INPUT_BINDING_TYPE::AXIS_2D)
 		{
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PLAYER_CAMERA_LAYER, "PlayerCameraLayer::Update() - PLAYER_CAMERA_ACTIONS::MOVE is not bound to INPUT_TYPE::AXIS_2D as required");
@@ -49,7 +54,6 @@ namespace NK
 			
 			for (std::unordered_map<ActionTypeMapKey, INPUT_STATE_VARIANT>::iterator it{ input.actionStates.begin() }; it != input.actionStates.end(); ++it)
 			{
-
 				//Process movement
 				const Axis2DState moveState{ input.GetActionState<Axis2DState>(PLAYER_CAMERA_ACTIONS::MOVE) };
 				glm::vec3 movementDirection{ 0, 0, 0 };

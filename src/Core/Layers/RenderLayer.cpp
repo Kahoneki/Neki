@@ -79,6 +79,12 @@ namespace NK
 
 		m_pointLightProjMatrix = glm::perspectiveLH(glm::radians(90.0f), 1.0f, 0.01f, 1000.0f);
 
+		m_focalDistance = 10.0f;
+		m_focalDepth = 8.0f;
+		m_maxBlurRadius = 4.0f;
+		m_dofDebugMode = false;
+		m_acesExposure = 0.6f;
+
 		
 		m_logger.Unindent();
 	}
@@ -1223,11 +1229,11 @@ namespace NK
 			//todo: make these not hardcoded
 			pushConstantData.nearPlane = 0.01f;
 			pushConstantData.farPlane = 100.0f;
-			pushConstantData.focalDistance = 10.0f;
-			pushConstantData.focalDepth = 8.0f;
-			pushConstantData.maxBlurRadius = 4.0f;
-			pushConstantData.dofDebugMode = false;
-			pushConstantData.acesExposure = 0.6f;
+			pushConstantData.focalDistance = m_focalDistance;
+			pushConstantData.focalDepth = m_focalDepth;
+			pushConstantData.maxBlurRadius = m_maxBlurRadius;
+			pushConstantData.dofDebugMode = (m_dofDebugMode ? 1 : 0);
+			pushConstantData.acesExposure = m_acesExposure;
 
 			//Screen Quad
 			std::size_t screenQuadVertexBufferStride{ sizeof(ScreenQuadVertex) };
@@ -1485,6 +1491,26 @@ namespace NK
 
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
+
+		UpdateImGui();
+	}
+
+
+
+	void RenderLayer::UpdateImGui()
+	{
+		if (ImGui::Begin("Postprocessing Settings"))
+		{
+			if (ImGui::CollapsingHeader("Depth of Field", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::DragFloat("Focal Distance", &m_focalDistance, 0.1f, 0.0f, 100.0f);
+				ImGui::DragFloat("Focal Depth", &m_focalDepth, 0.1f, 0.0f, 100.0f);
+				ImGui::DragFloat("Max Blur Radius", &m_maxBlurRadius, 0.1f, 0.0f, 16.0f);
+				ImGui::Checkbox("Debug Mode", &m_dofDebugMode);
+			}
+			ImGui::DragFloat("Exposure", &m_acesExposure, 0.01f, 0.0f, 10.0f);
+		}
+		ImGui::End();
 	}
 
 

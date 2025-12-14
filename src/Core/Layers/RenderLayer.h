@@ -50,6 +50,19 @@ namespace NK
 		virtual ~RenderLayer() override;
 
 		virtual void Update() override;
+
+		//todo: replace with some kinda ecs component like CPostprocessSettings or something
+		inline void SetFocalDistance(const float _focalDistance) { m_focalDistance = _focalDistance; }
+		inline void SetFocalDepth(const float _focalDepth) { m_focalDepth = _focalDepth; }
+		inline void SetMaxBlurRadius(const float _blurRadius) { m_maxBlurRadius = _blurRadius; }
+		inline void SetDOFDebugMode(const bool _enabled) { m_dofDebugMode = _enabled; }
+		inline void SetACESExposure(const float _exposure) { m_acesExposure = _exposure; }
+
+		[[nodiscard]] inline float GetFocalDistance() const { return m_focalDistance; }
+		[[nodiscard]] inline float GetFocalDepth() const { return m_focalDepth; }
+		[[nodiscard]] inline float GetMaxBlurRadius() const { return m_maxBlurRadius; }
+		[[nodiscard]] inline bool GetDOFDebugMode() const { return m_dofDebugMode; }
+		[[nodiscard]] inline float GetACESExposure() const { return m_acesExposure; }
 		
 		
 	private:
@@ -79,6 +92,7 @@ namespace NK
 		void InitShadowMapForLight(const CLight& _light);
 
 		void PreAppUpdate();
+		void UpdateImGui();
 		void PostAppUpdate();
 		
 		void UpdateSkybox(CSkybox& _skybox);
@@ -257,6 +271,11 @@ namespace NK
 
 			float acesExposure;
 		};
+		float m_focalDistance;
+		float m_focalDepth;
+		float m_maxBlurRadius;
+		bool m_dofDebugMode;
+		float m_acesExposure;
 		UniquePtr<IRootSignature> m_postprocessPassRootSignature;
 		
 		UniquePtr<IPipeline> m_modelVisibilityPipeline;

@@ -13,6 +13,7 @@ namespace NK
 	ILogger* Context::m_logger{ nullptr };
 	IAllocator* Context::m_allocator{ nullptr };
 	LAYER_UPDATE_STATE Context::m_layerUpdateState{ LAYER_UPDATE_STATE::PRE_APP };
+	bool Context::m_editorActive{ false };
 
 
 	void GLFWErrorCallback(int _error, const char* _description)

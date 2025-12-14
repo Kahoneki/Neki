@@ -176,6 +176,30 @@ public:
 			DrawLightNode("Point Light 1", m_redLightEntity);
 			DrawLightNode("Point Light 2", m_greenLightEntity);
 
+			if (ImGui::CollapsingHeader("Helmet", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::PushID(static_cast<int>(m_helmetEntity));
+				NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(m_helmetEntity);
+				glm::vec3 pos = transform.GetPosition();
+				if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) 
+				{
+					transform.SetPosition(pos);
+				}
+				ImGui::PopID();
+			}
+
+			if (ImGui::CollapsingHeader("Sponza", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::PushID(static_cast<int>(m_sponzaEntity));
+				NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(m_sponzaEntity);
+				glm::vec3 pos = transform.GetPosition();
+				if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) 
+				{
+					transform.SetPosition(pos);
+				}
+				ImGui::PopID();
+			}
+			
 			if (ImGui::Button("change"))
 			{
 				NK::CSkybox& skybox{ m_reg.GetComponent<NK::CSkybox>(m_skyboxEntity) };
@@ -276,11 +300,11 @@ public:
 		glfwSetWindowShouldClose(m_window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
 		if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::E) && !m_editorActiveKeyPressedLastFrame)
 		{
-			m_editorActive = !m_editorActive;
+			NK::Context::SetEditorActive(!NK::Context::GetEditorActive());
 		}
 		m_editorActiveKeyPressedLastFrame = NK::InputManager::GetKeyPressed(NK::KEYBOARD::E);
 		
-		m_window->SetCursorVisibility(m_editorActive);
+		m_window->SetCursorVisibility(NK::Context::GetEditorActive());
 		
 		m_shutdown = m_window->ShouldClose();
 	}
@@ -291,7 +315,6 @@ private:
 	NK::Entity m_windowEntity;
 
 	bool m_editorActiveKeyPressedLastFrame{ false };
-	bool m_editorActive{ false };
 	
 	//Pre-app layers
 	NK::UniquePtr<NK::WindowLayer> m_windowLayer;
