@@ -153,6 +153,48 @@ FetchContent_MakeAvailable(assimp)
 target_link_libraries(Neki PUBLIC assimp)
 
 
+# ImGui
+FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG docking)
+FetchContent_MakeAvailable(imgui)
+
+set(IMGUI_DIR ${imgui_SOURCE_DIR})
+set(IMGUI_SOURCES
+        ${IMGUI_DIR}/imgui.cpp
+        ${IMGUI_DIR}/imgui_demo.cpp
+        ${IMGUI_DIR}/imgui_draw.cpp
+        ${IMGUI_DIR}/imgui_tables.cpp
+        ${IMGUI_DIR}/imgui_widgets.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+)
+
+if(NEKI_BUILD_VULKAN)
+    list(APPEND IMGUI_SOURCES ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
+endif()
+
+if(NEKI_BUILD_D3D12)
+    list(APPEND IMGUI_SOURCES ${IMGUI_DIR}/backends/imgui_impl_dx12.cpp)
+endif()
+
+add_library(ImGui STATIC ${IMGUI_SOURCES})
+target_include_directories(ImGui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+target_link_libraries(ImGui PUBLIC glfw)
+
+if(NEKI_BUILD_VULKAN)
+    target_link_libraries(ImGui PUBLIC Vulkan::Vulkan)
+endif()
+
+if(NEKI_BUILD_D3D12)
+    target_link_libraries(ImGui PUBLIC d3d12 dxgi d3dcompiler)
+endif()
+
+if(UNIX AND NOT APPLE)
+    find_package(X11 REQUIRED)
+    target_link_libraries(ImGui PUBLIC X11::X11)
+endif()
+
+target_link_libraries(Neki PUBLIC ImGui)
+
+
 
 
 #Compiles a given HLSL shader source file to SPIR-V and/or DXIL

@@ -55,24 +55,31 @@ namespace NK
 	private:
 		//Init sub-functions
 		void InitBaseResources();
+		void InitImGui();
 		void InitCameraBuffers();
 		void InitLightDataBuffer();
 		void InitModelMatricesBuffer();
 		void InitModelVisibilityBuffers();
 		void InitCube();
 		void InitScreenQuad();
+		
 		void InitShadersAndPipelines();
 		void InitModelVisibilityPipeline();
 		void InitShadowPipeline();
 		void InitSkyboxPipeline();
 		void InitGraphicsPipelines();
+		void InitPrefixSumPipeline();
 		void InitPostprocessPipeline();
+		
 		void InitRenderGraphs();
 		void InitScreenResources();
 		void InitBRDFLut();
 
 		//Automatically determines whether to make a 2d texture or a cubemap based on light type
 		void InitShadowMapForLight(const CLight& _light);
+
+		void PreAppUpdate();
+		void PostAppUpdate();
 		
 		void UpdateSkybox(CSkybox& _skybox);
 		void UpdateCameraBuffer(const CCamera& _camera) const;
@@ -187,6 +194,7 @@ namespace NK
 		UniquePtr<IShader> m_pbrFragShader;
 		UniquePtr<IShader> m_postprocessFragShader;
 		UniquePtr<IShader> m_modelVisibilityFragShader;
+		UniquePtr<IShader> m_prefixSumCompShader;
 
 		struct ModelVisibilityPassPushConstantData
 		{
@@ -221,11 +229,33 @@ namespace NK
 		};
 		UniquePtr<IRootSignature> m_meshPassRootSignature;
 
+		struct PrefixSumPassPushConstantData
+		{
+			ResourceIndex inputTextureIndex;
+			ResourceIndex outputTextureIndex;
+    
+			//Dimensions of the texture being processed in this specific pass.
+			//Pass 1: (Width, Height)
+			//Pass 2: (Height, Width) - pass 1 transposes the output to create the SAT
+			glm::uvec2 dimensions; 
+		};
+		UniquePtr<IRootSignature> m_prefixSumPassRootSignature;
+
 		struct PostprocessPassPushConstantData
 		{
 			ResourceIndex sceneColourIndex;
 			ResourceIndex sceneDepthIndex;
+			ResourceIndex satTextureIndex;
 			SamplerIndex samplerIndex;
+
+			float nearPlane;
+			float farPlane;
+			float focalDistance;
+			float focalDepth;
+			float maxBlurRadius;
+			std::uint32_t dofDebugMode;
+
+			float acesExposure;
 		};
 		UniquePtr<IRootSignature> m_postprocessPassRootSignature;
 		
@@ -234,6 +264,7 @@ namespace NK
 		UniquePtr<IPipeline> m_skyboxPipeline;
 		UniquePtr<IPipeline> m_blinnPhongPipeline;
 		UniquePtr<IPipeline> m_pbrPipeline;
+		UniquePtr<IPipeline> m_prefixSumPipeline;
 		UniquePtr<IPipeline> m_postprocessPipeline;
 
 		UniquePtr<RenderGraph> m_meshRenderGraph;
@@ -241,7 +272,7 @@ namespace NK
 
 
 		//Shadow maps
-		static constexpr glm::ivec2 m_shadowMapBaseResolution{ 2048, 2048 };
+		static constexpr glm::ivec2 m_shadowMapBaseResolution{ 1024, 1024 };
 		std::vector<UniquePtr<ITexture>> m_shadowMaps2D;
 		std::vector<UniquePtr<ITextureView>> m_shadowMap2DDSVs;
 		std::vector<UniquePtr<ITextureView>> m_shadowMap2DSRVs;
@@ -272,6 +303,15 @@ namespace NK
 		UniquePtr<ITextureView> m_sceneDepthSSAASRV;
 		UniquePtr<ITextureView> m_sceneDepthMSAADSV;
 		UniquePtr<ITextureView> m_sceneDepthMSAASRV;
+
+		//For Depth of Field
+		//Double buffered to ping pong
+		UniquePtr<ITexture> m_satIntermediate;
+		UniquePtr<ITexture> m_satFinal;
+		UniquePtr<ITextureView> m_satIntermediateUAV;
+		UniquePtr<ITextureView> m_satFinalUAV;
+		UniquePtr<ITextureView> m_satIntermediateSRV;
+		UniquePtr<ITextureView> m_satFinalSRV;
 
 		
 		//Stores the model matrices for all models - regardless of whether the model is loaded or not

@@ -120,7 +120,7 @@ namespace NK
 			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		}
 		barrier.subresourceRange.baseMipLevel = 0;
-		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.levelCount = _texture->GetMipLevels();
 		barrier.subresourceRange.baseArrayLayer = 0;
 		barrier.subresourceRange.layerCount = _texture->IsArrayTexture() ? (_texture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _texture->GetSize().y : _texture->GetSize().z) : 1;
 
@@ -536,7 +536,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent)
+	void VulkanCommandBuffer::CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent, std::uint32_t _mipLevel)
 	{
 		//Input validation
 
@@ -570,7 +570,7 @@ namespace NK
 		copyRegion.bufferRowLength = 0;   //Tightly packed
 		copyRegion.bufferImageHeight = 0; //Tightly packed
 		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		copyRegion.imageSubresource.mipLevel = 0;
+		copyRegion.imageSubresource.mipLevel = _mipLevel;
 		copyRegion.imageSubresource.baseArrayLayer = _dstOffset.z;
 		copyRegion.imageSubresource.layerCount = (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_3) ? 1 : static_cast<std::uint32_t>(_dstExtent.z);
 		copyRegion.imageOffset = { _dstOffset.x, _dstOffset.y, 0 };
@@ -578,6 +578,27 @@ namespace NK
 		copyRegion.imageExtent = { static_cast<std::uint32_t>(_dstExtent.x), static_cast<std::uint32_t>(_dstExtent.y), depth };
 
 		vkCmdCopyBufferToImage(m_buffer, dynamic_cast<VulkanBuffer*>(_srcBuffer)->GetBuffer(), dynamic_cast<VulkanTexture*>(_dstTexture)->GetTexture(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+	}
+
+
+
+	void VulkanCommandBuffer::ClearTexture(ITexture* _texture, float* _clearColour)
+	{
+		const VkClearColorValue clearValue{ _clearColour[0], _clearColour[1], _clearColour[2], _clearColour[3] };
+		VkImageSubresourceRange range{};
+		range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		range.baseMipLevel = 0;
+		range.levelCount = 1;
+		range.baseArrayLayer = 0;
+		range.layerCount = 1;
+		vkCmdClearColorImage(m_buffer, dynamic_cast<VulkanTexture*>(_texture)->GetTexture(), VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &range);
+	}
+
+
+
+	void VulkanCommandBuffer::Dispatch(std::uint32_t _dimX, std::uint32_t _dimY, std::uint32_t _dimZ)
+	{
+		vkCmdDispatch(m_buffer, _dimX, _dimY, _dimZ);
 	}
 
 }

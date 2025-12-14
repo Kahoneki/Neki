@@ -76,6 +76,7 @@ namespace NK
 	{
 		UNDEFINED = 0,
 
+		R16_TYPELESS,
 		R32_TYPELESS,
 
 		//8-bit Colour Formats
@@ -88,6 +89,7 @@ namespace NK
 
 		//16-bit Colour Formats
 		R16_SFLOAT,
+		R16_UNORM,
 		R16G16_SFLOAT,
 		R16G16B16A16_SFLOAT,
 

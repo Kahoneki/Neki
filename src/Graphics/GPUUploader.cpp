@@ -189,104 +189,132 @@ namespace NK
 			m_commandBuffer->TransitionBarrier(_dstTexture, _dstTextureInitialState, RESOURCE_STATE::COPY_DEST);
 		}
 
-		m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset, { 0, 0, 0 }, copyDstExtent);
+		m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset, { 0, 0, 0 }, copyDstExtent, 0);
 	}
 
 
 
-	void GPUUploader::EnqueueTextureDataUpload(const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState)
-	{
-		if (m_flushing)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "EnqueueTextureDataUploaded() called while m_flushing was true. Did you forget to call Reset()?\n");
-			throw std::runtime_error("");
-		}
+void GPUUploader::EnqueueTextureDataUpload(const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState)
+{
+    if (m_flushing)
+    {
+        m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::GPU_UPLOADER, "EnqueueTextureDataUploaded() called while m_flushing was true. Did you forget to call Reset()?\n");
+        throw std::runtime_error("");
+    }
 
-		const TextureCopyMemoryLayout memLayout{ m_device.GetRequiredMemoryLayoutForTextureCopy(_dstTexture) };
+    constexpr std::size_t TEXTURE_COPY_ALIGNMENT{ 512u };
 
-		constexpr std::size_t TEXTURE_COPY_ALIGNMENT{ 512u };
+	//Get total size of upload for staging buffer reservation
+    std::size_t totalUploadSize{ 0 };
+    glm::ivec3 mipSize{ _dstTexture->GetSize() };
+    for (std::uint32_t i{ 0 }; i < _dstTexture->GetMipLevels(); ++i)
+    {
+        std::size_t mipRowPitch{ 0 };
+        std::size_t mipHeight{ 0 };
 
-		std::size_t rowsPerLayer{};
-		if (RHIUtils::IsBlockCompressed(_dstTexture->GetFormat()))
-		{
-			const std::uint32_t height{ static_cast<std::uint32_t>(_dstTexture->GetSize().y) };
-			rowsPerLayer = (height + 3) / 4;
-		}
-		else
-		{
-			rowsPerLayer = _dstTexture->GetSize().y;
-		}
+        if (RHIUtils::IsBlockCompressed(_dstTexture->GetFormat()))
+        {
+            mipRowPitch = ((mipSize.x + 3) / 4) * RHIUtils::GetBlockByteSize(_dstTexture->GetFormat());
+            mipHeight = (mipSize.y + 3) / 4;
+        }
+        else
+        {
+            mipRowPitch = mipSize.x * RHIUtils::GetFormatBytesPerPixel(_dstTexture->GetFormat());
+            mipHeight = mipSize.y;
+        }
 
-		//Pad each layer in the staging buffer so the next one starts at an aligned offset
-		const std::size_t unalignedBytesPerLayer{ rowsPerLayer * memLayout.rowPitch };
-		const std::size_t alignedBytesPerLayer{ (unalignedBytesPerLayer + TEXTURE_COPY_ALIGNMENT - 1) & ~(TEXTURE_COPY_ALIGNMENT - 1) };
+        const std::size_t mipBytes{ mipRowPitch * mipHeight * (_dstTexture->IsArrayTexture() ? (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _dstTexture->GetSize().y : _dstTexture->GetSize().z) : 1) };
+        
+        //Align mip start
+        totalUploadSize = (totalUploadSize + TEXTURE_COPY_ALIGNMENT - 1) & ~(TEXTURE_COPY_ALIGNMENT - 1);
+        totalUploadSize += mipBytes;
 
-		std::size_t numLayers{ 1 };
-		if (_dstTexture->IsArrayTexture())
-		{
-			numLayers = (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _dstTexture->GetSize().y : _dstTexture->GetSize().z);
-		}
+    	//Just to be safe (final mip is 1x1)
+        mipSize.x = std::max(1, mipSize.x / 2);
+        mipSize.y = std::max(1, mipSize.y / 2);
+        mipSize.z = std::max(1, mipSize.z / 2);
+    }
 
-		//Global offset into the staging buffer
-		const std::size_t unalignedOffset{ m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size };
-		const std::size_t alignedOffset{ (unalignedOffset + TEXTURE_COPY_ALIGNMENT - 1) & ~(TEXTURE_COPY_ALIGNMENT - 1) };
-		
-		BufferSubregion subregion{};
-		subregion.offset = alignedOffset;
-		subregion.size = memLayout.totalBytes;
+    //Calculate global offset into the staging buffer for subregion
+    const std::size_t unalignedOffset{ m_stagingBufferSubregions.empty() ? 0 : m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size };
+    const std::size_t alignedOffset{ (unalignedOffset + TEXTURE_COPY_ALIGNMENT - 1) & ~(TEXTURE_COPY_ALIGNMENT - 1) };
+    
+    BufferSubregion subregion{};
+    subregion.offset = alignedOffset;
+    subregion.size = totalUploadSize;
 
-		if (subregion.offset + subregion.size > m_stagingBufferSize)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::GPU_UPLOADER, "EnqueueTextureDataUpload() exceeded m_stagingBufferSize - flushing staging buffer with _waitIdle = true.\n");
-			Flush(true, nullptr, nullptr);
-			Reset();
+    if (subregion.offset + subregion.size > m_stagingBufferSize)
+    {
+        m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::GPU_UPLOADER, "EnqueueTextureDataUpload() exceeded m_stagingBufferSize - flushing staging buffer with _waitIdle = true.\n");
+        Flush(true, nullptr, nullptr);
+        Reset();
+        subregion.offset = 0;
+    }
 
-			subregion.offset = 0;
-		}
+    //Main copy loop
+    const unsigned char* srcPtr{ static_cast<const unsigned char*>(_data) };
+    unsigned char* baseDstPtr{ m_stagingBufferMap + subregion.offset };
+    std::size_t currentBufferOffset = 0;
+    mipSize = _dstTexture->GetSize();
 
-		std::size_t sourceRowPitch{};
-		if (RHIUtils::IsBlockCompressed(_dstTexture->GetFormat()))
-		{
-			sourceRowPitch = ((_dstTexture->GetSize().x + 3) / 4) * RHIUtils::GetBlockByteSize(_dstTexture->GetFormat());
-		}
-		else
-		{
-			sourceRowPitch = _dstTexture->GetSize().x * RHIUtils::GetFormatBytesPerPixel(_dstTexture->GetFormat());
-		}
+    if (_dstTextureInitialState != RESOURCE_STATE::COPY_DEST)
+    {
+        m_commandBuffer->TransitionBarrier(_dstTexture, _dstTextureInitialState, RESOURCE_STATE::COPY_DEST);
+    }
 
-		const unsigned char* srcPtr{ static_cast<const unsigned char*>(_data) };
-		unsigned char* baseDstPtr{ m_stagingBufferMap + subregion.offset };
+    for (std::uint32_t mip{ 0 }; mip < _dstTexture->GetMipLevels(); ++mip)
+    {
+        //Calculate layout for the current mip level
+        std::size_t sourceRowPitch = 0;
+        std::size_t numRows = 0;
+        if (RHIUtils::IsBlockCompressed(_dstTexture->GetFormat()))
+        {
+            sourceRowPitch = ((mipSize.x + 3) / 4) * RHIUtils::GetBlockByteSize(_dstTexture->GetFormat());
+            numRows = (mipSize.y + 3) / 4;
+        }
+        else
+        {
+            sourceRowPitch = mipSize.x * RHIUtils::GetFormatBytesPerPixel(_dstTexture->GetFormat());
+            numRows = mipSize.y;
+        }
 
-		//Loop through all layers and copy all rows
-		for (std::size_t layer{ 0 }; layer < numLayers; ++layer)
-		{
-			unsigned char* layerDstPtr{ baseDstPtr + (layer * alignedBytesPerLayer) };
-			for (std::size_t row{ 0 }; row < rowsPerLayer; ++row)
-			{
-				memcpy(layerDstPtr, srcPtr, std::min(memLayout.rowPitch, static_cast<std::uint32_t>(sourceRowPitch)));
-				srcPtr += sourceRowPitch;
-				layerDstPtr += memLayout.rowPitch;
-			}
-		}
-		m_stagingBufferSubregions.push_back(subregion);
+        //Calculate aligned offset into buffer for the current mip level
+        currentBufferOffset = (currentBufferOffset + TEXTURE_COPY_ALIGNMENT - 1) & ~(TEXTURE_COPY_ALIGNMENT - 1);
+        
+        //Determine layers
+        std::size_t numLayers = 1;
+        if (_dstTexture->IsArrayTexture())
+        {
+            numLayers = (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_1 ? _dstTexture->GetSize().y : _dstTexture->GetSize().z);
+        }
+        
+        //Issue copy for all layers for the current mip
+        for (std::size_t layer = 0; layer < numLayers; ++layer)
+        {
+            const std::size_t layerSize{ sourceRowPitch * numRows };
+            unsigned char* dst{ baseDstPtr + currentBufferOffset };
+            memcpy(dst, srcPtr, layerSize);
+            
+            //Enqueue the copy command
+            glm::ivec3 copyExtent{ mipSize.x, mipSize.y, 1 };
+            if (_dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_3) { copyExtent.z = mipSize.z; }
+            glm::ivec3 copyOffset{0, 0, 0};
+            if (_dstTexture->IsArrayTexture()) { copyOffset.z = layer; }
+            m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset + currentBufferOffset, copyOffset, copyExtent, mip);
 
-		if (_dstTextureInitialState != RESOURCE_STATE::COPY_DEST)
-		{
-			m_commandBuffer->TransitionBarrier(_dstTexture, _dstTextureInitialState, RESOURCE_STATE::COPY_DEST);
-		}
+        	//Prepare for next layer
+            srcPtr += layerSize;
+            currentBufferOffset += layerSize;
+        }
 
-		if (_dstTexture->IsArrayTexture() && _dstTexture->GetDimension() == TEXTURE_DIMENSION::DIM_2)
-		{
-			for (std::uint32_t i{ 0 }; i < _dstTexture->GetSize().z; ++i)
-			{
-				m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset + (i * alignedBytesPerLayer), { 0, 0, static_cast<std::int32_t>(i) }, { _dstTexture->GetSize().x, _dstTexture->GetSize().y, 1 });
-			}
-		}
-		else
-		{
-			m_commandBuffer->CopyBufferToTexture(m_stagingBuffer.get(), _dstTexture, subregion.offset, { 0, 0, 0 }, _dstTexture->GetSize());
-		}
-	}
+        //Prepare for next mip
+        mipSize.x = std::max(1, mipSize.x / 2);
+        mipSize.y = std::max(1, mipSize.y / 2);
+        mipSize.z = std::max(1, mipSize.z / 2);
+    }
+
+    m_stagingBufferSubregions.push_back(subregion);
+}
 
 
 

@@ -103,7 +103,10 @@ namespace NK
 		
 		virtual void CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer, std::size_t _srcOffset, std::size_t _dstOffset, std::size_t _size) = 0;
 		//_srcOffset in bytes, _dstOffset in texels for XYZ, _dstExtent in texels for XYZ
-		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent) = 0;
+		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent, std::uint32_t _mipLevel) = 0;
+		virtual void ClearTexture(ITexture* _texture, float* _clearColour) = 0;
+
+		virtual void Dispatch(std::uint32_t _dimX, std::uint32_t _dimY, std::uint32_t _dimZ) = 0;
 
 
 	protected:
@@ -122,5 +125,5 @@ namespace NK
 
 		COMMAND_BUFFER_LEVEL m_level;
 	};
-	
+
 }

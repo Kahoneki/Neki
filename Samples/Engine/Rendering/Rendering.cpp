@@ -19,6 +19,8 @@
 #include <Managers/InputManager.h>
 #include <Managers/TimeManager.h>
 
+#include <imgui.h>
+
 
 class GameScene final : public NK::Scene
 {
@@ -65,7 +67,7 @@ public:
 //		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath.string(), true, true);
 //		serialisedModelOutputPath = std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel");
 //		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Cube.gltf", serialisedModelOutputPath.string(), true, true);
-//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel") };
+//		serialisedModelOutputPath = std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel");
 //		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath, true, true);
 		
 		m_helmetEntity = m_reg.Create();
@@ -75,22 +77,30 @@ public:
 		helmetTransform.SetPosition(glm::vec3(0, 0, -5));
 		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 
-		m_groundEntity = m_reg.Create();
-		NK::CModelRenderer& groundModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_groundEntity) };
-		groundModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
-		NK::CTransform& groundTransform{ m_reg.AddComponent<NK::CTransform>(m_groundEntity) };
-//		groundTransform.SetScale({ 0.01f, 0.01f, 0.01f });
-		groundTransform.SetPosition(glm::vec3(0, -3, -3));
-		groundTransform.SetScale({ 5.0f, 0.2f, 5.0f });
+//		m_groundEntity = m_reg.Create();
+//		NK::CModelRenderer& groundModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_groundEntity) };
+//		groundModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
+//		NK::CTransform& groundTransform{ m_reg.AddComponent<NK::CTransform>(m_groundEntity) };
+////		groundTransform.SetScale({ 0.01f, 0.01f, 0.01f });
+//		groundTransform.SetPosition(glm::vec3(0, -3, -3));
+//		groundTransform.SetScale({ 5.0f, 0.2f, 5.0f });
+//
+//		m_wallEntity = m_reg.Create();
+//		NK::CModelRenderer& groundModelRenderer2{ m_reg.AddComponent<NK::CModelRenderer>(m_wallEntity) };
+//		groundModelRenderer2.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
+//		NK::CTransform& groundTransform2{ m_reg.AddComponent<NK::CTransform>(m_wallEntity) };
+//		//		groundTransform.SetScale({ 0.01f, 0.01f, 0.01f });
+//		groundTransform2.SetPosition(glm::vec3(0, 1.8, -8));
+//		groundTransform2.SetScale({ 5.0f, 0.2f, 5.0f });
+//		groundTransform2.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
 
-		m_wallEntity = m_reg.Create();
-		NK::CModelRenderer& groundModelRenderer2{ m_reg.AddComponent<NK::CModelRenderer>(m_wallEntity) };
-		groundModelRenderer2.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
-		NK::CTransform& groundTransform2{ m_reg.AddComponent<NK::CTransform>(m_wallEntity) };
-		//		groundTransform.SetScale({ 0.01f, 0.01f, 0.01f });
-		groundTransform2.SetPosition(glm::vec3(0, 1.8, -8));
-		groundTransform2.SetScale({ 5.0f, 0.2f, 5.0f });
-		groundTransform2.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
+
+		m_sponzaEntity = m_reg.Create();
+		NK::CModelRenderer& sponzaModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_sponzaEntity) };
+		sponzaModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel";
+		NK::CTransform& sponzaTransform{ m_reg.AddComponent<NK::CTransform>(m_sponzaEntity) };
+		sponzaTransform.SetScale({ 0.01f, 0.01f, 0.01f });
+		sponzaTransform.SetPosition(glm::vec3(0, -3, -3));
 		
 
 		m_cameraEntity = m_reg.Create();
@@ -118,10 +128,63 @@ public:
 	
 	virtual void Update() override
 	{
-		NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		constexpr float speed{ 50.0f };
 		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
-		transform.SetRotation(transform.GetRotation() + glm::vec3(0,rotationAmount,0));
+		helmetTransform.SetRotation(helmetTransform.GetRotation() + glm::vec3(0,rotationAmount,0));
+
+
+		//ImGui for lights
+		if (ImGui::Begin("Light Controls"))
+		{
+			auto DrawLightNode = [&](const char* label, NK::Entity entity) 
+			{
+				if (ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					ImGui::PushID(static_cast<int>(entity));
+
+					//Position
+					NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(entity);
+					glm::vec3 pos = transform.GetPosition();
+					if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) 
+					{
+						transform.SetPosition(pos);
+					}
+
+					//Light properties
+					NK::CLight& lightComp = m_reg.GetComponent<NK::CLight>(entity);
+					if (lightComp.light)
+					{
+						// Colour
+						glm::vec3 color = lightComp.light->GetColour();
+						if (ImGui::ColorEdit3("Colour", &color.x))
+						{
+							lightComp.light->SetColour(color);
+						}
+
+						// Intensity
+						float intensity = lightComp.light->GetIntensity();
+						if (ImGui::DragFloat("Intensity", &intensity, 0.1f, 0.0f, 100.0f))
+						{
+							lightComp.light->SetIntensity(intensity);
+						}
+					}
+					ImGui::PopID();
+				}
+			};
+
+			DrawLightNode("Point Light 1", m_redLightEntity);
+			DrawLightNode("Point Light 2", m_greenLightEntity);
+
+			if (ImGui::Button("change"))
+			{
+				NK::CSkybox& skybox{ m_reg.GetComponent<NK::CSkybox>(m_skyboxEntity) };
+				skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
+				skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
+				skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
+			}
+		}
+		ImGui::End();
 
 		
 //		const double time{ NK::TimeManager::GetTotalTime() };
@@ -145,6 +208,7 @@ public:
 private:
 	NK::Entity m_skyboxEntity;
 	NK::Entity m_helmetEntity;
+	NK::Entity m_sponzaEntity;
 	NK::Entity m_groundEntity;
 	NK::Entity m_wallEntity;
 	NK::Entity m_redLightEntity;
@@ -182,15 +246,6 @@ public:
 		m_windowLayer = NK::UniquePtr<NK::WindowLayer>(NK_NEW(NK::WindowLayer, m_reg));
 		NK::InputLayerDesc inputLayerDesc{ m_window.get() };
 		m_inputLayer = NK::UniquePtr<NK::InputLayer>(NK_NEW(NK::InputLayer, m_scenes[m_activeScene]->m_reg, inputLayerDesc));
-		m_playerCameraLayer = NK::UniquePtr<NK::PlayerCameraLayer>(NK_NEW(NK::PlayerCameraLayer, m_scenes[m_activeScene]->m_reg));
-
-		m_preAppLayers.push_back(m_windowLayer.get());
-		m_preAppLayers.push_back(m_inputLayer.get());
-		m_preAppLayers.push_back(m_playerCameraLayer.get());
-		
-		
-		//Post-app layers
-		m_modelVisibilityLayer = NK::UniquePtr<NK::ModelVisibilityLayer>(NK_NEW(NK::ModelVisibilityLayer, m_scenes[m_activeScene]->m_reg));
 		NK::RenderLayerDesc renderLayerDesc{};
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 //		renderLayerDesc.enableMSAA = true;
@@ -200,7 +255,15 @@ public:
 		renderLayerDesc.window = m_window.get();
 		renderLayerDesc.framesInFlight = 3;
 		m_renderLayer = NK::UniquePtr<NK::RenderLayer>(NK_NEW(NK::RenderLayer, m_scenes[m_activeScene]->m_reg,  renderLayerDesc));
+		m_playerCameraLayer = NK::UniquePtr<NK::PlayerCameraLayer>(NK_NEW(NK::PlayerCameraLayer, m_scenes[m_activeScene]->m_reg));
+
+		m_preAppLayers.push_back(m_windowLayer.get());
+		m_preAppLayers.push_back(m_inputLayer.get());
+		m_preAppLayers.push_back(m_renderLayer.get());
+		m_preAppLayers.push_back(m_playerCameraLayer.get());
 		
+		
+		//Post-app layers
 		m_postAppLayers.push_back(m_renderLayer.get());
 	}
 
@@ -211,6 +274,13 @@ public:
 		m_scenes[m_activeScene]->Update();
 
 		glfwSetWindowShouldClose(m_window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
+		if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::E) && !m_editorActiveKeyPressedLastFrame)
+		{
+			m_editorActive = !m_editorActive;
+		}
+		m_editorActiveKeyPressedLastFrame = NK::InputManager::GetKeyPressed(NK::KEYBOARD::E);
+		
+		m_window->SetCursorVisibility(m_editorActive);
 		
 		m_shutdown = m_window->ShouldClose();
 	}
@@ -220,6 +290,9 @@ private:
 	NK::UniquePtr<NK::Window> m_window;
 	NK::Entity m_windowEntity;
 
+	bool m_editorActiveKeyPressedLastFrame{ false };
+	bool m_editorActive{ false };
+	
 	//Pre-app layers
 	NK::UniquePtr<NK::WindowLayer> m_windowLayer;
 	NK::UniquePtr<NK::InputLayer> m_inputLayer;

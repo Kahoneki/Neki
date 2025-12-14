@@ -18,14 +18,26 @@
 #include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
 
+
 #ifdef NEKI_VULKAN_SUPPORTED
+	#include <RHI-Vulkan/VulkanCommandBuffer.h>
 	#include <RHI-Vulkan/VulkanDevice.h>
+	#include <RHI-Vulkan/VulkanQueue.h>
+	#include <RHI-Vulkan/VulkanUtils.h>
 #endif
 #ifdef NEKI_D3D12_SUPPORTED
 	#include <RHI-D3D12/D3D12Device.h>
 #endif
 
 #include <cstring>
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#ifdef NEKI_VULKAN_SUPPORTED
+	#include <backends/imgui_impl_vulkan.h>
+#endif
+#ifdef NEKI_D3D12_SUPPORTED
+	#include <backends/imgui_impl_dx12.h>
+#endif
 
 
 namespace NK
@@ -43,6 +55,7 @@ namespace NK
 		//For resource transition
 		m_graphicsCommandBuffers[0]->Begin();
 
+		InitImGui();
 		InitCameraBuffers();
 		InitLightDataBuffer();
 		InitModelMatricesBuffer();
@@ -79,6 +92,20 @@ namespace NK
 
 
 		m_graphicsQueue->WaitIdle();
+		#ifdef NEKI_VULKAN_SUPPORTED
+			if (m_desc.backend == GRAPHICS_BACKEND::VULKAN)
+			{
+				ImGui_ImplVulkan_Shutdown();
+			}
+		#endif
+		#ifdef NEKI_D3D12_SUPPORTED
+			if (m_desc.backend == GRAPHICS_BACKEND::D3D12)
+			{
+				ImGui_ImplDX12_Shutdown();
+			}
+		#endif
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
 
 
 		m_logger.Unindent();
@@ -88,217 +115,8 @@ namespace NK
 
 	void RenderLayer::Update()
 	{
-		
-		//Begin rendering
-		m_inFlightFences[m_currentFrame]->Wait();
-		m_inFlightFences[m_currentFrame]->Reset();
-		m_graphicsCommandBuffers[m_currentFrame]->Begin();
-		
-		
-		//Update skybox
-		bool found{ false };
-		for (auto&& [skybox] : m_reg.get().View<CSkybox>())
-		{
-			if (found)
-			{
-				//Multiple skyboxes, notify the user only the first one is being considered for rendering
-				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CSkybox`s found in registry. Note that only one skybox is supported - only the first skybox will be used.\n");
-				break;
-			}
-			found = true;
-			UpdateSkybox(skybox);
-		}
-		if (!found)
-		{
-//			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CSkybox`s found in registry.\n");
-		}
-
-
-		//Update camera
-		found = false;
-		for (auto&& [camera] : m_reg.get().View<CCamera>())
-		{
-			if (found)
-			{
-				//Multiple cameras, notify the user only the first one is being considered for rendering - todo: change this (probably let the user specify on CModelRenderer which camera they want to use)
-				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
-				break;
-			}
-			found = true;
-			UpdateCameraBuffer(camera);
-		}
-		if (!found)
-		{
-			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
-		}
-
-
-		UpdateLightDataBuffer();
-
-
-		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
-		while (!m_modelUnloadQueues[m_currentFrame].empty())
-		{
-			if (m_gpuModelReferenceCounter[m_modelUnloadQueues[m_currentFrame].back()] == 0)
-			{
-				ModelLoader::UnloadModel(m_modelUnloadQueues[m_currentFrame].back());
-				m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
-			}
-			m_modelUnloadQueues[m_currentFrame].pop_back();
-		}
-
-		const std::size_t prevFrameIndex{ (m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight };
-		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[prevFrameIndex]) };
-		
-		//Model Loading Phase
-		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[prevFrameIndex].size(); ++i)
-		{
-			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[prevFrameIndex][i]) };
-			//modelRenderer.visible = visibilityMap[i] == 1;
-			modelRenderer.visible = true;
-
-			if (modelRenderer.visible && !modelRenderer.model)
-			{
-				//If model is only queued for unload (and so hasn't yet been unloaded), we can just remove it from the unload queue
-				bool modelInUnloadQueue{ false };
-				for (std::vector<std::string>& q : m_modelUnloadQueues)
-				{
-					std::vector<std::string>::iterator it{ std::ranges::find(q, modelRenderer.modelPath) };
-					if (it != q.end())
-					{
-						modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
-						modelInUnloadQueue = true;
-						q.erase(it);
-					}
-				}
-				if (modelInUnloadQueue)
-				{
-					++m_gpuModelReferenceCounter[modelRenderer.modelPath];
-					continue;
-				}
-
-				//Model is visible but isn't assigned, assign it
-				if (!m_gpuModelCache.contains(modelRenderer.modelPath))
-				{
-					//Model isn't loaded, load it
-					const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
-					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
-					m_newGPUUploaderUpload = true;
-					m_gpuModelReferenceCounter[modelRenderer.modelPath] = 0;
-				}
-				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
-				++m_gpuModelReferenceCounter[modelRenderer.modelPath];
-			}
-			
-			else if (!modelRenderer.visible && modelRenderer.model)
-			{
-				//Model isn't visible but is loaded, decrement reference counter and unassign
-				--m_gpuModelReferenceCounter[modelRenderer.modelPath];
-				std::cout << m_gpuModelReferenceCounter[modelRenderer.modelPath] << '\n';
-				modelRenderer.model = nullptr;
-
-				if (m_gpuModelReferenceCounter[modelRenderer.modelPath] == 0)
-				{
-					//No CModelRenderers are currently visible that use this model, add it to the unload queue
-					m_modelUnloadQueues[prevFrameIndex].push_back(modelRenderer.modelPath);
-				}
-			}
-		}
-		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the fence to wait on before drawing
-		if (m_newGPUUploaderUpload)
-		{
-			m_gpuUploader->Flush(false, m_gpuUploaderFlushFence.get(), nullptr);
-		}
-
-		//Clear the visibility buffer
-		std::memset(visibilityMap, 0, m_desc.maxModels * sizeof(std::uint32_t));
-
-		UpdateModelMatricesBuffer();
-		
-
-		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
-
-		
-		RenderGraphExecutionDesc execDesc{};
-		execDesc.commandBuffers["MODEL_VISIBILITY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		execDesc.commandBuffers["MODEL_VISIBILITY_BUFFER_COPY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		execDesc.commandBuffers["SHADOW_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		execDesc.commandBuffers["DEPTH_BARRIER"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		if (m_desc.enableMSAA) { execDesc.commandBuffers["MSAA_RESOLVE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
-		if (m_desc.enableSSAA) { execDesc.commandBuffers["SSAA_DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
-		execDesc.commandBuffers["POSTPROCESS_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-
-		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffers[m_currentFrame].get());
-		execDesc.buffers.Set("CAMERA_BUFFER_PREVIOUS_FRAME", m_camDataBuffersPreviousFrame[m_currentFrame].get());
-		execDesc.buffers.Set("LIGHT_DATA_BUFFER", m_lightDataBuffer.get());
-		execDesc.buffers.Set("MODEL_MATRICES_BUFFER", m_modelMatricesBuffers[m_currentFrame].get());
-		execDesc.buffers.Set("MODEL_VISIBILITY_DEVICE_BUFFER", m_modelVisibilityDeviceBuffers[m_currentFrame].get());
-		execDesc.buffers.Set("MODEL_VISIBILITY_READBACK_BUFFER", m_modelVisibilityReadbackBuffers[m_currentFrame].get());
-
-		execDesc.textures.Set("SCENE_COLOUR", m_sceneColour.get());
-		execDesc.textures.Set("SCENE_COLOUR_MSAA", m_sceneColourMSAA.get());
-		execDesc.textures.Set("SCENE_COLOUR_SSAA", m_sceneColourSSAA.get());
-
-		execDesc.textures.Set("SCENE_DEPTH", m_sceneDepth.get());
-		execDesc.textures.Set("SCENE_DEPTH_MSAA", m_sceneDepthMSAA.get());
-		execDesc.textures.Set("SCENE_DEPTH_SSAA", m_sceneDepthSSAA.get());
-
-		execDesc.textures.Set("BACKBUFFER", m_swapchain->GetImage(imageIndex));
-		execDesc.textures.Set("SKYBOX", m_skyboxTexture.get());
-		execDesc.textures.Set("IRRADIANCE_MAP", m_irradianceMap.get());
-		execDesc.textures.Set("PREFILTER_MAP", m_prefilterMap.get());
-		execDesc.textures.Set("BRDF_LUT", m_brdfLUT.get());
-
-		execDesc.bufferViews.Set("LIGHT_DATA_BUFFER_VIEW", m_lightDataBufferView.get());
-		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferViews[m_currentFrame].get());
-		execDesc.bufferViews.Set("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW", m_camDataBufferPreviousFrameViews[m_currentFrame].get());
-		execDesc.bufferViews.Set("MODEL_MATRICES_BUFFER_VIEW", m_modelMatricesBufferViews[m_currentFrame].get());
-		execDesc.bufferViews.Set("MODEL_VISIBILITY_DEVICE_BUFFER_VIEW", m_modelVisibilityDeviceBufferViews[m_currentFrame].get());
-
-		execDesc.textureViews.Set("SCENE_COLOUR_RTV", m_sceneColourRTV.get());
-		execDesc.textureViews.Set("SCENE_COLOUR_SRV", m_sceneColourSRV.get());
-		execDesc.textureViews.Set("SCENE_COLOUR_MSAA_RTV", m_sceneColourMSAARTV.get());
-		execDesc.textureViews.Set("SCENE_COLOUR_MSAA_SRV", m_sceneColourMSAASRV.get());
-		execDesc.textureViews.Set("SCENE_COLOUR_SSAA_RTV", m_sceneColourSSAARTV.get());
-		execDesc.textureViews.Set("SCENE_COLOUR_SSAA_SRV", m_sceneColourSSAASRV.get());
-
-		execDesc.textureViews.Set("SCENE_DEPTH_DSV", m_sceneDepthDSV.get());
-		execDesc.textureViews.Set("SCENE_DEPTH_SRV", m_sceneDepthSRV.get());
-		execDesc.textureViews.Set("SCENE_DEPTH_MSAA_DSV", m_sceneDepthMSAADSV.get());
-		execDesc.textureViews.Set("SCENE_DEPTH_MSAA_SRV", m_sceneDepthMSAASRV.get());
-		execDesc.textureViews.Set("SCENE_DEPTH_SSAA_DSV", m_sceneDepthSSAADSV.get());
-		execDesc.textureViews.Set("SCENE_DEPTH_SSAA_SRV", m_sceneDepthSSAASRV.get());
-
-		execDesc.textureViews.Set("BACKBUFFER_RTV", m_swapchain->GetImageView(imageIndex));
-		execDesc.textureViews.Set("SKYBOX_VIEW", m_skyboxTextureView.get());
-		execDesc.textureViews.Set("IRRADIANCE_MAP_VIEW", m_skyboxTextureView.get());
-		execDesc.textureViews.Set("PREFILTER_MAP_VIEW", m_skyboxTextureView.get());
-		execDesc.textureViews.Set("BRDF_LUT_VIEW", m_skyboxTextureView.get());
-
-		execDesc.samplers.Set("SAMPLER", m_linearSampler.get());
-		execDesc.samplers.Set("BRDF_LUT_SAMPLER", m_linearSampler.get());
-		
-		m_meshRenderGraph->Execute(execDesc);
-
-		
-		m_graphicsCommandBuffers[m_currentFrame]->End();
-
-		if (m_newGPUUploaderUpload)
-		{
-			m_gpuUploaderFlushFence->Wait();
-			m_gpuUploaderFlushFence->Reset();
-			m_gpuUploader->Reset();
-		}
-
-		//Submit
-		m_graphicsQueue->Submit(m_graphicsCommandBuffers[m_currentFrame].get(), m_imageAvailableSemaphores[m_currentFrame].get(), m_renderFinishedSemaphores[imageIndex].get(), m_inFlightFences[m_currentFrame].get());
-		m_swapchain->Present(m_renderFinishedSemaphores[imageIndex].get(), imageIndex);
-
-		m_currentFrame = (m_currentFrame + 1) % m_desc.framesInFlight;
-
-		m_firstFrame = false;
+		if (Context::GetLayerUpdateState() == LAYER_UPDATE_STATE::PRE_APP) { PreAppUpdate(); }
+		else { PostAppUpdate(); }
 	}
 
 
@@ -388,6 +206,8 @@ namespace NK
 		samplerDesc.magFilter = FILTER_MODE::LINEAR;
 		samplerDesc.mipmapFilter = FILTER_MODE::LINEAR;
 		samplerDesc.maxAnisotropy = 16.0f;
+		samplerDesc.minLOD = 0.0f;
+		samplerDesc.maxLOD = 1000.0f;
 		m_linearSampler = m_device->CreateSampler(samplerDesc);
 
 		samplerDesc.maxAnisotropy = 1.0f;
@@ -423,6 +243,48 @@ namespace NK
 		{
 			m_inFlightFences[i] = m_device->CreateFence(inFlightFenceDesc);
 		}
+	}
+
+
+
+	void RenderLayer::InitImGui()
+	{
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGuiIO& io{ ImGui::GetIO() };
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+		io.ConfigFlags |= ImGuiConfigFlags_IsSRGB;
+		ImGui::StyleColorsDark();
+		
+		#ifdef NEKI_VULKAN_SUPPORTED
+			const VulkanDevice* device{ dynamic_cast<VulkanDevice*>(m_device.get()) };
+			ImGui_ImplGlfw_InitForVulkan(m_desc.window->GetGLFWWindow(), true);
+			ImGui_ImplVulkan_InitInfo initInfo{};
+			initInfo.Instance = device->GetInstance();
+			initInfo.PhysicalDevice = device->GetPhysicalDevice();
+			initInfo.Device = device->GetDevice();
+			initInfo.QueueFamily = device->GetGraphicsQueueFamilyIndex();
+			initInfo.Queue = dynamic_cast<VulkanQueue*>(m_graphicsQueue.get())->GetQueue();
+			initInfo.PipelineCache = VK_NULL_HANDLE;
+			initInfo.DescriptorPoolSize = 1024;
+			initInfo.MinImageCount = m_desc.framesInFlight;
+			initInfo.ImageCount = m_desc.framesInFlight;
+			initInfo.ApiVersion = VK_API_VERSION_1_4;
+			initInfo.Allocator = Context::GetAllocator()->GetVulkanCallbacks();
+			initInfo.UseDynamicRendering = true;
+			initInfo.PipelineInfoMain.MSAASamples = m_desc.enableMSAA ? VulkanUtils::GetVulkanSampleCount(m_desc.msaaSampleCount) : VK_SAMPLE_COUNT_1_BIT;
+			constexpr VkFormat colourAttachmentFormat{ VK_FORMAT_R8G8B8A8_SRGB };
+			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &colourAttachmentFormat;
+			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+			ImGui_ImplVulkan_Init(&initInfo);
+		#endif
+		#ifdef NEKI_D3D12_SUPPORTED
+			ImGui_ImplGlfw_InitForOther(m_desc.window->GetGLFWWindow(), true);
+			ImGui_ImplDX12_Init(); //todo: implement
+		#endif
 	}
 
 
@@ -679,10 +541,17 @@ namespace NK
 		m_skyboxFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Postprocess_fs";
 		m_postprocessFragShader = m_device->CreateShader(fragShaderDesc);
+
+		//Compute Shaders
+		ShaderDesc compShaderDesc{};
+		compShaderDesc.type = SHADER_TYPE::COMPUTE;
+		compShaderDesc.filepath = "Shaders/PrefixSum_cs";
+		m_prefixSumCompShader = m_device->CreateShader(compShaderDesc);
 		
 
 		//Root Signatures
 		RootSignatureDesc rootSigDesc{};
+		rootSigDesc.bindPoint = PIPELINE_BIND_POINT::GRAPHICS;
 		rootSigDesc.num32BitPushConstantValues = sizeof(ModelVisibilityPassPushConstantData) / 4;
 		m_modelVisibilityPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.num32BitPushConstantValues = sizeof(ShadowPassPushConstantData) / 4;
@@ -691,12 +560,16 @@ namespace NK
 		m_meshPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.num32BitPushConstantValues = sizeof(PostprocessPassPushConstantData) / 4;
 		m_postprocessPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
+		rootSigDesc.bindPoint = PIPELINE_BIND_POINT::COMPUTE;
+		rootSigDesc.num32BitPushConstantValues = sizeof(PrefixSumPassPushConstantData) / 4;
+		m_prefixSumPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		
 
 		InitModelVisibilityPipeline();
 		InitShadowPipeline();
 		InitSkyboxPipeline();
 		InitGraphicsPipelines();
+		InitPrefixSumPipeline();
 		InitPostprocessPipeline();
 	}
 
@@ -804,7 +677,7 @@ namespace NK
 		pipelineDesc.multisamplingDesc = multisamplingDesc;
 		pipelineDesc.colourBlendDesc = colourBlendDesc;
 		pipelineDesc.colourAttachmentFormats = {};
-		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
+		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D16_UNORM;
 
 		m_shadowPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
@@ -923,6 +796,17 @@ namespace NK
 
 		pipelineDesc.fragmentShader = m_pbrFragShader.get();
 		m_pbrPipeline = m_device->CreatePipeline(pipelineDesc);
+	}
+
+
+
+	void RenderLayer::InitPrefixSumPipeline()
+	{
+		PipelineDesc pipelineDesc{};
+		pipelineDesc.type = PIPELINE_TYPE::COMPUTE;
+		pipelineDesc.computeShader = m_prefixSumCompShader.get();
+		pipelineDesc.rootSignature = m_prefixSumPassRootSignature.get();
+		m_prefixSumPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
 
 
@@ -1273,13 +1157,54 @@ namespace NK
 				_cmdBuf->ResolveImage(_texs.Get("SCENE_COLOUR_MSAA"), _texs.Get("SCENE_COLOUR"), TEXTURE_ASPECT::COLOUR);
 			});
 		}
+
+		
+		meshDesc.AddNode(
+		"SUMMED_AREA_TABLE_PASS",
+		{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SAT_INTERMEDIATE", RESOURCE_STATE::UNORDERED_ACCESS },
+		{ "SAT_FINAL", RESOURCE_STATE::UNORDERED_ACCESS }},
+		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+		{
+			float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			_cmdBuf->ClearTexture(_texs.Get("SAT_INTERMEDIATE"), clearColor);
+			_cmdBuf->ClearTexture(_texs.Get("SAT_FINAL"), clearColor);
+			
+			_cmdBuf->BindPipeline(m_prefixSumPipeline.get(), PIPELINE_BIND_POINT::COMPUTE);
+			_cmdBuf->BindRootSignature(m_prefixSumPassRootSignature.get(), PIPELINE_BIND_POINT::COMPUTE);
+			const glm::uvec3 dimensions{ _texs.Get("SCENE_COLOUR")->GetSize() };
+
+			PrefixSumPassPushConstantData pushConstantData{};
+
+			//Pass 1: horizontal accumulation (rows)
+			//Reads SCENE_COLOUR and writes sums to SAT_INTERMEDIATE (transposes output to prepare for subsequent columns pass)
+			pushConstantData.inputTextureIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
+			pushConstantData.outputTextureIndex = _texViews.Get("SAT_INTERMEDIATE_UAV")->GetIndex();
+			pushConstantData.dimensions = { dimensions.x, dimensions.y };
+			_cmdBuf->PushConstants(m_prefixSumPassRootSignature.get(), &pushConstantData);
+			_cmdBuf->Dispatch(dimensions.y, 1, 1); //1 group per row (num groups = height)
+
+			//Barrier
+			//Wait for pass 1 writes to complete and transition intermediate to read-only
+			_cmdBuf->TransitionBarrier(_texs.Get("SAT_INTERMEDIATE"), RESOURCE_STATE::UNORDERED_ACCESS, RESOURCE_STATE::SHADER_RESOURCE);
+
+			//Pass 2: vertical accumulation (columns)
+			//Reads SAT_INTERMEDIATE and writes sums to SAT_FINAL (transposes again to be back to original orientation)
+			pushConstantData.inputTextureIndex = _texViews.Get("SAT_INTERMEDIATE_SRV")->GetIndex();
+			pushConstantData.outputTextureIndex = _texViews.Get("SAT_FINAL_UAV")->GetIndex();
+			pushConstantData.dimensions = { dimensions.y, dimensions.x };
+			_cmdBuf->PushConstants(m_prefixSumPassRootSignature.get(), &pushConstantData);
+			_cmdBuf->Dispatch(dimensions.x, 1, 1);
+
+			_cmdBuf->TransitionBarrier(_texs.Get("SAT_FINAL"), RESOURCE_STATE::UNORDERED_ACCESS, RESOURCE_STATE::SHADER_RESOURCE);
+		});
+
 		
 		meshDesc.AddNode(
 		"POSTPROCESS_PASS",
 		{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
-		{ "SCENE_COLOUR_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SCENE_DEPTH", RESOURCE_STATE::SHADER_RESOURCE },
-		{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SAT_FINAL", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "BACKBUFFER", RESOURCE_STATE::RENDER_TARGET }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
@@ -1292,7 +1217,17 @@ namespace NK
 			PostprocessPassPushConstantData pushConstantData{};
 			pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
 			pushConstantData.sceneDepthIndex = _texViews.Get("SCENE_DEPTH_SRV")->GetIndex();
+			pushConstantData.satTextureIndex = _texViews.Get("SAT_FINAL_SRV")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+
+			//todo: make these not hardcoded
+			pushConstantData.nearPlane = 0.01f;
+			pushConstantData.farPlane = 100.0f;
+			pushConstantData.focalDistance = 10.0f;
+			pushConstantData.focalDepth = 8.0f;
+			pushConstantData.maxBlurRadius = 4.0f;
+			pushConstantData.dofDebugMode = false;
+			pushConstantData.acesExposure = 0.6f;
 
 			//Screen Quad
 			std::size_t screenQuadVertexBufferStride{ sizeof(ScreenQuadVertex) };
@@ -1301,6 +1236,21 @@ namespace NK
 			_cmdBuf->BindVertexBuffers(0, 1, m_screenQuadVertBuffer.get(), &screenQuadVertexBufferStride);
 			_cmdBuf->BindIndexBuffer(m_screenQuadIndexBuffer.get(), DATA_FORMAT::R32_UINT);
 			_cmdBuf->DrawIndexed(6, 1, 0, 0);
+
+			#ifdef NEKI_VULKAN_SUPPORTED
+			if (m_desc.backend == GRAPHICS_BACKEND::VULKAN)
+			{
+				VkCommandBuffer vkCmdBuf{ dynamic_cast<VulkanCommandBuffer*>(_cmdBuf)->GetBuffer() };
+				ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vkCmdBuf);
+			}
+			#endif
+			#ifdef NEKI_D3D12_SUPPORTED
+			if (m_desc.backend == GRAPHICS_BACKEND::D3D12)
+			{
+				ID3D12GraphicsCommandList* d3dCmdBuf{ dynamic_cast<D3D12CommandBuffer*>(_cmdBuf)->GetCommandList() };
+				ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), d3dCmdBuf);
+			}
+			#endif
 
 			_cmdBuf->EndRendering(1, nullptr, _texs.Get("BACKBUFFER"));
 		});
@@ -1317,13 +1267,6 @@ namespace NK
 
 	void RenderLayer::InitScreenResources()
 	{
-		//--------SHADOW MAPS--------//
-		
-
-		
-		//--------END OF SHADOW MAPS--------//
-		
-		
 		//--------SCENE COLOUR--------//
 		
 		//Scene Colour
@@ -1421,6 +1364,35 @@ namespace NK
 		if (m_desc.enableSSAA) { m_sceneDepthSSAASRV = m_device->CreateShaderResourceTextureView(m_sceneDepthSSAA.get(), sceneDepthViewDesc); }
 		
 		//--------END OF SCENE DEPTH--------//
+
+
+		//--------SUMMED AREA TABLE--------//
+
+		TextureDesc satDesc{};
+		satDesc.dimension = TEXTURE_DIMENSION::DIM_2;
+		satDesc.format = DATA_FORMAT::R32G32B32A32_SFLOAT;
+		glm::ivec2 winDimensions{ m_desc.window->GetSize().x, m_desc.window->GetSize().y };
+		satDesc.size = glm::ivec3(winDimensions.y, winDimensions.x, 1);
+		satDesc.usage = TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::READ_WRITE | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
+		satDesc.arrayTexture = false;
+		satDesc.sampleCount = SAMPLE_COUNT::BIT_1;
+		m_satIntermediate = m_device->CreateTexture(satDesc);
+		satDesc.size = glm::ivec3(winDimensions.x, winDimensions.y, 1);
+		m_satFinal = m_device->CreateTexture(satDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_satIntermediate.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::UNORDERED_ACCESS);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_satFinal.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::UNORDERED_ACCESS);
+
+		TextureViewDesc satViewDesc{};
+		satViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
+		satViewDesc.format = DATA_FORMAT::R32G32B32A32_SFLOAT;
+		satViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_WRITE;
+		m_satIntermediateUAV = m_device->CreateShaderResourceTextureView(m_satIntermediate.get(), satViewDesc);
+		m_satFinalUAV = m_device->CreateShaderResourceTextureView(m_satFinal.get(), satViewDesc);
+		satViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+		m_satIntermediateSRV = m_device->CreateShaderResourceTextureView(m_satIntermediate.get(), satViewDesc);
+		m_satFinalSRV = m_device->CreateShaderResourceTextureView(m_satFinal.get(), satViewDesc);
+		
+		//--------END OF SUMMED AREA TABLE--------//
 	}
 
 
@@ -1446,7 +1418,7 @@ namespace NK
 		//Shadow Map
 		TextureDesc shadowMapDesc{};
 		shadowMapDesc.dimension = TEXTURE_DIMENSION::DIM_2;
-		shadowMapDesc.format = (m_desc.backend == GRAPHICS_BACKEND::D3D12 ? DATA_FORMAT::R32_TYPELESS : DATA_FORMAT::D32_SFLOAT);
+		shadowMapDesc.format = (m_desc.backend == GRAPHICS_BACKEND::D3D12 ? DATA_FORMAT::R16_TYPELESS : DATA_FORMAT::D16_UNORM);
 		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		shadowMapDesc.sampleCount = SAMPLE_COUNT::BIT_1;
 		if (_light.lightType == LIGHT_TYPE::POINT)
@@ -1467,7 +1439,7 @@ namespace NK
 		
 		//DSV(s) and SRV
 		TextureViewDesc shadowMapViewDesc{};
-		shadowMapViewDesc.format = DATA_FORMAT::D32_SFLOAT;
+		shadowMapViewDesc.format = DATA_FORMAT::D16_UNORM;
 		shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
 		if (_light.lightType == LIGHT_TYPE::POINT)
 		{
@@ -1486,7 +1458,7 @@ namespace NK
 			//SRV
 			shadowMapViewDesc.baseArrayLayer = 0;
 			shadowMapViewDesc.arrayLayerCount = 6;
-			if (m_desc.backend == GRAPHICS_BACKEND::D3D12) { shadowMapViewDesc.format = DATA_FORMAT::R32_SFLOAT; }
+			if (m_desc.backend == GRAPHICS_BACKEND::D3D12) { shadowMapViewDesc.format = DATA_FORMAT::R16_UNORM; }
 			shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 			shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_CUBE;
 			m_shadowMapCubeSRVs.push_back(m_device->CreateShaderResourceTextureView(m_shadowMapsCube[m_shadowMapsCube.size() - 1].get(), shadowMapViewDesc));
@@ -1498,6 +1470,248 @@ namespace NK
 			shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 			m_shadowMap2DSRVs.push_back(m_device->CreateShaderResourceTextureView(m_shadowMaps2D[m_shadowMaps2D.size() - 1].get(), shadowMapViewDesc));
 		}
+	}
+
+
+
+	void RenderLayer::PreAppUpdate()
+	{
+		#ifdef NEKI_VULKAN_SUPPORTED
+			if (m_desc.backend == GRAPHICS_BACKEND::VULKAN) ImGui_ImplVulkan_NewFrame();
+		#endif
+		#ifdef NEKI_D3D12_SUPPORTED
+			if (m_desc.backend == GRAPHICS_BACKEND::D3D12) ImGui_ImplDX12_NewFrame();
+		#endif
+
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+	}
+
+
+
+	void RenderLayer::PostAppUpdate()
+	{
+				//Begin rendering
+		m_inFlightFences[m_currentFrame]->Wait();
+		m_inFlightFences[m_currentFrame]->Reset();
+		m_graphicsCommandBuffers[m_currentFrame]->Begin();
+		
+		
+		//Update skybox
+		bool found{ false };
+		for (auto&& [skybox] : m_reg.get().View<CSkybox>())
+		{
+			if (found)
+			{
+				//Multiple skyboxes, notify the user only the first one is being considered for rendering
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CSkybox`s found in registry. Note that only one skybox is supported - only the first skybox will be used.\n");
+				break;
+			}
+			found = true;
+			UpdateSkybox(skybox);
+		}
+		if (!found)
+		{
+//			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CSkybox`s found in registry.\n");
+		}
+
+
+		//Update camera
+		found = false;
+		for (auto&& [camera] : m_reg.get().View<CCamera>())
+		{
+			if (found)
+			{
+				//Multiple cameras, notify the user only the first one is being considered for rendering - todo: change this (probably let the user specify on CModelRenderer which camera they want to use)
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
+				break;
+			}
+			found = true;
+			UpdateCameraBuffer(camera);
+		}
+		if (!found)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
+		}
+
+
+		UpdateLightDataBuffer();
+
+
+		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
+		while (!m_modelUnloadQueues[m_currentFrame].empty())
+		{
+			if (m_gpuModelReferenceCounter[m_modelUnloadQueues[m_currentFrame].back()] == 0)
+			{
+				ModelLoader::UnloadModel(m_modelUnloadQueues[m_currentFrame].back());
+				m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
+			}
+			m_modelUnloadQueues[m_currentFrame].pop_back();
+		}
+
+		const std::size_t prevFrameIndex{ (m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight };
+		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[prevFrameIndex]) };
+		
+		//Model Loading Phase
+		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[prevFrameIndex].size(); ++i)
+		{
+			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[prevFrameIndex][i]) };
+//			modelRenderer.visible = visibilityMap[i] == 1;
+			modelRenderer.visible = true;
+
+			if (modelRenderer.visible && !modelRenderer.model)
+			{
+				//If model is only queued for unload (and so hasn't yet been unloaded), we can just remove it from the unload queue
+				bool modelInUnloadQueue{ false };
+				for (std::vector<std::string>& q : m_modelUnloadQueues)
+				{
+					std::vector<std::string>::iterator it{ std::ranges::find(q, modelRenderer.modelPath) };
+					if (it != q.end())
+					{
+						modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
+						modelInUnloadQueue = true;
+						q.erase(it);
+					}
+				}
+				if (modelInUnloadQueue)
+				{
+					++m_gpuModelReferenceCounter[modelRenderer.modelPath];
+					continue;
+				}
+
+				//Model is visible but isn't assigned, assign it
+				if (!m_gpuModelCache.contains(modelRenderer.modelPath))
+				{
+					//Model isn't loaded, load it
+					const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
+					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
+					m_newGPUUploaderUpload = true;
+					m_gpuModelReferenceCounter[modelRenderer.modelPath] = 0;
+				}
+				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
+				++m_gpuModelReferenceCounter[modelRenderer.modelPath];
+			}
+			
+			else if (!modelRenderer.visible && modelRenderer.model)
+			{
+				//Model isn't visible but is loaded, decrement reference counter and unassign
+				--m_gpuModelReferenceCounter[modelRenderer.modelPath];
+				std::cout << m_gpuModelReferenceCounter[modelRenderer.modelPath] << '\n';
+				modelRenderer.model = nullptr;
+
+				if (m_gpuModelReferenceCounter[modelRenderer.modelPath] == 0)
+				{
+					//No CModelRenderers are currently visible that use this model, add it to the unload queue
+					m_modelUnloadQueues[prevFrameIndex].push_back(modelRenderer.modelPath);
+				}
+			}
+		}
+		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the fence to wait on before drawing
+		if (m_newGPUUploaderUpload)
+		{
+			m_gpuUploader->Flush(false, m_gpuUploaderFlushFence.get(), nullptr);
+		}
+
+		//Clear the visibility buffer
+		std::memset(visibilityMap, 0, m_desc.maxModels * sizeof(std::uint32_t));
+
+		UpdateModelMatricesBuffer();
+		
+
+		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
+
+		
+		RenderGraphExecutionDesc execDesc{};
+		execDesc.commandBuffers["MODEL_VISIBILITY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["MODEL_VISIBILITY_BUFFER_COPY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["SHADOW_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["DEPTH_BARRIER"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		if (m_desc.enableMSAA) { execDesc.commandBuffers["MSAA_RESOLVE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
+		if (m_desc.enableSSAA) { execDesc.commandBuffers["SSAA_DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
+		execDesc.commandBuffers["SUMMED_AREA_TABLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["POSTPROCESS_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+
+		execDesc.buffers.Set("CAMERA_BUFFER", m_camDataBuffers[m_currentFrame].get());
+		execDesc.buffers.Set("CAMERA_BUFFER_PREVIOUS_FRAME", m_camDataBuffersPreviousFrame[m_currentFrame].get());
+		execDesc.buffers.Set("LIGHT_DATA_BUFFER", m_lightDataBuffer.get());
+		execDesc.buffers.Set("MODEL_MATRICES_BUFFER", m_modelMatricesBuffers[m_currentFrame].get());
+		execDesc.buffers.Set("MODEL_VISIBILITY_DEVICE_BUFFER", m_modelVisibilityDeviceBuffers[m_currentFrame].get());
+		execDesc.buffers.Set("MODEL_VISIBILITY_READBACK_BUFFER", m_modelVisibilityReadbackBuffers[m_currentFrame].get());
+
+		execDesc.textures.Set("SCENE_COLOUR", m_sceneColour.get());
+		execDesc.textures.Set("SCENE_COLOUR_MSAA", m_sceneColourMSAA.get());
+		execDesc.textures.Set("SCENE_COLOUR_SSAA", m_sceneColourSSAA.get());
+
+		execDesc.textures.Set("SCENE_DEPTH", m_sceneDepth.get());
+		execDesc.textures.Set("SCENE_DEPTH_MSAA", m_sceneDepthMSAA.get());
+		execDesc.textures.Set("SCENE_DEPTH_SSAA", m_sceneDepthSSAA.get());
+
+		execDesc.textures.Set("SAT_INTERMEDIATE", m_satIntermediate.get());
+		execDesc.textures.Set("SAT_FINAL", m_satFinal.get());
+		
+		execDesc.textures.Set("BACKBUFFER", m_swapchain->GetImage(imageIndex));
+		execDesc.textures.Set("SKYBOX", m_skyboxTexture.get());
+		execDesc.textures.Set("IRRADIANCE_MAP", m_irradianceMap.get());
+		execDesc.textures.Set("PREFILTER_MAP", m_prefilterMap.get());
+		execDesc.textures.Set("BRDF_LUT", m_brdfLUT.get());
+
+		execDesc.bufferViews.Set("LIGHT_DATA_BUFFER_VIEW", m_lightDataBufferView.get());
+		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferViews[m_currentFrame].get());
+		execDesc.bufferViews.Set("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW", m_camDataBufferPreviousFrameViews[m_currentFrame].get());
+		execDesc.bufferViews.Set("MODEL_MATRICES_BUFFER_VIEW", m_modelMatricesBufferViews[m_currentFrame].get());
+		execDesc.bufferViews.Set("MODEL_VISIBILITY_DEVICE_BUFFER_VIEW", m_modelVisibilityDeviceBufferViews[m_currentFrame].get());
+
+		execDesc.textureViews.Set("SCENE_COLOUR_RTV", m_sceneColourRTV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_SRV", m_sceneColourSRV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_MSAA_RTV", m_sceneColourMSAARTV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_MSAA_SRV", m_sceneColourMSAASRV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_SSAA_RTV", m_sceneColourSSAARTV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_SSAA_SRV", m_sceneColourSSAASRV.get());
+
+		execDesc.textureViews.Set("SCENE_DEPTH_DSV", m_sceneDepthDSV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_SRV", m_sceneDepthSRV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_MSAA_DSV", m_sceneDepthMSAADSV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_MSAA_SRV", m_sceneDepthMSAASRV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_SSAA_DSV", m_sceneDepthSSAADSV.get());
+		execDesc.textureViews.Set("SCENE_DEPTH_SSAA_SRV", m_sceneDepthSSAASRV.get());
+
+		execDesc.textureViews.Set("SAT_INTERMEDIATE_UAV", m_satIntermediateUAV.get());
+		execDesc.textureViews.Set("SAT_FINAL_UAV", m_satFinalUAV.get());
+		execDesc.textureViews.Set("SAT_INTERMEDIATE_SRV", m_satIntermediateSRV.get());
+		execDesc.textureViews.Set("SAT_FINAL_SRV", m_satFinalSRV.get());
+		
+		execDesc.textureViews.Set("BACKBUFFER_RTV", m_swapchain->GetImageView(imageIndex));
+		execDesc.textureViews.Set("SKYBOX_VIEW", m_skyboxTextureView.get());
+		execDesc.textureViews.Set("IRRADIANCE_MAP_VIEW", m_skyboxTextureView.get());
+		execDesc.textureViews.Set("PREFILTER_MAP_VIEW", m_skyboxTextureView.get());
+		execDesc.textureViews.Set("BRDF_LUT_VIEW", m_skyboxTextureView.get());
+
+		execDesc.samplers.Set("SAMPLER", m_linearSampler.get());
+		execDesc.samplers.Set("BRDF_LUT_SAMPLER", m_linearSampler.get());
+
+		ImGui::Render();
+		
+		m_meshRenderGraph->Execute(execDesc);
+
+		
+		m_graphicsCommandBuffers[m_currentFrame]->End();
+
+		if (m_newGPUUploaderUpload)
+		{
+			m_gpuUploaderFlushFence->Wait();
+			m_gpuUploaderFlushFence->Reset();
+			m_gpuUploader->Reset();
+		}
+
+		//Submit
+		m_graphicsQueue->Submit(m_graphicsCommandBuffers[m_currentFrame].get(), m_imageAvailableSemaphores[m_currentFrame].get(), m_renderFinishedSemaphores[imageIndex].get(), m_inFlightFences[m_currentFrame].get());
+		m_swapchain->Present(m_renderFinishedSemaphores[imageIndex].get(), imageIndex);
+
+		m_currentFrame = (m_currentFrame + 1) % m_desc.framesInFlight;
+
+		m_firstFrame = false;
 	}
 
 
