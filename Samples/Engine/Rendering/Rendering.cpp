@@ -25,41 +25,47 @@
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(7), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
+	explicit GameScene() : Scene(8), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
 	{
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
-		skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/Shanghai Bund/skybox.ktx");
-		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/Shanghai Bund/irradiance.ktx");
-		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/Shanghai Bund/prefilter.ktx");
+		skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
+		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
+		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
 
 		
-		m_redLightEntity = m_reg.Create();
-		NK::CLight& redLight{ m_reg.AddComponent<NK::CLight>(m_redLightEntity) };
-		redLight.lightType = NK::LIGHT_TYPE::POINT;
-		redLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
+		m_lightEntity1 = m_reg.Create();
+		m_reg.AddComponent<NK::CTransform>(m_lightEntity1);
+		NK::CLight& redLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
+		redLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
+		redLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
 		redLight.light->SetColour({ 1,0,0 });
 		redLight.light->SetIntensity(0.75f);
-		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetConstantAttenuation(1.0f);
-		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetLinearAttenuation(0.1f);
-		dynamic_cast<NK::PointLight*>(redLight.light.get())->SetQuadraticAttenuation(0.01f);
-
-		NK::CTransform& redLightTransform{ m_reg.AddComponent<NK::CTransform>(m_redLightEntity) };
-		redLightTransform.SetPosition({ 0, 3, -3 });
 
 		
-		m_greenLightEntity = m_reg.Create();
-		NK::CLight& greenLight{ m_reg.AddComponent<NK::CLight>(m_greenLightEntity) };
-		greenLight.lightType = NK::LIGHT_TYPE::POINT;
-		greenLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
-		greenLight.light->SetColour({ 0,1,0 });
-		greenLight.light->SetIntensity(1.0f);
-		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetConstantAttenuation(1.0f);
-		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetLinearAttenuation(0.1f);
-		dynamic_cast<NK::PointLight*>(greenLight.light.get())->SetQuadraticAttenuation(0.01f);
+		m_lightEntity2 = m_reg.Create();
+		m_reg.AddComponent<NK::CTransform>(m_lightEntity2);
+		NK::CLight& spotLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity2) };
+		spotLight.lightType = NK::LIGHT_TYPE::SPOT;
+		spotLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::SpotLight));
+		spotLight.light->SetColour({ 0,1,0 });
+		spotLight.light->SetIntensity(1.0f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetConstantAttenuation(1.0f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetLinearAttenuation(0.1f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetQuadraticAttenuation(0.01f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetInnerAngle(glm::radians(30.0f));
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetOuterAngle(glm::radians(60.0f));
 		
-		NK::CTransform& greenLightTransform{ m_reg.AddComponent<NK::CTransform>(m_greenLightEntity) };
-		greenLightTransform.SetPosition({ 0, 0, -3 });
+		m_lightEntity3 = m_reg.Create();
+		m_reg.AddComponent<NK::CTransform>(m_lightEntity3);
+		NK::CLight& pointLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity3) };
+		pointLight.lightType = NK::LIGHT_TYPE::POINT;
+		pointLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
+		pointLight.light->SetColour({ 0,0,1 });
+		pointLight.light->SetIntensity(1.0f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetConstantAttenuation(1.0f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetLinearAttenuation(0.1f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetQuadraticAttenuation(0.01f);
 		
 		
 		//preprocessing step - ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
@@ -140,7 +146,7 @@ public:
 		//ImGui for lights
 		if (ImGui::Begin("Light Controls"))
 		{
-			auto DrawLightNode = [&](const char* label, NK::Entity entity) 
+			auto DrawLightNode{ [&](const char* label, NK::Entity entity) 
 			{
 				if (ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen))
 				{
@@ -148,36 +154,65 @@ public:
 
 					//Position
 					NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(entity);
-					glm::vec3 pos = transform.GetPosition();
+					glm::vec3 pos{ transform.GetPosition() };
 					if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) 
 					{
 						transform.SetPosition(pos);
 					}
+					
+					//Rotation
+					glm::vec3 rot{ glm::degrees(transform.GetRotation()) };
+					if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f)) 
+					{
+						transform.SetRotation(glm::radians(rot));
+					}
 
+					
 					//Light properties
 					NK::CLight& lightComp = m_reg.GetComponent<NK::CLight>(entity);
 					if (lightComp.light)
 					{
-						// Colour
+						//Colour
 						glm::vec3 color = lightComp.light->GetColour();
 						if (ImGui::ColorEdit3("Colour", &color.x))
 						{
 							lightComp.light->SetColour(color);
 						}
 
-						// Intensity
+						//Intensity
 						float intensity = lightComp.light->GetIntensity();
 						if (ImGui::DragFloat("Intensity", &intensity, 0.1f, 0.0f, 100.0f))
 						{
 							lightComp.light->SetIntensity(intensity);
 						}
+						
+						if (NK::PointLight* pointLight{ dynamic_cast<NK::PointLight*>(lightComp.light.get()) })
+						{
+							//Attenuation
+							float constant{ pointLight->GetConstantAttenuation() };
+							if (ImGui::DragFloat("Constant", &constant, 0.01f, 0.0f, 100.0f)) { pointLight->SetConstantAttenuation(constant); }
+							float linear{ pointLight->GetLinearAttenuation() };
+							if (ImGui::DragFloat("Linear", &linear, 0.01f, 0.0f, 100.0f)) { pointLight->SetLinearAttenuation(linear); }
+							float quadratic{ pointLight->GetQuadraticAttenuation() };
+							if (ImGui::DragFloat("Quadratic", &quadratic, 0.01f, 0.0f, 100.0f)) { pointLight->SetQuadraticAttenuation(quadratic); }
+							
+							if (NK::SpotLight* spotLight{ dynamic_cast<NK::SpotLight*>(pointLight) })
+							{
+								//Angles
+								float innerAngle{ glm::degrees(spotLight->GetInnerAngle()) };
+								if (ImGui::DragFloat("Inner (deg)", &innerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetInnerAngle(glm::radians(innerAngle)); }
+								float outerAngle{ glm::degrees(spotLight->GetOuterAngle()) };
+								if (ImGui::DragFloat("Outer (deg)", &outerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetOuterAngle(glm::radians(outerAngle)); }
+							}
+						}
 					}
 					ImGui::PopID();
 				}
-			};
+			}};
 
-			DrawLightNode("Point Light 1", m_redLightEntity);
-			DrawLightNode("Point Light 2", m_greenLightEntity);
+			DrawLightNode("Directional Light", m_lightEntity1);
+			DrawLightNode("Spot Light", m_lightEntity2);
+			DrawLightNode("Point Light", m_lightEntity3);
 
 			if (ImGui::CollapsingHeader("Helmet", ImGuiTreeNodeFlags_DefaultOpen))
 			{
@@ -249,8 +284,9 @@ private:
 	NK::Entity m_sponzaEntity;
 	NK::Entity m_groundEntity;
 	NK::Entity m_wallEntity;
-	NK::Entity m_redLightEntity;
-	NK::Entity m_greenLightEntity;
+	NK::Entity m_lightEntity1;
+	NK::Entity m_lightEntity2;
+	NK::Entity m_lightEntity3;
 	NK::Entity m_cameraEntity;
 	NK::UniquePtr<NK::PlayerCamera> m_playerCamera;
 };
@@ -285,10 +321,10 @@ public:
 		NK::InputLayerDesc inputLayerDesc{ m_window.get() };
 		m_inputLayer = NK::UniquePtr<NK::InputLayer>(NK_NEW(NK::InputLayer, m_scenes[m_activeScene]->m_reg, inputLayerDesc));
 		NK::RenderLayerDesc renderLayerDesc{};
-		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::D3D12;
-		renderLayerDesc.enableMSAA = true;
+		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
+		renderLayerDesc.enableMSAA = false;
 		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
-		renderLayerDesc.enableSSAA = false;
+		renderLayerDesc.enableSSAA = true;
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.window = m_window.get();
 		renderLayerDesc.framesInFlight = 3;
