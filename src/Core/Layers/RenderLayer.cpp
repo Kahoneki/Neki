@@ -26,7 +26,9 @@
 	#include <RHI-Vulkan/VulkanUtils.h>
 #endif
 #ifdef NEKI_D3D12_SUPPORTED
+	#include <RHI-D3D12/D3D12CommandBuffer.h>
 	#include <RHI-D3D12/D3D12Device.h>
+	#include <RHI-D3D12/D3D12Queue.h>
 #endif
 
 #include <cstring>
@@ -296,8 +298,18 @@ namespace NK
 			ImGui_ImplVulkan_Init(&initInfo);
 		#endif
 		#ifdef NEKI_D3D12_SUPPORTED
+			D3D12Device* device{ dynamic_cast<D3D12Device*>(m_device.get()) };
 			ImGui_ImplGlfw_InitForOther(m_desc.window->GetGLFWWindow(), true);
-			ImGui_ImplDX12_Init(); //todo: implement
+			ImGui_ImplDX12_InitInfo initInfo{};
+			initInfo.Device = device->GetDevice();
+			initInfo.CommandQueue = dynamic_cast<D3D12Queue*>(m_graphicsQueue.get())->GetQueue();
+			initInfo.NumFramesInFlight = m_desc.framesInFlight;
+			initInfo.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+			initInfo.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+			std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> descriptor{ device->AllocateImGuiDescriptor() };
+			initInfo.LegacySingleSrvCpuDescriptor = descriptor.first;
+			initInfo.LegacySingleSrvGpuDescriptor = descriptor.second;
+			ImGui_ImplDX12_Init(&initInfo);
 		#endif
 	}
 

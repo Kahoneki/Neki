@@ -158,6 +158,8 @@ namespace NK
 		std::vector<D3D12_RENDER_PASS_RENDER_TARGET_DESC> colourAttachmentInfos(_numColourAttachments);
 		for (std::size_t i{ 0 }; i < _numColourAttachments; ++i)
 		{
+			ITextureView* activeRTV{ (_multisampleColourAttachments) ? &_multisampleColourAttachments[i] : &_outputColourAttachments[i] };
+
 			if (_multisampleColourAttachments && _multisampleColourAttachments[i].GetParentTexture()->GetState() != RESOURCE_STATE::RENDER_TARGET)
 			{
 				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _multisampleColourAttachments[" + std::to_string(i) + "]'s current state is " + std::to_string(std::to_underlying(_multisampleColourAttachments[i].GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::RENDER_TARGET\n");
@@ -172,7 +174,7 @@ namespace NK
 
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 			beg.Type = (_clearRTVs ? D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR : D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE);
-			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat((_multisampleColourAttachments ? _multisampleColourAttachments[i] : _outputColourAttachments[i]).GetFormat());
+			beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(activeRTV->GetFormat());
 			beg.Clear.ClearValue.Color[0] = 0.0f;
 			beg.Clear.ClearValue.Color[1] = 0.0f;
 			beg.Clear.ClearValue.Color[2] = 0.0f;
@@ -180,16 +182,26 @@ namespace NK
 
 			colourAttachmentInfos[i].BeginningAccess = beg;
 			colourAttachmentInfos[i].EndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
-			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(&(_multisampleColourAttachments ? _multisampleColourAttachments[i] : _outputColourAttachments[i]))->GetCPUDescriptorHandle();
+			colourAttachmentInfos[i].cpuDescriptor = dynamic_cast<D3D12TextureView*>(activeRTV)->GetCPUDescriptorHandle();
 		}
 
 		//Depth-stencil attachment
 		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC depthStencilAttachmentInfo{};
-		if (_outputDepthAttachment || _stencilAttachment)
+
+		ITextureView* activeDSV{ _multisampleDepthAttachment ? _multisampleDepthAttachment : _outputDepthAttachment };
+		if (!activeDSV && _stencilAttachment) { activeDSV = _stencilAttachment; }
+
+		if (activeDSV)
 		{
+			if (_multisampleDepthAttachment && _multisampleDepthAttachment->GetParentTexture()->GetState() != RESOURCE_STATE::DEPTH_WRITE)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _multisampleDepthAttachment's current state is " + std::to_string(std::to_underlying(_multisampleDepthAttachment->GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::DEPTH_WRITE\n");
+				throw std::runtime_error("");
+			}
+
 			if (_outputDepthAttachment && _outputDepthAttachment->GetParentTexture()->GetState() != RESOURCE_STATE::DEPTH_WRITE)
 			{
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _depthAttachment's current state is " + std::to_string(std::to_underlying(_outputDepthAttachment->GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::DEPTH_WRITE\n");
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "BeginRendering() - Provided _outputDepthAttachment's current state is " + std::to_string(std::to_underlying(_outputDepthAttachment->GetParentTexture()->GetState())) + " which doesn't match required state of RESOURCE_STATE::DEPTH_WRITE\n");
 				throw std::runtime_error("");
 			}
 
@@ -199,11 +211,11 @@ namespace NK
 				throw std::runtime_error("");
 			}
 
-			if (_outputDepthAttachment)
+			if (_outputDepthAttachment || _multisampleDepthAttachment)
 			{
 				D3D12_RENDER_PASS_BEGINNING_ACCESS beg{};
 				beg.Type = (_clearDSV ? D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR : D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE);
-				beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(_outputDepthAttachment->GetFormat());
+				beg.Clear.ClearValue.Format = D3D12Texture::GetDXGIFormat(activeDSV->GetFormat());
 				beg.Clear.ClearValue.DepthStencil.Depth = 1.0f;
 				depthStencilAttachmentInfo.DepthBeginningAccess = beg;
 			}
@@ -224,11 +236,11 @@ namespace NK
 			}
 
 			depthStencilAttachmentInfo.DepthEndingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE;
-			depthStencilAttachmentInfo.cpuDescriptor = dynamic_cast<D3D12TextureView*>(_outputDepthAttachment ? _outputDepthAttachment : _stencilAttachment)->GetCPUDescriptorHandle();
+			depthStencilAttachmentInfo.cpuDescriptor = dynamic_cast<D3D12TextureView*>(activeDSV)->GetCPUDescriptorHandle();
 		}
 
 		//todo: look into allow uav write flag?
-		m_buffer->BeginRenderPass(_numColourAttachments, colourAttachmentInfos.data(), (_outputDepthAttachment || _stencilAttachment) ? &depthStencilAttachmentInfo : nullptr, D3D12_RENDER_PASS_FLAG_NONE);
+		m_buffer->BeginRenderPass(_numColourAttachments, colourAttachmentInfos.data(), (activeDSV) ? &depthStencilAttachmentInfo : nullptr, D3D12_RENDER_PASS_FLAG_NONE);
 	}
 
 
@@ -543,7 +555,7 @@ namespace NK
 
 
 
-	void D3D12CommandBuffer::CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent)
+	void D3D12CommandBuffer::CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent, std::uint32_t _mipLevel)
 	{
 		//Input validation
 
@@ -588,39 +600,67 @@ namespace NK
 
 		D3D12Buffer* d3d12SrcBuffer{ dynamic_cast<D3D12Buffer*>(_srcBuffer) };
 		D3D12Texture* d3d12DstTexture{ dynamic_cast<D3D12Texture*>(_dstTexture) };
-		
-		//Get footprint of destination texture
 		D3D12_RESOURCE_DESC dstDesc{ d3d12DstTexture->GetResourceDesc() };
-		UINT numLayers = (dstDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) ? 1 : dstDesc.DepthOrArraySize;
-		std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> dstFootprints(numLayers);
-		dynamic_cast<D3D12Device&>(m_device).GetDevice()->GetCopyableFootprints(&dstDesc, 0, numLayers, _srcOffset, dstFootprints.data(), nullptr, nullptr, nullptr);
 
+		//Calculate Subresource Index
+		//For 1D/2D arrays and cubemaps: subresource = mip level + (array slice * total mip levels)
+		//For 3D textures: subresource = mip level
+		UINT subresourceIndex{ _mipLevel };
 
-		for (UINT i{ 0 }; i < numLayers; ++i)
+		UINT dstX{ static_cast<UINT>(_dstOffset.x) };
+		UINT dstY{ static_cast<UINT>(_dstOffset.y) };
+		UINT dstZ{ static_cast<UINT>(_dstOffset.z) };
+
+		//If not a 3D texture, the z coordinate in _dstOffset refers to the array slice index
+		//This needs to be taken into account for the subresource index, and the dst z for the copy command must be 0
+		if (dstDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D)
 		{
-			D3D12_BOX srcBox{};
-			srcBox.left = 0;
-			srcBox.top = 0;
-			srcBox.front = 0;
-			srcBox.right = _dstExtent.x;
-			srcBox.bottom = _dstExtent.y;
-			srcBox.back = _dstExtent.z;
-
-			//Describe source copy location
-			D3D12_TEXTURE_COPY_LOCATION srcLocation{};
-			srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-			srcLocation.PlacedFootprint = dstFootprints[i];
-			srcLocation.pResource = d3d12SrcBuffer->GetBuffer();
-
-			//Describe destination copy location
-			D3D12_TEXTURE_COPY_LOCATION dstLocation{};
-			dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-			dstLocation.SubresourceIndex = i;
-			dstLocation.pResource = d3d12DstTexture->GetResource();
-
-			m_buffer->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, &srcBox);
+			UINT arraySlice{ dstZ };
+			subresourceIndex = _mipLevel + (arraySlice * dstDesc.MipLevels);
+			dstZ = 0;
 		}
+
+		//Get footprint
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
+		dynamic_cast<D3D12Device&>(m_device).GetDevice()->GetCopyableFootprints(&dstDesc, subresourceIndex, 1, _srcOffset, &footprint, nullptr, nullptr, nullptr);
+
+		D3D12_BOX srcBox{};
+		srcBox.left = 0;
+		srcBox.top = 0;
+		srcBox.front = 0;
+		srcBox.right = footprint.Footprint.Width;
+		srcBox.bottom = footprint.Footprint.Height;
+		srcBox.back = footprint.Footprint.Depth;
+
+		//Source copy location
+		D3D12_TEXTURE_COPY_LOCATION srcLocation{};
+		srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+		srcLocation.PlacedFootprint = footprint;
+		srcLocation.pResource = d3d12SrcBuffer->GetBuffer();
+
+		//Destination copy location
+		D3D12_TEXTURE_COPY_LOCATION dstLocation{};
+		dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+		dstLocation.SubresourceIndex = subresourceIndex;
+		dstLocation.pResource = d3d12DstTexture->GetResource();
+
+		m_buffer->CopyTextureRegion(&dstLocation, dstX, dstY, dstZ, &srcLocation, &srcBox);
 	}
+
+
+
+	void D3D12CommandBuffer::ClearTexture(ITexture* _texture, float* _clearColour)
+	{
+		//todo: implement
+	}
+
+
+
+	void D3D12CommandBuffer::Dispatch(std::uint32_t _dimX, std::uint32_t _dimY, std::uint32_t _dimZ)
+	{
+		m_buffer->Dispatch(_dimX, _dimY, _dimZ);
+	}
+
 
 
 

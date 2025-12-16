@@ -65,6 +65,7 @@ namespace NK
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetSamplerDescriptorHeap() const { return m_samplerDescriptorHeap.Get(); }
 		[[nodiscard]] inline UINT GetResourceDescriptorSize() const { return m_resourceDescriptorSize; }
 		[[nodiscard]] inline UINT GetSamplerDescriptorSize() const { return m_samplerDescriptorSize; }
+		[[nodiscard]] std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> AllocateImGuiDescriptor();
 
 
 	private:

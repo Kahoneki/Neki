@@ -39,7 +39,7 @@ namespace NK
 			}
 			case TEXTURE_VIEW_DIMENSION::DIM_2:
 			{
-				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				desc.ViewDimension = (m_parentTexture->GetSampleCount() == SAMPLE_COUNT::BIT_1 ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE2DMS);
 				desc.Texture2D.MipLevels = _texture->GetMipLevels();
 				break;
 			}
@@ -63,7 +63,7 @@ namespace NK
 			}
 			case TEXTURE_VIEW_DIMENSION::DIM_2D_ARRAY:
 			{
-				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+				desc.ViewDimension = (m_parentTexture->GetSampleCount() == SAMPLE_COUNT::BIT_1 ? D3D12_SRV_DIMENSION_TEXTURE2DARRAY : D3D12_SRV_DIMENSION_TEXTURE2DMSARRAY);
 				desc.Texture2DArray.MipLevels = _texture->GetMipLevels();
 				break;
 			}

@@ -73,14 +73,36 @@ namespace NK
 
 		if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT))
 		{
-			clearValue.Format = (m_resourceDesc.Format == DXGI_FORMAT_R32_TYPELESS ? DXGI_FORMAT_D32_FLOAT : m_resourceDesc.Format);
+			if (m_resourceDesc.Format == DXGI_FORMAT_R32_TYPELESS)
+			{
+				clearValue.Format = DXGI_FORMAT_D32_FLOAT;
+			}
+			else if (m_resourceDesc.Format == DXGI_FORMAT_R16_TYPELESS)
+			{
+				clearValue.Format = DXGI_FORMAT_D16_UNORM;
+			}
+			else
+			{
+				clearValue.Format = m_resourceDesc.Format;
+			}
 			clearValue.DepthStencil.Depth = 1.0f;
 			clearValue.DepthStencil.Stencil = 0;
 			pClearValue = &clearValue;
 		}
 		else if (EnumUtils::Contains(m_usage, TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT))
 		{
-			clearValue.Format = (m_resourceDesc.Format == DXGI_FORMAT_R32_TYPELESS ? DXGI_FORMAT_R32_FLOAT : m_resourceDesc.Format);
+			if (m_resourceDesc.Format == DXGI_FORMAT_R32_TYPELESS)
+			{
+				clearValue.Format = DXGI_FORMAT_R32_FLOAT;
+			}
+			else if (m_resourceDesc.Format == DXGI_FORMAT_R16_TYPELESS)
+			{
+				clearValue.Format = DXGI_FORMAT_R16_FLOAT;
+			}
+			else
+			{
+				clearValue.Format = m_resourceDesc.Format;
+			}
 			clearValue.Color[0] = 0.0f;
 			clearValue.Color[1] = 0.0f;
 			clearValue.Color[2] = 0.0f;
@@ -194,8 +216,10 @@ namespace NK
 		switch (_format)
 		{
 		case DATA_FORMAT::UNDEFINED:				return DXGI_FORMAT_UNKNOWN;
+		case DATA_FORMAT::R16_TYPELESS:				return DXGI_FORMAT_R16_TYPELESS;
 		case DATA_FORMAT::R32_TYPELESS:				return DXGI_FORMAT_R32_TYPELESS;
 		case DATA_FORMAT::R8_UNORM:					return DXGI_FORMAT_R8_UNORM;
+		case DATA_FORMAT::R16_UNORM:				return DXGI_FORMAT_R16_UNORM;
 		case DATA_FORMAT::R8G8_UNORM:				return DXGI_FORMAT_R8G8_UNORM;
 		case DATA_FORMAT::R8G8B8A8_UNORM:			return DXGI_FORMAT_R8G8B8A8_UNORM;
 		case DATA_FORMAT::R8G8B8A8_SRGB:			return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;

@@ -1,5 +1,6 @@
 #include "D3D12Device.h"
 #include "D3D12Device.h"
+#include "D3D12Device.h"
 
 #include "D3D12Buffer.h"
 #include "D3D12BufferView.h"
@@ -194,6 +195,28 @@ namespace NK
 		memLayout.rowPitch = footprints[0].Footprint.RowPitch; //same for non-mipmapped - todo: add mipmap support
 
 		return memLayout;
+	}
+
+
+
+	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3D12Device::AllocateImGuiDescriptor()
+	{
+		const ResourceIndex index{ m_resourceIndexAllocator->Allocate() };
+		if (index == FreeListAllocator::INVALID_INDEX)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "AllocateImGuiDescriptor() - failed to allocate descriptor index for ImGui - Heap is full.\n");
+			throw std::runtime_error("");
+		}
+
+		ID3D12DescriptorHeap* heap{ m_resourceDescriptorHeap.Get() };
+		const UINT descriptorSize{ m_resourceDescriptorSize };
+
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle{ heap->GetCPUDescriptorHandleForHeapStart() };
+		cpuHandle.ptr += index * descriptorSize;
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle{ heap->GetGPUDescriptorHandleForHeapStart() };
+		gpuHandle.ptr += index * descriptorSize;
+
+		return { cpuHandle, gpuHandle };
 	}
 
 
