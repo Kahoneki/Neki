@@ -177,12 +177,16 @@ namespace NK
 		std::vector<UniquePtr<IBufferView>> m_modelVisibilityDeviceBufferViews;
 		std::vector<void*> m_modelVisibilityReadbackBufferMaps;
 		
-		UniquePtr<ITexture> m_skyboxTexture; //Not created at startup
-		UniquePtr<ITextureView> m_skyboxTextureView; //Not created at startup
-		UniquePtr<ITexture> m_irradianceMap;
-		UniquePtr<ITextureView> m_irradianceMapView;
-		UniquePtr<ITexture> m_prefilterMap;
-		UniquePtr<ITextureView> m_prefilterMapView;
+		//(one for each frame in flight)
+		std::size_t m_skyboxDirtyCounter;
+		std::size_t m_irradianceDirtyCounter;
+		std::size_t m_prefilterDirtyCounter;
+		std::vector<UniquePtr<ITexture>> m_skyboxTextures; //Not created at startup
+		std::vector<UniquePtr<ITextureView>> m_skyboxTextureViews; //Not created at startup
+		std::vector<UniquePtr<ITexture>> m_irradianceMaps;
+		std::vector<UniquePtr<ITextureView>> m_irradianceMapViews;
+		std::vector<UniquePtr<ITexture>> m_prefilterMaps;
+		std::vector<UniquePtr<ITextureView>> m_prefilterMapViews;
 		UniquePtr<ITexture> m_brdfLUT;
 		UniquePtr<ITextureView> m_brdfLUTView;
 		UniquePtr<IBuffer> m_cubeVertBuffer;
@@ -222,6 +226,8 @@ namespace NK
 		{
 			glm::mat4 viewProjMat;
 			glm::mat4 modelMat;
+			float time;
+			float waveAmplitude;
 		};
 		UniquePtr<IRootSignature> m_shadowPassRootSignature;
 		
@@ -240,6 +246,9 @@ namespace NK
 			
 			ResourceIndex materialBufferIndex;
 			SamplerIndex samplerIndex;
+			
+			float time;
+			float waveAmplitude;
 		};
 		UniquePtr<IRootSignature> m_meshPassRootSignature;
 

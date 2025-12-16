@@ -16,9 +16,24 @@ namespace NK
 		[[nodiscard]] inline std::string GetIrradianceFilepath() { return irradianceFilepath; }
 		[[nodiscard]] inline std::string GetPrefilterFilepath() { return prefilterFilepath; }
 
-		inline void SetSkyboxFilepath(const std::string& _val) { skyboxFilepath = _val; skyboxFilepathDirty = true; }
-		inline void SetIrradianceFilepath(const std::string& _val) { irradianceFilepath = _val; irradianceFilepathDirty = true; }
-		inline void SetPrefilterFilepath(const std::string& _val) { prefilterFilepath = _val; prefilterFilepathDirty = true; }
+		inline void SetSkyboxFilepath(const std::string& _val)
+		{
+			if (_val == skyboxFilepath) { return; }
+			skyboxFilepath = _val;
+			skyboxFilepathDirty = true;
+		}
+		inline void SetIrradianceFilepath(const std::string& _val)
+		{
+			if (_val == irradianceFilepath) { return; }
+			irradianceFilepath = _val;
+			irradianceFilepathDirty = true;
+		}
+		inline void SetPrefilterFilepath(const std::string& _val)
+		{
+			if (_val == prefilterFilepath) { return; }
+			prefilterFilepath = _val;
+			prefilterFilepathDirty = true;
+		}
 		
 		
 	private:

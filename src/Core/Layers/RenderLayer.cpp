@@ -84,6 +84,14 @@ namespace NK
 		m_maxBlurRadius = 4.0f;
 		m_dofDebugMode = false;
 		m_acesExposure = 0.6f;
+		
+		m_skyboxDirtyCounter = 0;
+		m_skyboxTextures.resize(m_desc.framesInFlight);
+		m_skyboxTextureViews.resize(m_desc.framesInFlight);
+		m_irradianceMaps.resize(m_desc.framesInFlight);
+		m_irradianceMapViews.resize(m_desc.framesInFlight);
+		m_prefilterMaps.resize(m_desc.framesInFlight);
+		m_prefilterMapViews.resize(m_desc.framesInFlight);
 
 		
 		m_logger.Unindent();
@@ -967,6 +975,7 @@ namespace NK
 			std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
 			
 			ShadowPassPushConstantData pushConstantData{};
+			pushConstantData.time = TimeManager::GetTotalTime();
 
 			
 			auto drawModels{ [&]()
@@ -977,6 +986,7 @@ namespace NK
 					const GPUModel* const model{ modelRenderer.model };
 					if (!model) { continue; }
 					pushConstantData.modelMat = transform.GetModelMatrix();
+					pushConstantData.waveAmplitude = modelRenderer.waveAmplitude;
 
 					for (std::size_t meshIndex{ 0 }; meshIndex < modelRenderer.model->meshes.size(); ++meshIndex)
 					{
@@ -1083,6 +1093,7 @@ namespace NK
 			pushConstantData.brdfLUTIndex = _texViews.Get("BRDF_LUT_VIEW")->GetIndex();
 			pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+			pushConstantData.time = TimeManager::GetTotalTime();
 
 			//Skybox
 			if (_texs.Get("SKYBOX"))
@@ -1103,6 +1114,7 @@ namespace NK
 				const GPUModel* const model{ modelRenderer.model };
 				if (!model) { continue; }
 				pushConstantData.modelMat = transform.GetModelMatrix();
+				pushConstantData.waveAmplitude = modelRenderer.waveAmplitude;
 
 				for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
 				{
@@ -1228,7 +1240,7 @@ namespace NK
 
 			//todo: make these not hardcoded
 			pushConstantData.nearPlane = 0.01f;
-			pushConstantData.farPlane = 100.0f;
+			pushConstantData.farPlane = 1000.0f;
 			pushConstantData.focalDistance = m_focalDistance;
 			pushConstantData.focalDepth = m_focalDepth;
 			pushConstantData.maxBlurRadius = m_maxBlurRadius;
@@ -1517,7 +1529,7 @@ namespace NK
 
 	void RenderLayer::PostAppUpdate()
 	{
-				//Begin rendering
+		//Begin rendering
 		m_inFlightFences[m_currentFrame]->Wait();
 		m_inFlightFences[m_currentFrame]->Reset();
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
@@ -1678,9 +1690,9 @@ namespace NK
 		execDesc.textures.Set("SAT_FINAL", m_satFinal.get());
 		
 		execDesc.textures.Set("BACKBUFFER", m_swapchain->GetImage(imageIndex));
-		execDesc.textures.Set("SKYBOX", m_skyboxTexture.get());
-		execDesc.textures.Set("IRRADIANCE_MAP", m_irradianceMap.get());
-		execDesc.textures.Set("PREFILTER_MAP", m_prefilterMap.get());
+		execDesc.textures.Set("SKYBOX", m_skyboxTextures[m_currentFrame].get());
+		execDesc.textures.Set("IRRADIANCE_MAP", m_irradianceMaps[m_currentFrame].get());
+		execDesc.textures.Set("PREFILTER_MAP", m_prefilterMaps[m_currentFrame].get());
 		execDesc.textures.Set("BRDF_LUT", m_brdfLUT.get());
 
 		execDesc.bufferViews.Set("LIGHT_DATA_BUFFER_VIEW", m_lightDataBufferView.get());
@@ -1709,10 +1721,10 @@ namespace NK
 		execDesc.textureViews.Set("SAT_FINAL_SRV", m_satFinalSRV.get());
 		
 		execDesc.textureViews.Set("BACKBUFFER_RTV", m_swapchain->GetImageView(imageIndex));
-		execDesc.textureViews.Set("SKYBOX_VIEW", m_skyboxTextureView.get());
-		execDesc.textureViews.Set("IRRADIANCE_MAP_VIEW", m_skyboxTextureView.get());
-		execDesc.textureViews.Set("PREFILTER_MAP_VIEW", m_skyboxTextureView.get());
-		execDesc.textureViews.Set("BRDF_LUT_VIEW", m_skyboxTextureView.get());
+		execDesc.textureViews.Set("SKYBOX_VIEW", m_skyboxTextureViews[m_currentFrame].get());
+		execDesc.textureViews.Set("IRRADIANCE_MAP_VIEW", m_skyboxTextureViews[m_currentFrame].get());
+		execDesc.textureViews.Set("PREFILTER_MAP_VIEW", m_skyboxTextureViews[m_currentFrame].get());
+		execDesc.textureViews.Set("BRDF_LUT_VIEW", m_skyboxTextureViews[m_currentFrame].get());
 
 		execDesc.samplers.Set("SAMPLER", m_linearSampler.get());
 		execDesc.samplers.Set("BRDF_LUT_SAMPLER", m_linearSampler.get());
@@ -1752,41 +1764,56 @@ namespace NK
 		textureViewDesc.arrayLayerCount = 6;
 		
 		
-		if (_skybox.skyboxFilepathDirty)
+		if (_skybox.skyboxFilepathDirty || m_skyboxDirtyCounter != 0)
 		{
 			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetSkyboxFilepath(), false, true) };
 			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
-			m_skyboxTexture = m_device->CreateTexture(data->desc);
-			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_skyboxTexture.get(), RESOURCE_STATE::UNDEFINED);
-			m_skyboxTextureView = m_device->CreateShaderResourceTextureView(m_skyboxTexture.get(), textureViewDesc);
+			m_skyboxTextures[m_currentFrame] = m_device->CreateTexture(data->desc);
+			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_skyboxTextures[m_currentFrame].get(), RESOURCE_STATE::UNDEFINED);
+			m_skyboxTextureViews[m_currentFrame] = m_device->CreateShaderResourceTextureView(m_skyboxTextures[m_currentFrame].get(), textureViewDesc);
 			m_newGPUUploaderUpload = true;
+			if (_skybox.skyboxFilepathDirty) { m_skyboxDirtyCounter = m_desc.framesInFlight; }
 			_skybox.skyboxFilepathDirty = false;
 		}
 
 		
-		if (_skybox.irradianceFilepathDirty)
+		if (_skybox.irradianceFilepathDirty || m_irradianceDirtyCounter != 0)
 		{
 			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetIrradianceFilepath(), false, true) };
 			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
-			m_irradianceMap = m_device->CreateTexture(data->desc);
-			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_irradianceMap.get(), RESOURCE_STATE::UNDEFINED);
-			m_irradianceMapView = m_device->CreateShaderResourceTextureView(m_irradianceMap.get(), textureViewDesc);
+			m_irradianceMaps[m_currentFrame] = m_device->CreateTexture(data->desc);
+			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_irradianceMaps[m_currentFrame].get(), RESOURCE_STATE::UNDEFINED);
+			m_irradianceMapViews[m_currentFrame] = m_device->CreateShaderResourceTextureView(m_irradianceMaps[m_currentFrame].get(), textureViewDesc);
 			m_newGPUUploaderUpload = true;
+			if (_skybox.irradianceFilepathDirty) { m_irradianceDirtyCounter = m_desc.framesInFlight; }
 			_skybox.irradianceFilepathDirty = false;
 		}
 
 		
-		if (_skybox.prefilterFilepathDirty)
+		if (_skybox.prefilterFilepathDirty || m_prefilterDirtyCounter != 0)
 		{
 			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetSkyboxFilepath(), false, true) };
 			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
-			m_prefilterMap = m_device->CreateTexture(data->desc);
-			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_prefilterMap.get(), RESOURCE_STATE::UNDEFINED);
-			m_prefilterMapView = m_device->CreateShaderResourceTextureView(m_prefilterMap.get(), textureViewDesc);
+			m_prefilterMaps[m_currentFrame] = m_device->CreateTexture(data->desc);
+			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_prefilterMaps[m_currentFrame].get(), RESOURCE_STATE::UNDEFINED);
+			m_prefilterMapViews[m_currentFrame] = m_device->CreateShaderResourceTextureView(m_prefilterMaps[m_currentFrame].get(), textureViewDesc);
 			m_newGPUUploaderUpload = true;
+			if (_skybox.prefilterFilepathDirty) { m_prefilterDirtyCounter = m_desc.framesInFlight; }
 			_skybox.prefilterFilepathDirty = false;
 		}
 		
+		if (m_skyboxDirtyCounter != 0)
+		{
+			--m_skyboxDirtyCounter;
+		}
+		if (m_irradianceDirtyCounter != 0)
+		{
+			--m_irradianceDirtyCounter;
+		}
+		if (m_prefilterDirtyCounter != 0)
+		{
+			--m_prefilterDirtyCounter;
+		}
 	}
 
 

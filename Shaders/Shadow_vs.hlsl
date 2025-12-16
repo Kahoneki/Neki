@@ -18,12 +18,16 @@ struct VertexOutput
 PUSH_CONSTANTS_BLOCK(
 	float4x4 viewProjMat;
 	float4x4 modelMat;
+	float time;
+	float waveAmplitude;
 );
 
 
 VertexOutput VSMain(VertexInput input)
 {
     VertexOutput output;
-    output.pos = mul(PC(viewProjMat), mul(PC(modelMat), float4(input.pos, 1.0)));
+	float offset = sin(PC(time) * 2.0f + input.pos.y * 5.0f) * PC(waveAmplitude);
+	float3 manipulatedPos = input.pos + (input.normal * offset);
+    output.pos = mul(PC(viewProjMat), mul(PC(modelMat), float4(manipulatedPos, 1.0)));
     return output;
 }

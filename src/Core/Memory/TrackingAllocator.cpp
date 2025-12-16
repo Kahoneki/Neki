@@ -240,6 +240,16 @@ namespace NK
 
 		void VKAPI_CALL TrackingAllocator::Free(void* _pUserData, void* _pMemory)
 		{
+			if (_pUserData == nullptr)
+			{
+	        #if defined(_WIN32)
+				_aligned_free(_pMemory);
+	        #else
+				free(_pMemory);
+	        #endif
+				return;
+			}
+		
 			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pUserData) };
 			if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Free --- Freeing " + FormatUtils::GetSizeString(allocator->m_hostAllocationMap[_pMemory].size) + "\n"); }
 			allocator->FreeAligned(_pMemory);

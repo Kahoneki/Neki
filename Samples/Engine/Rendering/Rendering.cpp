@@ -25,7 +25,7 @@
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(7), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 100.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
+	explicit GameScene() : Scene(7), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
 	{
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
@@ -73,8 +73,10 @@ public:
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
 		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
+		helmetModelRenderer.waveAmplitude = 0.2f;
 		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
 		helmetTransform.SetPosition(glm::vec3(0, 0, -5));
+		helmetTransform.SetScale({ 5.0f, 5.0f, 5.0f });
 		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 
 //		m_groundEntity = m_reg.Create();
@@ -98,8 +100,9 @@ public:
 		m_sponzaEntity = m_reg.Create();
 		NK::CModelRenderer& sponzaModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_sponzaEntity) };
 		sponzaModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel";
+		sponzaModelRenderer.waveAmplitude = 0.0f;
 		NK::CTransform& sponzaTransform{ m_reg.AddComponent<NK::CTransform>(m_sponzaEntity) };
-		sponzaTransform.SetScale({ 0.01f, 0.01f, 0.01f });
+		sponzaTransform.SetScale({ 0.1f, 0.1f, 0.1f });
 		sponzaTransform.SetPosition(glm::vec3(0, -3, -3));
 		
 
@@ -179,12 +182,14 @@ public:
 			if (ImGui::CollapsingHeader("Helmet", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				ImGui::PushID(static_cast<int>(m_helmetEntity));
-				NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(m_helmetEntity);
-				glm::vec3 pos = transform.GetPosition();
+				NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+				glm::vec3 pos{ transform.GetPosition() };
 				if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) 
 				{
 					transform.SetPosition(pos);
 				}
+				NK::CModelRenderer& modelRenderer{ m_reg.GetComponent<NK::CModelRenderer>(m_helmetEntity) };
+				ImGui::DragFloat("Wave Amplitude", &modelRenderer.waveAmplitude, 0.001f);
 				ImGui::PopID();
 			}
 
@@ -200,12 +205,21 @@ public:
 				ImGui::PopID();
 			}
 			
-			if (ImGui::Button("change"))
+			if (ImGui::Button("Swap Skybox"))
 			{
 				NK::CSkybox& skybox{ m_reg.GetComponent<NK::CSkybox>(m_skyboxEntity) };
-				skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
-				skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
-				skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
+				if (skybox.GetSkyboxFilepath() == "Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx")
+				{
+					skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/Shanghai Bund/skybox.ktx");
+					skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/Shanghai Bund/irradiance.ktx");
+					skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/Shanghai Bund/prefilter.ktx");
+				}
+				else
+				{
+					skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
+					skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
+					skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
+				}
 			}
 		}
 		ImGui::End();
