@@ -78,7 +78,7 @@ bool PointInPointLightShadow(float3 _fragPos, float3 _lightPos, uint _shadowInde
 
 	float closestDepth = g_cubemaps[NonUniformResourceIndex(_shadowIndex)].Sample(_samplerState, lightToFrag).r;
 
-	float bias = 0.0005f;
+	float bias = 0.00002f;
 	return (normDepth - bias) > closestDepth;
 }
 

@@ -81,11 +81,11 @@ namespace NK
 
 		m_pointLightProjMatrix = glm::perspectiveLH(glm::radians(90.0f), 1.0f, 0.01f, 1000.0f);
 
-		m_focalDistance = 10.0f;
-		m_focalDepth = 8.0f;
+		m_focalDistance = 17.0f;
+		m_focalDepth = 12.0f;
 		m_maxBlurRadius = 4.0f;
 		m_dofDebugMode = false;
-		m_acesExposure = 0.6f;
+		m_acesExposure = 1.0f;
 		
 		m_skyboxDirtyCounter = 0;
 		m_skyboxTextures.resize(m_desc.framesInFlight);
@@ -1937,7 +1937,7 @@ namespace NK
 			{
 				const SpotLight* spotLight{ dynamic_cast<SpotLight*>(light.light.get()) };
 
-				const glm::mat4 projMat{ glm::perspectiveLH(glm::radians(spotLight->GetOuterAngle()), 1.0f, 0.01f, 100.0f) }; //todo: add range parameters for spot light shadow mapping
+				const glm::mat4 projMat{ glm::perspectiveLH(spotLight->GetOuterAngle() * 2.0f, 1.0f, 0.01f, 1000.0f) }; //todo: add range parameters for spot light shadow mapping
 				shaderData.viewProjMat = projMat * viewMat;
 				
 				shaderData.constantAttenuation = spotLight->GetConstantAttenuation();

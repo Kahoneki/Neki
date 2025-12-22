@@ -25,84 +25,68 @@
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(8), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0, 0, 3), -90.0f, 0, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
+	explicit GameScene() : Scene(8), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(-20.0f, -52.0f, -5.0f), 0.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
 	{
+		//preprocessing step - ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
+		//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
+		//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath.string(), true, true);
+		//		serialisedModelOutputPath = std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel");
+		//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Cube.gltf", serialisedModelOutputPath.string(), true, true);
+		//		serialisedModelOutputPath = std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel");
+		//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath, true, true);
+		
+		
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
 		skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
 		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
 		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
-
 		
 		m_lightEntity1 = m_reg.Create();
-		m_reg.AddComponent<NK::CTransform>(m_lightEntity1);
-		NK::CLight& redLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
-		redLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
-		redLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
-		redLight.light->SetColour({ 1,0,0 });
-		redLight.light->SetIntensity(0.75f);
-
+		NK::CTransform& directionalLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity1) };
+		directionalLightTransform.SetRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
+		directionalLightTransform.SetPosition({ 0.0f, 50.0f, -5.0f });
+		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
+		directionalLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
+		directionalLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
+		directionalLight.light->SetColour({ 1,0,0 });
+		directionalLight.light->SetIntensity(10.0f);
+		dynamic_cast<NK::DirectionalLight*>(directionalLight.light.get())->SetDimensions({ 500, 500, 500 });
 		
 		m_lightEntity2 = m_reg.Create();
-		m_reg.AddComponent<NK::CTransform>(m_lightEntity2);
+		NK::CTransform& spotLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity2) };
+		spotLightTransform.SetPosition({ -4.2f, -49.95f, -10.65f });
+		spotLightTransform.SetRotation({ glm::radians(75.4f), 0.0f, glm::radians(10.5f) });
 		NK::CLight& spotLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity2) };
 		spotLight.lightType = NK::LIGHT_TYPE::SPOT;
 		spotLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::SpotLight));
 		spotLight.light->SetColour({ 0,1,0 });
-		spotLight.light->SetIntensity(1.0f);
-		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetConstantAttenuation(1.0f);
-		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetLinearAttenuation(0.1f);
-		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetQuadraticAttenuation(0.01f);
+		spotLight.light->SetIntensity(10.0f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetConstantAttenuation(0.65f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetLinearAttenuation(0.0f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetQuadraticAttenuation(0.0f);
 		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetInnerAngle(glm::radians(30.0f));
 		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetOuterAngle(glm::radians(60.0f));
 		
 		m_lightEntity3 = m_reg.Create();
-		m_reg.AddComponent<NK::CTransform>(m_lightEntity3);
+		NK::CTransform& pointLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity3) };
+		pointLightTransform.SetPosition({ -4.3f, -47.7f, -4.85f });
 		NK::CLight& pointLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity3) };
 		pointLight.lightType = NK::LIGHT_TYPE::POINT;
 		pointLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
 		pointLight.light->SetColour({ 0,0,1 });
-		pointLight.light->SetIntensity(1.0f);
-		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetConstantAttenuation(1.0f);
-		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetLinearAttenuation(0.1f);
-		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetQuadraticAttenuation(0.01f);
-		
-		
-		//preprocessing step - ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
-//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
-//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath.string(), true, true);
-//		serialisedModelOutputPath = std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel");
-//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Cube.gltf", serialisedModelOutputPath.string(), true, true);
-//		serialisedModelOutputPath = std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel");
-//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath, true, true);
+		pointLight.light->SetIntensity(10.0f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetConstantAttenuation(0.65f);
 		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
 		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
-		helmetModelRenderer.waveAmplitude = 0.2f;
+		helmetModelRenderer.waveAmplitude = 0.0f;
 		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
-		helmetTransform.SetPosition(glm::vec3(0, 0, -5));
+		helmetTransform.SetPosition({ 0, -58.0f, -5.0f });
 		helmetTransform.SetScale({ 5.0f, 5.0f, 5.0f });
 		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
-
-//		m_groundEntity = m_reg.Create();
-//		NK::CModelRenderer& groundModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_groundEntity) };
-//		groundModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
-//		NK::CTransform& groundTransform{ m_reg.AddComponent<NK::CTransform>(m_groundEntity) };
-////		groundTransform.SetScale({ 0.01f, 0.01f, 0.01f });
-//		groundTransform.SetPosition(glm::vec3(0, -3, -3));
-//		groundTransform.SetScale({ 5.0f, 0.2f, 5.0f });
-//
-//		m_wallEntity = m_reg.Create();
-//		NK::CModelRenderer& groundModelRenderer2{ m_reg.AddComponent<NK::CModelRenderer>(m_wallEntity) };
-//		groundModelRenderer2.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
-//		NK::CTransform& groundTransform2{ m_reg.AddComponent<NK::CTransform>(m_wallEntity) };
-//		//		groundTransform.SetScale({ 0.01f, 0.01f, 0.01f });
-//		groundTransform2.SetPosition(glm::vec3(0, 1.8, -8));
-//		groundTransform2.SetScale({ 5.0f, 0.2f, 5.0f });
-//		groundTransform2.SetRotation({ glm::radians(90.0f), 0.0f, 0.0f });
-
-
+		
 		m_sponzaEntity = m_reg.Create();
 		NK::CModelRenderer& sponzaModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_sponzaEntity) };
 		sponzaModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel";
@@ -111,13 +95,13 @@ public:
 		sponzaTransform.SetScale({ 0.1f, 0.1f, 0.1f });
 		sponzaTransform.SetPosition(glm::vec3(0, -3, -3));
 		
-
+		
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
 		camera.camera = m_playerCamera.get();
 
 
-//		//Inputs
+		//Inputs
 		NK::ButtonBinding aBinding{ NK::KEYBOARD::A };
 		NK::ButtonBinding dBinding{ NK::KEYBOARD::D };
 		NK::ButtonBinding sBinding{ NK::KEYBOARD::S };
@@ -134,6 +118,7 @@ public:
 		input.AddActionToMap(NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH);
 	}
 
+	
 	
 	virtual void Update() override
 	{
@@ -245,9 +230,9 @@ public:
 				NK::CSkybox& skybox{ m_reg.GetComponent<NK::CSkybox>(m_skyboxEntity) };
 				if (skybox.GetSkyboxFilepath() == "Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx")
 				{
-					skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/Shanghai Bund/skybox.ktx");
-					skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/Shanghai Bund/irradiance.ktx");
-					skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/Shanghai Bund/prefilter.ktx");
+					skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/skybox.ktx");
+					skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/irradiance.ktx");
+					skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/prefilter.ktx");
 				}
 				else
 				{

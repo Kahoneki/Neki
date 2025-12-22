@@ -300,7 +300,7 @@ namespace NK
 
 
 		//Shadow maps
-		static constexpr glm::ivec2 m_shadowMapBaseResolution{ 1024, 1024 };
+		static constexpr glm::ivec2 m_shadowMapBaseResolution{ 2048, 2048 };
 		std::vector<UniquePtr<ITexture>> m_shadowMaps2D;
 		std::vector<UniquePtr<ITextureView>> m_shadowMap2DDSVs;
 		std::vector<UniquePtr<ITextureView>> m_shadowMap2DSRVs;
