@@ -273,7 +273,8 @@ namespace NK
 		io.ConfigFlags |= ImGuiConfigFlags_IsSRGB;
 		ImGui::StyleColorsDark();
 		
-		#ifdef NEKI_VULKAN_SUPPORTED
+		if (m_desc.backend == GRAPHICS_BACKEND::VULKAN)
+		{
 			const VulkanDevice* device{ dynamic_cast<VulkanDevice*>(m_device.get()) };
 			ImGui_ImplGlfw_InitForVulkan(m_desc.window->GetGLFWWindow(), true);
 			ImGui_ImplVulkan_InitInfo initInfo{};
@@ -296,8 +297,9 @@ namespace NK
 			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 			ImGui_ImplVulkan_Init(&initInfo);
-		#endif
-		#ifdef NEKI_D3D12_SUPPORTED
+		}
+		else if (m_desc.backend == GRAPHICS_BACKEND::D3D12)
+		{
 			D3D12Device* device{ dynamic_cast<D3D12Device*>(m_device.get()) };
 			ImGui_ImplGlfw_InitForOther(m_desc.window->GetGLFWWindow(), true);
 			ImGui_ImplDX12_InitInfo initInfo{};
@@ -310,7 +312,7 @@ namespace NK
 			initInfo.LegacySingleSrvCpuDescriptor = descriptor.first;
 			initInfo.LegacySingleSrvGpuDescriptor = descriptor.second;
 			ImGui_ImplDX12_Init(&initInfo);
-		#endif
+		}
 	}
 
 

@@ -37,9 +37,9 @@ namespace NK
 		#if NEKI_VULKAN_SUPPORTED
 			//Static C-Style Vulkan Host-Callbacks
 			//todo: maybe add internal allocation notification callbacks ?
-			static void* VKAPI_CALL Allocation(void* _pUserData, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope);
-			static void* VKAPI_CALL Reallocation(void* _pUserData, void* _pOriginal, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope);
-			static void VKAPI_CALL Free(void* _pUserData, void* _pMemory);
+			static void* VKAPI_CALL AllocationVK(void* _pUserData, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope);
+			static void* VKAPI_CALL ReallocationVK(void* _pUserData, void* _pOriginal, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope);
+			static void VKAPI_CALL FreeVK(void* _pUserData, void* _pMemory);
 			static std::string VulkanAllocationScopeToString(VkSystemAllocationScope _scope);
 
 			//Static C-Style VMA Device-Callbacks
@@ -47,12 +47,11 @@ namespace NK
 			static void VKAPI_PTR VMADeviceMemoryFree(VmaAllocator VMA_NOT_NULL _allocator, std::uint32_t _memType, VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE _memory, VkDeviceSize _size, void* VMA_NULLABLE _pUserData);
 		
 			#define TRACK_DEVICE_ALLOCATIONS
-
-		#elif NEKI_D3D12_SUPPORTED
+		#endif
+		#if NEKI_D3D12_SUPPORTED
 			//Static C-Style D3D12MA Host-Callbacks
-			static void* Allocation(std::size_t _Size, std::size_t _Alignment, void* _pPrivateData);
-			static void Free(void* _pMemory, void* _pPrivateData);
-
+			static void* AllocationDX(std::size_t _Size, std::size_t _Alignment, void* _pPrivateData);
+			static void FreeDX(void* _pMemory, void* _pPrivateData);
 		#endif
 
 		//Impl

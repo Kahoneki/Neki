@@ -19,18 +19,18 @@ namespace NK
 	{
 		#if NEKI_VULKAN_SUPPORTED
 			m_vulkanCallbacks.pUserData = static_cast<void*>(this);
-			m_vulkanCallbacks.pfnAllocation = &TrackingAllocator::Allocation;
-			m_vulkanCallbacks.pfnReallocation = &TrackingAllocator::Reallocation;
-			m_vulkanCallbacks.pfnFree = &TrackingAllocator::Free;
+			m_vulkanCallbacks.pfnAllocation = &TrackingAllocator::AllocationVK;
+			m_vulkanCallbacks.pfnReallocation = &TrackingAllocator::ReallocationVK;
+			m_vulkanCallbacks.pfnFree = &TrackingAllocator::FreeVK;
 
 			m_vmaCallbacks.pfnAllocate = &TrackingAllocator::VMADeviceMemoryAllocation;
 			m_vmaCallbacks.pfnFree = &TrackingAllocator::VMADeviceMemoryFree;
 			m_vmaCallbacks.pUserData = static_cast<void*>(this);
-
-		#elif NEKI_D3D12_SUPPORTED
+		#endif
+		#if NEKI_D3D12_SUPPORTED
 			m_d3d12maCallbacks.pPrivateData = static_cast<void*>(this);
-			m_d3d12maCallbacks.pAllocate = &TrackingAllocator::Allocation;
-			m_d3d12maCallbacks.pFree = &TrackingAllocator::Free;
+			m_d3d12maCallbacks.pAllocate = &TrackingAllocator::AllocationDX;
+			m_d3d12maCallbacks.pFree = &TrackingAllocator::FreeDX;
 
 		#endif
 	}
@@ -209,7 +209,7 @@ namespace NK
 
 
 	#if NEKI_VULKAN_SUPPORTED
-		void* VKAPI_CALL TrackingAllocator::Allocation(void* _pUserData, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
+		void* VKAPI_CALL TrackingAllocator::AllocationVK(void* _pUserData, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
 		{
 			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pUserData) };
 			if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Allocation: " + VulkanAllocationScopeToString(_allocationScope) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
@@ -223,7 +223,7 @@ namespace NK
 
 
 
-		void* VKAPI_CALL TrackingAllocator::Reallocation(void* _pUserData, void* _pOriginal, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
+		void* VKAPI_CALL TrackingAllocator::ReallocationVK(void* _pUserData, void* _pOriginal, std::size_t _size, std::size_t _alignment, VkSystemAllocationScope _allocationScope)
 		{
 			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pUserData) };
 			if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Reallocation: " + VulkanAllocationScopeToString(_allocationScope) + " --- Request for " + FormatUtils::GetSizeString(_size) + " (aligned to " + FormatUtils::GetSizeString(_alignment) + ")\n"); }
@@ -238,7 +238,7 @@ namespace NK
 
 
 
-		void VKAPI_CALL TrackingAllocator::Free(void* _pUserData, void* _pMemory)
+		void VKAPI_CALL TrackingAllocator::FreeVK(void* _pUserData, void* _pMemory)
 		{
 			if (_pUserData == nullptr)
 			{
@@ -308,11 +308,11 @@ namespace NK
 			std::lock_guard<std::mutex> lock(allocator->m_deviceAllocationMapMtx);
 			allocator->m_deviceAllocationMap.erase(_memory);
 		}
+		#endif
+		
 
-
-
-	#elif NEKI_D3D12_SUPPORTED
-		void* TrackingAllocator::Allocation(std::size_t _Size, std::size_t _Alignment, void* _pPrivateData)
+		#if NEKI_D3D12_SUPPORTED
+		void* TrackingAllocator::AllocationDX(std::size_t _Size, std::size_t _Alignment, void* _pPrivateData)
 		{
 			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pPrivateData) };
 			if (allocator->m_d3d12maVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "D3D12MA Host-Allocation --- Request for " + FormatUtils::GetSizeString(_Size) + " (aligned to " + FormatUtils::GetSizeString(_Alignment) + ")\n"); }
@@ -325,7 +325,7 @@ namespace NK
 		}
 
 
-		void TrackingAllocator::Free(void* _pMemory, void* _pPrivateData)
+		void TrackingAllocator::FreeDX(void* _pMemory, void* _pPrivateData)
 		{
 			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pPrivateData) };
 			if (allocator->m_d3d12maVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "D3D12MA Host-Free --- Freeing " + FormatUtils::GetSizeString(allocator->m_hostAllocationMap[_pMemory].size) + "\n"); }
@@ -339,7 +339,6 @@ namespace NK
 			std::lock_guard<std::mutex> lock(allocator->m_hostAllocationMapMtx);
 			allocator->m_hostAllocationMap.erase(_pMemory);
 		}
-
 	#endif
 
 

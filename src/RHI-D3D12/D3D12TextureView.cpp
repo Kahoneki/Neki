@@ -26,7 +26,7 @@ namespace NK
 		case TEXTURE_VIEW_TYPE::SHADER_READ_ONLY:
 		{
 			D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
-			desc.Format = D3D12Texture::GetDXGIFormat(m_format);
+			desc.Format = (m_format == DATA_FORMAT::D16_UNORM ? DXGI_FORMAT_R16_UNORM : D3D12Texture::GetDXGIFormat(m_format));
 
 			//todo: add array support
 			switch (m_dimension)
