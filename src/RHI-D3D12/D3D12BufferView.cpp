@@ -62,12 +62,14 @@ namespace NK
 		case BUFFER_VIEW_TYPE::STORAGE_READ_ONLY:
 		{
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-			srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Buffer.FirstElement = static_cast<UINT>(_desc.offset / 4); //offset is measured in elements (4 bytes for r32 format)
-			srvDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / 4);
-			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW; //ByteAddressBuffer instead of StructuredBuffer
+
+			srvDesc.Buffer.FirstElement = _desc.offset / std::max(std::size_t(1u), _desc.stride);
+			srvDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / std::max(std::size_t(1u), _desc.stride));
+			srvDesc.Buffer.StructureByteStride = _desc.stride;
+			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateShaderResourceView(d3d12Buffer->GetBuffer(), &srvDesc, addr);
 			break;
@@ -75,11 +77,13 @@ namespace NK
 		case BUFFER_VIEW_TYPE::STORAGE_READ_WRITE:
 		{
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-			uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+			uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-			uavDesc.Buffer.FirstElement = static_cast<UINT>(_desc.offset / 4); //offset is measured in elements (4 bytes for r32 format)
-			uavDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / 4);
-			uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+
+			uavDesc.Buffer.FirstElement = _desc.offset / std::max(std::size_t(1u), _desc.stride);
+			uavDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / std::max(std::size_t(1u), _desc.stride));
+			uavDesc.Buffer.StructureByteStride = _desc.stride;
+			uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateUnorderedAccessView(d3d12Buffer->GetBuffer(), nullptr, &uavDesc, addr);
 			break;

@@ -364,8 +364,9 @@ namespace NK
 		m_graphicsCommandBuffers[0]->TransitionBarrier(m_lightDataBuffer.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::SHADER_RESOURCE);
 
 		BufferViewDesc lightDataBufferViewDesc{};
-		lightDataBufferViewDesc.size = sizeof(LightShaderData);
+		lightDataBufferViewDesc.size = sizeof(LightShaderData) * m_desc.maxLights;
 		lightDataBufferViewDesc.offset = 0;
+		lightDataBufferViewDesc.stride = sizeof(LightShaderData);
 		lightDataBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
 		m_lightDataBufferView = m_device->CreateBufferView(m_lightDataBuffer.get(), lightDataBufferViewDesc);
 
@@ -392,6 +393,7 @@ namespace NK
 			BufferViewDesc modelMatricesBufferViewDesc{};
 			modelMatricesBufferViewDesc.size = m_desc.maxModels * sizeof(glm::mat4);
 			modelMatricesBufferViewDesc.offset = 0;
+			modelMatricesBufferViewDesc.stride = sizeof(glm::mat4);
 			modelMatricesBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
 			m_modelMatricesBufferViews[i] = m_device->CreateBufferView(m_modelMatricesBuffers[i].get(), modelMatricesBufferViewDesc);
 
@@ -427,6 +429,7 @@ namespace NK
 			BufferViewDesc modelVisibilityBufferViewDesc{};
 			modelVisibilityBufferViewDesc.size = m_desc.maxModels * sizeof(std::uint32_t);
 			modelVisibilityBufferViewDesc.offset = 0;
+			modelVisibilityBufferViewDesc.stride = sizeof(std::uint32_t);
 			modelVisibilityBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_WRITE;
 			m_modelVisibilityDeviceBufferViews[i] = m_device->CreateBufferView(m_modelVisibilityDeviceBuffers[i].get(), modelVisibilityBufferViewDesc);
 
@@ -1231,7 +1234,7 @@ namespace NK
 		meshDesc.AddNode(
 		"POSTPROCESS_PASS",
 		{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
-		{ "SCENE_DEPTH", RESOURCE_STATE::SHADER_RESOURCE },
+		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
 		{ "SAT_FINAL", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "BACKBUFFER", RESOURCE_STATE::RENDER_TARGET }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)

@@ -156,6 +156,7 @@ namespace NK
 			float linearAttenuation;
 			float quadraticAttenuation;
 			std::uint32_t shadowMapIndex;
+			float padding[3];
 		};
 		std::vector<LightShaderData> m_cpuLightData;
 		UniquePtr<IBuffer> m_lightDataBuffer;

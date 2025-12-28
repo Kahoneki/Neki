@@ -34,6 +34,7 @@ struct LightData
 	float linearAttenuation;
 	float quadraticAttenuation;
 	uint shadowMapIndex;
+    float3 padding;
 };
 
 

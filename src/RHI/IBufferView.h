@@ -11,6 +11,7 @@ namespace NK
 		BUFFER_VIEW_TYPE type;
 		std::uint64_t offset; //Offset from start of IBuffer in bytes (must be aligned to hardware specific requirements)
 		std::uint64_t size; //Size of view in bytes
+		std::size_t stride; //Size of one element (for structured buffers)
 	};
 
 
