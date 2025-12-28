@@ -22,15 +22,15 @@ namespace NK
 	struct RenderLayerDesc
 	{
 		explicit RenderLayerDesc(const GRAPHICS_BACKEND _backend, const bool _enableMSAA, const SAMPLE_COUNT _msaaSampleCount, const bool _enableSSAA, const std::uint32_t _ssaaMultiplier, Window* _window, const std::uint32_t _framesInFlight, const std::uint32_t _maxModels, const std::uint32_t _maxLights)
-		: backend(_backend), enableMSAA(_enableMSAA), msaaSampleCount(_msaaSampleCount), enableSSAA(_enableSSAA), ssaaMultiplier(_ssaaMultiplier), window(_window), framesInFlight(_framesInFlight), maxModels(_maxModels), maxLights(_maxLights) {}
+			: backend(_backend), enableMSAA(_enableMSAA), msaaSampleCount(_msaaSampleCount), enableSSAA(_enableSSAA), ssaaMultiplier(_ssaaMultiplier), window(_window), framesInFlight(_framesInFlight), maxModels(_maxModels), maxLights(_maxLights) {}
 
 		RenderLayerDesc() {}
 
 		GRAPHICS_BACKEND backend{ GRAPHICS_BACKEND::VULKAN };
-		
+
 		bool enableMSAA{ false };
 		SAMPLE_COUNT msaaSampleCount{ SAMPLE_COUNT::BIT_1 };
-		
+
 		bool enableSSAA{ false };
 		std::uint32_t ssaaMultiplier{ 1 };
 
@@ -42,7 +42,7 @@ namespace NK
 		std::uint32_t maxLights{ 16 };
 	};
 
-	
+
 	class RenderLayer final : public ILayer
 	{
 	public:
@@ -63,8 +63,8 @@ namespace NK
 		[[nodiscard]] inline float GetMaxBlurRadius() const { return m_maxBlurRadius; }
 		[[nodiscard]] inline bool GetDOFDebugMode() const { return m_dofDebugMode; }
 		[[nodiscard]] inline float GetACESExposure() const { return m_acesExposure; }
-		
-		
+
+
 	private:
 		//Init sub-functions
 		void InitBaseResources();
@@ -75,7 +75,7 @@ namespace NK
 		void InitModelVisibilityBuffers();
 		void InitCube();
 		void InitScreenQuad();
-		
+
 		void InitShadersAndPipelines();
 		void InitModelVisibilityPipeline();
 		void InitShadowPipeline();
@@ -83,7 +83,7 @@ namespace NK
 		void InitGraphicsPipelines();
 		void InitPrefixSumPipeline();
 		void InitPostprocessPipeline();
-		
+
 		void InitRenderGraphs();
 		void InitScreenResources();
 		void InitBRDFLut();
@@ -94,15 +94,15 @@ namespace NK
 		void PreAppUpdate();
 		void UpdateImGui();
 		void PostAppUpdate();
-		
+
 		void UpdateSkybox(CSkybox& _skybox);
 		void UpdateCameraBuffer(const CCamera& _camera) const;
 		void UpdateLightDataBuffer();
 		void UpdateModelMatricesBuffer();
 
 		static glm::mat4 GetPointLightViewMatrix(const glm::vec3& _lightPos, const std::size_t _faceIndex);
-		
-		
+
+
 		//Dependency injections
 		IAllocator& m_allocator;
 		const RenderLayerDesc m_desc;
@@ -112,7 +112,7 @@ namespace NK
 
 		//Resolution of intermediate textures if SSAA is enabled
 		glm::ivec2 m_supersampleResolution;
-		
+
 		UniquePtr<IDevice> m_device;
 		std::vector<UniquePtr<ICommandPool>> m_graphicsCommandPools;
 		UniquePtr<IQueue> m_graphicsQueue;
@@ -140,7 +140,7 @@ namespace NK
 		std::vector<UniquePtr<IBufferView>> m_camDataBufferPreviousFrameViews;
 		std::vector<void*> m_camDataBufferPreviousFrameMaps;
 
-		
+
 		struct alignas(16) LightShaderData
 		{
 			//Do not reorder - aligned for hlsl
@@ -176,7 +176,7 @@ namespace NK
 		std::vector<UniquePtr<IBuffer>> m_modelVisibilityReadbackBuffers;
 		std::vector<UniquePtr<IBufferView>> m_modelVisibilityDeviceBufferViews;
 		std::vector<void*> m_modelVisibilityReadbackBufferMaps;
-		
+
 		//(one for each frame in flight)
 		std::size_t m_skyboxDirtyCounter;
 		std::size_t m_irradianceDirtyCounter;
@@ -199,7 +199,7 @@ namespace NK
 		};
 		UniquePtr<IBuffer> m_screenQuadVertBuffer;
 		UniquePtr<IBuffer> m_screenQuadIndexBuffer;
-		
+
 		UniquePtr<IShader> m_shadowVertShader;
 		UniquePtr<IShader> m_meshVertShader;
 		UniquePtr<IShader> m_skyboxVertShader;
@@ -221,34 +221,29 @@ namespace NK
 			ResourceIndex modelVisibilityBufferIndex;
 		};
 		UniquePtr<IRootSignature> m_modelVisibilityPassRootSignature;
-		
+
 		struct ShadowPassPushConstantData
 		{
 			glm::mat4 viewProjMat;
 			glm::mat4 modelMat;
-			float time;
-			float waveAmplitude;
 		};
 		UniquePtr<IRootSignature> m_shadowPassRootSignature;
-		
+
 		struct MeshPassPushConstantData
 		{
 			glm::mat4 modelMat;
 			ResourceIndex camDataBufferIndex;
 			std::uint32_t numLights;
 			ResourceIndex lightDataBufferIndex;
-			
+
 			ResourceIndex skyboxCubemapIndex;
 			ResourceIndex irradianceCubemapIndex;
 			ResourceIndex prefilterCubemapIndex;
 			ResourceIndex brdfLUTIndex;
 			SamplerIndex brdfLUTSamplerIndex;
-			
+
 			ResourceIndex materialBufferIndex;
 			SamplerIndex samplerIndex;
-			
-			float time;
-			float waveAmplitude;
 		};
 		UniquePtr<IRootSignature> m_meshPassRootSignature;
 
@@ -256,11 +251,11 @@ namespace NK
 		{
 			ResourceIndex inputTextureIndex;
 			ResourceIndex outputTextureIndex;
-    
+
 			//Dimensions of the texture being processed in this specific pass.
 			//Pass 1: (Width, Height)
 			//Pass 2: (Height, Width) - pass 1 transposes the output to create the SAT
-			glm::uvec2 dimensions; 
+			glm::uvec2 dimensions;
 		};
 		UniquePtr<IRootSignature> m_prefixSumPassRootSignature;
 
@@ -286,7 +281,7 @@ namespace NK
 		bool m_dofDebugMode;
 		float m_acesExposure;
 		UniquePtr<IRootSignature> m_postprocessPassRootSignature;
-		
+
 		UniquePtr<IPipeline> m_modelVisibilityPipeline;
 		UniquePtr<IPipeline> m_shadowPipeline;
 		UniquePtr<IPipeline> m_skyboxPipeline;
@@ -300,7 +295,7 @@ namespace NK
 
 
 		//Shadow maps
-		static constexpr glm::ivec2 m_shadowMapBaseResolution{ 2048, 2048 };
+		static constexpr glm::ivec2 m_shadowMapBaseResolution{ 1024, 1024 };
 		std::vector<UniquePtr<ITexture>> m_shadowMaps2D;
 		std::vector<UniquePtr<ITextureView>> m_shadowMap2DDSVs;
 		std::vector<UniquePtr<ITextureView>> m_shadowMap2DSRVs;
@@ -310,7 +305,7 @@ namespace NK
 		std::vector<std::vector<UniquePtr<ITextureView>>> m_shadowMapCube_FaceDSVs; //Each inner vector is 6 DSVs (1 for each face in the shadow cubemap)
 		std::vector<UniquePtr<ITextureView>> m_shadowMapCubeSRVs;
 
-		
+
 		//Screen Resources
 		UniquePtr<ITexture> m_sceneColour;
 		UniquePtr<ITexture> m_sceneColourMSAA;
@@ -341,15 +336,15 @@ namespace NK
 		UniquePtr<ITextureView> m_satIntermediateSRV;
 		UniquePtr<ITextureView> m_satFinalSRV;
 
-		
+
 		//Stores the model matrices for all models - regardless of whether the model is loaded or not
 		//(used to populate m_modelMatricesBuffer)
 		std::vector<glm::mat4> m_modelMatrices;
 		//(parallel to m_modelMatrices)
 		//(one for each frame in flight)
 		std::vector<std::vector<Entity>> m_modelMatricesEntitiesLookups;
-		
-		
+
+
 		//RenderLayer owns and is responsible for all GPUModels - todo: move to out-of-core rendering with HLODs
 		std::unordered_map<std::string, UniquePtr<GPUModel>> m_gpuModelCache;
 

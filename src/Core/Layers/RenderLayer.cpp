@@ -989,7 +989,6 @@ namespace NK
 			std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
 			
 			ShadowPassPushConstantData pushConstantData{};
-			pushConstantData.time = TimeManager::GetTotalTime();
 
 			
 			auto drawModels{ [&]()
@@ -1000,7 +999,6 @@ namespace NK
 					const GPUModel* const model{ modelRenderer.model };
 					if (!model) { continue; }
 					pushConstantData.modelMat = transform.GetModelMatrix();
-					pushConstantData.waveAmplitude = modelRenderer.waveAmplitude;
 
 					for (std::size_t meshIndex{ 0 }; meshIndex < modelRenderer.model->meshes.size(); ++meshIndex)
 					{
@@ -1107,7 +1105,6 @@ namespace NK
 			pushConstantData.brdfLUTIndex = _texViews.Get("BRDF_LUT_VIEW")->GetIndex();
 			pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
-			pushConstantData.time = TimeManager::GetTotalTime();
 
 			//Skybox
 			if (_texs.Get("SKYBOX"))
@@ -1128,7 +1125,6 @@ namespace NK
 				const GPUModel* const model{ modelRenderer.model };
 				if (!model) { continue; }
 				pushConstantData.modelMat = transform.GetModelMatrix();
-				pushConstantData.waveAmplitude = modelRenderer.waveAmplitude;
 
 				for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
 				{

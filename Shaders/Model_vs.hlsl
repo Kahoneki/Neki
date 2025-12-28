@@ -48,9 +48,6 @@ PUSH_CONSTANTS_BLOCK(
 
 	uint materialBufferIndex;
 	uint samplerIndex;
-	
-	float time;
-	float waveAmplitude;
 );
 
 
@@ -61,46 +58,8 @@ VertexOutput VSMain(VertexInput input, uint vertexID : SV_VertexID)
 
     output.camPos = camData.pos.xyz;
 	output.texCoord = input.texCoord;
-	
-	//Constants
-	float freq = 3.0f;
-	float speed = 5.0f;
-	float amp = PC(waveAmplitude);
-	
-	//Displacement (non-linear horizontal shear based on height, in the shape of a sine wave)
-	float angle =  speed * PC(time) + freq * input.pos.y;
-	float offset = sin(angle) * amp;
-	float3 manipulatedPos = input.pos;
-	manipulatedPos.x += offset;
-	
-	//Derivative
-	float derivative = cos(angle) * freq * amp;
-	
-	//Need to transform to the normal and tangent to correct the lighting
-	//For x += y*k, the normal transforms by the inverse-transpose matrix:
-	//[ 1  0  0 ]
-	//[-k  1  0 ]
-	//[ 0  0  1 ]
-	float3 N = input.normal;
-	float3 N_new;
-	N_new.x = N.x;
-	N_new.y = N.y - (derivative * N.x);
-	N_new.z = N.z;
-	N_new = normalize(N_new);
-	
-	//Tangent transforms by the regular shear matrix:
-	//[ 1  k  0 ]
-	//[ 0  1  0 ]
-	//[ 0  0  1 ]
-	float3 T = input.tangent.xyz;
-	float3 T_new;
-	T_new.x = T.x + (derivative * T.y);
-	T_new.y = T.y;
-	T_new.z = T.z;
-	T_new = normalize(T_new);
-	
-	//Standard transforms (with manipulatedPos)
-	float4 worldPos = mul(PC(modelMat), float4(manipulatedPos, 1.0));
+
+	float4 worldPos = mul(PC(modelMat), float4(input.pos, 1.0));
 	output.worldPos = worldPos.xyz;
 	output.fragPos = float3(worldPos.xyz);
 	output.pos = mul(camData.projMat, mul(camData.viewMat, worldPos));
@@ -108,8 +67,8 @@ VertexOutput VSMain(VertexInput input, uint vertexID : SV_VertexID)
 	
 	//TBN
     float sign = input.tangent.w;
-	float3 T_os = float3(input.tangent.x, input.tangent.yz);
-    float3 N_os = N_new;
+	float3 T_os = input.tangent.xyz;
+    float3 N_os = input.normal.xyz;
     float3 B_os = cross(T_os, N_os) * sign;
     
 	float3 T_world = normalize( mul(PC(modelMat), float4(T_os, 0.0)).xyz );
