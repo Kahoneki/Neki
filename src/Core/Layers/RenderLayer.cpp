@@ -83,7 +83,7 @@ namespace NK
 
 		m_focalDistance = 17.0f;
 		m_focalDepth = 12.0f;
-		m_maxBlurRadius = 4.0f;
+		m_maxBlurRadius = 0.0f;
 		m_dofDebugMode = false;
 		m_acesExposure = 1.0f;
 		
@@ -1759,6 +1759,7 @@ namespace NK
 			m_gpuUploaderFlushFence->Wait();
 			m_gpuUploaderFlushFence->Reset();
 			m_gpuUploader->Reset();
+			m_newGPUUploaderUpload = false;
 		}
 
 		//Submit

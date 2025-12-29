@@ -16,7 +16,8 @@ namespace NK
 
 		inline void SetRegistry(Registry& _reg) { m_reg = _reg; }
 		
-		virtual void Update() = 0;
+		virtual void Update() {}
+		inline virtual void FixedUpdate() {}
 
 
 	protected:

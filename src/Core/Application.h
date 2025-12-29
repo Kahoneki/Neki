@@ -16,6 +16,14 @@ namespace NK
 		explicit Application(const std::size_t _maxEntities) : m_reg(_maxEntities) {}
 		virtual ~Application() = default;
 
+		inline virtual void PreFixedUpdate() const final
+		{
+			for (ILayer* const l : m_preAppLayers)
+			{
+				l->FixedUpdate();
+			}
+		}
+		
 		inline virtual void PreUpdate() const final
 		{
 			for (ILayer* const l : m_preAppLayers)
@@ -25,8 +33,18 @@ namespace NK
 		}
 
 		//Call m_scenes[m_activeScene]->Update() somewhere in your inherited Application::Update() method
-		inline virtual void Update() = 0;
+		inline virtual void Update() {}
+		//Call m_scenes[m_activeScene]->FixedUpdate() somewhere in your inherited Application::FixedUpdate() method
+		inline virtual void FixedUpdate() {}
 
+		inline virtual void PostFixedUpdate() const final
+		{
+			for (ILayer* const l : m_postAppLayers)
+			{
+				l->FixedUpdate();
+			}
+		}
+		
 		inline virtual void PostUpdate() const final
 		{
 			for (ILayer* const l : m_postAppLayers)
@@ -34,6 +52,7 @@ namespace NK
 				l->Update();
 			}
 		}
+		
 
 
 	protected:

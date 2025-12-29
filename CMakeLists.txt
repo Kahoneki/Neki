@@ -16,6 +16,9 @@ file(GLOB_RECURSE NEKI_COMMON_SOURCES
         "src/Platform/*.cpp"
         "src/Graphics/*.cpp"
         "src/Managers/*.cpp"
+        "src/Networking/*.cpp"
+        "src/Physics/*.cpp"
+        "src/Types/*.cpp"
         "src/RHI/*.cpp"
 )
 set(NEKI_SOURCES ${NEKI_COMMON_SOURCES})
@@ -152,8 +155,14 @@ set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(assimp)
 target_link_libraries(Neki PUBLIC assimp)
 
+#Jolt
+FetchContent_Declare(jolt GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git GIT_TAG master SOURCE_SUBDIR Build)
+FetchContent_MakeAvailable(jolt)
+target_link_libraries(Neki PUBLIC Jolt)
+target_include_directories(Neki PUBLIC ${jolt_SOURCE_DIR})
 
-# ImGui
+
+#ImGui
 FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG v1.92.5-docking)
 FetchContent_MakeAvailable(imgui)
 
@@ -427,5 +436,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     target_include_directories(NKEngineSample_Networking_Client PUBLIC "${CMAKE_SOURCE_DIR}/src")
     target_link_libraries(NKEngineSample_Networking_Client PRIVATE Neki)
     add_dependencies(NKEngineSample_Networking_Client Shaders)
+
+    add_executable(NKEngineSample_Physics "Samples/Engine/Physics/Physics.cpp")
+    target_include_directories(NKEngineSample_Physics PUBLIC "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(NKEngineSample_Physics PRIVATE Neki)
+    add_dependencies(NKEngineSample_Physics Shaders)
 
 endif()

@@ -5,6 +5,7 @@
 #include <Core/Utils/enum_enable_bitmask_operators.h>
 #include <Core/Utils/Serialisation/Serialisation.h>
 #include <Core-ECS/Entity.h>
+#include <Physics/PhysicsObjectLayer.h>
 
 #include <cstdint>
 #include <typeindex>
@@ -12,6 +13,8 @@
 #include <variant>
 #include <vector>
 #include <glm/glm.hpp>
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/PhysicsSystem.h>
 #include <SFML/Network.hpp>
 
 
@@ -21,17 +24,17 @@ namespace NK
 	//For compatibility, this must be specified at creation and cannot be changed
 	enum class BUFFER_USAGE_FLAGS : std::uint32_t
 	{
-		NONE                = 0,
-		TRANSFER_SRC_BIT    = 1 << 0,
-		TRANSFER_DST_BIT    = 1 << 1,
-		UNIFORM_BUFFER_BIT  = 1 << 2,
+		NONE                          = 0,
+		TRANSFER_SRC_BIT              = 1 << 0,
+		TRANSFER_DST_BIT              = 1 << 1,
+		UNIFORM_BUFFER_BIT            = 1 << 2,
 		STORAGE_BUFFER_READ_ONLY_BIT  = 1 << 3,
 		STORAGE_BUFFER_READ_WRITE_BIT = 1 << 4,
-		VERTEX_BUFFER_BIT   = 1 << 5,
-		INDEX_BUFFER_BIT    = 1 << 6,
-		INDIRECT_BUFFER_BIT = 1 << 7,
+		VERTEX_BUFFER_BIT             = 1 << 5,
+		INDEX_BUFFER_BIT              = 1 << 6,
+		INDIRECT_BUFFER_BIT           = 1 << 7,
 	};
-	ENABLE_BITMASK_OPERATORS(BUFFER_USAGE_FLAGS)
+ENABLE_BITMASK_OPERATORS(BUFFER_USAGE_FLAGS)
 
 	enum class MEMORY_TYPE
 	{
@@ -496,6 +499,7 @@ namespace NK
 		PLAYER_CAMERA_LAYER,
 		MODEL_VISIBILITY_LAYER,
 		WINDOW_LAYER,
+		PHYSICS_LAYER,
 		
 		DEVICE,
 		COMMAND_POOL,
@@ -757,7 +761,6 @@ struct std::hash<ActionTypeMapKey>
 
 namespace NK
 {
-
 	enum class PLAYER_CAMERA_ACTIONS
 	{
 		MOVE,
@@ -801,6 +804,28 @@ namespace NK
 		DIRECTIONAL = 1,
 		POINT = 2,
 		SPOT = 3,
+	};
+	
+}
+
+
+template<>
+struct std::hash<NK::PhysicsObjectLayer>
+{
+	[[nodiscard]] inline std::size_t operator()(const NK::PhysicsObjectLayer& _key) const noexcept
+	{
+		return std::hash<std::uint32_t>{}(_key.GetValue());
+	}
+};
+
+
+namespace NK
+{
+	
+	struct PhysicsLayerDesc
+	{
+		std::vector<PhysicsObjectLayer> objectLayers;
+		std::unordered_map<PhysicsObjectLayer, std::vector<PhysicsObjectLayer>> objectLayerCollisionPartners; //For any given object layer, stores a vector of all the other object layers that it can collide with
 	};
 	
 }

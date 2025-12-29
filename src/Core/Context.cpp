@@ -14,6 +14,7 @@ namespace NK
 	IAllocator* Context::m_allocator{ nullptr };
 	LAYER_UPDATE_STATE Context::m_layerUpdateState{ LAYER_UPDATE_STATE::PRE_APP };
 	bool Context::m_editorActive{ false };
+	float Context::m_fixedUpdateTimestep{ 0.0f };
 
 
 	void GLFWErrorCallback(int _error, const char* _description)
@@ -27,6 +28,8 @@ namespace NK
 
 	void Context::Initialise(const ContextConfig& _config)
 	{
+		m_fixedUpdateTimestep = _config.fixedUpdateTimestep;
+		
 		switch (_config.loggerConfig.type)
 		{
 		case LOGGER_TYPE::CONSOLE: m_logger = new ConsoleLogger(_config.loggerConfig);

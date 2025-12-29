@@ -20,6 +20,8 @@ namespace NK
 
 	private:
 		UniquePtr<Application> m_application;
+		float m_timestepAccumulator;
+		float m_fixedUpdateSpeedFactor;
 	};
 	
 }
