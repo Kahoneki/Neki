@@ -81,19 +81,17 @@ public:
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
 		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
-		helmetModelRenderer.waveAmplitude = 0.0f;
 		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
 		helmetTransform.SetPosition({ 0, -58.0f, -5.0f });
 		helmetTransform.SetScale({ 5.0f, 5.0f, 5.0f });
 		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 
 		m_sponzaEntity = m_reg.Create();
-		NK::CModelRenderer& sponzaModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_sponzaEntity) };
-		sponzaModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel";
-		sponzaModelRenderer.waveAmplitude = 0.0f;
-		NK::CTransform& sponzaTransform{ m_reg.AddComponent<NK::CTransform>(m_sponzaEntity) };
-		sponzaTransform.SetScale({ 0.1f, 0.1f, 0.1f });
-		sponzaTransform.SetPosition(glm::vec3(0, -3, -3));
+//		NK::CModelRenderer& sponzaModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_sponzaEntity) };
+//		sponzaModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel";
+//		NK::CTransform& sponzaTransform{ m_reg.AddComponent<NK::CTransform>(m_sponzaEntity) };
+//		sponzaTransform.SetScale({ 0.1f, 0.1f, 0.1f });
+//		sponzaTransform.SetPosition(glm::vec3(0, -3, -3));
 
 
 		m_cameraEntity = m_reg.Create();
@@ -208,22 +206,20 @@ public:
 				{
 					transform.SetPosition(pos);
 				}
-				NK::CModelRenderer& modelRenderer{ m_reg.GetComponent<NK::CModelRenderer>(m_helmetEntity) };
-				ImGui::DragFloat("Wave Amplitude", &modelRenderer.waveAmplitude, 0.001f);
 				ImGui::PopID();
 			}
 
-			if (ImGui::CollapsingHeader("Sponza", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::PushID(static_cast<int>(m_sponzaEntity));
-				NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(m_sponzaEntity);
-				glm::vec3 pos = transform.GetPosition();
-				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
-				{
-					transform.SetPosition(pos);
-				}
-				ImGui::PopID();
-			}
+//			if (ImGui::CollapsingHeader("Sponza", ImGuiTreeNodeFlags_DefaultOpen))
+//			{
+//				ImGui::PushID(static_cast<int>(m_sponzaEntity));
+//				NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(m_sponzaEntity);
+//				glm::vec3 pos = transform.GetPosition();
+//				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
+//				{
+//					transform.SetPosition(pos);
+//				}
+//				ImGui::PopID();
+//			}
 
 			if (ImGui::Button("Swap Skybox"))
 			{
@@ -292,7 +288,7 @@ public:
 		//Window
 		NK::WindowDesc windowDesc;
 		windowDesc.name = "Rendering Sample";
-		windowDesc.size = { 1920, 1080 };
+		windowDesc.size = { 1280, 720 };
 		m_window = NK::UniquePtr<NK::Window>(NK_NEW(NK::Window, windowDesc));
 		m_window->SetCursorVisibility(false);
 
@@ -306,10 +302,10 @@ public:
 		NK::InputLayerDesc inputLayerDesc{ m_window.get() };
 		m_inputLayer = NK::UniquePtr<NK::InputLayer>(NK_NEW(NK::InputLayer, m_scenes[m_activeScene]->m_reg, inputLayerDesc));
 		NK::RenderLayerDesc renderLayerDesc{};
-		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::D3D12;
+		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 		renderLayerDesc.enableMSAA = false;
 		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
-		renderLayerDesc.enableSSAA = false;
+		renderLayerDesc.enableSSAA = true;
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.window = m_window.get();
 		renderLayerDesc.framesInFlight = 3;

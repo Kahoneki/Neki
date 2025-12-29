@@ -36,6 +36,7 @@ namespace NK
 		virtual void CopyBufferToBuffer(IBuffer* _srcBuffer, IBuffer* _dstBuffer, std::size_t _srcOffset, std::size_t _dstOffset, std::size_t _size) override;
 		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent, std::uint32_t _mipLevel) override;
 		virtual void ClearTexture(ITexture* _texture, float* _clearColour) override;
+		virtual void ClearBuffer(IBuffer* _buffer, std::uint32_t _clearUint) override;
 
 		virtual void Dispatch(std::uint32_t _dimX, std::uint32_t _dimY, std::uint32_t _dimZ) override;
 		

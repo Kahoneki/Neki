@@ -46,7 +46,7 @@ namespace NK
 {
 
 	RenderLayer::RenderLayer(Registry& _reg, const RenderLayerDesc& _desc)
-	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.window->GetSize()), m_firstFrame(true)
+	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.window->GetSize()), m_visibilityIndexAllocator(NK_NEW(FreeListAllocator, _desc.maxModels)), m_firstFrame(true)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Initialising Render Layer\n");
@@ -275,43 +275,47 @@ namespace NK
 		
 		if (m_desc.backend == GRAPHICS_BACKEND::VULKAN)
 		{
-			const VulkanDevice* device{ dynamic_cast<VulkanDevice*>(m_device.get()) };
-			ImGui_ImplGlfw_InitForVulkan(m_desc.window->GetGLFWWindow(), true);
-			ImGui_ImplVulkan_InitInfo initInfo{};
-			initInfo.Instance = device->GetInstance();
-			initInfo.PhysicalDevice = device->GetPhysicalDevice();
-			initInfo.Device = device->GetDevice();
-			initInfo.QueueFamily = device->GetGraphicsQueueFamilyIndex();
-			initInfo.Queue = dynamic_cast<VulkanQueue*>(m_graphicsQueue.get())->GetQueue();
-			initInfo.PipelineCache = VK_NULL_HANDLE;
-			initInfo.DescriptorPoolSize = 1024;
-			initInfo.MinImageCount = m_desc.framesInFlight;
-			initInfo.ImageCount = m_desc.framesInFlight;
-			initInfo.ApiVersion = VK_API_VERSION_1_4;
-			initInfo.Allocator = Context::GetAllocator()->GetVulkanCallbacks();
-			initInfo.UseDynamicRendering = true;
-			initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-			constexpr VkFormat colourAttachmentFormat{ VK_FORMAT_R8G8B8A8_SRGB };
-			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &colourAttachmentFormat;
-			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
-			initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-			ImGui_ImplVulkan_Init(&initInfo);
+			#ifdef NEKI_VULKAN_SUPPORTED
+				const VulkanDevice* device{ dynamic_cast<VulkanDevice*>(m_device.get()) };
+				ImGui_ImplGlfw_InitForVulkan(m_desc.window->GetGLFWWindow(), true);
+				ImGui_ImplVulkan_InitInfo initInfo{};
+				initInfo.Instance = device->GetInstance();
+				initInfo.PhysicalDevice = device->GetPhysicalDevice();
+				initInfo.Device = device->GetDevice();
+				initInfo.QueueFamily = device->GetGraphicsQueueFamilyIndex();
+				initInfo.Queue = dynamic_cast<VulkanQueue*>(m_graphicsQueue.get())->GetQueue();
+				initInfo.PipelineCache = VK_NULL_HANDLE;
+				initInfo.DescriptorPoolSize = 1024;
+				initInfo.MinImageCount = m_desc.framesInFlight;
+				initInfo.ImageCount = m_desc.framesInFlight;
+				initInfo.ApiVersion = VK_API_VERSION_1_4;
+				initInfo.Allocator = Context::GetAllocator()->GetVulkanCallbacks();
+				initInfo.UseDynamicRendering = true;
+				initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+				constexpr VkFormat colourAttachmentFormat{ VK_FORMAT_R8G8B8A8_SRGB };
+				initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+				initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &colourAttachmentFormat;
+				initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+				initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+				ImGui_ImplVulkan_Init(&initInfo);
+			#endif
 		}
 		else if (m_desc.backend == GRAPHICS_BACKEND::D3D12)
 		{
-			D3D12Device* device{ dynamic_cast<D3D12Device*>(m_device.get()) };
-			ImGui_ImplGlfw_InitForOther(m_desc.window->GetGLFWWindow(), true);
-			ImGui_ImplDX12_InitInfo initInfo{};
-			initInfo.Device = device->GetDevice();
-			initInfo.CommandQueue = dynamic_cast<D3D12Queue*>(m_graphicsQueue.get())->GetQueue();
-			initInfo.NumFramesInFlight = m_desc.framesInFlight;
-			initInfo.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-			initInfo.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-			std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> descriptor{ device->AllocateImGuiDescriptor() };
-			initInfo.LegacySingleSrvCpuDescriptor = descriptor.first;
-			initInfo.LegacySingleSrvGpuDescriptor = descriptor.second;
-			ImGui_ImplDX12_Init(&initInfo);
+			#ifdef NEKI_D3D12_SUPPORTED
+				D3D12Device* device{ dynamic_cast<D3D12Device*>(m_device.get()) };
+				ImGui_ImplGlfw_InitForOther(m_desc.window->GetGLFWWindow(), true);
+				ImGui_ImplDX12_InitInfo initInfo{};
+				initInfo.Device = device->GetDevice();
+				initInfo.CommandQueue = dynamic_cast<D3D12Queue*>(m_graphicsQueue.get())->GetQueue();
+				initInfo.NumFramesInFlight = m_desc.framesInFlight;
+				initInfo.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+				initInfo.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+				std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> descriptor{ device->AllocateImGuiDescriptor() };
+				initInfo.LegacySingleSrvCpuDescriptor = descriptor.first;
+				initInfo.LegacySingleSrvGpuDescriptor = descriptor.second;
+				ImGui_ImplDX12_Init(&initInfo);
+			#endif
 		}
 	}
 
@@ -384,16 +388,16 @@ namespace NK
 		for (std::size_t i = 0; i < m_desc.framesInFlight; ++i)
 		{
 			BufferDesc modelMatricesBufferDesc{};
-			modelMatricesBufferDesc.size = m_desc.maxModels * sizeof(glm::mat4);
+			modelMatricesBufferDesc.size = m_desc.maxModels * sizeof(ModelMatrixShaderData);
 			modelMatricesBufferDesc.type = MEMORY_TYPE::HOST; //Todo: look into device-local host-accessible memory type?
 			modelMatricesBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
 			m_modelMatricesBuffers[i] = m_device->CreateBuffer(modelMatricesBufferDesc);
 			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelMatricesBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::SHADER_RESOURCE);
 
 			BufferViewDesc modelMatricesBufferViewDesc{};
-			modelMatricesBufferViewDesc.size = m_desc.maxModels * sizeof(glm::mat4);
+			modelMatricesBufferViewDesc.size = m_desc.maxModels * sizeof(ModelMatrixShaderData);
 			modelMatricesBufferViewDesc.offset = 0;
-			modelMatricesBufferViewDesc.stride = sizeof(glm::mat4);
+			modelMatricesBufferViewDesc.stride = sizeof(ModelMatrixShaderData);
 			modelMatricesBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
 			m_modelMatricesBufferViews[i] = m_device->CreateBufferView(m_modelMatricesBuffers[i].get(), modelMatricesBufferViewDesc);
 
@@ -422,7 +426,7 @@ namespace NK
 			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityReadbackBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
 
 			modelVisibilityBufferDesc.type = MEMORY_TYPE::DEVICE;
-			modelVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_WRITE_BIT;
+			modelVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT | BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_WRITE_BIT;
 			m_modelVisibilityDeviceBuffers[i] = m_device->CreateBuffer(modelVisibilityBufferDesc);
 			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityDeviceBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::UNORDERED_ACCESS);
 
@@ -927,6 +931,8 @@ namespace NK
 			{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE } },
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
+				_cmdBuf->ClearBuffer(_bufs.Get("MODEL_VISIBILITY_DEVICE_BUFFER"), 0u);
+				
 				if (m_desc.enableMSAA)
 				{
 					_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, m_firstFrame);
@@ -1601,14 +1607,13 @@ namespace NK
 		}
 
 		const std::size_t prevFrameIndex{ (m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight };
-		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[prevFrameIndex]) };
+		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[m_currentFrame]) };
 		
 		//Model Loading Phase
-		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[prevFrameIndex].size(); ++i)
+		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++i)
 		{
-			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[prevFrameIndex][i]) };
-//			modelRenderer.visible = visibilityMap[i] == 1;
-			modelRenderer.visible = true;
+			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
+			modelRenderer.visible = visibilityMap[modelRenderer.visibilityIndex] == 1;
 
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
@@ -1972,6 +1977,11 @@ namespace NK
 
 		for (auto&& [transform, model] : m_reg.get().View<CTransform, CModelRenderer>())
 		{
+			if (model.visibilityIndex == 0xFFFFFFFF)
+			{
+				model.visibilityIndex = m_visibilityIndexAllocator->Allocate();
+			}
+			
 			constexpr float epsilon{ 1e-3 };
 			if (model.localSpaceHalfExtents.x < epsilon && model.localSpaceHalfExtents.y < epsilon && model.localSpaceHalfExtents.z < epsilon)
 			{

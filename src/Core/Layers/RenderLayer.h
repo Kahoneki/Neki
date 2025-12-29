@@ -163,6 +163,13 @@ namespace NK
 		UniquePtr<IBufferView> m_lightDataBufferView; //SRV
 		void* m_lightDataBufferMap;
 
+		UniquePtr<FreeListAllocator> m_visibilityIndexAllocator;
+		struct alignas(16) ModelMatrixShaderData
+		{
+			glm::mat4 modelMatrix;
+			std::uint32_t visibilityIndex;
+			std::uint32_t padding[3];
+		};
 		//Stores the model matrices for all models - regardless of whether the model is loaded or not
 		//(parallel to m_modelVisibilityBuffers)
 		//(one for each frame in flight)

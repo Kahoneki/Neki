@@ -596,6 +596,13 @@ namespace NK
 
 
 
+	void VulkanCommandBuffer::ClearBuffer(IBuffer* _buffer, std::uint32_t _clearUint)
+	{
+		vkCmdFillBuffer(m_buffer, dynamic_cast<VulkanBuffer*>(_buffer)->GetBuffer(), 0, _buffer->GetSize(), _clearUint);
+	}
+
+
+
 	void VulkanCommandBuffer::Dispatch(std::uint32_t _dimX, std::uint32_t _dimY, std::uint32_t _dimZ)
 	{
 		vkCmdDispatch(m_buffer, _dimX, _dimY, _dimZ);

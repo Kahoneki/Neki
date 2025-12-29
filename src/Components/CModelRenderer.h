@@ -18,9 +18,6 @@ namespace NK
 		//Volume in local space
 		glm::vec3 localSpaceOrigin;
 		glm::vec3 localSpaceHalfExtents;
-		
-		//Amplitude of the sine wave vertex deformation effect
-		float waveAmplitude;
 
 		
 	private:
@@ -28,6 +25,7 @@ namespace NK
 		GPUModel* model;
 		
 		bool visible{ true };
+		std::uint32_t visibilityIndex{ 0xFFFFFFFF };
 	};
 	
 }
