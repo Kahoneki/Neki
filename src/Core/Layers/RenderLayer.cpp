@@ -46,7 +46,7 @@ namespace NK
 {
 
 	RenderLayer::RenderLayer(Registry& _reg, const RenderLayerDesc& _desc)
-	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.window->GetSize()), m_visibilityIndexAllocator(NK_NEW(FreeListAllocator, _desc.maxModels)), m_firstFrame(true)
+	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.window->GetFramebufferSize()), m_visibilityIndexAllocator(NK_NEW(FreeListAllocator, _desc.maxModels)), m_firstFrame(true)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Initialising Render Layer\n");
@@ -949,8 +949,8 @@ namespace NK
 
 				_cmdBuf->BindRootSignature(m_modelVisibilityPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
-				_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetFramebufferSize() });
+				_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetFramebufferSize() });
 
 				ModelVisibilityPassPushConstantData pushConstantData{};
 				pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW")->GetIndex();
@@ -1102,8 +1102,8 @@ namespace NK
 			
 			_cmdBuf->BindRootSignature(m_meshPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
-			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetSize() });
+			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetFramebufferSize() });
+			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetFramebufferSize() });
 
 			MeshPassPushConstantData pushConstantData{};
 			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
@@ -1249,8 +1249,8 @@ namespace NK
 			_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("BACKBUFFER_RTV"), nullptr, nullptr, nullptr);
 			_cmdBuf->BindRootSignature(m_postprocessPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.window->GetSize() });
-			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.window->GetSize() });
+			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.window->GetFramebufferSize() });
+			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.window->GetFramebufferSize() });
 
 			PostprocessPassPushConstantData pushConstantData{};
 			pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
@@ -1311,7 +1311,7 @@ namespace NK
 		TextureDesc sceneColourDesc{};
 		sceneColourDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		sceneColourDesc.format = DATA_FORMAT::R16G16B16A16_SFLOAT;
-		sceneColourDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
+		sceneColourDesc.size = glm::ivec3(m_desc.window->GetFramebufferSize(), 1);
 		sceneColourDesc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		sceneColourDesc.arrayTexture = false;
 		sceneColourDesc.sampleCount = SAMPLE_COUNT::BIT_1;
@@ -1360,7 +1360,7 @@ namespace NK
 		TextureDesc sceneDepthDesc{};
 		sceneDepthDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		sceneDepthDesc.format = (m_desc.backend == GRAPHICS_BACKEND::D3D12 ? DATA_FORMAT::R32_TYPELESS : DATA_FORMAT::D32_SFLOAT);
-		sceneDepthDesc.size = glm::ivec3(m_desc.window->GetSize(), 1);
+		sceneDepthDesc.size = glm::ivec3(m_desc.window->GetFramebufferSize(), 1);
 		sceneDepthDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		sceneDepthDesc.arrayTexture = false;
 		sceneDepthDesc.sampleCount = SAMPLE_COUNT::BIT_1;
@@ -1409,7 +1409,7 @@ namespace NK
 		TextureDesc satDesc{};
 		satDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		satDesc.format = DATA_FORMAT::R32G32B32A32_SFLOAT;
-		glm::ivec2 winDimensions{ m_desc.window->GetSize().x, m_desc.window->GetSize().y };
+		glm::ivec2 winDimensions{ m_desc.window->GetFramebufferSize().x, m_desc.window->GetFramebufferSize().y };
 		satDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(winDimensions.y, winDimensions.x, 1);
 		satDesc.usage = TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::READ_WRITE | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		satDesc.arrayTexture = false;
@@ -1830,7 +1830,7 @@ namespace NK
 		constexpr float epsilon{ 0.1f }; //Buffer for floating-point-comparison-imprecision mitigation
 		if (std::abs(_camera.camera->GetAspectRatio() - WIN_ASPECT_RATIO) < epsilon)
 		{
-			_camera.camera->SetAspectRatio(static_cast<float>(m_desc.window->GetSize().x) / m_desc.window->GetSize().y);
+			_camera.camera->SetAspectRatio(static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y);
 		}
 
 

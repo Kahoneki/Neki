@@ -34,7 +34,7 @@ namespace NK
 		INDEX_BUFFER_BIT              = 1 << 6,
 		INDIRECT_BUFFER_BIT           = 1 << 7,
 	};
-ENABLE_BITMASK_OPERATORS(BUFFER_USAGE_FLAGS)
+	ENABLE_BITMASK_OPERATORS(BUFFER_USAGE_FLAGS)
 
 	enum class MEMORY_TYPE
 	{
@@ -834,5 +834,31 @@ namespace NK
 		Entity entityA;
 		Entity entityB;
 	};
+	
+	
+	enum class MOTION_TYPE
+	{
+		STATIC,
+		KINEMATIC,
+		DYNAMIC,
+	};
+	
+	
+	enum class MOTION_QUALITY
+	{
+		DISCRETE,
+		LINEAR_CAST,
+	};
+	
+	enum class PHYSICS_DIRTY_FLAGS : std::uint32_t
+	{
+		CLEAN = 0,
+		FRICTION = 1 << 0,
+		RESTITUTION = 1 << 1,
+		DAMPING = 1 << 2,
+		GRAVITY = 1 << 3,
+		MASS = 1 << 4
+	};
+	ENABLE_BITMASK_OPERATORS(PHYSICS_DIRTY_FLAGS)
 	
 }

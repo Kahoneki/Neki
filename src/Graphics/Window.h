@@ -24,7 +24,13 @@ namespace NK
 		explicit Window(const WindowDesc& _desc);
 		~Window();
 
-		[[nodiscard]] inline glm::ivec2 GetSize() const { return m_size; }
+		[[nodiscard]] inline glm::ivec2 GetSize() const { return m_size; } //Logical size
+		[[nodiscard]] inline glm::ivec2 GetFramebufferSize() const
+		{
+			int w, h;
+			glfwGetFramebufferSize(m_window, &w, &h);
+			return { w, h };
+		}
 		[[nodiscard]] inline bool ShouldClose() const { return glfwWindowShouldClose(m_window); }
 		[[nodiscard]] inline GLFWwindow* GetGLFWWindow() const { return m_window; }
 

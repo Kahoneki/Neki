@@ -71,8 +71,8 @@ public:
 		floorTransform.SetPosition({ 0, 0.0f, 0.0f });
 		floorTransform.SetScale({ 5.0f, 0.2f, 5.0f });
 		NK::CPhysicsBody& floorPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_floorEntity) };
-		floorPhysicsBody.dynamic = false;
-		floorPhysicsBody.objectLayer = floorObjectLayer;
+		floorPhysicsBody.initialMotionType = NK::MOTION_TYPE::STATIC;
+		floorPhysicsBody.initialObjectLayer = floorObjectLayer;
 		NK::CBoxCollider& floorCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_floorEntity) };
 		floorCollider.halfExtents = { 5.0f, 0.2f, 5.0f };
 		
@@ -84,8 +84,8 @@ public:
 		helmetTransform.SetScale({ 1.0f, 1.0f, 1.0f });
 		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 		NK::CPhysicsBody& helmetPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_helmetEntity) };
-		helmetPhysicsBody.dynamic = true;
-		helmetPhysicsBody.objectLayer = helmetObjectLayer;
+		helmetPhysicsBody.initialMotionType = NK::MOTION_TYPE::DYNAMIC;
+		helmetPhysicsBody.initialObjectLayer = helmetObjectLayer;
 		NK::CBoxCollider& helmetCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_helmetEntity) };
 		helmetCollider.halfExtents = { 0.944977, 1.000000, 0.900984 };
 

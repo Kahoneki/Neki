@@ -8,7 +8,10 @@
 #include <Jolt/Physics/Body/Body.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
+#include <Jolt/Physics/Body/MotionProperties.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
+
+#include "Core/Utils/EnumUtils.h"
 
 
 namespace NK
@@ -54,14 +57,36 @@ namespace NK
 			{
 				JPH::BoxShapeSettings shapeSettings{ GLMToJPH(box.halfExtents) };
 				JPH::ShapeSettings::ShapeResult shapeResult{ shapeSettings.Create() };
-				JPH::BodyCreationSettings creationSettings{ shapeResult.Get(), GLMToJPH(transform.GetPosition()), GLMToJPH(glm::quat(transform.GetRotation())), (body.dynamic ? JPH::EMotionType::Dynamic : JPH::EMotionType::Static), body.objectLayer.GetValue() };
-				creationSettings.mFriction = 0.5f;
-				creationSettings.mRestitution = 0.2f;
-				if (body.dynamic)
+
+				JPH::EMotionType motionType = JPH::EMotionType::Dynamic;
+				if (body.initialMotionType == MOTION_TYPE::STATIC) motionType = JPH::EMotionType::Static;
+				else if (body.initialMotionType == MOTION_TYPE::KINEMATIC) motionType = JPH::EMotionType::Kinematic;
+
+				JPH::BodyCreationSettings creationSettings{ shapeResult.Get(), GLMToJPH(transform.GetPosition()), GLMToJPH(transform.GetRotationQuat()), motionType, body.initialObjectLayer.GetValue() };
+				creationSettings.mFriction = body.GetFriction();
+				creationSettings.mRestitution = body.GetRestitution();
+				creationSettings.mLinearDamping = body.GetLinearDamping();
+				creationSettings.mAngularDamping = body.GetAngularDamping();
+				creationSettings.mGravityFactor = body.GetGravityFactor();
+				creationSettings.mIsSensor = body.initialTrigger;
+				creationSettings.mLinearVelocity = GLMToJPH(body.initialLinearVelocity);
+				creationSettings.mAngularVelocity = GLMToJPH(body.initialAngularVelocity);
+
+				if (body.initialMotionQuality == MOTION_QUALITY::LINEAR_CAST)
 				{
 					creationSettings.mMotionQuality = JPH::EMotionQuality::LinearCast;
 				}
-				creationSettings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateMassAndInertia;
+
+				if (body.GetMass() > 0.0f)
+				{
+					creationSettings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
+					creationSettings.mMassPropertiesOverride.mMass = body.GetMass();
+				}
+				else
+				{
+					creationSettings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateMassAndInertia;
+				}
+
 				creationSettings.mUserData = static_cast<std::uint64_t>(m_reg.get().GetEntity(transform));
 				
 				const JPH::Body* jphBody{ bodyInterface.CreateBody(creationSettings) };
@@ -72,12 +97,39 @@ namespace NK
 			if (transform.physicsSyncDirty)
 			{
 				//The transform was updated by something other than the jolt->ctransform sync (e.g.: imgui), perform a ctransform->jolt sync
-				bodyInterface.SetPositionAndRotation(JPH::BodyID(body.bodyID), GLMToJPH(transform.GetPosition()), GLMToJPH(glm::quat(transform.GetRotationQuat())), JPH::EActivation::Activate);
+				bodyInterface.SetPositionAndRotation(JPH::BodyID(body.bodyID), GLMToJPH(transform.GetPosition()), GLMToJPH(transform.GetRotationQuat()), JPH::EActivation::Activate);
 				
 				//Zero out the velocity to avoid a large jump
 				bodyInterface.SetLinearAndAngularVelocity(JPH::BodyID(body.bodyID), JPH::Vec3::sZero(), JPH::Vec3::sZero());
 				
 				transform.physicsSyncDirty = false;
+			}
+
+			if (body.dirtyFlags != PHYSICS_DIRTY_FLAGS::CLEAN)
+			{
+				JPH::BodyID id(body.bodyID);
+				JPH::Body* jphBody{ m_physicsSystem.GetBodyLockInterfaceNoLock().TryGetBody(id) };
+				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::FRICTION)) bodyInterface.SetFriction(id, body.GetFriction());
+				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::RESTITUTION)) bodyInterface.SetRestitution(id, body.GetRestitution());
+				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::GRAVITY)) bodyInterface.SetGravityFactor(id, body.GetGravityFactor());
+				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::DAMPING))
+				{
+					if (JPH::MotionProperties* mp{ jphBody->GetMotionProperties() })
+					{
+						mp->SetLinearDamping(body.linearDamping);
+						mp->SetAngularDamping(body.angularDamping);
+					}
+				}
+				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::MASS))
+				{
+					if (JPH::MotionProperties* mp{ jphBody->GetMotionProperties() })
+					{
+						JPH::MassProperties mpScaled{ jphBody->GetShape()->GetMassProperties() };
+						mpScaled.ScaleToMass(body.GetMass());
+						mp->SetMassProperties(JPH::EAllowedDOFs::All, mpScaled);
+					}
+				}
+				body.dirtyFlags = PHYSICS_DIRTY_FLAGS::CLEAN;
 			}
 		}
 		
@@ -87,7 +139,7 @@ namespace NK
 		//Sync jolt -> ctransform
 		for (auto&& [body, transform] : m_reg.get().View<CPhysicsBody, CTransform>())
 		{
-			if (body.bodyID == 0xFFFFFFFF || !body.dynamic)
+			if (body.bodyID == 0xFFFFFFFF || body.initialMotionType != MOTION_TYPE::DYNAMIC)
 			{
 				continue;
 			}
