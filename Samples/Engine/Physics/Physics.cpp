@@ -70,23 +70,25 @@ public:
 		NK::CTransform& floorTransform{ m_reg.AddComponent<NK::CTransform>(m_floorEntity) };
 		floorTransform.SetPosition({ 0, 0.0f, 0.0f });
 		floorTransform.SetScale({ 5.0f, 0.2f, 5.0f });
-//		NK::CPhysicsBody& floorPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_floorEntity) };
-//		floorPhysicsBody.dynamic = false;
-//		floorPhysicsBody.objectLayer = floorObjectLayer;
+		NK::CPhysicsBody& floorPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_floorEntity) };
+		floorPhysicsBody.dynamic = false;
+		floorPhysicsBody.objectLayer = floorObjectLayer;
 		NK::CBoxCollider floorCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_floorEntity) };
 		floorCollider.halfExtents = { 5.0f, 0.2f, 5.0f };
+		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
 		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
 		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
-		helmetTransform.SetPosition({ 0, 10.0f, 0.0f });
+		helmetTransform.SetPosition({ 0, 3.0f, 0.0f });
 		helmetTransform.SetScale({ 1.0f, 1.0f, 1.0f });
 		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
-//		NK::CPhysicsBody& helmetPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_helmetEntity) };
-//		helmetPhysicsBody.dynamic = true;
-//		helmetPhysicsBody.objectLayer = helmetObjectLayer;
+		NK::CPhysicsBody& helmetPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_helmetEntity) };
+		helmetPhysicsBody.dynamic = true;
+		helmetPhysicsBody.objectLayer = helmetObjectLayer;
 		NK::CBoxCollider helmetCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_helmetEntity) };
 		helmetCollider.halfExtents = { 0.944977, 1.000000, 0.900984 };
+
 		
 
 

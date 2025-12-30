@@ -428,7 +428,7 @@ namespace NK
 			modelVisibilityBufferDesc.type = MEMORY_TYPE::DEVICE;
 			modelVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT | BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_WRITE_BIT;
 			m_modelVisibilityDeviceBuffers[i] = m_device->CreateBuffer(modelVisibilityBufferDesc);
-			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityDeviceBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::UNORDERED_ACCESS);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityDeviceBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
 
 			BufferViewDesc modelVisibilityBufferViewDesc{};
 			modelVisibilityBufferViewDesc.size = m_desc.maxModels * sizeof(std::uint32_t);
@@ -925,13 +925,14 @@ namespace NK
 			"MODEL_VISIBILITY_PASS",
 			{ { "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::CONSTANT_BUFFER },
 			{ "MODEL_MATRICES_BUFFER", RESOURCE_STATE::SHADER_RESOURCE },
-			{ "MODEL_VISIBILITY_DEVICE_BUFFER", RESOURCE_STATE::UNORDERED_ACCESS },
+			{ "MODEL_VISIBILITY_DEVICE_BUFFER", RESOURCE_STATE::COPY_DEST },
 			{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
 			{ "SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE },
 			{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE } },
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
 				_cmdBuf->ClearBuffer(_bufs.Get("MODEL_VISIBILITY_DEVICE_BUFFER"), 0u);
+				_cmdBuf->TransitionBarrier(_bufs.Get("MODEL_VISIBILITY_DEVICE_BUFFER"), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::UNORDERED_ACCESS);
 				
 				if (m_desc.enableMSAA)
 				{
@@ -1552,6 +1553,18 @@ namespace NK
 		m_inFlightFences[m_currentFrame]->Wait();
 		m_inFlightFences[m_currentFrame]->Reset();
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
+
+
+		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
+		while (!m_modelUnloadQueues[m_currentFrame].empty())
+		{
+			if (m_gpuModelReferenceCounter[m_modelUnloadQueues[m_currentFrame].back()] == 0)
+			{
+				ModelLoader::UnloadModel(m_modelUnloadQueues[m_currentFrame].back());
+				m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
+			}
+			m_modelUnloadQueues[m_currentFrame].pop_back();
+		}
 		
 		
 		//Update skybox
@@ -1566,10 +1579,6 @@ namespace NK
 			}
 			found = true;
 			UpdateSkybox(skybox);
-		}
-		if (!found)
-		{
-//			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CSkybox`s found in registry.\n");
 		}
 
 
@@ -1591,29 +1600,18 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
 		}
 
-
-		UpdateLightDataBuffer();
-
-
-		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
-		while (!m_modelUnloadQueues[m_currentFrame].empty())
-		{
-			if (m_gpuModelReferenceCounter[m_modelUnloadQueues[m_currentFrame].back()] == 0)
-			{
-				ModelLoader::UnloadModel(m_modelUnloadQueues[m_currentFrame].back());
-				m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
-			}
-			m_modelUnloadQueues[m_currentFrame].pop_back();
-		}
-
-		const std::size_t prevFrameIndex{ (m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight };
-		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[m_currentFrame]) };
 		
 		//Model Loading Phase
+		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[m_currentFrame]) };
 		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++i)
 		{
 			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
-			modelRenderer.visible = visibilityMap[modelRenderer.visibilityIndex] == 1;
+			
+			//Update visibility
+			if (modelRenderer.visibilityIndex != 0xFFFFFFFF)
+			{
+				modelRenderer.visible = (visibilityMap[modelRenderer.visibilityIndex] == 1);
+			}
 
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
@@ -1652,26 +1650,24 @@ namespace NK
 			{
 				//Model isn't visible but is loaded, decrement reference counter and unassign
 				--m_gpuModelReferenceCounter[modelRenderer.modelPath];
-				std::cout << m_gpuModelReferenceCounter[modelRenderer.modelPath] << '\n';
+				// std::cout << m_gpuModelReferenceCounter[modelRenderer.modelPath] << '\n';
 				modelRenderer.model = nullptr;
 
 				if (m_gpuModelReferenceCounter[modelRenderer.modelPath] == 0)
 				{
 					//No CModelRenderers are currently visible that use this model, add it to the unload queue
-					m_modelUnloadQueues[prevFrameIndex].push_back(modelRenderer.modelPath);
+					m_modelUnloadQueues[m_currentFrame].push_back(modelRenderer.modelPath);
 				}
 			}
 		}
+		std::memset(visibilityMap, 0, m_desc.maxModels * sizeof(std::uint32_t));
+		
+		
 		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the fence to wait on before drawing
 		if (m_newGPUUploaderUpload)
 		{
 			m_gpuUploader->Flush(false, m_gpuUploaderFlushFence.get(), nullptr);
 		}
-
-		//Clear the visibility buffer
-		std::memset(visibilityMap, 0, m_desc.maxModels * sizeof(std::uint32_t));
-
-		UpdateModelMatricesBuffer();
 		
 
 		const std::uint32_t imageIndex{ m_swapchain->AcquireNextImageIndex(m_imageAvailableSemaphores[m_currentFrame].get(), nullptr) };
@@ -1751,6 +1747,10 @@ namespace NK
 		
 		m_meshRenderGraph->Execute(execDesc);
 
+
+		UpdateLightDataBuffer();
+		UpdateModelMatricesBuffer();
+		
 		
 		m_graphicsCommandBuffers[m_currentFrame]->End();
 
@@ -1973,6 +1973,7 @@ namespace NK
 
 	void RenderLayer::UpdateModelMatricesBuffer()
 	{
+		std::vector<ModelMatrixShaderData> shaderData;
 		m_modelMatrices.clear();
 		m_modelMatricesEntitiesLookups[m_currentFrame].clear();
 
@@ -1994,11 +1995,17 @@ namespace NK
 
 			constexpr float scaleBuffer{ 1.05f }; //Used as a scalar multiplier to the AABB's scale so that it's a bit larger than the model (eliminates z-fighting issues)
 			const glm::mat4 aabbMatrix{ transform.GetModelMatrix() * glm::translate(glm::mat4(1.0f), model.localSpaceOrigin) * glm::scale(glm::mat4(1.0f), model.localSpaceHalfExtents * 2.0f * scaleBuffer) };
-			m_modelMatrices.push_back(aabbMatrix);
+			
+			ModelMatrixShaderData data{};
+			data.modelMatrix = aabbMatrix;
+			data.visibilityIndex = model.visibilityIndex;
+			shaderData.push_back(data);
+        
 			m_modelMatricesEntitiesLookups[m_currentFrame].push_back(m_reg.get().GetEntity(transform));
+			m_modelMatrices.push_back(aabbMatrix);
 		}
 		
-		memcpy(m_modelMatricesBufferMaps[m_currentFrame], m_modelMatrices.data(), m_modelMatrices.size() * sizeof(glm::mat4));
+		memcpy(m_modelMatricesBufferMaps[m_currentFrame], shaderData.data(), shaderData.size() * sizeof(ModelMatrixShaderData));
 	}
 
 

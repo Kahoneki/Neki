@@ -58,7 +58,12 @@ namespace NK
 
 	void VulkanFence::Wait()
 	{
-		vkWaitForFences(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), 1, &m_fence, VK_TRUE, UINT64_MAX);
+		const VkResult result{ vkWaitForFences(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), 1, &m_fence, VK_TRUE, UINT64_MAX) };
+		if (result != VK_SUCCESS)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::FENCE, "vkWaitForFence failed - result: " + std::to_string(result) + "\n");
+			throw std::runtime_error("");
+		}
 	}
 
 
