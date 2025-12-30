@@ -60,7 +60,6 @@ namespace NK
 		glm::vec3 normal;
 		glm::vec2 texCoord;
 		glm::vec4 tangent;
-
 	};
 	SERIALISE(ModelVertex, v.position, v.normal, v.texCoord, v.tangent)
 	

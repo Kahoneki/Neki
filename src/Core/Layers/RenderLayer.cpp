@@ -1782,8 +1782,11 @@ namespace NK
 		textureViewDesc.baseArrayLayer = 0;
 		textureViewDesc.arrayLayerCount = 6;
 		
+		if (_skybox.skyboxFilepathDirty) { m_skyboxDirtyCounter = m_desc.framesInFlight; _skybox.skyboxFilepathDirty = false; }
+		if (_skybox.irradianceFilepathDirty) { m_irradianceDirtyCounter = m_desc.framesInFlight; _skybox.irradianceFilepathDirty = false; }
+		if (_skybox.prefilterFilepathDirty) { m_prefilterDirtyCounter = m_desc.framesInFlight; _skybox.prefilterFilepathDirty = false; }
 		
-		if (_skybox.skyboxFilepathDirty || m_skyboxDirtyCounter != 0)
+		if (m_skyboxDirtyCounter != 0)
 		{
 			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetSkyboxFilepath(), false, true) };
 			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
@@ -1791,12 +1794,11 @@ namespace NK
 			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_skyboxTextures[m_currentFrame].get(), RESOURCE_STATE::UNDEFINED);
 			m_skyboxTextureViews[m_currentFrame] = m_device->CreateShaderResourceTextureView(m_skyboxTextures[m_currentFrame].get(), textureViewDesc);
 			m_newGPUUploaderUpload = true;
-			if (_skybox.skyboxFilepathDirty) { m_skyboxDirtyCounter = m_desc.framesInFlight; }
-			_skybox.skyboxFilepathDirty = false;
+			--m_skyboxDirtyCounter;
 		}
 
 		
-		if (_skybox.irradianceFilepathDirty || m_irradianceDirtyCounter != 0)
+		if (m_irradianceDirtyCounter != 0)
 		{
 			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetIrradianceFilepath(), false, true) };
 			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
@@ -1804,12 +1806,11 @@ namespace NK
 			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_irradianceMaps[m_currentFrame].get(), RESOURCE_STATE::UNDEFINED);
 			m_irradianceMapViews[m_currentFrame] = m_device->CreateShaderResourceTextureView(m_irradianceMaps[m_currentFrame].get(), textureViewDesc);
 			m_newGPUUploaderUpload = true;
-			if (_skybox.irradianceFilepathDirty) { m_irradianceDirtyCounter = m_desc.framesInFlight; }
-			_skybox.irradianceFilepathDirty = false;
+			--m_irradianceDirtyCounter;
 		}
 
 		
-		if (_skybox.prefilterFilepathDirty || m_prefilterDirtyCounter != 0)
+		if (m_prefilterDirtyCounter != 0)
 		{
 			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetSkyboxFilepath(), false, true) };
 			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
@@ -1817,20 +1818,6 @@ namespace NK
 			m_gpuUploader->EnqueueTextureDataUpload(data->data, m_prefilterMaps[m_currentFrame].get(), RESOURCE_STATE::UNDEFINED);
 			m_prefilterMapViews[m_currentFrame] = m_device->CreateShaderResourceTextureView(m_prefilterMaps[m_currentFrame].get(), textureViewDesc);
 			m_newGPUUploaderUpload = true;
-			if (_skybox.prefilterFilepathDirty) { m_prefilterDirtyCounter = m_desc.framesInFlight; }
-			_skybox.prefilterFilepathDirty = false;
-		}
-		
-		if (m_skyboxDirtyCounter != 0)
-		{
-			--m_skyboxDirtyCounter;
-		}
-		if (m_irradianceDirtyCounter != 0)
-		{
-			--m_irradianceDirtyCounter;
-		}
-		if (m_prefilterDirtyCounter != 0)
-		{
 			--m_prefilterDirtyCounter;
 		}
 	}

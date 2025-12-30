@@ -156,7 +156,7 @@ FetchContent_MakeAvailable(assimp)
 target_link_libraries(Neki PUBLIC assimp)
 
 #Jolt
-FetchContent_Declare(jolt GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git GIT_TAG master SOURCE_SUBDIR Build)
+FetchContent_Declare(jolt GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git GIT_TAG v5.5.0 SOURCE_SUBDIR Build)
 FetchContent_MakeAvailable(jolt)
 target_link_libraries(Neki PUBLIC Jolt)
 target_include_directories(Neki PUBLIC ${jolt_SOURCE_DIR})

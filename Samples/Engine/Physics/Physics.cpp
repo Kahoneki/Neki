@@ -73,7 +73,7 @@ public:
 		NK::CPhysicsBody& floorPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_floorEntity) };
 		floorPhysicsBody.dynamic = false;
 		floorPhysicsBody.objectLayer = floorObjectLayer;
-		NK::CBoxCollider floorCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_floorEntity) };
+		NK::CBoxCollider& floorCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_floorEntity) };
 		floorCollider.halfExtents = { 5.0f, 0.2f, 5.0f };
 		
 		m_helmetEntity = m_reg.Create();
@@ -86,10 +86,8 @@ public:
 		NK::CPhysicsBody& helmetPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_helmetEntity) };
 		helmetPhysicsBody.dynamic = true;
 		helmetPhysicsBody.objectLayer = helmetObjectLayer;
-		NK::CBoxCollider helmetCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_helmetEntity) };
+		NK::CBoxCollider& helmetCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_helmetEntity) };
 		helmetCollider.halfExtents = { 0.944977, 1.000000, 0.900984 };
-
-		
 
 
 		m_cameraEntity = m_reg.Create();
@@ -112,16 +110,129 @@ public:
 		NK::CInput& input{ m_reg.AddComponent<NK::CInput>(m_cameraEntity) };
 		input.AddActionToMap(NK::PLAYER_CAMERA_ACTIONS::MOVE);
 		input.AddActionToMap(NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH);
+		
+		
+		//Collision event
+		NK::EventManager::Subscribe<GameScene, NK::CollisionEvent>(this, &GameScene::OnCollision);
 	}
 
 
 
 	virtual void Update() override
 	{
-//		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
-//		constexpr float speed{ 50.0f };
-//		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
-//		helmetTransform.SetRotation(helmetTransform.GetRotation() + glm::vec3(0, rotationAmount, 0));
+		// NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+		// constexpr float speed{ 50.0f };
+		// const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
+		// helmetTransform.SetRotation(helmetTransform.GetRotation() + glm::vec3(0, rotationAmount, 0));
+
+
+		//ImGui for lights
+		if (ImGui::Begin("Light Controls"))
+		{
+			auto DrawLightNode{ [&](const char* label, NK::Entity entity)
+			{
+				if (ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					ImGui::PushID(static_cast<int>(entity));
+
+					//Position
+					NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(entity);
+					glm::vec3 pos{ transform.GetPosition() };
+					if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
+					{
+						transform.SetPosition(pos);
+					}
+
+					//Rotation
+					glm::vec3 rot{ glm::degrees(transform.GetRotation()) };
+					if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f))
+					{
+						transform.SetRotation(glm::radians(rot));
+					}
+
+
+					//Light properties
+					NK::CLight& lightComp = m_reg.GetComponent<NK::CLight>(entity);
+					if (lightComp.light)
+					{
+						//Colour
+						glm::vec3 color = lightComp.light->GetColour();
+						if (ImGui::ColorEdit3("Colour", &color.x))
+						{
+							lightComp.light->SetColour(color);
+						}
+
+						//Intensity
+						float intensity = lightComp.light->GetIntensity();
+						if (ImGui::DragFloat("Intensity", &intensity, 0.1f, 0.0f, 100.0f))
+						{
+							lightComp.light->SetIntensity(intensity);
+						}
+
+						if (NK::PointLight * pointLight{ dynamic_cast<NK::PointLight*>(lightComp.light.get()) })
+						{
+							//Attenuation
+							float constant{ pointLight->GetConstantAttenuation() };
+							if (ImGui::DragFloat("Constant", &constant, 0.01f, 0.0f, 100.0f)) { pointLight->SetConstantAttenuation(constant); }
+							float linear{ pointLight->GetLinearAttenuation() };
+							if (ImGui::DragFloat("Linear", &linear, 0.01f, 0.0f, 100.0f)) { pointLight->SetLinearAttenuation(linear); }
+							float quadratic{ pointLight->GetQuadraticAttenuation() };
+							if (ImGui::DragFloat("Quadratic", &quadratic, 0.01f, 0.0f, 100.0f)) { pointLight->SetQuadraticAttenuation(quadratic); }
+
+							if (NK::SpotLight * spotLight{ dynamic_cast<NK::SpotLight*>(pointLight) })
+							{
+								//Angles
+								float innerAngle{ glm::degrees(spotLight->GetInnerAngle()) };
+								if (ImGui::DragFloat("Inner (deg)", &innerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetInnerAngle(glm::radians(innerAngle)); }
+								float outerAngle{ glm::degrees(spotLight->GetOuterAngle()) };
+								if (ImGui::DragFloat("Outer (deg)", &outerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetOuterAngle(glm::radians(outerAngle)); }
+							}
+						}
+					}
+					ImGui::PopID();
+				}
+			} };
+
+			DrawLightNode("Directional Light", m_lightEntity);
+
+			if (ImGui::CollapsingHeader("Helmet", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::PushID(static_cast<int>(m_helmetEntity));
+				NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+				glm::vec3 pos{ transform.GetPosition() };
+				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
+				{
+					transform.SetPosition(pos);
+				}
+				ImGui::PopID();
+			}
+			
+
+			if (ImGui::Button("Swap Skybox"))
+			{
+				NK::CSkybox& skybox{ m_reg.GetComponent<NK::CSkybox>(m_skyboxEntity) };
+				if (skybox.GetSkyboxFilepath() == "Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx")
+				{
+					skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/skybox.ktx");
+					skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/irradiance.ktx");
+					skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/prefilter.ktx");
+				}
+				else
+				{
+					skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
+					skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
+					skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
+				}
+			}
+		}
+		ImGui::End();
+	}
+	
+	
+	
+	inline void OnCollision(const NK::CollisionEvent& _event)
+	{
+		std::cout << "Collision occurred\n";
 	}
 
 
@@ -185,7 +296,13 @@ public:
 		//Post-app layers
 		NK::PhysicsLayerDesc physicsLayerDesc{};
 		physicsLayerDesc.objectLayers = { helmetObjectLayer, floorObjectLayer };
-		physicsLayerDesc.objectLayerCollisionPartners = { { helmetObjectLayer, {helmetObjectLayer, floorObjectLayer} }, { floorObjectLayer, { floorObjectLayer } } };
+		physicsLayerDesc.objectLayerCollisionPartners = {
+		{
+			helmetObjectLayer, { helmetObjectLayer, floorObjectLayer}
+		},
+		{
+			floorObjectLayer, { helmetObjectLayer, floorObjectLayer }
+		}};
 		m_physicsLayer = NK::UniquePtr<NK::PhysicsLayer>(NK_NEW(NK::PhysicsLayer, m_scenes[m_activeScene]->m_reg, physicsLayerDesc));
 		
 		m_postAppLayers.push_back(m_physicsLayer.get());

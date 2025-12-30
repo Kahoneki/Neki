@@ -240,32 +240,33 @@ namespace NK
 
 		void VKAPI_CALL TrackingAllocator::FreeVK(void* _pUserData, void* _pMemory)
 		{
-			if (_pUserData == nullptr)
+			if (_pUserData == nullptr || _pMemory == nullptr)
 			{
-	        #if defined(_WIN32)
-				_aligned_free(_pMemory);
-	        #else
-				free(_pMemory);
-	        #endif
-				return;
-			}
-		
-			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pUserData) };
-			if (allocator == nullptr)
-			{
-		        #if defined(_WIN32)
+				#if defined(_WIN32)
 					_aligned_free(_pMemory);
-		        #else
+				#else
 					free(_pMemory);
-		        #endif
+				#endif
 				return;
 			}
-		
-			if (allocator->m_vulkanVerbose) { allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR, "Vulkan Free --- Freeing " + FormatUtils::GetSizeString(allocator->m_hostAllocationMap[_pMemory].size) + "\n"); }
+
+			TrackingAllocator* allocator{ static_cast<TrackingAllocator*>(_pUserData) };
+			std::lock_guard<std::mutex> lock(allocator->m_hostAllocationMapMtx);
+
+			const std::unordered_map<void*, AllocationInfo>::const_iterator it{ allocator->m_hostAllocationMap.find(_pMemory) };
+	    
+			if (allocator->m_vulkanVerbose) 
+			{
+				const std::string sizeStr{ (it != allocator->m_hostAllocationMap.end() ? FormatUtils::GetSizeString(it->second.size)  : "Unknown size") };
+				allocator->m_logger.IndentLog(LOGGER_CHANNEL::INFO, LOGGER_LAYER::TRACKING_ALLOCATOR,  "Vulkan Free --- Freeing " + sizeStr + "\n");
+			}
+
 			allocator->FreeAligned(_pMemory);
 
-			std::lock_guard<std::mutex> lock(allocator->m_hostAllocationMapMtx);
-			allocator->m_hostAllocationMap.erase(_pMemory);
+			if (it != allocator->m_hostAllocationMap.end())
+			{
+				allocator->m_hostAllocationMap.erase(it);
+			}
 		}
 
 

@@ -828,4 +828,11 @@ namespace NK
 		std::unordered_map<PhysicsObjectLayer, std::vector<PhysicsObjectLayer>> objectLayerCollisionPartners; //For any given object layer, stores a vector of all the other object layers that it can collide with
 	};
 	
+	
+	struct CollisionEvent
+	{
+		Entity entityA;
+		Entity entityB;
+	};
+	
 }
