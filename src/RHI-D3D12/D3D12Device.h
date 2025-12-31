@@ -62,6 +62,7 @@ namespace NK
 		[[nodiscard]] inline ID3D12Device* GetDevice() const { return m_device.Get();  }
 		[[nodiscard]] inline D3D12MA::Allocator* GetD3D12MAAllocator() const { return m_d3d12maAllocator.Get(); }
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetResourceDescriptorHeap() const { return m_resourceDescriptorHeap.Get(); }
+		[[nodiscard]] inline ID3D12DescriptorHeap* GetNonVisibleResourceDescriptorHeap() const { return m_nonVisibleResourceDescriptorHeap.Get(); }
 		[[nodiscard]] inline ID3D12DescriptorHeap* GetSamplerDescriptorHeap() const { return m_samplerDescriptorHeap.Get(); }
 		[[nodiscard]] inline UINT GetResourceDescriptorSize() const { return m_resourceDescriptorSize; }
 		[[nodiscard]] inline UINT GetSamplerDescriptorSize() const { return m_samplerDescriptorSize; }
@@ -100,6 +101,7 @@ namespace NK
 		std::unordered_map<COMMAND_TYPE, UniquePtr<ICommandBuffer>> m_syncLists;
 
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_resourceDescriptorHeap;
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_nonVisibleResourceDescriptorHeap;
 		UINT m_resourceDescriptorSize;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
 		UINT m_samplerDescriptorSize;

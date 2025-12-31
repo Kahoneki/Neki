@@ -429,6 +429,21 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create Resource Descriptor Heap.\n");
 			throw std::runtime_error("");
 		}
+
+		D3D12_DESCRIPTOR_HEAP_DESC nonVisibleDesc{};
+		nonVisibleDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		nonVisibleDesc.NumDescriptors = MAX_BINDLESS_RESOURCES;
+		nonVisibleDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		hr = m_device->CreateDescriptorHeap(&nonVisibleDesc, IID_PPV_ARGS(&m_nonVisibleResourceDescriptorHeap));
+		if (SUCCEEDED(hr))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::DEVICE, "Non-Visible Resource Descriptor Heap created.\n");
+		}
+		else
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::DEVICE, "Failed to create Non-Visible Resource Descriptor Heap.\n");
+			throw std::runtime_error("");
+		}
 		m_resourceDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 

@@ -3,6 +3,7 @@
 #include "ICommandPool.h"
 #include "ITexture.h"
 #include "IBuffer.h"
+#include "IBufferView.h"
 
 #include <Types/NekiTypes.h>
 
@@ -51,6 +52,16 @@ namespace NK
 			}
 			TransitionBarrierImpl(_buffer, _oldState, _newState);
 			_buffer->m_state = _newState;
+		}
+
+		//After calling this function, _bufferView's parent buffer will be in the unordered access state
+		void ClearReadWriteBufferView(IBufferView* _bufferView, std::uint32_t _clearUint)
+		{
+			if (_bufferView->GetParentBuffer()->GetState() != RESOURCE_STATE::UNORDERED_ACCESS)
+			{
+				TransitionBarrier(_bufferView->GetParentBuffer(), _bufferView->GetParentBuffer()->GetState(), RESOURCE_STATE::UNORDERED_ACCESS);
+			}
+			ClearReadWriteBufferViewImpl(_bufferView, _clearUint);
 		}
 
 		//----End of NVIs----//
@@ -105,7 +116,6 @@ namespace NK
 		//_srcOffset in bytes, _dstOffset in texels for XYZ, _dstExtent in texels for XYZ
 		virtual void CopyBufferToTexture(IBuffer* _srcBuffer, ITexture* _dstTexture, std::size_t _srcOffset, glm::ivec3 _dstOffset, glm::ivec3 _dstExtent, std::uint32_t _mipLevel) = 0;
 		virtual void ClearTexture(ITexture* _texture, float* _clearColour) = 0;
-		virtual void ClearBuffer(IBuffer* _buffer, std::uint32_t _clearUint) = 0;
 
 		virtual void Dispatch(std::uint32_t _dimX, std::uint32_t _dimY, std::uint32_t _dimZ) = 0;
 
@@ -117,6 +127,7 @@ namespace NK
 		//NVI implementations
 		virtual void TransitionBarrierImpl(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) = 0;
 		virtual void TransitionBarrierImpl(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) = 0;
+		virtual void ClearReadWriteBufferViewImpl(IBufferView* _bufferView, std::uint32_t _clearUint) = 0;
 
 
 		//Dependency injections

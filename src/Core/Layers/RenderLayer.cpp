@@ -433,7 +433,7 @@ namespace NK
 			BufferViewDesc modelVisibilityBufferViewDesc{};
 			modelVisibilityBufferViewDesc.size = m_desc.maxModels * sizeof(std::uint32_t);
 			modelVisibilityBufferViewDesc.offset = 0;
-			modelVisibilityBufferViewDesc.stride = sizeof(std::uint32_t);
+			modelVisibilityBufferViewDesc.stride = 0; //byte address buffer
 			modelVisibilityBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_WRITE;
 			m_modelVisibilityDeviceBufferViews[i] = m_device->CreateBufferView(m_modelVisibilityDeviceBuffers[i].get(), modelVisibilityBufferViewDesc);
 
@@ -931,9 +931,8 @@ namespace NK
 			{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE } },
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
-				_cmdBuf->ClearBuffer(_bufs.Get("MODEL_VISIBILITY_DEVICE_BUFFER"), 0u);
-				_cmdBuf->TransitionBarrier(_bufs.Get("MODEL_VISIBILITY_DEVICE_BUFFER"), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::UNORDERED_ACCESS);
-				
+				_cmdBuf->ClearReadWriteBufferView(_bufViews.Get("MODEL_VISIBILITY_DEVICE_BUFFER_VIEW"), 0u);
+
 				if (m_desc.enableMSAA)
 				{
 					_cmdBuf->BeginRendering(0, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, m_firstFrame);

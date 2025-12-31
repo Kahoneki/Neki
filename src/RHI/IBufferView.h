@@ -21,11 +21,13 @@ namespace NK
 		virtual ~IBufferView() = default;
 
 		[[nodiscard]] inline ResourceIndex GetIndex() const { return m_resourceIndex; }
+		[[nodiscard]] inline BUFFER_VIEW_TYPE GetType() const { return m_type; }
+		[[nodiscard]] inline IBuffer* GetParentBuffer() const { return m_parentBuffer; }
 
 
 	protected:
 		explicit IBufferView(ILogger& _logger, FreeListAllocator& _allocator, IDevice& _device, IBuffer* _buffer, const BufferViewDesc& _desc)
-		: m_logger(_logger), m_allocator(_allocator), m_device(_device),
+		: m_logger(_logger), m_allocator(_allocator), m_device(_device), m_parentBuffer(_buffer),
 		  m_type(_desc.type), m_offset(_desc.offset), m_size(_desc.size) {}
 		
 		
@@ -33,6 +35,7 @@ namespace NK
 		ILogger& m_logger;
 		FreeListAllocator& m_allocator;
 		IDevice& m_device;
+		IBuffer* m_parentBuffer;
 		
 		ResourceIndex m_resourceIndex{ FreeListAllocator::INVALID_INDEX };
 		BUFFER_VIEW_TYPE m_type;

@@ -13,6 +13,9 @@
 #include <variant>
 #include <vector>
 #include <glm/glm.hpp>
+#ifdef AddJob
+	#undef AddJob
+#endif
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <SFML/Network.hpp>

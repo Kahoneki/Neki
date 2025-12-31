@@ -52,6 +52,7 @@ namespace NK
 		//NVI implementations
 		virtual void TransitionBarrierImpl(ITexture* _texture, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
 		virtual void TransitionBarrierImpl(IBuffer* _buffer, RESOURCE_STATE _oldState, RESOURCE_STATE _newState) override;
+		virtual void ClearReadWriteBufferViewImpl(IBufferView* _bufferView, std::uint32_t _clearUint) override;
 
 
 	private:

@@ -4,6 +4,9 @@
 #include <Components/CPhysicsBody.h>
 #include <Components/CTransform.h>
 
+#ifdef AddJob
+	#undef AddJob
+#endif
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Physics/Body/Body.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>

@@ -1,7 +1,9 @@
 #pragma once
 
 #include <Types/NekiTypes.h>
-
+#ifdef AddJob
+	#undef AddJob
+#endif
 #include <Jolt/Physics/PhysicsSystem.h>
 
 

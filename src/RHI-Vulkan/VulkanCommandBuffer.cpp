@@ -1,6 +1,7 @@
 #include "VulkanCommandBuffer.h"
 
 #include "VulkanBuffer.h"
+#include "VulkanBufferView.h"
 #include "VulkanCommandPool.h"
 #include "VulkanPipeline.h"
 #include "VulkanRootSignature.h"
@@ -11,7 +12,6 @@
 #include <Core/Utils/EnumUtils.h>
 
 #include <stdexcept>
-
 
 
 namespace NK
@@ -596,9 +596,16 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::ClearBuffer(IBuffer* _buffer, std::uint32_t _clearUint)
+	void VulkanCommandBuffer::ClearReadWriteBufferViewImpl(IBufferView* _bufferView, std::uint32_t _clearUint)
 	{
-		vkCmdFillBuffer(m_buffer, dynamic_cast<VulkanBuffer*>(_buffer)->GetBuffer(), 0, _buffer->GetSize(), _clearUint);
+		if (_bufferView->GetType() != BUFFER_VIEW_TYPE::STORAGE_READ_WRITE)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "ClearReadWriteBufferView() - Provided _bufferView is not of required type BUFFER_VIEW_TYPE::STORAGE_READ_WRITE - type = " + std::to_string(std::to_underlying(_bufferView->GetType())) + "\n");
+			throw std::invalid_argument("");
+		}
+
+		VulkanBuffer* vkBuffer{ dynamic_cast<VulkanBuffer*>(_bufferView->GetParentBuffer()) };
+		vkCmdFillBuffer(m_buffer, vkBuffer->GetBuffer(), 0, vkBuffer->GetSize(), _clearUint);
 	}
 
 

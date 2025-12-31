@@ -1,6 +1,9 @@
 #pragma once
 
 #include <Types/NekiTypes.h>
+#ifdef max
+	#undef max
+#endif
 
 
 namespace NK
@@ -12,7 +15,8 @@ namespace NK
 		explicit BroadPhaseLayerInterfaceImpl(const PhysicsLayerDesc& _desc)
 		{
 			m_numBroadPhaseLayers = 0;
-			for (const auto& layer : _desc.objectLayers) {
+			for (const auto& layer : _desc.objectLayers)
+			{
 				m_numBroadPhaseLayers = std::max(m_numBroadPhaseLayers, layer.GetBroadPhaseLayer().GetValue());
 			}
 			++m_numBroadPhaseLayers;

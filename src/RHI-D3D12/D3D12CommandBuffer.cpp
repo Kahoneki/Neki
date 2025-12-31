@@ -1,6 +1,7 @@
 #include "D3D12CommandBuffer.h"
 
 #include "D3D12Buffer.h"
+#include "D3D12BufferView.h"
 #include "D3D12CommandPool.h"
 #include "D3D12Pipeline.h"
 #include "D3D12RootSignature.h"
@@ -652,6 +653,30 @@ namespace NK
 	void D3D12CommandBuffer::ClearTexture(ITexture* _texture, float* _clearColour)
 	{
 		//todo: implement
+	}
+
+
+
+	void D3D12CommandBuffer::ClearReadWriteBufferViewImpl(IBufferView* _bufferView, std::uint32_t _clearUint)
+	{
+		if (_bufferView->GetType() != BUFFER_VIEW_TYPE::STORAGE_READ_WRITE)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::COMMAND_BUFFER, "ClearReadWriteBufferView() - Provided _bufferView is not of required type BUFFER_VIEW_TYPE::STORAGE_READ_WRITE - type = " + std::to_string(std::to_underlying(_bufferView->GetType())) + "\n");
+			throw std::invalid_argument("");
+		}
+
+		D3D12Device& d3d12Device{ dynamic_cast<D3D12Device&>(m_device) };
+		
+		//todo: need to set the descriptor heaps back at the end of the function, this is fine for now because the only place this function is used is before BindRootSignature is called, but that's very obviously janky....
+		ID3D12DescriptorHeap* heaps[]{ d3d12Device.GetResourceDescriptorHeap(), d3d12Device.GetSamplerDescriptorHeap() };
+		m_buffer->SetDescriptorHeaps(2, heaps);
+
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle{ d3d12Device.GetResourceDescriptorHeap()->GetGPUDescriptorHandleForHeapStart() };
+		gpuHandle.ptr += _bufferView->GetIndex() * d3d12Device.GetResourceDescriptorSize();
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle{ d3d12Device.GetNonVisibleResourceDescriptorHeap()->GetCPUDescriptorHandleForHeapStart() };
+		cpuHandle.ptr += _bufferView->GetIndex() * d3d12Device.GetResourceDescriptorSize();
+		UINT clear[4]{ _clearUint, _clearUint, _clearUint, _clearUint };
+		m_buffer->ClearUnorderedAccessViewUint(gpuHandle, cpuHandle, dynamic_cast<D3D12Buffer*>(_bufferView->GetParentBuffer())->GetBuffer(), clear, 0, nullptr);
 	}
 
 

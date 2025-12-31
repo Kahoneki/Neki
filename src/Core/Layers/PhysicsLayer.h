@@ -7,6 +7,9 @@
 #include <Physics/ObjectLayerPairFilterImpl.h>
 #include <Physics/ObjectVsBroadPhaseLayerFilterImpl.h>
 
+#ifdef AddJob
+	#undef AddJob
+#endif
 #include <Jolt/Core/JobSystemThreadPool.h>
 
 

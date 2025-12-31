@@ -77,15 +77,33 @@ namespace NK
 		case BUFFER_VIEW_TYPE::STORAGE_READ_WRITE:
 		{
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-			uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 
-			uavDesc.Buffer.FirstElement = _desc.offset / std::max(std::size_t(1u), _desc.stride);
-			uavDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / std::max(std::size_t(1u), _desc.stride));
-			uavDesc.Buffer.StructureByteStride = _desc.stride;
-			uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+			if (_desc.stride == 0)
+			{
+				uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+				uavDesc.Buffer.FirstElement = _desc.offset / 4;
+				uavDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / 4);
+				uavDesc.Buffer.StructureByteStride = 0;
+				uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+			}
+			else
+			{
+				uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+				uavDesc.Buffer.FirstElement = _desc.offset / std::max(std::size_t(1u), _desc.stride);
+				uavDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / std::max(std::size_t(1u), _desc.stride));
+				uavDesc.Buffer.StructureByteStride = _desc.stride;
+				uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+			}
+			D3D12Device& d3d12Device{ dynamic_cast<D3D12Device&>(m_device) };
+			ID3D12Resource* resource{ d3d12Buffer->GetBuffer() };
 
-			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateUnorderedAccessView(d3d12Buffer->GetBuffer(), nullptr, &uavDesc, addr);
+			d3d12Device.GetDevice()->CreateUnorderedAccessView(resource, nullptr, &uavDesc, addr);
+
+			D3D12_CPU_DESCRIPTOR_HANDLE nonVisibleAddr{ d3d12Device.GetNonVisibleResourceDescriptorHeap()->GetCPUDescriptorHandleForHeapStart() };
+			nonVisibleAddr.ptr += m_resourceIndex * d3d12Device.GetResourceDescriptorSize();
+			d3d12Device.GetDevice()->CreateUnorderedAccessView(resource, nullptr, &uavDesc, nonVisibleAddr);
+
 			break;
 		}
 		}
