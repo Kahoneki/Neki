@@ -51,7 +51,7 @@ void PlayerLayer::Update()
 		glm::vec3 movementDirection{ moveState.values.x, 0, moveState.values.y };
 		if (movementDirection != glm::vec3(0))
 		{
-			transform.SetPosition(transform.GetPosition() + glm::normalize(movementDirection) * player.movementSpeed * static_cast<float>(NK::TimeManager::GetDeltaTime()));
+			transform.SetPosition(transform.GetLocalPosition() + glm::normalize(movementDirection) * player.movementSpeed * static_cast<float>(NK::TimeManager::GetDeltaTime()));
 		}
 
 
@@ -69,5 +69,5 @@ void PlayerLayer::Update()
 void PlayerLayer::HandleJump(const PlayerJumpEvent& _event)
 {
 	NK::CTransform& transform{ m_reg.get().GetComponent<NK::CTransform&>(_event.entity) };
-	transform.SetPosition(transform.GetPosition() + glm::vec3(0, 0.25f, 0));
+	transform.SetPosition(transform.GetLocalPosition() + glm::vec3(0, 0.25f, 0));
 }

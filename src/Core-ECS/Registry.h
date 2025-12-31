@@ -145,6 +145,18 @@ namespace NK
 			}
 			return GetPool<Component>()->entityToIndex.contains(_entity);
 		}
+		
+		
+		//Returns true if _entity has component with type index _index
+		[[nodiscard]] inline bool HasComponent(const Entity _entity, const std::type_index _index) const
+		{
+			if (!m_entityComponents.contains(_entity))
+			{
+				throw std::invalid_argument("Registry::HasComponent() - provided _entity (" + std::to_string(_entity) + ") is not in registry.");
+			}
+
+			return (std::ranges::find(m_entityComponents.at(_entity), _index) != m_entityComponents.at(_entity).end());
+		}
 
 		
 		//Returns const-reference to Component component on _entity
@@ -202,8 +214,12 @@ namespace NK
 			}
 			return pool->indexToEntity[componentPtr - poolComponentsBegin];
 		}
-		
 	
+		
+		[[nodiscard]] inline std::vector<std::type_index> GetEntityComponents(const Entity _entity) const { return m_entityComponents.at(_entity); }
+		[[nodiscard]] inline IComponentPool* GetPool(const std::type_index _index) const { return m_componentPools.at(_index).get(); }
+		
+		
 	private:
 		template<typename Component>
 		[[nodiscard]] inline const ComponentPool<Component>* GetPool() const

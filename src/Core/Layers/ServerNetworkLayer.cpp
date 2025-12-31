@@ -373,9 +373,9 @@ namespace NK
 		{
 			NetworkTransformData data{};
 			data.entity = m_reg.get().GetEntity(transform);
-			data.pos = transform.GetPosition();
-			data.rot = transform.GetRotation();
-			data.scale = transform.GetScale();
+			data.pos = transform.GetLocalPosition();
+			data.rot = transform.GetLocalRotation();
+			data.scale = transform.GetLocalScale();
 			transformComponents.push(data);
 		}
 		if (transformComponents.empty())

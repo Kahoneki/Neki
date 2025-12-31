@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CImGuiInspectorRenderable.h"
+
 #include <Types/NekiTypes.h>
 
 

@@ -56,8 +56,9 @@ public:
 
 		m_lightEntity = m_reg.Create();
 		NK::CTransform& directionalLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity) };
-		directionalLightTransform.SetRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
-		directionalLightTransform.SetPosition({ 0.0f, 10.0f, 5.0f });
+		directionalLightTransform.name = "Directional Light";
+		directionalLightTransform.SetLocalRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
+		directionalLightTransform.SetLocalPosition({ 0.0f, 10.0f, 5.0f });
 		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity) };
 		directionalLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
 		directionalLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
@@ -69,26 +70,28 @@ public:
 		NK::CModelRenderer& floorModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_floorEntity) };
 		floorModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
 		NK::CTransform& floorTransform{ m_reg.AddComponent<NK::CTransform>(m_floorEntity) };
-		floorTransform.SetPosition({ 0, 0.0f, 0.0f });
-		floorTransform.SetScale({ 5.0f, 0.2f, 5.0f });
+		floorTransform.name = "Floor";
+		floorTransform.SetLocalPosition({ 0, 0.0f, 0.0f });
+		floorTransform.SetLocalScale({ 5.0f, 0.2f, 5.0f });
 		NK::CPhysicsBody& floorPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_floorEntity) };
 		floorPhysicsBody.initialMotionType = NK::MOTION_TYPE::KINEMATIC;
 		floorPhysicsBody.initialObjectLayer = floorObjectLayer;
 		NK::CBoxCollider& floorCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_floorEntity) };
-		floorCollider.halfExtents = { 5.0f, 0.2f, 5.0f };
+		floorCollider.SetHalfExtents({ 1.0f, 1.0f, 1.0f });
 		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
 		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
 		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
-		helmetTransform.SetPosition({ 0, 3.0f, 0.0f });
-		helmetTransform.SetScale({ 1.0f, 1.0f, 1.0f });
-		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
+		helmetTransform.name = "Helmet";
+		helmetTransform.SetLocalPosition({ 0, 3.0f, 0.0f });
+		helmetTransform.SetLocalScale({ 1.0f, 1.0f, 1.0f });
+		helmetTransform.SetLocalRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 		NK::CPhysicsBody& helmetPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_helmetEntity) };
 		helmetPhysicsBody.initialMotionType = NK::MOTION_TYPE::DYNAMIC;
 		helmetPhysicsBody.initialObjectLayer = helmetObjectLayer;
 		NK::CBoxCollider& helmetCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_helmetEntity) };
-		helmetCollider.halfExtents = { 0.944977, 1.000000, 0.900984 };
+		helmetCollider.SetHalfExtents({ 0.944977, 1.000000, 0.900984 });
 
 
 		m_cameraEntity = m_reg.Create();
@@ -128,117 +131,120 @@ public:
 
 
 		//ImGui for lights
-		if (ImGui::Begin("Light Controls"))
-		{
-			auto DrawLightNode{ [&](const char* label, NK::Entity entity)
-			{
-				if (ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen))
-				{
-					ImGui::PushID(static_cast<int>(entity));
-
-					//Position
-					NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(entity);
-					glm::vec3 pos{ transform.GetPosition() };
-					if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
-					{
-						transform.SetPosition(pos);
-					}
-
-					//Rotation
-					glm::vec3 rot{ glm::degrees(transform.GetRotation()) };
-					if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f))
-					{
-						transform.SetRotation(glm::radians(rot));
-					}
-
-
-					//Light properties
-					NK::CLight& lightComp = m_reg.GetComponent<NK::CLight>(entity);
-					if (lightComp.light)
-					{
-						//Colour
-						glm::vec3 color = lightComp.light->GetColour();
-						if (ImGui::ColorEdit3("Colour", &color.x))
-						{
-							lightComp.light->SetColour(color);
-						}
-
-						//Intensity
-						float intensity = lightComp.light->GetIntensity();
-						if (ImGui::DragFloat("Intensity", &intensity, 0.1f, 0.0f, 100.0f))
-						{
-							lightComp.light->SetIntensity(intensity);
-						}
-
-						if (NK::PointLight * pointLight{ dynamic_cast<NK::PointLight*>(lightComp.light.get()) })
-						{
-							//Attenuation
-							float constant{ pointLight->GetConstantAttenuation() };
-							if (ImGui::DragFloat("Constant", &constant, 0.01f, 0.0f, 100.0f)) { pointLight->SetConstantAttenuation(constant); }
-							float linear{ pointLight->GetLinearAttenuation() };
-							if (ImGui::DragFloat("Linear", &linear, 0.01f, 0.0f, 100.0f)) { pointLight->SetLinearAttenuation(linear); }
-							float quadratic{ pointLight->GetQuadraticAttenuation() };
-							if (ImGui::DragFloat("Quadratic", &quadratic, 0.01f, 0.0f, 100.0f)) { pointLight->SetQuadraticAttenuation(quadratic); }
-
-							if (NK::SpotLight * spotLight{ dynamic_cast<NK::SpotLight*>(pointLight) })
-							{
-								//Angles
-								float innerAngle{ glm::degrees(spotLight->GetInnerAngle()) };
-								if (ImGui::DragFloat("Inner (deg)", &innerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetInnerAngle(glm::radians(innerAngle)); }
-								float outerAngle{ glm::degrees(spotLight->GetOuterAngle()) };
-								if (ImGui::DragFloat("Outer (deg)", &outerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetOuterAngle(glm::radians(outerAngle)); }
-							}
-						}
-					}
-					ImGui::PopID();
-				}
-			} };
-
-			DrawLightNode("Directional Light", m_lightEntity);
-
-			if (ImGui::CollapsingHeader("Helmet", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::PushID(static_cast<int>(m_helmetEntity));
-				NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
-				glm::vec3 pos{ transform.GetPosition() };
-				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
-				{
-					transform.SetPosition(pos);
-				}
-				ImGui::PopID();
-			}
-			
-			if (ImGui::CollapsingHeader("Floor", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::PushID(static_cast<int>(m_floorEntity));
-				NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_floorEntity) };
-				glm::vec3 pos{ transform.GetPosition() };
-				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
-				{
-					transform.SetPosition(pos);
-				}
-				ImGui::PopID();
-			}
-			
-
-			if (ImGui::Button("Swap Skybox"))
-			{
-				NK::CSkybox& skybox{ m_reg.GetComponent<NK::CSkybox>(m_skyboxEntity) };
-				if (skybox.GetSkyboxFilepath() == "Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx")
-				{
-					skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/skybox.ktx");
-					skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/irradiance.ktx");
-					skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/prefilter.ktx");
-				}
-				else
-				{
-					skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
-					skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
-					skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
-				}
-			}
-		}
-		ImGui::End();
+		// #if NEKI_EDITOR
+		// 	if (ImGui::Begin("Light Controls"))
+		// 	{
+		// 		auto DrawLightNode{ [&](const char* label, NK::Entity entity)
+		// 		{
+		// 			if (ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen))
+		// 			{
+		// 				ImGui::PushID(static_cast<int>(entity));
+		//
+		// 				//Position
+		// 				NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(entity);
+		// 				glm::vec3 pos{ transform.GetLocalPosition() };
+		// 				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
+		// 				{
+		// 					transform.SetPosition(pos);
+		// 				}
+		//
+		// 				//Rotation
+		// 				glm::vec3 rot{ glm::degrees(transform.GetLocalRotation()) };
+		// 				if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f))
+		// 				{
+		// 					transform.SetRotation(glm::radians(rot));
+		// 				}
+		//
+		//
+		// 				//Light properties
+		// 				NK::CLight& lightComp = m_reg.GetComponent<NK::CLight>(entity);
+		// 				if (lightComp.light)
+		// 				{
+		// 					//Colour
+		// 					glm::vec3 color = lightComp.light->GetColour();
+		// 					if (ImGui::ColorEdit3("Colour", &color.x))
+		// 					{
+		// 						lightComp.light->SetColour(color);
+		// 					}
+		//
+		// 					//Intensity
+		// 					float intensity = lightComp.light->GetIntensity();
+		// 					if (ImGui::DragFloat("Intensity", &intensity, 0.1f, 0.0f, 100.0f))
+		// 					{
+		// 						lightComp.light->SetIntensity(intensity);
+		// 					}
+		//
+		// 					if (NK::PointLight * pointLight{ dynamic_cast<NK::PointLight*>(lightComp.light.get()) })
+		// 					{
+		// 						//Attenuation
+		// 						float constant{ pointLight->GetConstantAttenuation() };
+		// 						if (ImGui::DragFloat("Constant", &constant, 0.01f, 0.0f, 100.0f)) { pointLight->SetConstantAttenuation(constant); }
+		// 						float linear{ pointLight->GetLinearAttenuation() };
+		// 						if (ImGui::DragFloat("Linear", &linear, 0.01f, 0.0f, 100.0f)) { pointLight->SetLinearAttenuation(linear); }
+		// 						float quadratic{ pointLight->GetQuadraticAttenuation() };
+		// 						if (ImGui::DragFloat("Quadratic", &quadratic, 0.01f, 0.0f, 100.0f)) { pointLight->SetQuadraticAttenuation(quadratic); }
+		//
+		// 						if (NK::SpotLight * spotLight{ dynamic_cast<NK::SpotLight*>(pointLight) })
+		// 						{
+		// 							//Angles
+		// 							float innerAngle{ glm::degrees(spotLight->GetInnerAngle()) };
+		// 							if (ImGui::DragFloat("Inner (deg)", &innerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetInnerAngle(glm::radians(innerAngle)); }
+		// 							float outerAngle{ glm::degrees(spotLight->GetOuterAngle()) };
+		// 							if (ImGui::DragFloat("Outer (deg)", &outerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetOuterAngle(glm::radians(outerAngle)); }
+		// 						}
+		// 					}
+		// 				}
+		// 				ImGui::PopID();
+		// 			}
+		// 		} };
+		//
+		// 		DrawLightNode("Directional Light", m_lightEntity);
+		//
+		// 		if (ImGui::CollapsingHeader("Helmet", ImGuiTreeNodeFlags_DefaultOpen))
+		// 		{
+		// 			ImGui::PushID(static_cast<int>(m_helmetEntity));
+		// 			NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+		// 			glm::vec3 pos{ transform.GetLocalPosition() };
+		// 			if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
+		// 			{
+		// 				transform.SetPosition(pos);
+		// 			}
+		// 			ImGui::PopID();
+		// 		}
+		// 		
+		// 		if (ImGui::CollapsingHeader("Floor", ImGuiTreeNodeFlags_DefaultOpen))
+		// 		{
+		// 			ImGui::PushID(static_cast<int>(m_floorEntity));
+		// 			NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_floorEntity) };
+		// 			glm::vec3 pos{ transform.GetLocalPosition() };
+		// 			if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
+		// 			{
+		// 				transform.SetPosition(pos);
+		// 			}
+		// 			ImGui::PopID();
+		// 		}
+		// 		
+		//
+		// 		if (ImGui::Button("Swap Skybox"))
+		// 		{
+		// 			NK::CSkybox& skybox{ m_reg.GetComponent<NK::CSkybox>(m_skyboxEntity) };
+		// 			if (skybox.GetSkyboxFilepath() == "Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx")
+		// 			{
+		// 				skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/skybox.ktx");
+		// 				skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/irradiance.ktx");
+		// 				skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/prefilter.ktx");
+		// 			}
+		// 			else
+		// 			{
+		// 				skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
+		// 				skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
+		// 				skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
+		// 			}
+		// 		}
+		// 	}
+		// 	ImGui::End();
+		//
+		// #endif
 	}
 	
 	
@@ -274,7 +280,7 @@ public:
 		//Window
 		NK::WindowDesc windowDesc;
 		windowDesc.name = "Rendering Sample";
-		windowDesc.size = { 1920, 1080 };
+		windowDesc.size = { 3840, 2160 };
 		m_window = NK::UniquePtr<NK::Window>(NK_NEW(NK::Window, windowDesc));
 		m_window->SetCursorVisibility(false);
 
@@ -292,7 +298,7 @@ public:
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 		renderLayerDesc.enableMSAA = false;
 		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
-		renderLayerDesc.enableSSAA = false;
+		renderLayerDesc.enableSSAA = true;
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.window = m_window.get();
 		renderLayerDesc.framesInFlight = 3;
@@ -329,14 +335,17 @@ public:
 		m_scenes[m_activeScene]->Update();
 
 		glfwSetWindowShouldClose(m_window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
-		if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::E) && !m_editorActiveKeyPressedLastFrame)
-		{
-			NK::Context::SetEditorActive(!NK::Context::GetEditorActive());
-		}
-		m_editorActiveKeyPressedLastFrame = NK::InputManager::GetKeyPressed(NK::KEYBOARD::E);
+		
+		#if NEKI_EDITOR
+			if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::E) && !m_editorActiveKeyPressedLastFrame)
+			{
+				NK::Context::SetEditorActive(!NK::Context::GetEditorActive());
+			}
+			m_editorActiveKeyPressedLastFrame = NK::InputManager::GetKeyPressed(NK::KEYBOARD::E);
 
-		m_window->SetCursorVisibility(NK::Context::GetEditorActive());
-
+			m_window->SetCursorVisibility(NK::Context::GetEditorActive());
+		#endif
+		
 		m_shutdown = m_window->ShouldClose();
 	}
 
@@ -345,8 +354,10 @@ private:
 	NK::UniquePtr<NK::Window> m_window;
 	NK::Entity m_windowEntity;
 
-	bool m_editorActiveKeyPressedLastFrame{ false };
-
+	#if NEKI_EDITOR
+		bool m_editorActiveKeyPressedLastFrame{ false };
+	#endif
+	
 	//Pre-app layers
 	NK::UniquePtr<NK::WindowLayer> m_windowLayer;
 	NK::UniquePtr<NK::InputLayer> m_inputLayer;

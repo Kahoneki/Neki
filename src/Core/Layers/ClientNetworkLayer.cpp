@@ -268,9 +268,9 @@ namespace NK
 				{
 					const NetworkTransformData& data{ transformData.back() };
 					CTransform& trans{ m_reg.get().GetComponent<CTransform>(data.entity) };
-					trans.SetPosition(data.pos);
-					trans.SetRotation(data.rot);
-					trans.SetScale(data.scale);
+					trans.SetLocalPosition(data.pos);
+					trans.SetLocalRotation(data.rot);
+					trans.SetLocalScale(data.scale);
 					transformData.pop();
 				}
 				break;

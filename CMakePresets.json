@@ -10,7 +10,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "NEKI_BUILD_VULKAN": "ON",
-        "NEKI_BUILD_D3D12": "OFF"
+        "NEKI_BUILD_D3D12": "OFF",
+        "NEKI_ENABLE_EDITOR": "OFF"
       }
     },
 
@@ -23,7 +24,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "NEKI_BUILD_VULKAN": "OFF",
-        "NEKI_BUILD_D3D12": "ON"
+        "NEKI_BUILD_D3D12": "ON",
+        "NEKI_ENABLE_EDITOR": "OFF"
       }
     },
 
@@ -36,7 +38,51 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "NEKI_BUILD_VULKAN": "ON",
-        "NEKI_BUILD_D3D12": "ON"
+        "NEKI_BUILD_D3D12": "ON",
+        "NEKI_ENABLE_EDITOR": "OFF"
+      }
+    },
+
+    
+    {
+      "name": "Vulkan Development (Debug)",
+      "displayName": "Vulkan Development (Debug)",
+      "description": "Builds with Vulkan backend for debugging",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/vulkan-development-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NEKI_BUILD_VULKAN": "ON",
+        "NEKI_BUILD_D3D12": "OFF",
+        "NEKI_ENABLE_EDITOR": "ON"
+      }
+    },
+
+    {
+      "name": "D3D12 Development (Debug)",
+      "displayName": "D3D12 Development (Debug)",
+      "description": "Builds with D3D12 backend for debugging",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/d3d12-development-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NEKI_BUILD_VULKAN": "OFF",
+        "NEKI_BUILD_D3D12": "ON",
+        "NEKI_ENABLE_EDITOR": "ON"
+      }
+    },
+
+    {
+      "name": "Vulkan/D3D12 Development (Debug)",
+      "displayName": "Vulkan/D3D12 Development (Debug)",
+      "description": "Builds with both Vulkan and D3D12 backends for cross-api debugging",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/cross-api-development-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NEKI_BUILD_VULKAN": "ON",
+        "NEKI_BUILD_D3D12": "ON",
+        "NEKI_ENABLE_EDITOR": "ON"
       }
     }
   ]

@@ -4,6 +4,7 @@
 #include <Components/CPhysicsBody.h>
 #include <Components/CTransform.h>
 
+
 #ifdef AddJob
 	#undef AddJob
 #endif
@@ -13,6 +14,7 @@
 #include <Jolt/Physics/Body/BodyInterface.h>
 #include <Jolt/Physics/Body/MotionProperties.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
 
 #include "Core/Utils/EnumUtils.h"
 
@@ -53,13 +55,15 @@ namespace NK
 	{
 		JPH::BodyInterface& bodyInterface{ m_physicsSystem.GetBodyInterface() };
 		
-		//Initialise any new bodies
 		for (auto&& [body, box, transform] : m_reg.get().View<CPhysicsBody, CBoxCollider, CTransform>())
 		{
+			//Initialise new body
 			if (body.bodyID == 0xFFFFFFFF)
 			{
-				JPH::BoxShapeSettings shapeSettings{ GLMToJPH(box.halfExtents) };
-				JPH::ShapeSettings::ShapeResult shapeResult{ shapeSettings.Create() };
+				JPH::Ref<JPH::BoxShapeSettings> baseShapeSettings{ new JPH::BoxShapeSettings(GLMToJPH(box.halfExtents)) };
+				box.halfExtentsDirty = false;
+				JPH::ScaledShapeSettings scaledShapeSettings{ baseShapeSettings, GLMToJPH(transform.GetWorldScale()) };
+				JPH::ShapeSettings::ShapeResult shapeResult{ scaledShapeSettings.Create() };
 
 				JPH::EMotionType motionType{};
 				switch (body.initialMotionType)
@@ -74,7 +78,7 @@ namespace NK
 				}
 				}
 
-				JPH::BodyCreationSettings creationSettings{ shapeResult.Get(), GLMToJPH(transform.GetPosition()), GLMToJPH(transform.GetRotationQuat()), motionType, body.initialObjectLayer.GetValue() };
+				JPH::BodyCreationSettings creationSettings{ shapeResult.Get(), GLMToJPH(transform.GetWorldPosition()), GLMToJPH(transform.GetWorldRotationQuat()), motionType, body.initialObjectLayer.GetValue() };
 				creationSettings.mFriction = body.GetFriction();
 				creationSettings.mRestitution = body.GetRestitution();
 				creationSettings.mLinearDamping = body.GetLinearDamping();
@@ -109,7 +113,7 @@ namespace NK
 			if (transform.physicsSyncDirty)
 			{
 				//The transform was updated by something other than the jolt->ctransform sync (e.g.: imgui), perform a ctransform->jolt sync
-				bodyInterface.SetPositionAndRotation(JPH::BodyID(body.bodyID), GLMToJPH(transform.GetPosition()), GLMToJPH(transform.GetRotationQuat()), JPH::EActivation::Activate);
+				bodyInterface.SetPositionAndRotation(JPH::BodyID(body.bodyID), GLMToJPH(transform.GetWorldPosition()), GLMToJPH(transform.GetWorldRotationQuat()), JPH::EActivation::Activate);
 				
 				//Zero out the velocity to avoid a large jump
 				bodyInterface.SetLinearAndAngularVelocity(JPH::BodyID(body.bodyID), JPH::Vec3::sZero(), JPH::Vec3::sZero());
@@ -117,9 +121,9 @@ namespace NK
 				transform.physicsSyncDirty = false;
 			}
 
+			JPH::BodyID id(body.bodyID);
 			if (body.dirtyFlags != PHYSICS_DIRTY_FLAGS::CLEAN)
 			{
-				JPH::BodyID id(body.bodyID);
 				JPH::Body* jphBody{ m_physicsSystem.GetBodyLockInterfaceNoLock().TryGetBody(id) };
 				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::FRICTION)) bodyInterface.SetFriction(id, body.GetFriction());
 				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::RESTITUTION)) bodyInterface.SetRestitution(id, body.GetRestitution());
@@ -143,10 +147,19 @@ namespace NK
 				}
 				body.dirtyFlags = PHYSICS_DIRTY_FLAGS::CLEAN;
 			}
+			if (box.halfExtentsDirty)
+			{
+				JPH::BoxShapeSettings newShapeSettings{ GLMToJPH(box.halfExtents * transform.GetWorldScale()) };
+				bodyInterface.SetShape(id, newShapeSettings.Create().Get(), true, JPH::EActivation::Activate);
+				box.halfExtentsDirty = false;
+			}
 		}
 		
-		//Step the world
-		m_physicsSystem.Update(Context::GetFixedUpdateTimestep(), 4, m_tempAllocator, m_jobSystem);
+		//Step the world if not paused
+		if (!Context::GetPaused())
+		{
+			m_physicsSystem.Update(Context::GetFixedUpdateTimestep(), 4, m_tempAllocator, m_jobSystem);
+		}
 		
 		//Sync jolt -> ctransform
 		for (auto&& [body, transform] : m_reg.get().View<CPhysicsBody, CTransform>())

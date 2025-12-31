@@ -861,7 +861,7 @@ namespace NK
 		RESTITUTION = 1 << 1,
 		DAMPING = 1 << 2,
 		GRAVITY = 1 << 3,
-		MASS = 1 << 4
+		MASS = 1 << 4,
 	};
 	ENABLE_BITMASK_OPERATORS(PHYSICS_DIRTY_FLAGS)
 	

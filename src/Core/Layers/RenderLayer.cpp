@@ -1,8 +1,11 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include "RenderLayer.h"
 
+#include <Components/CBoxCollider.h>
 #include <Components/CLight.h>
 #include <Components/CModelRenderer.h>
+#include <Components/CSelected.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <Core/Utils/TextureCompressor.h>
@@ -40,6 +43,8 @@
 #ifdef NEKI_D3D12_SUPPORTED
 	#include <backends/imgui_impl_dx12.h>
 #endif
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 
 
 namespace NK
@@ -1522,13 +1527,38 @@ namespace NK
 
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
-
-		UpdateImGui();
+		ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+		
+		
+		#if(NEKI_EDITOR)
+			ImGuizmo::BeginFrame();
+			ImGuizmo::SetRect(0, 0, ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
+			
+			//Camera isn't defined in pre app update for first frame
+			if (!m_firstFrame)
+			{
+				bool found{ false };
+				for (auto&& [camera] : m_reg.get().View<CCamera>())
+				{
+					if (found)
+					{
+						m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
+						break;
+					}
+					found = true;
+					UpdateImGui(camera);
+				}
+				if (!found)
+				{
+					m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
+				}
+			}
+		#endif
 	}
-
-
-
-	void RenderLayer::UpdateImGui()
+	
+	
+	
+	void RenderLayer::UpdateImGui(const CCamera& _camera)
 	{
 		if (ImGui::Begin("Postprocessing Settings"))
 		{
@@ -1542,8 +1572,235 @@ namespace NK
 			ImGui::DragFloat("Exposure", &m_acesExposure, 0.01f, 0.0f, 10.0f);
 		}
 		ImGui::End();
+		
+		
+		if (ImGui::Begin("Hierarchy"))
+		{
+			for (auto&& [transform] : m_reg.get().View<CTransform>())
+			{
+				if (transform.GetParent() != nullptr)
+				{
+					//Entities with parents will be drawn when they're recursively called from their parent's draw
+					continue;
+				}
+				
+				//Object is top level (no children), draw hierarchy
+				DrawImGuiHierarchy(transform);
+			}
+			
+			//Drag to empty space to unparent
+			ImGui::Spacing();
+			ImGui::Dummy(ImGui::GetContentRegionAvail()); //Create a dummy widget for the remaining space in the window to be able to drag into
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload{ ImGui::AcceptDragDropPayload("REPARENT_ENTITY") })
+				{
+					const Entity child{ *static_cast<const Entity*>(payload->Data) };
+					m_reg.get().GetComponent<CTransform>(child).SetParent(m_reg, nullptr);
+				}
+				ImGui::EndDragDropTarget();
+			}
+		}
+		ImGui::End();
+		
+		
+		if (ImGui::Begin("Inspector"))
+		{
+			for (auto&& [selected] : m_reg.get().View<CSelected>())
+			{
+				const Entity entity{ m_reg.get().GetEntity(selected) };
+				
+				ImGui::PushID(entity);
+				for (const std::type_index componentTypeIndex : m_reg.get().GetEntityComponents(entity))
+				{
+					//this is a bit yucky as it makes use of implementation-level registry access, but i can't think of a cleaner way of doing it, and it works for now.... so....
+					IComponentPool* pool{ m_reg.get().GetPool(componentTypeIndex) };
+					CImGuiInspectorRenderable* imGuiInspectorRenderable{ pool->GetAsImGuiInspectorRenderableComponent(entity) };
+					if (imGuiInspectorRenderable != nullptr)
+					{
+						//This component has a RenderImGuiInspectorContents() function
+						ImGui::PushID(componentTypeIndex.hash_code());
+						if (ImGui::CollapsingHeader(imGuiInspectorRenderable->GetComponentName().c_str(), imGuiInspectorRenderable->GetTreeNodeFlags()))
+						{
+							ImGui::Indent();
+							imGuiInspectorRenderable->RenderImGuiInspectorContents(m_reg, imGuiInspectorRenderable);
+							ImGui::Unindent();
+							
+							ImGui::Spacing();
+							ImGui::Spacing();
+							
+							ImGui::Separator();
+							
+							ImGui::Spacing();
+							ImGui::Spacing();
+						}
+						ImGui::PopID();
+					}
+				}
+				ImGui::PopID();
+			}
+		}
+		ImGui::End();
+		
+		
+		if (ImGui::Begin("Gizmo Settings"))
+		{
+			if (ImGui::RadioButton("Translate", m_currentGizmoOp == ImGuizmo::TRANSLATE)) { m_currentGizmoOp = ImGuizmo::TRANSLATE; }
+			ImGui::SameLine();
+			if (ImGui::RadioButton("Rotate", m_currentGizmoOp == ImGuizmo::ROTATE)) { m_currentGizmoOp = ImGuizmo::ROTATE; }
+			ImGui::SameLine();
+			if (ImGui::RadioButton("Scale", m_currentGizmoOp == ImGuizmo::SCALE)) { m_currentGizmoOp = ImGuizmo::SCALE; }
+
+			ImGui::Separator();
+
+			if (ImGui::RadioButton("Local", m_currentGizmoMode == ImGuizmo::LOCAL)) { m_currentGizmoMode = ImGuizmo::LOCAL; }
+			ImGui::SameLine();
+			if (ImGui::RadioButton("World", m_currentGizmoMode == ImGuizmo::WORLD)) { m_currentGizmoMode = ImGuizmo::WORLD; }
+		}
+		ImGui::End();
+		
+		
+		if (ImGui::Begin("Editor Settings"))
+		{
+			bool paused{ Context::GetPaused() };
+			int fixedUpdatesPerSecond{ static_cast<int>(std::round(1.0f / Context::GetFixedUpdateTimestep())) };
+			if (ImGui::Checkbox("Pause", &paused)) { Context::SetPaused(paused); }
+			ImGui::SameLine();
+			if (ImGui::DragInt("Fixed Updates Per Second", &fixedUpdatesPerSecond, 1, 1)) { Context::SetFixedUpdateTimestep(1.0f / std::max(1, fixedUpdatesPerSecond)); }
+		}
+		ImGui::End();
+		
+		
+		ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
+		ImGuizmo::SetOrthographic(false);
+		
+		for (auto&& [selected] : m_reg.get().View<CSelected>())
+		{
+			//Entity is selected
+			const Entity selectedEntity{ m_reg.get().GetEntity(selected) };
+			if (m_reg.get().HasComponent<CTransform>(selectedEntity))
+			{
+				CTransform& transform{ m_reg.get().GetComponent<CTransform>(selectedEntity) };
+				glm::mat4 modelMatrix{ transform.GetModelMatrix() };
+				CameraShaderData camData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
+			
+				const float aspect{ static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y };
+				const glm::mat4 imguiProj{ glm::perspectiveLH_ZO(glm::radians(_camera.camera->GetFOV()), aspect, 0.1f, 1000.0f) };
+		
+				ImGuizmo::Manipulate(glm::value_ptr(camData.viewMat), glm::value_ptr(imguiProj), m_currentGizmoOp, m_currentGizmoMode, glm::value_ptr(modelMatrix));
+			
+				//If the user updated the gizmo, update the CTransform to match
+				if (ImGuizmo::IsUsing())
+				{
+					glm::mat4 newLocalMatrix = modelMatrix;
+					if (transform.GetParent())
+					{
+						glm::mat4 parentInverse = glm::inverse(transform.GetParent()->GetModelMatrix());
+						newLocalMatrix = parentInverse * modelMatrix;
+					}
+
+					glm::vec3 scale, translation, skew;
+					glm::quat orientation;
+					glm::vec4 perspective;
+					if (glm::decompose(newLocalMatrix, scale, orientation, translation, skew, perspective))
+					{
+						transform.SetLocalPosition(translation);
+						transform.SetLocalRotation(glm::normalize(orientation));
+						transform.SetLocalScale(scale);
+					}
+				}
+				
+				//Reshaping an object's collider is very expensive so don't apply continuous updates as scale changes, only do it when the user lets go
+				bool isUsing{ ImGuizmo::IsUsing() };
+				static bool wasUsing{ false };
+				if (wasUsing && !isUsing && m_currentGizmoOp == ImGuizmo::SCALE)
+				{
+					if (m_reg.get().HasComponent<CBoxCollider>(selectedEntity))
+					{
+						m_reg.get().GetComponent<CBoxCollider>(selectedEntity).halfExtentsDirty = true;
+					}
+				}
+				wasUsing = isUsing;
+			}
+		}
 	}
 
+	
+	
+	void RenderLayer::DrawImGuiHierarchy(CTransform& _transform) const
+	{
+		DrawImGuiHierarchyNode(_transform);
+		ImGui::Indent();
+		for (CTransform* child : _transform.children)
+		{
+			DrawImGuiHierarchy(*child); //Recursive
+		}
+		ImGui::Unindent();
+	}
+
+
+	void RenderLayer::DrawImGuiHierarchyNode(CTransform& _transform) const
+	{
+		const Entity entity{ m_reg.get().GetEntity(_transform) };
+		ImGui::PushID(entity);
+				
+		const bool isSelected{ m_reg.get().HasComponent<CSelected>(entity) };
+
+		char label[256];
+		sprintf(label, _transform.name.c_str());
+		if (ImGui::Selectable(label, isSelected))
+		{
+			//Clear previous selection (only one selection is allowed at a time)
+			for (auto&& [selected] : m_reg.get().View<CSelected>())
+			{
+				m_reg.get().RemoveComponent<CSelected>(m_reg.get().GetEntity(selected));
+			}
+					
+			if (!isSelected)
+			{
+				m_reg.get().AddComponent<CSelected>(entity);
+			}
+		}
+				
+		//Drag source (the object being moved)
+		if (ImGui::BeginDragDropSource())
+		{
+			//Use the entity id as the drag/drop payload
+			ImGui::SetDragDropPayload("REPARENT_ENTITY", &entity, sizeof(Entity));
+			ImGui::Text("Reparent %s", _transform.name.c_str());
+			ImGui::EndDragDropSource();
+		}
+				
+		//Drag target (the potential new parent)
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload{ ImGui::AcceptDragDropPayload("REPARENT_ENTITY") })
+			{
+				const Entity child{ *static_cast<const Entity*>(payload->Data) };
+						
+				//Dont let parent self
+				if (child != entity)
+				{
+					if (!m_reg.get().GetComponent<CTransform>(child).SetParent(m_reg, &_transform))
+					{
+						m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Failed to reparent! Circular dependency detected\n");
+					}
+					else
+					{
+						//If child has a collider, it needs to be recalculated
+						if (m_reg.get().HasComponent<CBoxCollider>(child))
+						{
+							//Technically the halfExtents property isn't changing, so this is a bit misleading - this is just the flag that tells jolt to recalculate the extents (using the new hierarchy)
+							m_reg.get().GetComponent<CBoxCollider>(child).halfExtentsDirty = true;
+						}
+					}
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+		
+		ImGui::PopID();
+	}
 
 
 	void RenderLayer::PostAppUpdate()
@@ -1741,7 +1998,7 @@ namespace NK
 
 		execDesc.samplers.Set("SAMPLER", m_linearSampler.get());
 		execDesc.samplers.Set("BRDF_LUT_SAMPLER", m_linearSampler.get());
-
+		
 		ImGui::Render();
 		
 		m_meshRenderGraph->Execute(execDesc);
@@ -1883,16 +2140,16 @@ namespace NK
 			LightShaderData shaderData{};
 			shaderData.colour = light.light->GetColour();
 			shaderData.intensity = light.light->GetIntensity();
-			shaderData.position = transform.GetPosition();
+			shaderData.position = transform.GetLocalPosition();
 			shaderData.type = light.lightType;
 			shaderData.shadowMapIndex = light.light->GetShadowMapIndex();
 
 			//Calculate direction and view matrix from rotation
-			const glm::quat orientation{ glm::quat(transform.GetRotation()) };
+			const glm::quat orientation{ glm::quat(transform.GetLocalRotation()) };
 			shaderData.direction = glm::normalize(orientation * glm::vec3(0, 0, 1));
 			const glm::vec3 forward{ glm::normalize(orientation * glm::vec3(0, 0, 1)) };
 			const glm::vec3 up{ glm::normalize(orientation * glm::vec3(0, 1, 0)) };
-			const glm::mat4 viewMat{ glm::lookAtLH(transform.GetPosition(), transform.GetPosition() + forward, up) };
+			const glm::mat4 viewMat{ glm::lookAtLH(transform.GetLocalPosition(), transform.GetLocalPosition() + forward, up) };
 			
 			switch (light.lightType)
 			{

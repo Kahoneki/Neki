@@ -48,5 +48,6 @@ namespace NK
 		float linearDamping{ 0.05f };
 		float angularDamping{ 0.05f };
 		float gravityFactor{ 1.0f };
+		glm::vec3 scale{ 1.0f, 1.0f, 1.0f };
 	};
 }

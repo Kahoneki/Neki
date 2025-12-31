@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BaseComponent.h"
+
 #include <Core/Utils/Serialisation/Serialisation.h>
 #include <Core/Utils/Serialisation/TypeRegistry.h>
 #include <Types/NekiTypes.h>

@@ -1,6 +1,9 @@
 #pragma once
 
+#include "CImGuiInspectorRenderable.h"
+
 #include <string>
+
 
 
 namespace NK

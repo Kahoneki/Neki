@@ -14,6 +14,8 @@ namespace NK
 	{
 		virtual ~IComponentPool() = default;
 		virtual void RemoveEntity(Entity _entity) = 0;
+		//Returns the component for a given entity as a CImGuiInspectorRenderable* if possible
+		virtual class CImGuiInspectorRenderable* GetAsImGuiInspectorRenderableComponent(Entity _entity) = 0;
 	};
 
 	
@@ -43,6 +45,19 @@ namespace NK
 			components.pop_back();
 			indexToEntity.pop_back();
 			entityToIndex.erase(_entity);
+		}
+		
+		
+		virtual CImGuiInspectorRenderable* GetAsImGuiInspectorRenderableComponent(const Entity _entity) override
+		{
+			if constexpr (std::is_base_of_v<CImGuiInspectorRenderable, Component>)
+			{
+				if (entityToIndex.contains(_entity))
+				{
+					return static_cast<CImGuiInspectorRenderable*>(&components[entityToIndex.at(_entity)]);
+				}
+			}
+			return nullptr;
 		}
 		
 		

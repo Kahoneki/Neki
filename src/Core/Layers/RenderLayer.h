@@ -15,6 +15,8 @@
 #include <RHI/IDevice.h>
 #include <Types/NekiTypes.h>
 
+#include <ImGuizmo.h>
+
 
 namespace NK
 {
@@ -92,7 +94,9 @@ namespace NK
 		void InitShadowMapForLight(const CLight& _light);
 
 		void PreAppUpdate();
-		void UpdateImGui();
+		void UpdateImGui(const CCamera& _camera);
+		void DrawImGuiHierarchy(CTransform& _transform) const; //Draw the entire hierarchy for a single entity (its node and all of its children's nodes)
+		void DrawImGuiHierarchyNode(CTransform& _transform) const; //Draw the node for a single entity in a hierarchy
 		void PostAppUpdate();
 
 		void UpdateSkybox(CSkybox& _skybox);
@@ -365,6 +369,11 @@ namespace NK
 		std::vector<std::vector<std::string>> m_modelUnloadQueues;
 
 		bool m_firstFrame;
+		
+		
+		//UI
+		ImGuizmo::OPERATION m_currentGizmoOp{ ImGuizmo::TRANSLATE };
+		ImGuizmo::MODE m_currentGizmoMode{ ImGuizmo::WORLD };
 	};
 
 }

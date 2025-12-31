@@ -14,7 +14,8 @@ namespace NK
 	IAllocator* Context::m_allocator{ nullptr };
 	LAYER_UPDATE_STATE Context::m_layerUpdateState{ LAYER_UPDATE_STATE::PRE_APP };
 	bool Context::m_editorActive{ false };
-	float Context::m_fixedUpdateTimestep{ 0.0f };
+	bool Context::m_paused{ false };
+	float Context::m_fixedUpdateTimestep{ 1 / 60.0f };
 
 
 	void GLFWErrorCallback(int _error, const char* _description)

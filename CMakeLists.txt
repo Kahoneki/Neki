@@ -8,6 +8,7 @@ set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE BOOL "" FORCE)
 #Backend selection
 option(NEKI_BUILD_VULKAN "Enable the Vulkan RHI backend" OFF)
 option(NEKI_BUILD_D3D12 "Enable the D3D12 RHI backend" OFF)
+option(NEKI_ENABLE_EDITOR "Enable the engine editor tools" OFF)
 
 
 #Define library target
@@ -45,6 +46,9 @@ endif()
 if(NEKI_BUILD_D3D12)
     target_compile_definitions(Neki PUBLIC NEKI_D3D12_SUPPORTED=1)
     target_link_libraries(Neki PUBLIC d3d12 dxgi)
+endif()
+if(NEKI_ENABLE_EDITOR)
+    target_compile_definitions(Neki PUBLIC NEKI_EDITOR=1)
 endif()
 target_compile_definitions(Neki PUBLIC NEKI_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\")
 
@@ -186,8 +190,17 @@ if(NEKI_BUILD_D3D12)
     list(APPEND IMGUI_SOURCES ${IMGUI_DIR}/backends/imgui_impl_dx12.cpp)
 endif()
 
+
+#ImGuizmo
+FetchContent_Declare(imguizmo GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git GIT_TAG master)
+FetchContent_MakeAvailable(imguizmo)
+list(APPEND IMGUI_SOURCES ${imguizmo_SOURCE_DIR}/ImGuizmo.cpp)
+
+
+#ImGui library
 add_library(ImGui STATIC ${IMGUI_SOURCES})
 target_include_directories(ImGui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+target_include_directories(ImGui PUBLIC ${imguizmo_SOURCE_DIR})
 target_link_libraries(ImGui PUBLIC glfw)
 
 if(NEKI_BUILD_VULKAN)
@@ -204,7 +217,6 @@ if(UNIX AND NOT APPLE)
 endif()
 
 target_link_libraries(Neki PUBLIC ImGui)
-
 
 
 

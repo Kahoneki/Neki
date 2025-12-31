@@ -123,7 +123,7 @@ public:
 		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		constexpr float speed{ 50.0f };
 		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
-		helmetTransform.SetRotation(helmetTransform.GetRotation() + glm::vec3(0, rotationAmount, 0));
+		helmetTransform.SetRotation(helmetTransform.GetLocalRotation() + glm::vec3(0, rotationAmount, 0));
 
 
 		//ImGui for lights
@@ -137,14 +137,14 @@ public:
 
 					//Position
 					NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(entity);
-					glm::vec3 pos{ transform.GetPosition() };
+					glm::vec3 pos{ transform.GetLocalPosition() };
 					if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
 					{
 						transform.SetPosition(pos);
 					}
 
 					//Rotation
-					glm::vec3 rot{ glm::degrees(transform.GetRotation()) };
+					glm::vec3 rot{ glm::degrees(transform.GetLocalRotation()) };
 					if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f))
 					{
 						transform.SetRotation(glm::radians(rot));
@@ -201,7 +201,7 @@ public:
 			{
 				ImGui::PushID(static_cast<int>(m_helmetEntity));
 				NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
-				glm::vec3 pos{ transform.GetPosition() };
+				glm::vec3 pos{ transform.GetLocalPosition() };
 				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
 				{
 					transform.SetPosition(pos);
