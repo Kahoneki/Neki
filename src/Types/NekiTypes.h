@@ -664,6 +664,7 @@ namespace NK
 		//TCP
 		DISCONNECT,
 		EVENT,
+		ENTITY_SPAWN,
 
 		//UDP
 		UDP_PORT,

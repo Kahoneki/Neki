@@ -1,6 +1,7 @@
 #include "ClientNetworkLayer.h"
 
 #include <Components/CInput.h>
+#include <Components/CNetworkSync.h>
 #include <Components/CTransform.h>
 #include <Core/Utils/Timer.h>
 
@@ -221,6 +222,26 @@ namespace NK
 	void ClientNetworkLayer::PostAppUpdate()
 	{
 		sf::Packet incomingData;
+		
+		
+		//TCP
+		m_tcpSocket.setBlocking(false);
+		while (m_tcpSocket.receive(incomingData) == sf::Socket::Status::Done)
+		{
+			std::underlying_type_t<PACKET_CODE> codeValue;
+			incomingData >> codeValue;
+			const PACKET_CODE code{ static_cast<PACKET_CODE>(codeValue) };
+			switch (code)
+			{
+			case PACKET_CODE::ENTITY_SPAWN:
+			{
+				
+			}
+			}
+		}
+		
+		
+		//UDP
 		std::optional<sf::IpAddress> incomingClientIP;
 		unsigned short incomingClientPort;
 		m_udpSocket.setBlocking(false);

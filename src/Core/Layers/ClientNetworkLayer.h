@@ -47,6 +47,8 @@ namespace NK
 		ClientIndex m_index;
 
 		std::queue<sf::Packet> m_tcpEventQueue; //Queue of event packets to be sent and cleared in every PreAppUpdate() - structure: event packet code then the type registry constant for the event type then the event data itself
+		
+		std::unordered_map<std::uint32_t, Entity> m_networkIDToEntityMap; //Map from network-synced id to local entity index
 	};
 
 }
