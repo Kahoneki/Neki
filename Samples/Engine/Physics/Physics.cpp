@@ -30,9 +30,10 @@
 
 
 static const NK::PhysicsBroadPhaseLayer movingBroadPhaseLayer{ 0 };
-static const NK::PhysicsBroadPhaseLayer staticBroadPhaseLayer{ 1 };
+static const NK::PhysicsBroadPhaseLayer kinematicBroadPhaseLayer{ 1 };
+static const NK::PhysicsBroadPhaseLayer staticBroadPhaseLayer{ 2 };
 static const NK::PhysicsObjectLayer helmetObjectLayer{ 0, movingBroadPhaseLayer };
-static const NK::PhysicsObjectLayer floorObjectLayer{ 1, staticBroadPhaseLayer };
+static const NK::PhysicsObjectLayer floorObjectLayer{ 1, kinematicBroadPhaseLayer };
 
 
 class GameScene final : public NK::Scene
@@ -71,7 +72,7 @@ public:
 		floorTransform.SetPosition({ 0, 0.0f, 0.0f });
 		floorTransform.SetScale({ 5.0f, 0.2f, 5.0f });
 		NK::CPhysicsBody& floorPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_floorEntity) };
-		floorPhysicsBody.initialMotionType = NK::MOTION_TYPE::STATIC;
+		floorPhysicsBody.initialMotionType = NK::MOTION_TYPE::KINEMATIC;
 		floorPhysicsBody.initialObjectLayer = floorObjectLayer;
 		NK::CBoxCollider& floorCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_floorEntity) };
 		floorCollider.halfExtents = { 5.0f, 0.2f, 5.0f };
@@ -199,6 +200,18 @@ public:
 			{
 				ImGui::PushID(static_cast<int>(m_helmetEntity));
 				NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+				glm::vec3 pos{ transform.GetPosition() };
+				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
+				{
+					transform.SetPosition(pos);
+				}
+				ImGui::PopID();
+			}
+			
+			if (ImGui::CollapsingHeader("Floor", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::PushID(static_cast<int>(m_floorEntity));
+				NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_floorEntity) };
 				glm::vec3 pos{ transform.GetPosition() };
 				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
 				{

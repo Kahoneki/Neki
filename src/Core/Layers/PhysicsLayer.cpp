@@ -61,9 +61,18 @@ namespace NK
 				JPH::BoxShapeSettings shapeSettings{ GLMToJPH(box.halfExtents) };
 				JPH::ShapeSettings::ShapeResult shapeResult{ shapeSettings.Create() };
 
-				JPH::EMotionType motionType = JPH::EMotionType::Dynamic;
-				if (body.initialMotionType == MOTION_TYPE::STATIC) motionType = JPH::EMotionType::Static;
-				else if (body.initialMotionType == MOTION_TYPE::KINEMATIC) motionType = JPH::EMotionType::Kinematic;
+				JPH::EMotionType motionType{};
+				switch (body.initialMotionType)
+				{
+				case MOTION_TYPE::STATIC:		motionType = JPH::EMotionType::Static; break;
+				case MOTION_TYPE::KINEMATIC:	motionType = JPH::EMotionType::Kinematic; break;
+				case MOTION_TYPE::DYNAMIC:		motionType = JPH::EMotionType::Dynamic; break;
+				default:
+				{
+					m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PHYSICS_LAYER, "FixedUpdate() - body.initialMotionType of new body was not identified in switch case (value = " + std::to_string(std::to_underlying(body.initialMotionType)) + ")\n");
+					throw std::invalid_argument("");
+				}
+				}
 
 				JPH::BodyCreationSettings creationSettings{ shapeResult.Get(), GLMToJPH(transform.GetPosition()), GLMToJPH(transform.GetRotationQuat()), motionType, body.initialObjectLayer.GetValue() };
 				creationSettings.mFriction = body.GetFriction();
