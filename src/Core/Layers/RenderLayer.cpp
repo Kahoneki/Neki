@@ -1646,11 +1646,38 @@ namespace NK
 		if (ImGui::Begin("Gizmo Settings"))
 		{
 			if (ImGui::RadioButton("Translate", m_currentGizmoOp == ImGuizmo::TRANSLATE)) { m_currentGizmoOp = ImGuizmo::TRANSLATE; }
+
+			//Disable rotate and scale if in world mode and if selected entity's parent's world scale is non-uniform
+			bool nonUniformScale{ false };
+			for (auto&& [selected, transform] : m_reg.get().View<CSelected, CTransform>())
+			{
+				if (transform.GetParent())
+				{
+					const glm::vec3 worldScale{ transform.GetParent()->GetWorldScale() };
+					if (glm::abs(worldScale.x - worldScale.y) > glm::epsilon<float>() || glm::abs(worldScale.y - worldScale.z) > glm::epsilon<float>())
+					{
+						nonUniformScale = true;
+					}
+				}
+			}
+			
+			bool rotateScaleDisabled{ (m_currentGizmoMode == ImGuizmo::WORLD && nonUniformScale) };
+			
+			ImGui::BeginDisabled(rotateScaleDisabled);
 			ImGui::SameLine();
 			if (ImGui::RadioButton("Rotate", m_currentGizmoOp == ImGuizmo::ROTATE)) { m_currentGizmoOp = ImGuizmo::ROTATE; }
+			if (rotateScaleDisabled && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			{
+				ImGui::SetTooltip("World rotation gizmo disabled for objects whose parent has a non-uniform world scale - set in inspector at own risk!");
+			}
 			ImGui::SameLine();
 			if (ImGui::RadioButton("Scale", m_currentGizmoOp == ImGuizmo::SCALE)) { m_currentGizmoOp = ImGuizmo::SCALE; }
-
+			if (rotateScaleDisabled && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			{
+				ImGui::SetTooltip("World scale gizmo disabled for objects whose parent has a non-uniform world scale - set in inspector at own risk!");
+			}
+			ImGui::EndDisabled();
+			
 			ImGui::Separator();
 
 			if (ImGui::RadioButton("Local", m_currentGizmoMode == ImGuizmo::LOCAL)) { m_currentGizmoMode = ImGuizmo::LOCAL; }
