@@ -4,6 +4,7 @@
 
 #include <Core/Memory/Allocation.h>
 #include <Core/Memory/FreeListAllocator.h>
+#include <Managers/EventManager.h>
 
 #include <algorithm>
 #include <memory>
@@ -67,6 +68,8 @@ namespace NK
 			{
 				throw std::invalid_argument("Registry::Destroy() - provided _entity (" + std::to_string(_entity) + ") is not in registry.");
 			}
+			
+			EventManager::Trigger(EntityDestroyEvent(this, _entity));
 			
 			for (std::type_index type : m_entityComponents[_entity])
 			{
@@ -218,6 +221,7 @@ namespace NK
 		
 		[[nodiscard]] inline std::vector<std::type_index> GetEntityComponents(const Entity _entity) const { return m_entityComponents.at(_entity); }
 		[[nodiscard]] inline IComponentPool* GetPool(const std::type_index _index) const { return m_componentPools.at(_index).get(); }
+		[[nodiscard]] inline bool EntityInRegistry(const Entity _entity) const { return m_entityComponents.contains(_entity); }
 		
 		
 	private:

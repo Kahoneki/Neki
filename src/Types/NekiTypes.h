@@ -877,4 +877,12 @@ namespace NK
 		FORCE_MODE mode;
 	};
 	
+	//Triggered directly prior to an entity being removed from a registry
+	class Registry;
+	struct EntityDestroyEvent
+	{
+		Registry* reg;
+		Entity entity;
+	};
+	
 }

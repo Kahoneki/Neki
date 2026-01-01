@@ -51,7 +51,7 @@ namespace NK
 {
 
 	RenderLayer::RenderLayer(Registry& _reg, const RenderLayerDesc& _desc)
-	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.window->GetFramebufferSize()), m_visibilityIndexAllocator(NK_NEW(FreeListAllocator, _desc.maxModels)), m_firstFrame(true)
+	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_globalFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.window->GetFramebufferSize()), m_visibilityIndexAllocator(NK_NEW(FreeListAllocator, _desc.maxModels)), m_firstFrame(true)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Initialising Render Layer\n");
@@ -81,7 +81,6 @@ namespace NK
 		m_gpuUploader->Flush(true, nullptr, nullptr);
 		m_gpuUploader->Reset();
 
-		m_modelUnloadQueues.resize(m_desc.framesInFlight);
 		m_modelMatricesEntitiesLookups.resize(m_desc.framesInFlight);
 
 		m_pointLightProjMatrix = glm::perspectiveLH(glm::radians(90.0f), 1.0f, 0.01f, 1000.0f);
@@ -95,6 +94,9 @@ namespace NK
 		m_prefilterMapViews.resize(m_desc.framesInFlight);
 
 		
+		m_entityDestroyEventSubscriptionID = EventManager::Subscribe<RenderLayer, EntityDestroyEvent>(this, &RenderLayer::OnEntityDestroy);
+		
+		
 		m_logger.Unindent();
 	}
 
@@ -105,6 +107,7 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Shutting Down Render Layer\n");
 
+		EventManager::Unsubscribe<EntityDestroyEvent>(m_entityDestroyEventSubscriptionID);
 
 		m_graphicsQueue->WaitIdle();
 		#ifdef NEKI_VULKAN_SUPPORTED
@@ -1560,6 +1563,13 @@ namespace NK
 	{
 		if (ImGui::Begin("Hierarchy"))
 		{
+			ImGui::SameLine();
+			if (ImGui::Button("Create New Entity"))
+			{
+				const Entity entity{ m_reg.get().Create() };
+				m_reg.get().AddComponent<CTransform>(entity);
+			}
+			
 			for (auto&& [transform] : m_reg.get().View<CTransform>())
 			{
 				if (transform.GetParent() != nullptr)
@@ -1586,6 +1596,12 @@ namespace NK
 			}
 		}
 		ImGui::End();
+		
+		if (m_entityPendingDeletion != UINT32_MAX)
+		{
+			m_reg.get().Destroy(m_entityPendingDeletion);
+			m_entityPendingDeletion = UINT32_MAX;
+		}
 		
 		
 		if (ImGui::Begin("Inspector"))
@@ -1682,6 +1698,13 @@ namespace NK
 		ImGui::End();
 		
 		
+		// if (ImGui::Begin("Asset Browser"))
+		// {
+		// 	
+		// }
+		// ImGui::End();
+		
+		
 		ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
 		ImGuizmo::SetOrthographic(false);
 		
@@ -1738,7 +1761,7 @@ namespace NK
 
 	
 	
-	void RenderLayer::DrawImGuiHierarchy(CTransform& _transform) const
+	void RenderLayer::DrawImGuiHierarchy(CTransform& _transform)
 	{
 		DrawImGuiHierarchyNode(_transform);
 		ImGui::Indent();
@@ -1750,7 +1773,7 @@ namespace NK
 	}
 
 
-	void RenderLayer::DrawImGuiHierarchyNode(CTransform& _transform) const
+	void RenderLayer::DrawImGuiHierarchyNode(CTransform& _transform)
 	{
 		const Entity entity{ m_reg.get().GetEntity(_transform) };
 		ImGui::PushID(entity);
@@ -1771,6 +1794,35 @@ namespace NK
 			{
 				m_reg.get().AddComponent<CSelected>(entity);
 			}
+		}
+		
+		if (ImGui::BeginPopupContextItem())
+		{
+			//Don't let user delete the active camera (it's required to render the imgui - by deleting the active camera, they have no way of getting it back)
+			const bool activeCamera{ m_reg.get().HasComponent<CCamera>(entity) && (&m_reg.get().GetComponent<CCamera>(entity) == m_activeCamera) };
+			ImGui::BeginDisabled(activeCamera);
+			if (ImGui::MenuItem("Delete"))
+			{
+				m_entityPendingDeletion = entity;
+			}
+			if (ImGui::IsItemHovered() && activeCamera)
+			{
+				ImGui::SetTooltip("Active camera is required to render ImGui and hence cannot be deleted through the editor.");
+			}
+			ImGui::EndDisabled();
+
+			ImGui::Separator();
+        
+			static char nameBuf[64];
+			if (ImGui::IsWindowAppearing()) std::strncpy(nameBuf, _transform.name.c_str(), 64);
+
+			if (ImGui::InputText("Rename", nameBuf, 64, ImGuiInputTextFlags_EnterReturnsTrue))
+			{
+				_transform.name = nameBuf;
+				ImGui::CloseCurrentPopup();
+			}
+
+			ImGui::EndPopup();
 		}
 				
 		//Drag source (the object being moved)
@@ -1820,17 +1872,20 @@ namespace NK
 		m_inFlightFences[m_currentFrame]->Wait();
 		m_inFlightFences[m_currentFrame]->Reset();
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
+		
+		UpdateLightDataBuffer();
+		UpdateModelMatricesBuffer();
 
 
-		//Fence has been signalled, unload models that were marked for unloading from m_desc.framesInFlight frames ago
-		while (!m_modelUnloadQueues[m_currentFrame].empty())
+		//Fence has been signalled, unload models that have been marked for unloading this frame
+		while (!m_modelUnloadQueue[m_globalFrame].empty())
 		{
-			if (m_gpuModelReferenceCounter[m_modelUnloadQueues[m_currentFrame].back()] == 0)
+			if (m_gpuModelReferenceCounter[m_modelUnloadQueue[m_globalFrame].back()] == 0)
 			{
-				ModelLoader::UnloadModel(m_modelUnloadQueues[m_currentFrame].back());
-				m_gpuModelCache.erase(m_modelUnloadQueues[m_currentFrame].back());
+				ModelLoader::UnloadModel(m_modelUnloadQueue[m_globalFrame].back());
+				m_gpuModelCache.erase(m_modelUnloadQueue[m_globalFrame].back());
 			}
-			m_modelUnloadQueues[m_currentFrame].pop_back();
+			m_modelUnloadQueue[m_globalFrame].pop_back();
 		}
 		
 		
@@ -1873,6 +1928,16 @@ namespace NK
 		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[m_currentFrame]) };
 		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++i)
 		{
+			//In case entity has been destroyed
+			if (!m_reg.get().EntityInRegistry(m_modelMatricesEntitiesLookups[m_currentFrame][i]))
+			{
+				//O(1) swap and pop removal
+				m_modelMatricesEntitiesLookups[m_currentFrame][i] = m_modelMatricesEntitiesLookups[m_currentFrame].back();
+				m_modelMatricesEntitiesLookups[m_currentFrame].pop_back();
+				--i; //recheck index now that a new element is here
+				continue;
+			}
+			
 			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
 			
 			//Update visibility
@@ -1885,14 +1950,14 @@ namespace NK
 			{
 				//If model is only queued for unload (and so hasn't yet been unloaded), we can just remove it from the unload queue
 				bool modelInUnloadQueue{ false };
-				for (std::vector<std::string>& q : m_modelUnloadQueues)
+				for (std::unordered_map<std::uint64_t, std::vector<std::string>>::iterator it{ m_modelUnloadQueue.begin() }; it != m_modelUnloadQueue.end(); ++it)
 				{
-					std::vector<std::string>::iterator it{ std::ranges::find(q, modelRenderer.modelPath) };
-					if (it != q.end())
+					std::vector<std::string>::iterator vecIt{ std::ranges::find(it->second, modelRenderer.modelPath) };
+					if (vecIt != it->second.end())
 					{
 						modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
 						modelInUnloadQueue = true;
-						q.erase(it);
+						it->second.erase(vecIt);
 					}
 				}
 				if (modelInUnloadQueue)
@@ -1918,17 +1983,22 @@ namespace NK
 			{
 				//Model isn't visible but is loaded, decrement reference counter and unassign
 				--m_gpuModelReferenceCounter[modelRenderer.modelPath];
-				// std::cout << m_gpuModelReferenceCounter[modelRenderer.modelPath] << '\n';
 				modelRenderer.model = nullptr;
 
 				if (m_gpuModelReferenceCounter[modelRenderer.modelPath] == 0)
 				{
 					//No CModelRenderers are currently visible that use this model, add it to the unload queue
-					m_modelUnloadQueues[m_currentFrame].push_back(modelRenderer.modelPath);
+					m_modelUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(modelRenderer.modelPath);
 				}
 			}
 		}
 		std::memset(visibilityMap, 0, m_desc.maxModels * sizeof(std::uint32_t));
+		
+		
+		if (m_textureDeletionQueue.contains(m_globalFrame))
+		{
+			m_textureDeletionQueue.erase(m_globalFrame);
+		}
 		
 		
 		//This is the last point in the frame there can be any new gpu uploads, if there are any, start flushing them now and use the fence to wait on before drawing
@@ -2004,9 +2074,9 @@ namespace NK
 		
 		execDesc.textureViews.Set("BACKBUFFER_RTV", m_swapchain->GetImageView(imageIndex));
 		execDesc.textureViews.Set("SKYBOX_VIEW", m_skyboxTextureViews[m_currentFrame].get());
-		execDesc.textureViews.Set("IRRADIANCE_MAP_VIEW", m_skyboxTextureViews[m_currentFrame].get());
-		execDesc.textureViews.Set("PREFILTER_MAP_VIEW", m_skyboxTextureViews[m_currentFrame].get());
-		execDesc.textureViews.Set("BRDF_LUT_VIEW", m_skyboxTextureViews[m_currentFrame].get());
+		execDesc.textureViews.Set("IRRADIANCE_MAP_VIEW", m_irradianceMapViews[m_currentFrame].get());
+		execDesc.textureViews.Set("PREFILTER_MAP_VIEW", m_prefilterMapViews[m_currentFrame].get());
+		execDesc.textureViews.Set("BRDF_LUT_VIEW", m_brdfLUTView.get());
 
 		execDesc.samplers.Set("SAMPLER", m_linearSampler.get());
 		execDesc.samplers.Set("BRDF_LUT_SAMPLER", m_linearSampler.get());
@@ -2014,10 +2084,6 @@ namespace NK
 		ImGui::Render();
 		
 		m_meshRenderGraph->Execute(execDesc);
-
-
-		UpdateLightDataBuffer();
-		UpdateModelMatricesBuffer();
 		
 		
 		m_graphicsCommandBuffers[m_currentFrame]->End();
@@ -2035,6 +2101,7 @@ namespace NK
 		m_swapchain->Present(m_renderFinishedSemaphores[imageIndex].get(), imageIndex);
 
 		m_currentFrame = (m_currentFrame + 1) % m_desc.framesInFlight;
+		++m_globalFrame;
 
 		m_firstFrame = false;
 	}
@@ -2123,7 +2190,10 @@ namespace NK
 	void RenderLayer::UpdateLightDataBuffer()
 	{
 		bool bufferDirty{ false };
+		
+		std::size_t sizeBefore{ m_cpuLightData.size() };
 		m_cpuLightData.clear();
+		
 		for (auto&& [transform, light] : m_reg.get().View<CTransform, CLight>())
 		{
 			//Buffer is dirty if either transform.lightBufferDirty or light.light->dirty
@@ -2152,16 +2222,16 @@ namespace NK
 			LightShaderData shaderData{};
 			shaderData.colour = light.light->GetColour();
 			shaderData.intensity = light.light->GetIntensity();
-			shaderData.position = transform.GetLocalPosition();
+			shaderData.position = transform.GetWorldPosition();
 			shaderData.type = light.lightType;
 			shaderData.shadowMapIndex = light.light->GetShadowMapIndex();
 
 			//Calculate direction and view matrix from rotation
-			const glm::quat orientation{ glm::quat(transform.GetLocalRotation()) };
+			const glm::quat orientation{ transform.GetWorldRotationQuat() };
 			shaderData.direction = glm::normalize(orientation * glm::vec3(0, 0, 1));
 			const glm::vec3 forward{ glm::normalize(orientation * glm::vec3(0, 0, 1)) };
 			const glm::vec3 up{ glm::normalize(orientation * glm::vec3(0, 1, 0)) };
-			const glm::mat4 viewMat{ glm::lookAtLH(transform.GetLocalPosition(), transform.GetLocalPosition() + forward, up) };
+			const glm::mat4 viewMat{ glm::lookAtLH(transform.GetWorldPosition(), transform.GetWorldPosition() + forward, up) };
 			
 			switch (light.lightType)
 			{
@@ -2218,6 +2288,11 @@ namespace NK
 			m_cpuLightData.push_back(std::move(shaderData));
 		}
 
+		if (sizeBefore != m_cpuLightData.size())
+		{
+			bufferDirty = true;
+		}
+		
 		if (bufferDirty)
 		{
 			memcpy(m_lightDataBufferMap, m_cpuLightData.data(), sizeof(LightShaderData) * m_cpuLightData.size());
@@ -2280,4 +2355,101 @@ namespace NK
 		}
 	}
 
+	
+	
+	void RenderLayer::OnEntityDestroy(const NK::EntityDestroyEvent& _event)
+	{
+		if (_event.reg->HasComponent<CModelRenderer>(_event.entity))
+		{
+			CModelRenderer& modelRenderer = _event.reg->GetComponent<CModelRenderer>(_event.entity);
+
+			if (m_gpuModelReferenceCounter.contains(modelRenderer.modelPath))
+			{
+				--m_gpuModelReferenceCounter[modelRenderer.modelPath];
+				modelRenderer.model = nullptr;
+
+				if (m_gpuModelReferenceCounter[modelRenderer.modelPath] == 0)
+				{
+					//No CModelRenderers are currently visible that use this model, add it to the unload queue
+					m_modelUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(modelRenderer.modelPath);
+				}
+			}
+
+			if (modelRenderer.visibilityIndex != 0xFFFFFFFF)
+			{
+				m_visibilityIndexAllocator->Free(modelRenderer.visibilityIndex);
+				modelRenderer.visibilityIndex = 0xFFFFFFFF;
+			}
+		}
+		
+		
+		if (_event.reg->HasComponent<CLight>(_event.entity))
+		{
+			const CLight& light{ _event.reg->GetComponent<CLight>(_event.entity) };
+			if (light.light && !light.light->GetShadowMapDirty())
+			{
+				const std::uint64_t safeFrame{ m_globalFrame + m_desc.framesInFlight + 1 };
+				DeferredTextureDeletions& deletionBucket{ m_textureDeletionQueue[safeFrame] };
+				const std::size_t vecIdx{ light.light->GetShadowMapVectorIndex() };
+				std::vector<UniquePtr<ITexture>>& targetVec{ (light.lightType == LIGHT_TYPE::POINT ? m_shadowMapsCube : m_shadowMaps2D) };
+				deletionBucket.textures.push_back(std::move(targetVec[vecIdx]));
+				targetVec[vecIdx] = std::move(targetVec.back());
+				targetVec.pop_back();
+				const bool light2D{ (light.lightType == LIGHT_TYPE::DIRECTIONAL || light.lightType == LIGHT_TYPE::SPOT) };
+				for (auto&& [otherLight] : m_reg.get().View<CLight>())
+				{
+					if (light.light == otherLight.light) { continue; }
+					const bool otherLight2D{ (otherLight.lightType == LIGHT_TYPE::DIRECTIONAL || otherLight.lightType == LIGHT_TYPE::SPOT) };
+					if ((light2D == otherLight2D) && (otherLight.light->GetShadowMapVectorIndex() == targetVec.size()))
+					{
+						otherLight.light->SetShadowMapVectorIndex(vecIdx);
+						break;
+					}
+				}
+
+				
+				if (light.lightType == LIGHT_TYPE::POINT)
+				{
+					deletionBucket.views.push_back(std::move(m_shadowMapCubeSRVs[vecIdx]));
+					m_shadowMapCubeSRVs[vecIdx] = std::move(m_shadowMapCubeSRVs.back());
+					m_shadowMapCubeSRVs.pop_back();
+					for (auto& faceView : m_shadowMapCube_FaceDSVs[vecIdx])
+					{
+						deletionBucket.views.push_back(std::move(faceView));
+					}
+					m_shadowMapCube_FaceDSVs[vecIdx] = std::move(m_shadowMapCube_FaceDSVs.back());
+					m_shadowMapCube_FaceDSVs.pop_back();
+				}
+				else
+				{
+					deletionBucket.views.push_back(std::move(m_shadowMap2DSRVs[vecIdx]));
+					m_shadowMap2DSRVs[vecIdx] = std::move(m_shadowMap2DSRVs.back());
+					m_shadowMap2DSRVs.pop_back();
+					deletionBucket.views.push_back(std::move(m_shadowMap2DDSVs[vecIdx]));
+					m_shadowMap2DDSVs[vecIdx] = std::move(m_shadowMap2DDSVs.back());
+					m_shadowMap2DDSVs.pop_back();
+				}
+			}
+		}
+		
+		
+		if (_event.reg->HasComponent<CSkybox>(_event.entity))
+		{
+			const std::uint64_t safeFrame{ m_globalFrame + m_desc.framesInFlight + 1 };
+			DeferredTextureDeletions& deletionBucket{ m_textureDeletionQueue[safeFrame] };
+
+			for (std::size_t i{ 0 }; i < m_desc.framesInFlight; ++i)
+			{
+				if (m_skyboxTextures[i]) { deletionBucket.textures.push_back(std::move(m_skyboxTextures[i])); }
+				if (m_skyboxTextureViews[i]) { deletionBucket.views.push_back(std::move(m_skyboxTextureViews[i])); }
+
+				if (m_irradianceMaps[i]) { deletionBucket.textures.push_back(std::move(m_irradianceMaps[i])); }
+				if (m_irradianceMapViews[i]) { deletionBucket.views.push_back(std::move(m_irradianceMapViews[i])); }
+
+				if (m_prefilterMaps[i]) { deletionBucket.textures.push_back(std::move(m_prefilterMaps[i])); }
+				if (m_prefilterMapViews[i]) { deletionBucket.views.push_back(std::move(m_prefilterMapViews[i])); }
+			}
+		}
+	}
+	
 }

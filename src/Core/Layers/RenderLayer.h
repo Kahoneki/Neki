@@ -82,8 +82,8 @@ namespace NK
 
 		void PreAppUpdate();
 		void UpdateImGui(const CCamera& _camera);
-		void DrawImGuiHierarchy(CTransform& _transform) const; //Draw the entire hierarchy for a single entity (its node and all of its children's nodes)
-		void DrawImGuiHierarchyNode(CTransform& _transform) const; //Draw the node for a single entity in a hierarchy
+		void DrawImGuiHierarchy(CTransform& _transform); //Draw the entire hierarchy for a single entity (its node and all of its children's nodes)
+		void DrawImGuiHierarchyNode(CTransform& _transform); //Draw the node for a single entity in a hierarchy
 		void PostAppUpdate();
 
 		void UpdateSkybox(CSkybox& _skybox);
@@ -92,6 +92,8 @@ namespace NK
 		void UpdateModelMatricesBuffer();
 
 		static glm::mat4 GetPointLightViewMatrix(const glm::vec3& _lightPos, const std::size_t _faceIndex);
+		
+		void OnEntityDestroy(const EntityDestroyEvent& _event);
 
 
 		//Dependency injections
@@ -100,6 +102,8 @@ namespace NK
 
 		//Tracks the current frame (in range [0, m_framesInFlight-1])
 		std::uint32_t m_currentFrame;
+		//Tracks the current global frame (in range [0,N])
+		std::uint64_t m_globalFrame;
 
 		//Resolution of intermediate textures if SSAA is enabled
 		glm::ivec2 m_supersampleResolution;
@@ -345,15 +349,24 @@ namespace NK
 		//For each model, this tracks how many CModelRenderers use it - so we know when to unload it
 		std::unordered_map<std::string, std::uint32_t> m_gpuModelReferenceCounter;
 
-		//A model can't be unloaded until it's done being used by the GPU, keep track of all models we need to unload for each frame in flight
+		//A model can't be unloaded until it's done being used by the GPU, keep track of all models we need to unload and the global frame count on which it is safe to do so
 		//Once the appropriate fence has been signalled, unload all models in the corresponding vector
-		//Note: a vector is used here instead of a queue to allow for searching the queue for a specific model
-		std::vector<std::vector<std::string>> m_modelUnloadQueues;
+		std::unordered_map<std::uint64_t, std::vector<std::string>> m_modelUnloadQueue;
+		
+		struct DeferredTextureDeletions
+		{
+			std::vector<UniquePtr<ITexture>> textures;
+			std::vector<UniquePtr<ITextureView>> views;
+		};
+		std::unordered_map<std::uint64_t, DeferredTextureDeletions> m_textureDeletionQueue;
 
+		EventSubscriptionID m_entityDestroyEventSubscriptionID;
+		
 		bool m_firstFrame;
 		
 		
 		//UI
+		Entity m_entityPendingDeletion{ UINT32_MAX };
 		ImGuizmo::OPERATION m_currentGizmoOp{ ImGuizmo::TRANSLATE };
 		ImGuizmo::MODE m_currentGizmoMode{ ImGuizmo::WORLD };
 		CCamera* m_activeCamera{ nullptr };

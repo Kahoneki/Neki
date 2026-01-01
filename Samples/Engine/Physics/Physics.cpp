@@ -154,35 +154,6 @@ public:
 
 	virtual void Update() override
 	{
-		// NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
-		// constexpr float speed{ 50.0f };
-		// const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
-		// helmetTransform.SetRotation(helmetTransform.GetRotation() + glm::vec3(0, rotationAmount, 0));
-
-
-
-		// 		
-		//
-		// 		if (ImGui::Button("Swap Skybox"))
-		// 		{
-		// 			NK::CSkybox& skybox{ m_reg.GetComponent<NK::CSkybox>(m_skyboxEntity) };
-		// 			if (skybox.GetSkyboxFilepath() == "Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx")
-		// 			{
-		// 				skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/skybox.ktx");
-		// 				skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/irradiance.ktx");
-		// 				skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/Lake Pier/prefilter.ktx");
-		// 			}
-		// 			else
-		// 			{
-		// 				skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
-		// 				skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
-		// 				skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
-		// 			}
-		// 		}
-		// 	}
-		// 	ImGui::End();
-		//
-		// #endif
 	}
 	
 	
