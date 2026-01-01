@@ -42,11 +42,11 @@ public:
 		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
 		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
 
-		m_lightEntity = m_reg.Create();
-		NK::CTransform& directionalLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity) };
+		m_lightEntity1 = m_reg.Create();
+		NK::CTransform& directionalLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity1) };
 		directionalLightTransform.SetRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
 		directionalLightTransform.SetPosition({ 0.0f, 50.0f, -5.0f });
-		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity) };
+		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
 		directionalLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
 		directionalLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
 		directionalLight.light->SetColour({ 1,0,0 });
@@ -193,7 +193,7 @@ public:
 				}
 			} };
 
-			DrawLightNode("Directional Light", m_lightEntity);
+			DrawLightNode("Directional Light", m_lightEntity1);
 			DrawLightNode("Spot Light", m_lightEntity2);
 			DrawLightNode("Point Light", m_lightEntity3);
 
@@ -265,7 +265,7 @@ private:
 	NK::Entity m_sponzaEntity;
 	NK::Entity m_groundEntity;
 	NK::Entity m_wallEntity;
-	NK::Entity m_lightEntity;
+	NK::Entity m_lightEntity1;
 	NK::Entity m_lightEntity2;
 	NK::Entity m_lightEntity3;
 	NK::Entity m_cameraEntity;

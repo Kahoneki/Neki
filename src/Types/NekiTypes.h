@@ -865,4 +865,16 @@ namespace NK
 	};
 	ENABLE_BITMASK_OPERATORS(PHYSICS_DIRTY_FLAGS)
 	
+	enum class FORCE_MODE
+	{
+		FORCE,
+		IMPULSE,
+	};
+
+	struct ForceDesc
+	{
+		glm::vec3 forceVector;
+		FORCE_MODE mode;
+	};
+	
 }

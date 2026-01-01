@@ -6,6 +6,7 @@
 #include <Components/CLight.h>
 #include <Components/CModelRenderer.h>
 #include <Components/CPhysicsBody.h>
+#include <Components/CSelected.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
 #include <Core/EngineConfig.h>
@@ -27,8 +28,6 @@
 #include <glm/gtx/string_cast.hpp>
 
 
-
-
 static const NK::PhysicsBroadPhaseLayer movingBroadPhaseLayer{ 0 };
 static const NK::PhysicsBroadPhaseLayer kinematicBroadPhaseLayer{ 1 };
 static const NK::PhysicsBroadPhaseLayer staticBroadPhaseLayer{ 2 };
@@ -39,7 +38,7 @@ static const NK::PhysicsObjectLayer floorObjectLayer{ 1, kinematicBroadPhaseLaye
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(5), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0.0f, 3.0f, -5.0f), 90.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
+	explicit GameScene() : Scene(128), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0.0f, 3.0f, -5.0f), 90.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
 	{
 		//preprocessing step - ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
 		//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
@@ -50,21 +49,51 @@ public:
 
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
+		m_reg.AddComponent<NK::CTransform>(m_skyboxEntity).name = "Skybox";
 		skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
 		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
 		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
 
-		m_lightEntity = m_reg.Create();
-		NK::CTransform& directionalLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity) };
+		m_lightEntity1 = m_reg.Create();
+		NK::CTransform& directionalLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity1) };
 		directionalLightTransform.name = "Directional Light";
 		directionalLightTransform.SetLocalRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
 		directionalLightTransform.SetLocalPosition({ 0.0f, 10.0f, 5.0f });
-		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity) };
+		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
 		directionalLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
 		directionalLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
 		directionalLight.light->SetColour({ 1,0,0 });
-		directionalLight.light->SetIntensity(10.0f);
+		directionalLight.light->SetIntensity(0.06f);
 		dynamic_cast<NK::DirectionalLight*>(directionalLight.light.get())->SetDimensions({ 50, 50, 50 });
+		
+		m_lightEntity2 = m_reg.Create();
+		NK::CTransform& pointLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity2) };
+		pointLightTransform.SetLocalPosition({ -2.399, 3.01, 2.95 });
+		pointLightTransform.name = "Point Light";
+		NK::CLight& pointLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity2) };
+		pointLight.lightType = NK::LIGHT_TYPE::POINT;
+		pointLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
+		pointLight.light->SetColour({ 0.9f, 0.3f, 0.3f });
+		pointLight.light->SetIntensity(1.1f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetConstantAttenuation(0.74f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetLinearAttenuation(0.46f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetQuadraticAttenuation(0.05f);
+		
+		m_lightEntity3 = m_reg.Create();
+		NK::CTransform& spotLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity3) };
+		spotLightTransform.name = "Spot Light";
+		spotLightTransform.SetLocalPosition({ 5.231f, 8.95f, 2.255f });
+		spotLightTransform.SetLocalRotation({ glm::radians(-108.061f), glm::radians(42.646f), glm::radians(162.954f) });
+		NK::CLight& spotLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity3) };
+		spotLight.lightType = NK::LIGHT_TYPE::SPOT;
+		spotLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::SpotLight));
+		spotLight.light->SetColour({ 0,1,0 });
+		spotLight.light->SetIntensity(2.6f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetConstantAttenuation(0.88f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetLinearAttenuation(0.88f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetQuadraticAttenuation(0.18f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetInnerAngle(glm::radians(4.25f));
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetOuterAngle(glm::radians(37.84f));
 
 		m_floorEntity = m_reg.Create();
 		NK::CModelRenderer& floorModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_floorEntity) };
@@ -88,15 +117,16 @@ public:
 		helmetTransform.SetLocalScale({ 1.0f, 1.0f, 1.0f });
 		helmetTransform.SetLocalRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 		NK::CPhysicsBody& helmetPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_helmetEntity) };
+		helmetPhysicsBody.SetMass(1.0f);
 		helmetPhysicsBody.initialMotionType = NK::MOTION_TYPE::DYNAMIC;
 		helmetPhysicsBody.initialObjectLayer = helmetObjectLayer;
 		NK::CBoxCollider& helmetCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_helmetEntity) };
 		helmetCollider.SetHalfExtents({ 0.944977, 1.000000, 0.900984 });
-
-
+		
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
 		camera.camera = m_playerCamera.get();
+		m_reg.AddComponent<NK::CTransform>(m_cameraEntity).name = "Camera";
 
 
 		//Inputs
@@ -130,99 +160,7 @@ public:
 		// helmetTransform.SetRotation(helmetTransform.GetRotation() + glm::vec3(0, rotationAmount, 0));
 
 
-		//ImGui for lights
-		// #if NEKI_EDITOR
-		// 	if (ImGui::Begin("Light Controls"))
-		// 	{
-		// 		auto DrawLightNode{ [&](const char* label, NK::Entity entity)
-		// 		{
-		// 			if (ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen))
-		// 			{
-		// 				ImGui::PushID(static_cast<int>(entity));
-		//
-		// 				//Position
-		// 				NK::CTransform& transform = m_reg.GetComponent<NK::CTransform>(entity);
-		// 				glm::vec3 pos{ transform.GetLocalPosition() };
-		// 				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
-		// 				{
-		// 					transform.SetPosition(pos);
-		// 				}
-		//
-		// 				//Rotation
-		// 				glm::vec3 rot{ glm::degrees(transform.GetLocalRotation()) };
-		// 				if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f))
-		// 				{
-		// 					transform.SetRotation(glm::radians(rot));
-		// 				}
-		//
-		//
-		// 				//Light properties
-		// 				NK::CLight& lightComp = m_reg.GetComponent<NK::CLight>(entity);
-		// 				if (lightComp.light)
-		// 				{
-		// 					//Colour
-		// 					glm::vec3 color = lightComp.light->GetColour();
-		// 					if (ImGui::ColorEdit3("Colour", &color.x))
-		// 					{
-		// 						lightComp.light->SetColour(color);
-		// 					}
-		//
-		// 					//Intensity
-		// 					float intensity = lightComp.light->GetIntensity();
-		// 					if (ImGui::DragFloat("Intensity", &intensity, 0.1f, 0.0f, 100.0f))
-		// 					{
-		// 						lightComp.light->SetIntensity(intensity);
-		// 					}
-		//
-		// 					if (NK::PointLight * pointLight{ dynamic_cast<NK::PointLight*>(lightComp.light.get()) })
-		// 					{
-		// 						//Attenuation
-		// 						float constant{ pointLight->GetConstantAttenuation() };
-		// 						if (ImGui::DragFloat("Constant", &constant, 0.01f, 0.0f, 100.0f)) { pointLight->SetConstantAttenuation(constant); }
-		// 						float linear{ pointLight->GetLinearAttenuation() };
-		// 						if (ImGui::DragFloat("Linear", &linear, 0.01f, 0.0f, 100.0f)) { pointLight->SetLinearAttenuation(linear); }
-		// 						float quadratic{ pointLight->GetQuadraticAttenuation() };
-		// 						if (ImGui::DragFloat("Quadratic", &quadratic, 0.01f, 0.0f, 100.0f)) { pointLight->SetQuadraticAttenuation(quadratic); }
-		//
-		// 						if (NK::SpotLight * spotLight{ dynamic_cast<NK::SpotLight*>(pointLight) })
-		// 						{
-		// 							//Angles
-		// 							float innerAngle{ glm::degrees(spotLight->GetInnerAngle()) };
-		// 							if (ImGui::DragFloat("Inner (deg)", &innerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetInnerAngle(glm::radians(innerAngle)); }
-		// 							float outerAngle{ glm::degrees(spotLight->GetOuterAngle()) };
-		// 							if (ImGui::DragFloat("Outer (deg)", &outerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetOuterAngle(glm::radians(outerAngle)); }
-		// 						}
-		// 					}
-		// 				}
-		// 				ImGui::PopID();
-		// 			}
-		// 		} };
-		//
-		// 		DrawLightNode("Directional Light", m_lightEntity);
-		//
-		// 		if (ImGui::CollapsingHeader("Helmet", ImGuiTreeNodeFlags_DefaultOpen))
-		// 		{
-		// 			ImGui::PushID(static_cast<int>(m_helmetEntity));
-		// 			NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
-		// 			glm::vec3 pos{ transform.GetLocalPosition() };
-		// 			if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
-		// 			{
-		// 				transform.SetPosition(pos);
-		// 			}
-		// 			ImGui::PopID();
-		// 		}
-		// 		
-		// 		if (ImGui::CollapsingHeader("Floor", ImGuiTreeNodeFlags_DefaultOpen))
-		// 		{
-		// 			ImGui::PushID(static_cast<int>(m_floorEntity));
-		// 			NK::CTransform& transform{ m_reg.GetComponent<NK::CTransform>(m_floorEntity) };
-		// 			glm::vec3 pos{ transform.GetLocalPosition() };
-		// 			if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
-		// 			{
-		// 				transform.SetPosition(pos);
-		// 			}
-		// 			ImGui::PopID();
-		// 		}
+
 		// 		
 		//
 		// 		if (ImGui::Button("Swap Skybox"))
@@ -259,7 +197,9 @@ private:
 	NK::Entity m_skyboxEntity;
 	NK::Entity m_helmetEntity;
 	NK::Entity m_floorEntity;
-	NK::Entity m_lightEntity;
+	NK::Entity m_lightEntity1;
+	NK::Entity m_lightEntity2;
+	NK::Entity m_lightEntity3;
 	NK::Entity m_cameraEntity;
 	NK::UniquePtr<NK::PlayerCamera> m_playerCamera;
 };

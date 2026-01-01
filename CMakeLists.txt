@@ -51,6 +51,7 @@ if(NEKI_ENABLE_EDITOR)
     target_compile_definitions(Neki PUBLIC NEKI_EDITOR=1)
 endif()
 target_compile_definitions(Neki PUBLIC NEKI_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\")
+target_compile_definitions(Neki PUBLIC NEKI_BUILD_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\")
 
 
 
@@ -166,6 +167,16 @@ FetchContent_Declare(jolt GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.g
 FetchContent_MakeAvailable(jolt)
 target_link_libraries(Neki PUBLIC Jolt)
 target_include_directories(Neki PUBLIC ${jolt_SOURCE_DIR})
+
+#Portable File Dialogs
+FetchContent_Declare(portable_file_dialogs GIT_REPOSITORY https://github.com/samhocevar/portable-file-dialogs.git GIT_TAG main)
+FetchContent_GetProperties(portable_file_dialogs)
+if(NOT portable_file_dialogs_POPULATED)
+    FetchContent_Populate(portable_file_dialogs)
+    add_library(portable_file_dialogs INTERFACE)
+    target_include_directories(portable_file_dialogs INTERFACE ${portable_file_dialogs_SOURCE_DIR})
+endif()
+target_link_libraries(Neki PUBLIC portable_file_dialogs)
 
 
 #ImGui

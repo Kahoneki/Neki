@@ -153,6 +153,18 @@ namespace NK
 				bodyInterface.SetShape(id, newShapeSettings.Create().Get(), true, JPH::EActivation::Activate);
 				box.halfExtentsDirty = false;
 			}
+			
+			//Apply forces
+			while (!body.forceQueue.empty())
+			{
+				ForceDesc desc{ body.forceQueue.front() };
+				switch (desc.mode)
+				{
+				case FORCE_MODE::FORCE:		bodyInterface.AddForce(id, GLMToJPH(desc.forceVector)); break;
+				case FORCE_MODE::IMPULSE:	bodyInterface.AddImpulse(id, GLMToJPH(desc.forceVector)); break;
+				}
+				body.forceQueue.pop();
+			}
 		}
 		
 		//Step the world if not paused

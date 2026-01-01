@@ -6,9 +6,10 @@
 
 namespace NK
 {
-	struct CPhysicsBody final
+	struct CPhysicsBody final : public CImGuiInspectorRenderable
 	{
 		friend class PhysicsLayer;
+		friend class RenderLayer;
 
 		
 	public:
@@ -25,7 +26,10 @@ namespace NK
 		inline void SetLinearDamping(const float _val) { linearDamping = _val; dirtyFlags |= PHYSICS_DIRTY_FLAGS::DAMPING; }
 		inline void SetAngularDamping(const float _val) { angularDamping = _val; dirtyFlags |= PHYSICS_DIRTY_FLAGS::DAMPING; }
 		inline void SetGravityFactor(const float _val) { gravityFactor = _val; dirtyFlags |= PHYSICS_DIRTY_FLAGS::GRAVITY; }
-
+		
+		inline void AddForce(const ForceDesc& _desc) { forceQueue.push(_desc); }
+		inline void AddForce(const glm::vec3& _forceVector, const FORCE_MODE _mode = FORCE_MODE::FORCE) { forceQueue.push({ .forceVector = _forceVector, .mode = _mode }); }
+		
 		
 		PhysicsObjectLayer initialObjectLayer{ UINT16_MAX, PhysicsBroadPhaseLayer(UINT8_MAX) };
 
@@ -39,6 +43,49 @@ namespace NK
 
 		
 	private:
+		virtual inline std::string GetComponentName() const override { return "Physics Body"; }
+		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
+		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
+		{
+			float newMass{ GetMass() };
+			float newFriction{ GetFriction() };
+			float newRestitution{ GetRestitution() };
+			float newLinearDamping{ GetLinearDamping() };
+			float newAngularDamping{ GetAngularDamping() };
+			float newGravityFactor{ GetGravityFactor() };
+			if (ImGui::DragFloat("Mass", &newMass, 0.05f)) { SetMass(newMass); }
+			if (ImGui::DragFloat("Friction", &newFriction, 0.05f)) { SetFriction(newFriction); }
+			if (ImGui::DragFloat("Restitution", &newRestitution, 0.05f)) { SetRestitution(newRestitution); }
+			if (ImGui::DragFloat("Linear Damping", &newLinearDamping, 0.05f)) { SetLinearDamping(newLinearDamping); }
+			if (ImGui::DragFloat("Angular Damping", &newAngularDamping, 0.05f)) { SetAngularDamping(newAngularDamping); }
+			if (ImGui::DragFloat("Gravity Factor", &newGravityFactor, 0.05f)) { SetGravityFactor(newGravityFactor); }
+			
+			if (ImGui::CollapsingHeader("Force Test"))
+			{
+				ImGui::Indent();
+				
+				static glm::vec3 direction{};
+				static float strength{};
+				const char* modes[]{ "Force", "Impulse" };
+				static int selectedMode{ 0 };
+				ImGui::InputFloat3("Direction", &direction.x);
+				ImGui::DragFloat("Strength", &strength);
+				ImGui::Combo("Mode", &selectedMode, modes, IM_ARRAYSIZE(modes));
+					
+				if (ImGui::Button(selectedMode == 0 ? "Hold to Apply" : "Click to Apply"))
+				{
+					AddForce(glm::normalize(direction) * strength, static_cast<NK::FORCE_MODE>(selectedMode));
+				}
+				if (selectedMode == 0 && ImGui::IsItemActive())
+				{
+					AddForce(glm::normalize(direction) * strength, static_cast<NK::FORCE_MODE>(selectedMode));
+				}
+				
+				ImGui::Unindent();
+			}
+		}
+		
+		
 		std::uint32_t bodyID{ UINT32_MAX };
 		PHYSICS_DIRTY_FLAGS dirtyFlags{ PHYSICS_DIRTY_FLAGS::CLEAN };
 
@@ -49,5 +96,7 @@ namespace NK
 		float angularDamping{ 0.05f };
 		float gravityFactor{ 1.0f };
 		glm::vec3 scale{ 1.0f, 1.0f, 1.0f };
+		
+		std::queue<ForceDesc> forceQueue; //Applied and cleared every FixedUpdate in the PhysicsLayer
 	};
 }

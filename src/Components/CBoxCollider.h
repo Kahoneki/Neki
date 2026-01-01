@@ -27,19 +27,18 @@ namespace NK
 	private:
 		virtual inline std::string GetComponentName() const override { return "Box Collider"; }
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
-		virtual inline void RenderImGuiInspectorContents(Registry& _reg, CImGuiInspectorRenderable* _component) override
+		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
 		{
-			CBoxCollider* box{ dynamic_cast<CBoxCollider*>(_component) };
-			if (ImGui::DragFloat3("Half Extents", &box->halfExtents.x, 0.05f)) { box->halfExtentsEditedInInspector = true; }
-			if (box->halfExtentsEditedInInspector)
+			if (ImGui::DragFloat3("Half Extents", &halfExtents.x, 0.05f)) { halfExtentsEditedInInspector = true; }
+			if (halfExtentsEditedInInspector)
 			{
 				if (ImGui::Button("Apply"))
 				{
-					box->halfExtentsEditedInInspector = false;
-					box->halfExtentsDirty = true;
+					halfExtentsEditedInInspector = false;
+					halfExtentsDirty = true;
 				}
 			}
-			const Entity entity{ _reg.GetEntity(*box) };
+			const Entity entity{ _reg.GetEntity(*this) };
 			if (_reg.HasComponent<CModelRenderer>(entity))
 			{
 				if (ImGui::Button("Match Model Bounds"))

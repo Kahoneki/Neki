@@ -187,22 +187,21 @@ namespace NK
 		
 		virtual inline std::string GetComponentName() const override { return "Transform"; }
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
-		virtual inline void RenderImGuiInspectorContents(Registry& _reg, CImGuiInspectorRenderable* _component) override
+		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
 		{
-			CTransform* transform{ dynamic_cast<CTransform*>(_component) };
-			
 			if (ImGui::RadioButton("Local", local)) { local = true; }
 			ImGui::SameLine();
 			if (ImGui::RadioButton("World", !local)) { local = false; }
-			glm::vec3 pos{ local ? transform->GetLocalPosition() : transform->GetWorldPosition() };
-			glm::vec3 rot{ glm::degrees(local ? transform->GetLocalRotation() : transform->GetWorldRotation()) };
-			glm::vec3 scale{ local ? transform->GetLocalScale() : transform->GetWorldScale() };
-			if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) { local ? transform->SetLocalPosition(pos) : transform->SetWorldPosition(pos); }
-			if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f)) { local ? transform->SetLocalRotation(glm::radians(rot)) : transform->SetWorldRotation(rot); }
-			if (ImGui::DragFloat3("Scale", &scale.x, 0.05f)) { local ? transform->SetLocalScale(scale) : transform->SetWorldScale(scale); }
+			glm::vec3 pos{ local ? GetLocalPosition() : GetWorldPosition() };
+			glm::vec3 rot{ glm::degrees(local ? GetLocalRotation() : GetWorldRotation()) };
+			glm::vec3 scale{ local ? GetLocalScale() : GetWorldScale() };
+			if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) { local ? SetLocalPosition(pos) : SetWorldPosition(pos); }
+			if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f)) { local ? SetLocalRotation(glm::radians(rot)) : SetWorldRotation(rot); }
+			if (ImGui::DragFloat3("Scale", &scale.x, 0.05f)) { local ? SetLocalScale(scale) : SetWorldScale(scale); }
 			if (ImGui::CollapsingHeader("Matrices"))
 			{
 				ImGui::Indent();
+				ImGui::PushID("Matrices");
 				
 				if (ImGui::CollapsingHeader("Local"))
 				{
@@ -214,7 +213,7 @@ namespace NK
 							for (int col = 0; col < 4; col++) 
 							{
 								ImGui::TableSetColumnIndex(col);
-								ImGui::Text("%.2f", transform->localMatrix[col][row]);
+								ImGui::Text("%.2f", localMatrix[col][row]);
 							}
 						}
 						ImGui::EndTable();
@@ -225,7 +224,7 @@ namespace NK
 				{
 					if (ImGui::BeginTable("World", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) 
 					{
-						glm::mat4 worldMatrix{ transform->GetModelMatrix() };
+						glm::mat4 worldMatrix{ GetModelMatrix() };
 						for (int row = 0; row < 4; row++) 
 						{
 							ImGui::TableNextRow();
@@ -239,6 +238,7 @@ namespace NK
 					}
 				}
 				
+				ImGui::PopID();
 				ImGui::Unindent();
 			}
 		}
@@ -252,7 +252,7 @@ namespace NK
 		//True if pos, rot, and/or scale have been changed but localMatrix hasn't been updated yet
 		bool localMatrixDirty{ true };
 
-		//True if pos and/or rot have been changed by anything other than the physics layer's jolt->ctransform sync but the ctransform->jolt sync hasn't happened yet
+		//True if pos and/or rot have been changed by anything other than the physics layer's jolt->ctransform sync but the cjolt sync hasn't happened yet
 		//In other words, this flag gets set everytime anything other than the physics layer changes the transform, and it marks to the physics layer that the underlying jolt values have to be synced to match
 		bool physicsSyncDirty{ true };
 		

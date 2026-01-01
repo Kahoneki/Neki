@@ -85,12 +85,6 @@ namespace NK
 		m_modelMatricesEntitiesLookups.resize(m_desc.framesInFlight);
 
 		m_pointLightProjMatrix = glm::perspectiveLH(glm::radians(90.0f), 1.0f, 0.01f, 1000.0f);
-
-		m_focalDistance = 17.0f;
-		m_focalDepth = 12.0f;
-		m_maxBlurRadius = 0.0f;
-		m_dofDebugMode = false;
-		m_acesExposure = 1.0f;
 		
 		m_skyboxDirtyCounter = 0;
 		m_skyboxTextures.resize(m_desc.framesInFlight);
@@ -1208,6 +1202,8 @@ namespace NK
 		{ "SAT_FINAL", RESOURCE_STATE::UNORDERED_ACCESS }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
+			if (!m_activeCamera || !m_activeCamera->GetEnableDepthOfField()) { return; }
+			
 			float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 			_cmdBuf->ClearTexture(_texs.Get("SAT_INTERMEDIATE"), clearColor);
 			_cmdBuf->ClearTexture(_texs.Get("SAT_FINAL"), clearColor);
@@ -1262,15 +1258,17 @@ namespace NK
 			pushConstantData.satTextureIndex = _texViews.Get("SAT_FINAL_SRV")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 
-			//todo: make these not hardcoded
-			pushConstantData.nearPlane = 0.01f;
-			pushConstantData.farPlane = 1000.0f;
-			pushConstantData.focalDistance = m_focalDistance;
-			pushConstantData.focalDepth = m_focalDepth;
-			pushConstantData.maxBlurRadius = m_maxBlurRadius;
-			pushConstantData.dofDebugMode = (m_dofDebugMode ? 1 : 0);
-			pushConstantData.acesExposure = m_acesExposure;
-
+			if (m_activeCamera)
+			{
+				pushConstantData.nearPlane = m_activeCamera->camera->GetNearPlaneDistance();
+				pushConstantData.farPlane = m_activeCamera->camera->GetFarPlaneDistance();
+				pushConstantData.focalDistance = m_activeCamera->GetFocalDistance();
+				pushConstantData.focalDepth = m_activeCamera->GetFocalDepth();
+				pushConstantData.maxBlurRadius = (m_activeCamera->GetEnableDepthOfField() ? m_activeCamera->GetMaxBlurRadius() : 0.0f);
+				pushConstantData.dofDebugMode = (m_activeCamera->GetDOFDebugMode() ? 1 : 0);
+				pushConstantData.acesExposure = m_activeCamera->GetACESExposure();
+			}
+			
 			//Screen Quad
 			std::size_t screenQuadVertexBufferStride{ sizeof(ScreenQuadVertex) };
 			_cmdBuf->PushConstants(m_postprocessPassRootSignature.get(), &pushConstantData);
@@ -1560,20 +1558,6 @@ namespace NK
 	
 	void RenderLayer::UpdateImGui(const CCamera& _camera)
 	{
-		if (ImGui::Begin("Postprocessing Settings"))
-		{
-			if (ImGui::CollapsingHeader("Depth of Field", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::DragFloat("Focal Distance", &m_focalDistance, 0.1f, 0.0f, 100.0f);
-				ImGui::DragFloat("Focal Depth", &m_focalDepth, 0.1f, 0.0f, 100.0f);
-				ImGui::DragFloat("Max Blur Radius", &m_maxBlurRadius, 0.1f, 0.0f, 16.0f);
-				ImGui::Checkbox("Debug Mode", &m_dofDebugMode);
-			}
-			ImGui::DragFloat("Exposure", &m_acesExposure, 0.01f, 0.0f, 10.0f);
-		}
-		ImGui::End();
-		
-		
 		if (ImGui::Begin("Hierarchy"))
 		{
 			for (auto&& [transform] : m_reg.get().View<CTransform>())
@@ -1623,7 +1607,7 @@ namespace NK
 						if (ImGui::CollapsingHeader(imGuiInspectorRenderable->GetComponentName().c_str(), imGuiInspectorRenderable->GetTreeNodeFlags()))
 						{
 							ImGui::Indent();
-							imGuiInspectorRenderable->RenderImGuiInspectorContents(m_reg, imGuiInspectorRenderable);
+							imGuiInspectorRenderable->RenderImGuiInspectorContents(m_reg);
 							ImGui::Unindent();
 							
 							ImGui::Spacing();
@@ -1877,6 +1861,7 @@ namespace NK
 			}
 			found = true;
 			UpdateCameraBuffer(camera);
+			m_activeCamera = &camera;
 		}
 		if (!found)
 		{

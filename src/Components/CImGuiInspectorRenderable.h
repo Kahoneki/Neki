@@ -21,7 +21,7 @@ namespace NK
     protected:
         virtual std::string GetComponentName() const = 0;
         virtual ImGuiTreeNodeFlags GetTreeNodeFlags() const { return 0; }
-        virtual void RenderImGuiInspectorContents(Registry& _reg, CImGuiInspectorRenderable* _component) = 0;
+        virtual void RenderImGuiInspectorContents(Registry& _reg) = 0;
     };
     
 }
