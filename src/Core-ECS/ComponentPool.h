@@ -1,22 +1,10 @@
 #pragma once
 
-#include "Entity.h"
-
-#include <stdexcept>
-#include <unordered_map>
-#include <vector>
+#include "IComponentPool.h"
 
 
 namespace NK
 {
-
-	struct IComponentPool
-	{
-		virtual ~IComponentPool() = default;
-		virtual void RemoveEntity(Entity _entity) = 0;
-		//Returns the component for a given entity as a CImGuiInspectorRenderable* if possible
-		virtual class CImGuiInspectorRenderable* GetAsImGuiInspectorRenderableComponent(Entity _entity) = 0;
-	};
 
 	
 	template<typename Component>
@@ -48,7 +36,7 @@ namespace NK
 		}
 		
 		
-		virtual CImGuiInspectorRenderable* GetAsImGuiInspectorRenderableComponent(const Entity _entity) override
+		virtual inline CImGuiInspectorRenderable* GetAsImGuiInspectorRenderableComponent(const Entity _entity) override
 		{
 			if constexpr (std::is_base_of_v<CImGuiInspectorRenderable, Component>)
 			{
@@ -59,6 +47,25 @@ namespace NK
 			}
 			return nullptr;
 		}
+		
+		
+		virtual constexpr inline bool IsImGuiInspectorRenderableType() const override
+		{
+			return std::is_base_of_v<CImGuiInspectorRenderable, Component>;
+		}
+		
+		
+		virtual inline std::string GetImGuiInspectorRenderableName() const override
+		{
+			if constexpr (IsImGuiInspectorRenderableType())
+			{
+				return Component::GetStaticName();
+			}
+			return "Unnamed";
+		}
+		
+		
+		virtual void AddDefaultToEntity(Registry& _reg, const Entity _entity) override;
 		
 		
 		std::vector<Component> components; //All components of this component type

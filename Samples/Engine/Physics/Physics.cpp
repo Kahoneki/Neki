@@ -49,13 +49,13 @@ public:
 
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
-		m_reg.AddComponent<NK::CTransform>(m_skyboxEntity).name = "Skybox";
+		m_reg.GetComponent<NK::CTransform>(m_skyboxEntity).name = "Skybox";
 		skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
 		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
 		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
 
 		m_lightEntity1 = m_reg.Create();
-		NK::CTransform& directionalLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity1) };
+		NK::CTransform& directionalLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity1) };
 		directionalLightTransform.name = "Directional Light";
 		directionalLightTransform.SetLocalRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
 		directionalLightTransform.SetLocalPosition({ 0.0f, 10.0f, 5.0f });
@@ -67,7 +67,7 @@ public:
 		dynamic_cast<NK::DirectionalLight*>(directionalLight.light.get())->SetDimensions({ 50, 50, 50 });
 		
 		m_lightEntity2 = m_reg.Create();
-		NK::CTransform& pointLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity2) };
+		NK::CTransform& pointLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity2) };
 		pointLightTransform.SetLocalPosition({ -2.399, 3.01, 2.95 });
 		pointLightTransform.name = "Point Light";
 		NK::CLight& pointLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity2) };
@@ -80,7 +80,7 @@ public:
 		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetQuadraticAttenuation(0.05f);
 		
 		m_lightEntity3 = m_reg.Create();
-		NK::CTransform& spotLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity3) };
+		NK::CTransform& spotLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity3) };
 		spotLightTransform.name = "Spot Light";
 		spotLightTransform.SetLocalPosition({ 5.231f, 8.95f, 2.255f });
 		spotLightTransform.SetLocalRotation({ glm::radians(-108.061f), glm::radians(42.646f), glm::radians(162.954f) });
@@ -97,8 +97,8 @@ public:
 
 		m_floorEntity = m_reg.Create();
 		NK::CModelRenderer& floorModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_floorEntity) };
-		floorModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel";
-		NK::CTransform& floorTransform{ m_reg.AddComponent<NK::CTransform>(m_floorEntity) };
+		floorModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel");
+		NK::CTransform& floorTransform{ m_reg.GetComponent<NK::CTransform>(m_floorEntity) };
 		floorTransform.name = "Floor";
 		floorTransform.SetLocalPosition({ 0, 0.0f, 0.0f });
 		floorTransform.SetLocalScale({ 5.0f, 0.2f, 5.0f });
@@ -110,8 +110,8 @@ public:
 		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
-		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
+		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel");
+		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		helmetTransform.name = "Helmet";
 		helmetTransform.SetLocalPosition({ 0, 3.0f, 0.0f });
 		helmetTransform.SetLocalScale({ 1.0f, 1.0f, 1.0f });
@@ -126,7 +126,7 @@ public:
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
 		camera.camera = m_playerCamera.get();
-		m_reg.AddComponent<NK::CTransform>(m_cameraEntity).name = "Camera";
+		m_reg.GetComponent<NK::CTransform>(m_cameraEntity).name = "Camera";
 
 
 		//Inputs
@@ -248,11 +248,14 @@ public:
 		glfwSetWindowShouldClose(m_window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
 		
 		#if NEKI_EDITOR
-			if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::E) && !m_editorActiveKeyPressedLastFrame)
-			{
-				NK::Context::SetEditorActive(!NK::Context::GetEditorActive());
-			}
-			m_editorActiveKeyPressedLastFrame = NK::InputManager::GetKeyPressed(NK::KEYBOARD::E);
+			const bool inGame{ NK::InputManager::GetMouseButtonPressed(NK::MOUSE_BUTTON::RIGHT) && !ImGui::GetIO().WantCaptureMouse };
+			NK::Context::SetEditorActive(!inGame);
+		
+			// if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0) && !m_editorActiveKeyPressedLastFrame)
+			// {
+			// 	NK::Context::SetEditorActive(!NK::Context::GetEditorActive());
+			// }
+			// m_editorActiveKeyPressedLastFrame = NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0);
 
 			m_window->SetCursorVisibility(NK::Context::GetEditorActive());
 		#endif

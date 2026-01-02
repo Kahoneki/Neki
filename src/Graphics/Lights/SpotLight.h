@@ -25,10 +25,10 @@ namespace NK
 
 	private:
 		//Inner angle of the spot light, in radians
-		float m_innerAngle;
+		float m_innerAngle{ glm::radians(30.0f) };
 
 		//Outer angle of the spot light, in radians
-		float m_outerAngle;
+		float m_outerAngle{ glm::radians(60.0f) };
 	};
 	
 }

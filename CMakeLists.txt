@@ -13,6 +13,7 @@ option(NEKI_ENABLE_EDITOR "Enable the engine editor tools" OFF)
 
 #Define library target
 file(GLOB_RECURSE NEKI_COMMON_SOURCES
+        "src/Components/*.cpp"
         "src/Core/*.cpp"
         "src/Core-ECS/*.cpp"
         "src/Platform/*.cpp"

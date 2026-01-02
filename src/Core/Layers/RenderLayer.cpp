@@ -12,6 +12,7 @@
 #include <Graphics/Lights/DirectionalLight.h>
 #include <Graphics/Lights/PointLight.h>
 #include <Graphics/Lights/SpotLight.h>
+#include <Managers/InputManager.h>
 #include <Managers/TimeManager.h>
 #include <RHI/IBuffer.h>
 #include <RHI/IBufferView.h>
@@ -95,6 +96,7 @@ namespace NK
 
 		
 		m_entityDestroyEventSubscriptionID = EventManager::Subscribe<RenderLayer, EntityDestroyEvent>(this, &RenderLayer::OnEntityDestroy);
+		m_componentRemoveEventSubscriptionID = EventManager::Subscribe<RenderLayer, ComponentRemoveEvent>(this, &RenderLayer::OnComponentRemove);
 		
 		
 		m_logger.Unindent();
@@ -108,6 +110,7 @@ namespace NK
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Shutting Down Render Layer\n");
 
 		EventManager::Unsubscribe<EntityDestroyEvent>(m_entityDestroyEventSubscriptionID);
+		EventManager::Unsubscribe<ComponentRemoveEvent>(m_componentRemoveEventSubscriptionID);
 
 		m_graphicsQueue->WaitIdle();
 		#ifdef NEKI_VULKAN_SUPPORTED
@@ -1034,6 +1037,7 @@ namespace NK
 			for (std::size_t i{ 0 }; i < m_cpuLightData.size(); ++i, ++lightIt)
 			{
 				auto [light, transform] = *lightIt;
+				if (light.lightType == LIGHT_TYPE::UNDEFINED || !light.light) { continue; }
 				ITexture* shadowMap{ nullptr };
 				const LightShaderData& lightData{ m_cpuLightData[i] };
 				if (lightData.type == LIGHT_TYPE::POINT)
@@ -1567,7 +1571,6 @@ namespace NK
 			if (ImGui::Button("Create New Entity"))
 			{
 				const Entity entity{ m_reg.get().Create() };
-				m_reg.get().AddComponent<CTransform>(entity);
 			}
 			
 			for (auto&& [transform] : m_reg.get().View<CTransform>())
@@ -1610,17 +1613,110 @@ namespace NK
 			{
 				const Entity entity{ m_reg.get().GetEntity(selected) };
 				
+				//Add component
+				ImGui::PushID("AddComponent");
+				
+				//Get all components that inherit from CImGuiInspectorRenderable
+				const std::unordered_map<std::type_index, std::unique_ptr<IComponentPool>>& pools{ m_reg.get().GetPools() };
+				std::vector<std::type_index> typeIndices{};
+				std::vector<std::string> componentNamesStorage{};
+				std::vector<const char*> componentNamesPointers{};
+				for (std::unordered_map<std::type_index, std::unique_ptr<IComponentPool>>::const_iterator it{ pools.begin() }; it != pools.end(); ++it)
+				{
+					IComponentPool* pool{ it->second.get() };
+					if (pool->IsImGuiInspectorRenderableType())
+					{
+						typeIndices.push_back(it->first);
+						componentNamesStorage.push_back(pool->GetImGuiInspectorRenderableName());
+					}
+				}
+				
+				for (const std::string& name : componentNamesStorage)
+				{
+					componentNamesPointers.push_back(name.c_str());
+				}
+				
+				if (ImGui::Button("Add Component"))
+				{
+					ImGui::OpenPopup("AddComponentPopup");
+				}
+				
+				if (ImGui::BeginPopup("AddComponentPopup"))
+				{
+					ImGui::SeparatorText("Available Components");
+
+					for (std::size_t i{ 0 }; i < componentNamesPointers.size(); ++i)
+					{
+						//Don't allow multiple cameras and don't allow multiple components of same type
+						const std::vector<std::type_index>& existingComponents{ m_reg.get().GetEntityComponents(entity) };
+						if (componentNamesStorage[i] == "Camera" || std::ranges::find(existingComponents, typeIndices[i]) != existingComponents.end())
+						{
+							continue;
+						}
+						
+						if (ImGui::Selectable(componentNamesPointers[i]))
+						{
+							std::type_index selectedComponent{ typeIndices[i] };
+							if (pools.contains(selectedComponent))
+							{
+								pools.at(selectedComponent)->AddDefaultToEntity(m_reg.get(), entity);
+							}
+							
+							ImGui::CloseCurrentPopup();
+						}
+					}
+					ImGui::EndPopup();
+				}
+				
+				ImGui::Spacing();
+				ImGui::Spacing();
+				ImGui::Separator();
+				
+				ImGui::PopID();
+				
+				
 				ImGui::PushID(entity);
 				for (const std::type_index componentTypeIndex : m_reg.get().GetEntityComponents(entity))
 				{
-					//this is a bit yucky as it makes use of implementation-level registry access, but i can't think of a cleaner way of doing it, and it works for now.... so....
+					//this is a bit yucky as it makes use of implementation-level registry access, but i can't think of a cleaner way of doing it, and it works.... so....
 					IComponentPool* pool{ m_reg.get().GetPool(componentTypeIndex) };
 					CImGuiInspectorRenderable* imGuiInspectorRenderable{ pool->GetAsImGuiInspectorRenderableComponent(entity) };
 					if (imGuiInspectorRenderable != nullptr)
 					{
 						//This component has a RenderImGuiInspectorContents() function
 						ImGui::PushID(componentTypeIndex.hash_code());
-						if (ImGui::CollapsingHeader(imGuiInspectorRenderable->GetComponentName().c_str(), imGuiInspectorRenderable->GetTreeNodeFlags()))
+						bool headerOpen{ ImGui::CollapsingHeader(imGuiInspectorRenderable->GetComponentName().c_str(), imGuiInspectorRenderable->GetTreeNodeFlags()) };
+						if (ImGui::BeginPopupContextItem())
+						{
+							//Don't let user delete the active camera (it's required to render the imgui - by deleting the active camera, they have no way of getting it back)
+							const bool activeCamera{ imGuiInspectorRenderable->GetComponentName() == "Camera" && (&m_reg.get().GetComponent<CCamera>(entity) == m_activeCamera) };
+							
+							//Don't let user delete the transform component (all entities require one)
+							const bool transform{ imGuiInspectorRenderable->GetComponentName() == "Transform" };
+							
+							ImGui::BeginDisabled(activeCamera || transform);
+							if (ImGui::MenuItem("Remove"))
+							{
+								m_reg.get().RemoveComponent(entity, componentTypeIndex);
+								ImGui::EndDisabled();
+								ImGui::EndPopup();
+								ImGui::PopID();
+								break;
+							}
+							ImGui::EndDisabled();
+							if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && activeCamera)
+							{
+								ImGui::SetTooltip("Active camera is required to render ImGui and hence cannot be deleted through the editor.");
+							}
+							else if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && transform)
+							{
+								ImGui::SetTooltip("All entities must have a transform component, and hence it cannot be removed.");
+							}
+
+							ImGui::EndPopup();
+						}
+						
+						if (headerOpen)
 						{
 							ImGui::Indent();
 							imGuiInspectorRenderable->RenderImGuiInspectorContents(m_reg);
@@ -1645,9 +1741,15 @@ namespace NK
 		
 		if (ImGui::Begin("Gizmo Settings"))
 		{
-			if (ImGui::RadioButton("Translate", m_currentGizmoOp == ImGuizmo::TRANSLATE)) { m_currentGizmoOp = ImGuizmo::TRANSLATE; }
+			//Translate
+			const bool translateSelected{ ImGui::RadioButton("Translate", m_currentGizmoOp == ImGuizmo::TRANSLATE) };
+			if (translateSelected || (InputManager::GetKeyPressed(KEYBOARD::W) && Context::GetEditorActive()))
+			{
+				m_currentGizmoOp = ImGuizmo::TRANSLATE;
+			}
 
-			//Disable rotate and scale if in world mode and if selected entity's parent's world scale is non-uniform
+			//Rotate
+			//Present warning when hovering over rotate button if in world mode and if selected entity's parent's world scale is non-uniform
 			bool nonUniformScale{ false };
 			for (auto&& [selected, transform] : m_reg.get().View<CSelected, CTransform>())
 			{
@@ -1660,29 +1762,36 @@ namespace NK
 					}
 				}
 			}
-			
-			bool rotateScaleDisabled{ (m_currentGizmoMode == ImGuizmo::WORLD && nonUniformScale) };
-			
-			ImGui::BeginDisabled(rotateScaleDisabled);
+			const bool rotateWarning{ (m_currentGizmoMode == ImGuizmo::WORLD && nonUniformScale) };
 			ImGui::SameLine();
-			if (ImGui::RadioButton("Rotate", m_currentGizmoOp == ImGuizmo::ROTATE)) { m_currentGizmoOp = ImGuizmo::ROTATE; }
-			if (rotateScaleDisabled && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			if (rotateWarning) { ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255,255,0,255)); }
+			const bool rotateSelected{ ImGui::RadioButton("Rotate", m_currentGizmoOp == ImGuizmo::ROTATE) };
+			if (rotateSelected || (InputManager::GetKeyPressed(KEYBOARD::E) && Context::GetEditorActive())) { m_currentGizmoOp = ImGuizmo::ROTATE; }
+			if (rotateWarning && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
 			{
-				ImGui::SetTooltip("World rotation gizmo disabled for objects whose parent has a non-uniform world scale - set in inspector at own risk!");
+				ImGui::SetTooltip("Warning: non-uniform scaling in parent detected, and in a TRS system, this results in shear artifacts when rotating. Use at your own risk.");
 			}
-			ImGui::SameLine();
-			if (ImGui::RadioButton("Scale", m_currentGizmoOp == ImGuizmo::SCALE)) { m_currentGizmoOp = ImGuizmo::SCALE; }
-			if (rotateScaleDisabled && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-			{
-				ImGui::SetTooltip("World scale gizmo disabled for objects whose parent has a non-uniform world scale - set in inspector at own risk!");
-			}
-			ImGui::EndDisabled();
+			if (rotateWarning) { ImGui::PopStyleColor(); }
 			
+			//Scale
+			ImGui::SameLine();
+			const bool scaleSelected{ ImGui::RadioButton("Scale", m_currentGizmoOp == ImGuizmo::SCALE) };
+			if (scaleSelected || (InputManager::GetKeyPressed(KEYBOARD::R) && Context::GetEditorActive()))
+			{
+				m_currentGizmoOp = ImGuizmo::SCALE;
+			}
+		
 			ImGui::Separator();
 
-			if (ImGui::RadioButton("Local", m_currentGizmoMode == ImGuizmo::LOCAL)) { m_currentGizmoMode = ImGuizmo::LOCAL; }
+			if (ImGui::RadioButton("Local", m_currentGizmoMode == ImGuizmo::LOCAL))
+			{
+				m_currentGizmoMode = ImGuizmo::LOCAL;
+			}
 			ImGui::SameLine();
-			if (ImGui::RadioButton("World", m_currentGizmoMode == ImGuizmo::WORLD)) { m_currentGizmoMode = ImGuizmo::WORLD; }
+			if (ImGui::RadioButton("World", m_currentGizmoMode == ImGuizmo::WORLD))
+			{
+				m_currentGizmoMode = ImGuizmo::WORLD;
+			}
 		}
 		ImGui::End();
 		
@@ -1698,16 +1807,16 @@ namespace NK
 		ImGui::End();
 		
 		
-		// if (ImGui::Begin("Asset Browser"))
+		// if (ImGui::Begin("Asset Browser"))_path
 		// {
 		// 	
 		// }
 		// ImGui::End();
 		
 		
+		//ImGuizmo transform
 		ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
 		ImGuizmo::SetOrthographic(false);
-		
 		for (auto&& [selected] : m_reg.get().View<CSelected>())
 		{
 			//Entity is selected
@@ -1719,18 +1828,28 @@ namespace NK
 				CameraShaderData camData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
 			
 				const float aspect{ static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y };
-				const glm::mat4 imguiProj{ glm::perspectiveLH_ZO(glm::radians(_camera.camera->GetFOV()), aspect, 0.1f, 1000.0f) };
-		
-				ImGuizmo::Manipulate(glm::value_ptr(camData.viewMat), glm::value_ptr(imguiProj), m_currentGizmoOp, m_currentGizmoMode, glm::value_ptr(modelMatrix));
-			
-				//If the user updated the gizmo, update the CTransform to match
+				
+				//ImGuizmo uses right-handed coordinate system, so we need to flip the Z on our matrices
+				const glm::mat4 flipZ{ glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, -1.0f)) };
+				glm::mat4 modelMatrixRH{ flipZ * modelMatrix * flipZ };
+				glm::mat4 viewRH{ flipZ * camData.viewMat * flipZ };
+				const glm::mat4 projRH{ glm::perspectiveRH_ZO(glm::radians(_camera.camera->GetFOV()), aspect, _camera.camera->GetNearPlaneDistance(), _camera.camera->GetFarPlaneDistance()) };
+				
+				const glm::quat originalOrientation{ transform.GetLocalRotation() };
+				
+				ImGuizmo::Manipulate(glm::value_ptr(viewRH), glm::value_ptr(projRH), m_currentGizmoOp, m_currentGizmoMode, glm::value_ptr(modelMatrixRH));
+    
+				//If the user updated the gizmo, we need to convert it back to left-handed to update the transform
+				//what a palaver, an absolute kerfuffle, such a silly conundrum....
+				//when will people learn to stop using right handed systems
 				if (ImGuizmo::IsUsing())
 				{
-					glm::mat4 newLocalMatrix = modelMatrix;
+					const glm::mat4 modelMatrixLH{ flipZ * modelMatrixRH * flipZ };
+					glm::mat4 newLocalMatrix{ modelMatrixLH };
 					if (transform.GetParent())
 					{
 						glm::mat4 parentInverse = glm::inverse(transform.GetParent()->GetModelMatrix());
-						newLocalMatrix = parentInverse * modelMatrix;
+						newLocalMatrix = parentInverse * modelMatrixLH;
 					}
 
 					glm::vec3 scale, translation, skew;
@@ -1739,6 +1858,14 @@ namespace NK
 					if (glm::decompose(newLocalMatrix, scale, orientation, translation, skew, perspective))
 					{
 						transform.SetLocalPosition(translation);
+						//Local rotation needs delta inversion due to reflected coordinate frame
+						//I don't really understand the maths behind why this is necessary, but it works so....
+						if (m_currentGizmoOp == ImGuizmo::ROTATE && m_currentGizmoMode == ImGuizmo::LOCAL)
+						{
+							const glm::quat delta{ glm::normalize(orientation) * glm::inverse(originalOrientation) };
+							const glm::quat invertedDelta{ glm::conjugate(delta) };
+							orientation = invertedDelta * originalOrientation;
+						}
 						transform.SetLocalRotation(glm::normalize(orientation));
 						transform.SetLocalScale(scale);
 					}
@@ -1814,8 +1941,10 @@ namespace NK
 			ImGui::Separator();
         
 			static char nameBuf[64];
-			if (ImGui::IsWindowAppearing()) std::strncpy(nameBuf, _transform.name.c_str(), 64);
-
+			if (ImGui::IsWindowAppearing())
+			{
+				std::strncpy(nameBuf, _transform.name.c_str(), 64);
+			}
 			if (ImGui::InputText("Rename", nameBuf, 64, ImGuiInputTextFlags_EnterReturnsTrue))
 			{
 				_transform.name = nameBuf;
@@ -1939,12 +2068,79 @@ namespace NK
 			}
 			
 			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
+			CTransform& transform{ m_reg.get().GetComponent<CTransform>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
 			
 			//Update visibility
+			bool isVisible{ (visibilityMap[modelRenderer.visibilityIndex] == 1) }; //GPU visibility result
+			if (!isVisible && m_activeCamera)
+			{
+				//If camera is within model's bounds, the depth buffer will contain residual data from the model, and since the AABB lies outside this extent, it may not be rendered and so the gpu visibility check will fail
+				//Check if camera is within model bounds, and if so, override gpu's result and set visible to true
+				
+				//Transform camera position from world space -> model's local space
+				const glm::vec3 modelLocalCamPos{ glm::vec3(glm::inverse(transform.GetModelMatrix()) * glm::vec4(m_activeCamera->camera->GetPosition(), 1.0f)) };
+				
+				float bufferRegion{ 1.05f };
+				const glm::vec3 bufferedExtents{ modelRenderer.localSpaceHalfExtents * 1.05f };
+				const glm::vec3 minBound{ modelRenderer.localSpaceOrigin - bufferedExtents };
+				const glm::vec3 maxBound{ modelRenderer.localSpaceOrigin + bufferedExtents };
+				if (modelLocalCamPos.x >= minBound.x && modelLocalCamPos.x <= maxBound.x &&
+					modelLocalCamPos.y >= minBound.y && modelLocalCamPos.y <= maxBound.y &&
+					modelLocalCamPos.z >= minBound.z && modelLocalCamPos.z <= maxBound.z)
+				{
+					//Inside model, so override visibility flag
+					isVisible = true;
+				}
+			}
 			if (modelRenderer.visibilityIndex != 0xFFFFFFFF)
 			{
-				modelRenderer.visible = (visibilityMap[modelRenderer.visibilityIndex] == 1);
+				modelRenderer.visible = isVisible;
 			}
+			
+			
+			if (modelRenderer.modelPathDirty)
+			{
+				if (modelRenderer.filePathNotFoundError || modelRenderer.nonNkModelError)
+				{
+					continue;
+				}
+				
+				
+				//If there's a model currently assigned, we need to remove it before loading the new one
+				if (modelRenderer.model)
+				{
+					std::string oldPath;
+					for (const auto& [path, gpuModel] : m_gpuModelCache)
+					{
+						if (gpuModel.get() == modelRenderer.model)
+						{
+							oldPath = path;
+							break;
+						}
+					}
+
+					//Decrement reference count for the old model
+					if (!oldPath.empty() && m_gpuModelReferenceCounter.contains(oldPath))
+					{
+						--m_gpuModelReferenceCounter[oldPath];
+
+						if (m_gpuModelReferenceCounter[oldPath] == 0)
+						{
+							//No entities using this model, queue for unload
+							m_modelUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(oldPath);
+						}
+					}
+
+					//Trigger the model load
+					modelRenderer.model = nullptr;
+					
+					//Reset extents so the update knows to recalculate them from the new model header
+					modelRenderer.localSpaceHalfExtents = glm::vec3(0.0f);
+				}
+
+				modelRenderer.modelPathDirty = false;
+			}
+			
 
 			if (modelRenderer.visible && !modelRenderer.model)
 			{
@@ -2196,6 +2392,8 @@ namespace NK
 		
 		for (auto&& [transform, light] : m_reg.get().View<CTransform, CLight>())
 		{
+			if (light.lightType == LIGHT_TYPE::UNDEFINED || !light.light) { continue; }
+			
 			//Buffer is dirty if either transform.lightBufferDirty or light.light->dirty
 			if (transform.lightBufferDirty || light.light->GetDirty())
 			{
@@ -2357,11 +2555,20 @@ namespace NK
 
 	
 	
-	void RenderLayer::OnEntityDestroy(const NK::EntityDestroyEvent& _event)
+	void RenderLayer::OnEntityDestroy(const EntityDestroyEvent& _event)
 	{
-		if (_event.reg->HasComponent<CModelRenderer>(_event.entity))
+		if (_event.reg->HasComponent<CModelRenderer>(_event.entity))	{ OnComponentRemove({ _event.reg, _event.entity, typeid(CModelRenderer) }); }
+		if (_event.reg->HasComponent<CLight>(_event.entity))			{ OnComponentRemove({ _event.reg, _event.entity, typeid(CLight) }); }
+		if (_event.reg->HasComponent<CSkybox>(_event.entity))			{ OnComponentRemove({ _event.reg, _event.entity, typeid(CSkybox) }); }
+	}
+
+	
+	
+	void RenderLayer::OnComponentRemove(const ComponentRemoveEvent& _event)
+	{
+		if (_event.componentIndex == typeid(CModelRenderer))
 		{
-			CModelRenderer& modelRenderer = _event.reg->GetComponent<CModelRenderer>(_event.entity);
+			CModelRenderer& modelRenderer{ _event.reg->GetComponent<CModelRenderer>(_event.entity) };
 
 			if (m_gpuModelReferenceCounter.contains(modelRenderer.modelPath))
 			{
@@ -2383,9 +2590,11 @@ namespace NK
 		}
 		
 		
-		if (_event.reg->HasComponent<CLight>(_event.entity))
+		else if (_event.componentIndex == typeid(CLight))
 		{
 			const CLight& light{ _event.reg->GetComponent<CLight>(_event.entity) };
+			if (light.lightType == LIGHT_TYPE::UNDEFINED || !light.light) { return; }
+			
 			if (light.light && !light.light->GetShadowMapDirty())
 			{
 				const std::uint64_t safeFrame{ m_globalFrame + m_desc.framesInFlight + 1 };
@@ -2398,6 +2607,7 @@ namespace NK
 				const bool light2D{ (light.lightType == LIGHT_TYPE::DIRECTIONAL || light.lightType == LIGHT_TYPE::SPOT) };
 				for (auto&& [otherLight] : m_reg.get().View<CLight>())
 				{
+					if (otherLight.lightType == LIGHT_TYPE::UNDEFINED || otherLight.light == nullptr) { continue; }
 					if (light.light == otherLight.light) { continue; }
 					const bool otherLight2D{ (otherLight.lightType == LIGHT_TYPE::DIRECTIONAL || otherLight.lightType == LIGHT_TYPE::SPOT) };
 					if ((light2D == otherLight2D) && (otherLight.light->GetShadowMapVectorIndex() == targetVec.size()))
@@ -2406,7 +2616,6 @@ namespace NK
 						break;
 					}
 				}
-
 				
 				if (light.lightType == LIGHT_TYPE::POINT)
 				{
@@ -2433,7 +2642,7 @@ namespace NK
 		}
 		
 		
-		if (_event.reg->HasComponent<CSkybox>(_event.entity))
+		else if (_event.componentIndex == typeid(CSkybox))
 		{
 			const std::uint64_t safeFrame{ m_globalFrame + m_desc.framesInFlight + 1 };
 			DeferredTextureDeletions& deletionBucket{ m_textureDeletionQueue[safeFrame] };

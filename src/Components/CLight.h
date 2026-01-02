@@ -4,6 +4,7 @@
 
 #include <Core/Memory/Allocation.h>
 #include <Graphics/Lights/Light.h>
+#include <Graphics/Lights/DirectionalLight.h>
 #include <Graphics/Lights/PointLight.h>
 #include <Graphics/Lights/SpotLight.h>
 
@@ -18,12 +19,62 @@ namespace NK
 		UniquePtr<Light> light;
 		
 		
+		[[nodiscard]] inline static std::string GetStaticName() { return "Light"; }
+		
+		
 	private:
-		virtual inline std::string GetComponentName() const override { return (lightType == LIGHT_TYPE::UNDEFINED ? "Undefined Light" : (lightType == LIGHT_TYPE::DIRECTIONAL ? "Directional Light" : (lightType == LIGHT_TYPE::POINT ? "Point Light" : "Spot Light"))); }
+		virtual inline std::string GetComponentName() const override { return GetStaticName(); }
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
 		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
 		{
-			if (!light)
+			const char* lightTypeNames[]{ "Undefined", "Directional", "Point", "Spot" };
+			int currentTypeIndex{ static_cast<int>(lightType) };
+
+			if (ImGui::Combo("Type", &currentTypeIndex, lightTypeNames, IM_ARRAYSIZE(lightTypeNames)))
+			{
+				const LIGHT_TYPE newType{ static_cast<LIGHT_TYPE>(currentTypeIndex) };
+				if (newType != lightType)
+				{
+					//Need to recreated light
+					
+					//Preserve existing properties if existing
+					const glm::vec3 oldColour{ light ? light->GetColour() : glm::vec3(1.0f) };
+					const float oldIntensity{ light ? light->GetIntensity() : 1.0f };
+					const glm::vec3 oldAttenuation{ (lightType == LIGHT_TYPE::POINT || lightType == LIGHT_TYPE::SPOT) ? glm::vec3(dynamic_cast<PointLight*>(light.get())->GetConstantAttenuation(), dynamic_cast<PointLight*>(light.get())->GetLinearAttenuation(), dynamic_cast<PointLight*>(light.get())->GetQuadraticAttenuation()) : glm::vec3(0.0f) };
+
+					lightType = newType;
+
+					switch (lightType)
+					{
+					case LIGHT_TYPE::DIRECTIONAL:
+						light = UniquePtr<Light>(NK_NEW(DirectionalLight));
+						break;
+					case LIGHT_TYPE::POINT:
+						light = UniquePtr<Light>(NK_NEW(PointLight));
+						break;
+					case LIGHT_TYPE::SPOT:
+						light = UniquePtr<Light>(NK_NEW(SpotLight));
+						break;
+					default:
+						light = nullptr;
+						break;
+					}
+
+					if (light)
+					{
+						light->SetColour(oldColour);
+						light->SetIntensity(oldIntensity);
+						if (lightType == LIGHT_TYPE::POINT || lightType == LIGHT_TYPE::SPOT)
+						{
+							dynamic_cast<PointLight*>(light.get())->SetConstantAttenuation(oldAttenuation.x);
+							dynamic_cast<PointLight*>(light.get())->SetConstantAttenuation(oldAttenuation.y);
+							dynamic_cast<PointLight*>(light.get())->SetConstantAttenuation(oldAttenuation.z);
+						}
+					}
+				}
+			}
+
+			if (lightType == LIGHT_TYPE::UNDEFINED || !light)
 			{
 				return;
 			}

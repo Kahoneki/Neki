@@ -23,25 +23,51 @@ namespace NK
 		inline void SetSkyboxFilepath(const std::string& _val)
 		{
 			if (_val == skyboxFilepath) { return; }
-			skyboxFilepath = _val;
-			skyboxFilepathDirty = true;
+			skyboxFilepathNotFoundError = !std::filesystem::exists(_val);
+			if (!skyboxFilepathNotFoundError)
+			{
+				skyboxFileExtensionNotKTXError = (std::filesystem::path(_val).extension() != ".ktx");
+			}
+			if (!skyboxFilepathNotFoundError && !skyboxFileExtensionNotKTXError)
+			{
+				skyboxFilepath = _val;
+				skyboxFilepathDirty = true;
+			}
 		}
 		inline void SetIrradianceFilepath(const std::string& _val)
 		{
 			if (_val == irradianceFilepath) { return; }
-			irradianceFilepath = _val;
-			irradianceFilepathDirty = true;
+			irradianceFilepathNotFoundError = !std::filesystem::exists(_val);
+			if (!irradianceFilepathNotFoundError)
+			{
+				irradianceFileExtensionNotKTXError = (std::filesystem::path(_val).extension() != ".ktx");
+			}
+			if (!irradianceFilepathNotFoundError && !irradianceFileExtensionNotKTXError)
+			{
+				irradianceFilepath = _val;
+				irradianceFilepathDirty = true;
+			}
 		}
 		inline void SetPrefilterFilepath(const std::string& _val)
 		{
 			if (_val == prefilterFilepath) { return; }
-			prefilterFilepath = _val;
-			prefilterFilepathDirty = true;
+			prefilterFilepathNotFoundError = !std::filesystem::exists(_val);
+			if (!prefilterFilepathNotFoundError)
+			{
+				prefilterFileExtensionNotKTXError = (std::filesystem::path(_val).extension() != ".ktx");
+			}
+			if (!prefilterFilepathNotFoundError && !prefilterFileExtensionNotKTXError)
+			{
+				prefilterFilepath = _val;
+				prefilterFilepathDirty = true;
+			}
 		}
+		
+		[[nodiscard]] inline static std::string GetStaticName() { return "Skybox"; }
 		
 		
 	private:
-		[[nodiscard]] virtual inline std::string GetComponentName() const override { return "Skybox"; }
+		[[nodiscard]] virtual inline std::string GetComponentName() const override { return GetStaticName(); }
 		[[nodiscard]] virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
 		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
 		{
@@ -66,7 +92,7 @@ namespace NK
 		    DrawPathInput("Skybox Filepath", GetSkyboxFilepath(), &CSkybox::SetSkyboxFilepath);
 		    DrawPathInput("Irradiance Filepath", GetIrradianceFilepath(), &CSkybox::SetIrradianceFilepath);
 		    DrawPathInput("Prefilter Filepath", GetPrefilterFilepath(), &CSkybox::SetPrefilterFilepath);
-		    
+			
 		    if (ImGui::Button("Auto-Populate from Directory"))
 		    {
 		        const std::string folder = pfd::select_folder("Select Skybox Directory", lastAccessedFilepath).result();
@@ -85,6 +111,15 @@ namespace NK
 		    {
 		        ImGui::SetTooltip("Automatically populate paths using [Selected Directory] + /skybox.ktx, /irradiance.ktx, and /prefilter.ktx");
 		    }
+			
+			
+			if (skyboxFilepathNotFoundError)		{ ImGui::Text("Skybox Filepath Not Found!"); }
+			if (irradianceFilepathNotFoundError)	{ ImGui::Text("Irradiance Filepath Not Found!"); }
+			if (prefilterFilepathNotFoundError)		{ ImGui::Text("Prefilter Filepath Not Found!"); }
+			
+			if (skyboxFileExtensionNotKTXError)		{ ImGui::Text("Skybox Extension Must Be .ktx!"); }
+			if (irradianceFileExtensionNotKTXError)	{ ImGui::Text("Irradiance Extension Must Be .ktx!"); }
+			if (prefilterFileExtensionNotKTXError)	{ ImGui::Text("Prefilter Extension Must Be .ktx!"); }
 		}
 		
 		
@@ -96,11 +131,18 @@ namespace NK
 		std::string prefilterFilepath;
 
 		//True if skyboxFilepath has been modified and the skybox hasn't yet been updated by RenderLayer
-		bool skyboxFilepathDirty{ true };
+		bool skyboxFilepathDirty{ false };
 		//True if irradianceFilepath has been modified and the skybox hasn't yet been updated by RenderLayer
-		bool irradianceFilepathDirty{ true };
+		bool irradianceFilepathDirty{ false };
 		//True if prefilterFilepath has been modified and the skybox hasn't yet been updated by RenderLayer
-		bool prefilterFilepathDirty{ true };
+		bool prefilterFilepathDirty{ false };
+		
+		bool skyboxFilepathNotFoundError{ false };
+		bool skyboxFileExtensionNotKTXError{ false };
+		bool irradianceFilepathNotFoundError{ false };
+		bool irradianceFileExtensionNotKTXError{ false };
+		bool prefilterFilepathNotFoundError{ false };
+		bool prefilterFileExtensionNotKTXError{ false };
 		
 		
 		//For UI

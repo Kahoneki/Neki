@@ -42,7 +42,7 @@ namespace NK
 	bool InputManager::GetMouseButtonPressed(const MOUSE_BUTTON _button)
 	{
 		if (!m_window) { throw std::runtime_error("InputManager::GetMouseButtonHeld() was called internally, but m_window is nullptr. Set the window with InputManager::SetWindow() before the first InputLayer::Update()"); }
-		return (glfwGetKey(m_window->GetGLFWWindow(), InputUtils::GetGLFWMouseButton(_button)) == GLFW_PRESS);
+		return (glfwGetMouseButton(m_window->GetGLFWWindow(), InputUtils::GetGLFWMouseButton(_button)) == GLFW_PRESS);
 	}
 
 
@@ -50,7 +50,7 @@ namespace NK
 	bool InputManager::GetMouseButtonReleased(const MOUSE_BUTTON _button)
 	{
 		if (!m_window) { throw std::runtime_error("InputManager::GetMouseButtonReleased() was called internally, but m_window is nullptr. Set the window with InputManager::SetWindow() before the first InputLayer::Update()"); }
-		return (glfwGetKey(m_window->GetGLFWWindow(), InputUtils::GetGLFWMouseButton(_button)) == GLFW_RELEASE);
+		return (glfwGetMouseButton(m_window->GetGLFWWindow(), InputUtils::GetGLFWMouseButton(_button)) == GLFW_RELEASE);
 	}
 
 

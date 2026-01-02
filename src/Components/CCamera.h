@@ -29,6 +29,9 @@ namespace NK
 		inline void SetACESExposure(const float _val) { acesExposure = _val; }
 		
 		
+		[[nodiscard]] inline static std::string GetStaticName() { return "Camera"; }
+		
+		
 	private:
 		bool enableDOF{ false };
 		float focalDistance{ 0.0f };
@@ -37,7 +40,7 @@ namespace NK
 		bool dofDebugMode{ false };
 		float acesExposure{ 1.0f };
 		
-		virtual inline std::string GetComponentName() const override { return "Camera"; }
+		virtual inline std::string GetComponentName() const override { return GetStaticName(); }
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
 		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
 		{

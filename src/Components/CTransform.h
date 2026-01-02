@@ -1,5 +1,7 @@
 #pragma once
 
+#define GLM_ENABLE_EXPERIMENTAL
+
 #include "CBoxCollider.h"
 #include "CImGuiInspectorRenderable.h"
 
@@ -7,6 +9,7 @@
 #include <glm/glm.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 
 
 namespace NK
@@ -14,6 +17,7 @@ namespace NK
 
 	struct CTransform final : public CImGuiInspectorRenderable
 	{
+		friend class Registry;
 		friend class RenderLayer;
 		friend class PhysicsLayer;
 		
@@ -74,9 +78,6 @@ namespace NK
 				}
 				currentTransform = currentTransform->GetParent();
 			}
-			
-			const glm::vec3 worldPos{ GetWorldPosition() };
-			const glm::quat worldRot{ GetWorldRotationQuat() };
 
 			//Remove from old parent's children vector
 			if (parent != nullptr)
@@ -88,33 +89,31 @@ namespace NK
 				}
 			}
 
+			const glm::mat4 oldWorldMatrix{ GetModelMatrix() };
 			parent = _parent;
 
 			//Calculate new local properties relative to the new parent
 			if (parent != nullptr) 
 			{
 				parent->children.push_back(this);
-				localPos = glm::vec3(glm::inverse(parent->GetModelMatrix()) * glm::vec4(worldPos, 1.0f));
-				localRot = glm::inverse(parent->GetWorldRotationQuat()) * worldRot;
+				const glm::mat4 newLocalMatrix{ glm::inverse(parent->GetModelMatrix()) * oldWorldMatrix };
+				glm::vec3 skew;
+				glm::vec4 perspective;
+				glm::decompose(newLocalMatrix, localScale, localRot, localPos, skew, perspective);
+				localRot = glm::normalize(localRot);
 			} 
 			else 
 			{
 				//No parent, world space is just local space
-				localPos = worldPos;
-				localRot = worldRot;
+				glm::vec3 skew;
+				glm::vec4 perspective;
+				glm::decompose(oldWorldMatrix, localScale, localRot, localPos, skew, perspective);
 			}
 			
 			localMatrixDirty = true;
 			lightBufferDirty = true;
 			physicsSyncDirty = true;
 			InvalidateChildTree(true, true, true);
-			
-			//If child has a collider, it needs to be recalculated
-			if (_reg.HasComponent<CBoxCollider>(_reg.GetEntity(*this)))
-			{
-				//Technically the halfExtents property isn't changing, so this is a bit misleading - this is just the flag that tells jolt to recalculate the extents (using the new hierarchy)
-				_reg.GetComponent<CBoxCollider>(_reg.GetEntity(*this)).halfExtentsDirty = true;
-			}
 			
 			return true;
 		}
@@ -161,6 +160,8 @@ namespace NK
 		inline void SetWorldRotation(const glm::quat _val) { SetLocalRotation(parent ? glm::inverse(parent->GetWorldRotationQuat()) * _val : _val); }
 		inline void SetWorldScale(const glm::vec3 _val) { SetLocalScale(parent ? _val / parent->GetWorldScale() : _val); }
 		
+		[[nodiscard]] inline static std::string GetStaticName() { return "Transform"; }
+		
 		
 		std::string name{ "Unnamed" };
 		
@@ -185,7 +186,7 @@ namespace NK
 		}
 		
 		
-		virtual inline std::string GetComponentName() const override { return "Transform"; }
+		virtual inline std::string GetComponentName() const override { return GetStaticName(); }
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
 		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
 		{

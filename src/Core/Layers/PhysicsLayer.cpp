@@ -3,6 +3,7 @@
 #include <Components/CBoxCollider.h>
 #include <Components/CPhysicsBody.h>
 #include <Components/CTransform.h>
+#include <oneapi/tbb/profiling.h>
 
 
 #ifdef AddJob
@@ -45,10 +46,20 @@ namespace NK
 		m_jobSystem = new JPH::JobSystemThreadPool(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, std::thread::hardware_concurrency() - 1);
 
 		m_physicsSystem.Init(1024, 0, 1024, 1024, m_broadPhaseInterface, m_objectBroadPhaseFilter, m_objectFilter);
+		
+		m_entityDestroyEventSubscriptionID = EventManager::Subscribe<PhysicsLayer, EntityDestroyEvent>(this, &PhysicsLayer::OnEntityDestroy);
+		m_componentRemoveEventSubscriptionID = EventManager::Subscribe<PhysicsLayer, ComponentRemoveEvent>(this, &PhysicsLayer::OnComponentRemove);
 
 		m_logger.Unindent();
 	}
 
+	
+	
+	PhysicsLayer::~PhysicsLayer()
+	{
+		EventManager::Unsubscribe<EntityDestroyEvent>(m_entityDestroyEventSubscriptionID);
+		EventManager::Unsubscribe<ComponentRemoveEvent>(m_componentRemoveEventSubscriptionID);
+	}
 
 
 	void PhysicsLayer::FixedUpdate()
@@ -186,4 +197,49 @@ namespace NK
 		}
 	}
 
+	
+	
+	void PhysicsLayer::OnEntityDestroy(const EntityDestroyEvent& _event)
+	{
+		if (_event.reg->HasComponent<CPhysicsBody>(_event.entity))	{ OnComponentRemove({ _event.reg, _event.entity, typeid(CPhysicsBody) }); }
+		if (_event.reg->HasComponent<CBoxCollider>(_event.entity))	{ OnComponentRemove({ _event.reg, _event.entity, typeid(CBoxCollider) }); }
+	}
+
+	
+	
+	void PhysicsLayer::OnComponentRemove(const ComponentRemoveEvent& _event)
+	{
+		JPH::BodyInterface& bodyInterface{ m_physicsSystem.GetBodyInterface() };
+
+		if (_event.componentIndex == typeid(CPhysicsBody))
+		{
+			if (_event.reg->HasComponent<CPhysicsBody>(_event.entity))
+			{
+				CPhysicsBody& body{ _event.reg->GetComponent<CPhysicsBody>(_event.entity) };
+				if (body.bodyID != UINT32_MAX)
+				{
+					const JPH::BodyID id(body.bodyID);
+					bodyInterface.RemoveBody(id);
+					bodyInterface.DestroyBody(id);
+					body.bodyID = UINT32_MAX;
+				}
+			}
+		}
+		
+		if (_event.componentIndex == typeid(CBoxCollider))
+		{
+			if (_event.reg->HasComponent<CPhysicsBody>(_event.entity))
+			{
+				CPhysicsBody& body{ _event.reg->GetComponent<CPhysicsBody>(_event.entity) };
+				if (body.bodyID != UINT32_MAX)
+				{
+					const JPH::BodyID id(body.bodyID);
+					bodyInterface.RemoveBody(id);
+					bodyInterface.DestroyBody(id);
+					body.bodyID = UINT32_MAX;
+				}
+			}
+		}
+	}
+	
 }

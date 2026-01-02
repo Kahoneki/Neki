@@ -28,9 +28,9 @@ namespace NK
 
 
 	private:
-		float m_constantAttenuation;
-		float m_linearAttenuation;
-		float m_quadraticAttenuation;
+		float m_constantAttenuation{ 0.1f };
+		float m_linearAttenuation{ 0.01f };
+		float m_quadraticAttenuation{ 0.001f };
 	};
 	
 }

@@ -885,4 +885,12 @@ namespace NK
 		Entity entity;
 	};
 	
+	//Triggered directly prior to a component being removed from an entity
+	struct ComponentRemoveEvent
+	{
+		Registry* reg;
+		Entity entity;
+		std::type_index componentIndex;
+	};
+	
 }

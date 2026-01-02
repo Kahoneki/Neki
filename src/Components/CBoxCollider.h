@@ -22,31 +22,14 @@ namespace NK
 		
 		//Note: quite expensive, use sparingly (e.g.: avoid calling every frame for continuous updates, just set once at end of updates instead)
 		inline void SetHalfExtents(const glm::vec3 _val) { halfExtents = _val; halfExtentsEditedInInspector = false; halfExtentsDirty = true; }
+	
+		[[nodiscard]] inline static std::string GetStaticName() { return "Box Collider"; }
 		
 		
 	private:
-		virtual inline std::string GetComponentName() const override { return "Box Collider"; }
+		virtual inline std::string GetComponentName() const override { return GetStaticName(); }
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
-		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
-		{
-			if (ImGui::DragFloat3("Half Extents", &halfExtents.x, 0.05f)) { halfExtentsEditedInInspector = true; }
-			if (halfExtentsEditedInInspector)
-			{
-				if (ImGui::Button("Apply"))
-				{
-					halfExtentsEditedInInspector = false;
-					halfExtentsDirty = true;
-				}
-			}
-			const Entity entity{ _reg.GetEntity(*this) };
-			if (_reg.HasComponent<CModelRenderer>(entity))
-			{
-				if (ImGui::Button("Match Model Bounds"))
-				{
-					SetHalfExtents(_reg.GetComponent<CModelRenderer>(entity).localSpaceHalfExtents);
-				}
-			}
-		}
+		virtual void RenderImGuiInspectorContents(Registry& _reg) override;
 		
 		
 		bool halfExtentsEditedInInspector{ false }; //setting halfExtentsDirty is expensive, so we want to avoid it for continuous updates (i.e.: ImGui::DragFloat3) - use this if the half extents have been edited but the apply button hasn't been pressed yet

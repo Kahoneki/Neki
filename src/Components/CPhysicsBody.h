@@ -31,6 +31,9 @@ namespace NK
 		inline void AddForce(const glm::vec3& _forceVector, const FORCE_MODE _mode = FORCE_MODE::FORCE) { forceQueue.push({ .forceVector = _forceVector, .mode = _mode }); }
 		
 		
+		[[nodiscard]] inline static std::string GetStaticName() { return "Physics Body"; }
+		
+		
 		PhysicsObjectLayer initialObjectLayer{ UINT16_MAX, PhysicsBroadPhaseLayer(UINT8_MAX) };
 
 		MOTION_TYPE initialMotionType{ MOTION_TYPE::DYNAMIC };
@@ -43,7 +46,7 @@ namespace NK
 
 		
 	private:
-		virtual inline std::string GetComponentName() const override { return "Physics Body"; }
+		virtual inline std::string GetComponentName() const override { return GetStaticName(); }
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
 		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
 		{

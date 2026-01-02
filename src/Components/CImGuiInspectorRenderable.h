@@ -1,12 +1,13 @@
 #pragma once
 
-#include <Core-ECS/Registry.h>
-
 #include <imgui.h>
+#include <string>
 
 
 namespace NK
 {
+    
+    class Registry;
     
     //Inherited by any components that are to be rendered in the inspector menu
     struct CImGuiInspectorRenderable

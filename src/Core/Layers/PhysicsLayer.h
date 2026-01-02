@@ -21,12 +21,15 @@ namespace NK
 	{
 	public:
 		explicit PhysicsLayer(Registry& _reg, const PhysicsLayerDesc& _desc);
-		virtual ~PhysicsLayer() override = default;
+		virtual ~PhysicsLayer() override;
 
 		virtual void FixedUpdate() override;
 		
 		
 	private:
+		void OnEntityDestroy(const EntityDestroyEvent& _event);
+		void OnComponentRemove(const ComponentRemoveEvent& _event);
+		
 		JPH::PhysicsSystem m_physicsSystem;
 		JPH::TempAllocatorImpl* m_tempAllocator;
 		JPH::JobSystemThreadPool* m_jobSystem;
@@ -34,6 +37,9 @@ namespace NK
 		ContactListenerImpl m_contactListener;
 		ObjectLayerPairFilterImpl m_objectFilter;
 		ObjectVsBroadPhaseLayerFilterImpl m_objectBroadPhaseFilter;
+		
+		EventSubscriptionID m_entityDestroyEventSubscriptionID;
+		EventSubscriptionID m_componentRemoveEventSubscriptionID;
 	};
 
 }

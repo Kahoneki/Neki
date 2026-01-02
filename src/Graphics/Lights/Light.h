@@ -36,7 +36,6 @@ namespace NK
 		bool m_dirty{ true };
 
 		//True if the shadow map needs to be created (dirtied when CLight.lightType changes or the light has just been created this frame)
-		//^todo: changing light type and removing lights is currently not supported
 		//Gets cleaned when SetShadowMapIndex() is called
 		bool m_shadowMapDirty{ true };
 

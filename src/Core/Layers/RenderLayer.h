@@ -94,6 +94,7 @@ namespace NK
 		static glm::mat4 GetPointLightViewMatrix(const glm::vec3& _lightPos, const std::size_t _faceIndex);
 		
 		void OnEntityDestroy(const EntityDestroyEvent& _event);
+		void OnComponentRemove(const ComponentRemoveEvent& _event);
 
 
 		//Dependency injections
@@ -362,6 +363,7 @@ namespace NK
 
 		EventSubscriptionID m_entityDestroyEventSubscriptionID;
 		
+		EventSubscriptionID m_componentRemoveEventSubscriptionID;
 		bool m_firstFrame;
 		
 		

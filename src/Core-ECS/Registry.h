@@ -11,6 +11,8 @@
 #include <typeindex>
 #include <unordered_map>
 
+#include "Components/CTransform.h"
+
 
 namespace NK
 {
@@ -57,6 +59,7 @@ namespace NK
 				throw std::runtime_error("Registry::Create() - max entities reached!");
 			}
 			m_entityComponents[newEntity] = {};
+			AddComponent<CTransform>(newEntity);
 			return newEntity;
 		}
 
@@ -71,6 +74,23 @@ namespace NK
 			
 			EventManager::Trigger(EntityDestroyEvent(this, _entity));
 			
+			
+			//Update transform hierarchy
+			CTransform& transform{ GetComponent<CTransform>(_entity) };
+			
+			//Recursively delete all children
+			for (CTransform* child : transform.children)
+			{
+				Destroy(GetEntity(*child));
+			}
+			
+			//If entity has a parent, remove this entity from its children vector
+			if (transform.GetParent() != nullptr)
+			{
+				transform.GetParent()->children.erase(std::ranges::find(transform.GetParent()->children, &transform));
+			}
+			
+				
 			for (std::type_index type : m_entityComponents[_entity])
 			{
 				m_componentPools[type]->RemoveEntity(_entity);
@@ -126,7 +146,41 @@ namespace NK
 				throw std::invalid_argument("Registry::RemoveComponent() - provided _entity (" + std::to_string(_entity) + ") does not contain the provided component.");
 			}
 			
+			if (typeid(Component) == typeid(CTransform))
+			{
+				throw std::invalid_argument("Registry::RemoveComponent() - Attempted to remove a CTransform - this is not allowed as all entities require one!");
+			}
+			
+			EventManager::Trigger(ComponentRemoveEvent(this, _entity, std::type_index(typeid(Component))));
+			
 			ComponentPool<Component>* pool{ GetPool<Component>() };
+			pool->RemoveEntity(_entity);
+			m_entityComponents[_entity].erase(entityComponentsIt);
+		}
+		
+		
+		//Remove component with type index _index from _entity
+		inline void RemoveComponent(Entity _entity, std::type_index _index)
+		{
+			if (!m_entityComponents.contains(_entity))
+			{
+				throw std::invalid_argument("Registry::RemoveComponent() - provided _entity (" + std::to_string(_entity) + ") is not in registry.");
+			}
+
+			const std::vector<std::type_index>::iterator entityComponentsIt{ std::ranges::find(m_entityComponents[_entity], _index) };
+			if (entityComponentsIt == m_entityComponents[_entity].end())
+			{
+				throw std::invalid_argument("Registry::RemoveComponent() - provided _entity (" + std::to_string(_entity) + ") does not contain the provided component.");
+			}
+			
+			if (_index == typeid(CTransform))
+			{
+				throw std::invalid_argument("Registry::RemoveComponent() - Attempted to remove a CTransform - this is not allowed as all entities require one!");
+			}
+			
+			EventManager::Trigger(ComponentRemoveEvent(this, _entity, _index));
+			
+			IComponentPool* pool{ GetPool(_index) };
 			pool->RemoveEntity(_entity);
 			m_entityComponents[_entity].erase(entityComponentsIt);
 		}
@@ -222,6 +276,7 @@ namespace NK
 		[[nodiscard]] inline std::vector<std::type_index> GetEntityComponents(const Entity _entity) const { return m_entityComponents.at(_entity); }
 		[[nodiscard]] inline IComponentPool* GetPool(const std::type_index _index) const { return m_componentPools.at(_index).get(); }
 		[[nodiscard]] inline bool EntityInRegistry(const Entity _entity) const { return m_entityComponents.contains(_entity); }
+		[[nodiscard]] inline const std::unordered_map<std::type_index, std::unique_ptr<IComponentPool>>& GetPools() { return m_componentPools; }
 		
 		
 	private:
@@ -258,6 +313,20 @@ namespace NK
 		std::unordered_map<Entity, std::vector<std::type_index>> m_entityComponents;
 	};
 
+}
+
+
+template <typename Component>
+void NK::ComponentPool<Component>::AddDefaultToEntity(NK::Registry& _reg, const Entity _entity)
+{
+	if constexpr (std::is_default_constructible_v<Component>)
+	{
+		_reg.AddComponent<Component>(_entity);
+	}
+	else
+	{
+		throw std::runtime_error("ComponentPool::AddDefaultToEntity() - Components of this type are not default constructible!");
+	}
 }
 
 
