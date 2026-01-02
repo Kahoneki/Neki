@@ -1989,7 +1989,9 @@ namespace NK
 				//If an entity is currently selected, the copied entity should be pasted to the same tree-level as the selected entity (i.e.: the pasted entity's parent should be set to the selected entity's parent)
 				for (auto&& [selected] : m_reg.get().View<CSelected>())
 				{
-					m_reg.get().GetComponent<CTransform>(newEntity).SetParent(m_reg.get(), &(m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(selected))));
+					CTransform& newEntityTransform{ m_reg.get().GetComponent<CTransform>(newEntity) };
+					const CTransform& selectedEntityTransform{ m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(selected)) };
+					newEntityTransform.SetParent(m_reg.get(), selectedEntityTransform.GetParent());
 					break; //It's currently not possible to select more than one entity, if i ever add this functionality though, then todo: figure out what to do about pasting when multiple entities are selected
 				}
 			}

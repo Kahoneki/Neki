@@ -28,11 +28,9 @@
 #include <glm/gtx/string_cast.hpp>
 
 
-static const NK::PhysicsBroadPhaseLayer movingBroadPhaseLayer{ 0 };
-static const NK::PhysicsBroadPhaseLayer kinematicBroadPhaseLayer{ 1 };
-static const NK::PhysicsBroadPhaseLayer staticBroadPhaseLayer{ 2 };
-static const NK::PhysicsObjectLayer helmetObjectLayer{ 0, movingBroadPhaseLayer };
-static const NK::PhysicsObjectLayer floorObjectLayer{ 1, kinematicBroadPhaseLayer };
+
+static const NK::PhysicsObjectLayer helmetObjectLayer{ 0, NK::DynamicBroadPhaseLayer };
+static const NK::PhysicsObjectLayer floorObjectLayer{ 1, NK::KinematicBroadPhaseLayer };
 
 
 class GameScene final : public NK::Scene

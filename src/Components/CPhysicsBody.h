@@ -13,6 +13,54 @@ namespace NK
 
 		
 	public:
+		CPhysicsBody() = default;
+
+		CPhysicsBody(const CPhysicsBody& _other)
+			: initialObjectLayer(_other.initialObjectLayer),
+			  initialMotionType(_other.initialMotionType),
+			  initialMotionQuality(_other.initialMotionQuality),
+			  initialTrigger(_other.initialTrigger),
+			  initialLinearVelocity(_other.initialLinearVelocity),
+			  initialAngularVelocity(_other.initialAngularVelocity),
+			  bodyID(UINT32_MAX),
+			  dirtyFlags(PHYSICS_DIRTY_FLAGS::CLEAN),
+			  mass(_other.mass),
+			  friction(_other.friction),
+			  restitution(_other.restitution),
+			  linearDamping(_other.linearDamping),
+			  angularDamping(_other.angularDamping),
+			  gravityFactor(_other.gravityFactor),
+			  scale(_other.scale)
+		{
+		}
+
+		CPhysicsBody& operator=(const CPhysicsBody& _other)
+		{
+			if (this == &_other) return *this;
+
+			initialObjectLayer = _other.initialObjectLayer;
+			initialMotionType = _other.initialMotionType;
+			initialMotionQuality = _other.initialMotionQuality;
+			initialTrigger = _other.initialTrigger;
+			initialLinearVelocity = _other.initialLinearVelocity;
+			initialAngularVelocity = _other.initialAngularVelocity;
+
+			mass = _other.mass;
+			friction = _other.friction;
+			restitution = _other.restitution;
+			linearDamping = _other.linearDamping;
+			angularDamping = _other.angularDamping;
+			gravityFactor = _other.gravityFactor;
+			scale = _other.scale;
+
+			bodyID = UINT32_MAX;
+			dirtyFlags = PHYSICS_DIRTY_FLAGS::CLEAN;
+			forceQueue = std::queue<ForceDesc>();
+
+			return *this;
+		}
+		
+		
 		[[nodiscard]] inline float GetMass() const { return mass; }
 		[[nodiscard]] inline float GetFriction() const { return friction; }
 		[[nodiscard]] inline float GetRestitution() const { return restitution; }
@@ -34,9 +82,9 @@ namespace NK
 		[[nodiscard]] inline static std::string GetStaticName() { return "Physics Body"; }
 		
 		
-		PhysicsObjectLayer initialObjectLayer{ UINT16_MAX, PhysicsBroadPhaseLayer(UINT8_MAX) };
+		PhysicsObjectLayer initialObjectLayer{ DefaultObjectLayer };
 
-		MOTION_TYPE initialMotionType{ MOTION_TYPE::DYNAMIC };
+		MOTION_TYPE initialMotionType{ MOTION_TYPE::STATIC };
 		MOTION_QUALITY initialMotionQuality{ MOTION_QUALITY::DISCRETE };
 
 		bool initialTrigger{ false };

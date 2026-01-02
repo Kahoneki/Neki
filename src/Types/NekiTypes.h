@@ -893,4 +893,9 @@ namespace NK
 		std::type_index componentIndex;
 	};
 	
+	static const PhysicsBroadPhaseLayer DynamicBroadPhaseLayer{ 0 };
+	static const PhysicsBroadPhaseLayer KinematicBroadPhaseLayer{ 1 };
+	static const PhysicsBroadPhaseLayer StaticBroadPhaseLayer{ 2 };
+	
+	static const PhysicsObjectLayer DefaultObjectLayer{ UINT16_MAX, StaticBroadPhaseLayer };
 }
