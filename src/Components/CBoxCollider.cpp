@@ -5,6 +5,8 @@
 namespace NK
 {
     
+    //.cpp because full registry type is required and including Registry.h in the header creates a circular reference
+    
     void CBoxCollider::RenderImGuiInspectorContents(Registry& _reg)
     {
         if (ImGui::DragFloat3("Half Extents", &halfExtents.x, 0.05f)) { halfExtentsEditedInInspector = true; }
