@@ -15,11 +15,85 @@ namespace NK
 	struct CLight final : public CImGuiInspectorRenderable
 	{
 	public:
+		CLight() : lightType(LIGHT_TYPE::UNDEFINED), light(nullptr) {}
+
+		//Deep copy constructor
+		CLight(const CLight& _other) : lightType(_other.lightType)
+		{
+			if (_other.light)
+			{
+				switch (lightType)
+				{
+				case LIGHT_TYPE::DIRECTIONAL:
+					light = UniquePtr<Light>(NK_NEW(DirectionalLight, *static_cast<DirectionalLight*>(_other.light.get())));
+					break;
+				case LIGHT_TYPE::POINT:
+					light = UniquePtr<Light>(NK_NEW(PointLight, *static_cast<PointLight*>(_other.light.get())));
+					break;
+				case LIGHT_TYPE::SPOT:
+					light = UniquePtr<Light>(NK_NEW(SpotLight, *static_cast<SpotLight*>(_other.light.get())));
+					break;
+				default:
+					light = nullptr;
+					break;
+				}
+			}
+			else
+			{
+				light = nullptr;
+			}
+		}
+
+		//Deep copy assignment
+		CLight& operator=(const CLight& _other)
+		{
+			if (this == &_other) { return *this; }
+
+			lightType = _other.lightType;
+			light.reset();
+
+			if (_other.light)
+			{
+				switch (lightType)
+				{
+				case LIGHT_TYPE::DIRECTIONAL:
+					light = UniquePtr<Light>(NK_NEW(DirectionalLight, *static_cast<DirectionalLight*>(_other.light.get())));
+					break;
+				case LIGHT_TYPE::POINT:
+					light = UniquePtr<Light>(NK_NEW(PointLight, *static_cast<PointLight*>(_other.light.get())));
+					break;
+				case LIGHT_TYPE::SPOT:
+					light = UniquePtr<Light>(NK_NEW(SpotLight, *static_cast<SpotLight*>(_other.light.get())));
+					break;
+				default:
+					break;
+				}
+			}
+			
+			return *this;
+		}
+
+		CLight(CLight&& _other) noexcept : lightType(_other.lightType), light(std::move(_other.light))
+		{
+			_other.lightType = LIGHT_TYPE::UNDEFINED;
+		}
+
+		CLight& operator=(CLight&& _other) noexcept
+		{
+			if (this == &_other) { return *this; }
+			lightType = _other.lightType;
+			light = std::move(_other.light);
+			_other.lightType = LIGHT_TYPE::UNDEFINED;
+			return *this;
+		}
+
+		~CLight() override = default;
+
+		[[nodiscard]] inline static std::string GetStaticName() { return "Light"; }
+
+		
 		LIGHT_TYPE lightType{ LIGHT_TYPE::UNDEFINED };
 		UniquePtr<Light> light;
-		
-		
-		[[nodiscard]] inline static std::string GetStaticName() { return "Light"; }
 		
 		
 	private:

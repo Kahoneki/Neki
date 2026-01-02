@@ -59,6 +59,7 @@ namespace NK
 		case KEYBOARD::NUM_9: return GLFW_KEY_9;
 		case KEYBOARD::NUM_0: return GLFW_KEY_0;
 		case KEYBOARD::ESCAPE: return GLFW_KEY_ESCAPE;
+		case KEYBOARD::DEL: return GLFW_KEY_DELETE;
 		default:
 		{
 			throw std::invalid_argument("GetGLFWKeyboardKey() default case reached. _key = " + std::to_string(std::to_underlying(_key)));

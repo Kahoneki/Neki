@@ -271,6 +271,42 @@ namespace NK
 			}
 			return pool->indexToEntity[componentPtr - poolComponentsBegin];
 		}
+		
+		
+		//Makes a copy of an entity, including any children it has (parent is not carried over to the copy)
+		Entity CopyEntity(const Entity _entity)
+		{
+			if (!m_entityComponents.contains(_entity))
+			{
+				throw std::invalid_argument("Registry::CopyEntity() - provided _entity (" + std::to_string(_entity) + ") is not in registry.");
+			}
+
+			const Entity newEntity{ Create() };
+			for (const std::type_index& typeIndex : m_entityComponents.at(_entity))
+			{
+				if (typeIndex == std::type_index(typeid(CTransform)))
+				{
+					continue;
+				}
+				m_componentPools.at(typeIndex)->CopyComponentToEntity(*this, _entity, newEntity);
+			}
+
+			const CTransform& srcTransform{ GetComponent<CTransform>(_entity) };
+			CTransform& dstTransform{ GetComponent<CTransform>(newEntity) };
+
+			dstTransform.SetLocalPosition(srcTransform.GetLocalPosition());
+			dstTransform.SetLocalRotation(srcTransform.GetLocalRotationQuat());
+			dstTransform.SetLocalScale(srcTransform.GetLocalScale());
+			dstTransform.name = srcTransform.name;
+
+			for (CTransform* child : srcTransform.children)
+			{
+				const Entity childCopy{ CopyEntity(GetEntity(*child)) };
+				GetComponent<CTransform>(childCopy).SetParent(*this, &dstTransform);
+			}
+
+			return newEntity;
+		}
 	
 		
 		[[nodiscard]] inline std::vector<std::type_index> GetEntityComponents(const Entity _entity) const { return m_entityComponents.at(_entity); }
@@ -326,6 +362,16 @@ void NK::ComponentPool<Component>::AddDefaultToEntity(NK::Registry& _reg, const 
 	else
 	{
 		throw std::runtime_error("ComponentPool::AddDefaultToEntity() - Components of this type are not default constructible!");
+	}
+}
+
+
+template <typename Component>
+void NK::ComponentPool<Component>::CopyComponentToEntity(NK::Registry& _reg, const Entity _srcEntity, const Entity _dstEntity)
+{
+	if (entityToIndex.contains(_srcEntity))
+	{
+		_reg.AddComponent<Component>(_dstEntity, components[entityToIndex.at(_srcEntity)]);
 	}
 }
 

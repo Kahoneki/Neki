@@ -145,7 +145,7 @@ namespace NK
 		bool prefilterFileExtensionNotKTXError{ false };
 		
 		
-		//For UI
+		//UI
 		std::string lastAccessedFilepath{ NEKI_BUILD_DIR };
 	};
 	

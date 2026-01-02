@@ -17,6 +17,36 @@ namespace NK
 
 
 	public:
+		CModelRenderer() = default;
+		
+		CModelRenderer(const CModelRenderer& _other)
+		: modelPath(_other.modelPath), localSpaceOrigin(_other.localSpaceOrigin), localSpaceHalfExtents(_other.localSpaceHalfExtents),
+		  visible(_other.visible), model(nullptr), modelPathDirty(true), visibilityIndex(0xFFFFFFFF)
+		{
+		}
+		
+		CModelRenderer& operator=(const CModelRenderer& _other)
+		{
+			if (this == &_other) return *this;
+
+			modelPath = _other.modelPath;
+			modelPathDirty = true;
+
+			localSpaceOrigin = _other.localSpaceOrigin;
+			localSpaceHalfExtents = _other.localSpaceHalfExtents;
+			visible = _other.visible;
+
+			model = nullptr;
+			visibilityIndex = 0xFFFFFFFF; 
+
+			return *this;
+		}
+
+		CModelRenderer(CModelRenderer&&) = default;
+		CModelRenderer& operator=(CModelRenderer&&) = default;
+		~CModelRenderer() override = default;
+		
+		
 		[[nodiscard]] inline std::string GetModelPath() const { return modelPath; }
 		
 		inline void SetModelPath(const std::string& _path)
@@ -38,8 +68,8 @@ namespace NK
 		
 		
 		//Volume in local space
-		glm::vec3 localSpaceOrigin;
-		glm::vec3 localSpaceHalfExtents;
+		glm::vec3 localSpaceOrigin{ 0,0,0 };
+		glm::vec3 localSpaceHalfExtents{ 0,0,0 };
 		
 		
 	private:

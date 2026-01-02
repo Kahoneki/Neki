@@ -372,6 +372,7 @@ namespace NK
 		ImGuizmo::OPERATION m_currentGizmoOp{ ImGuizmo::TRANSLATE };
 		ImGuizmo::MODE m_currentGizmoMode{ ImGuizmo::WORLD };
 		CCamera* m_activeCamera{ nullptr };
+		Entity m_copiedEntity{ UINT32_MAX };
 	};
 
 }

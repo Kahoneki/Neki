@@ -22,6 +22,7 @@ namespace NK
 		virtual bool IsImGuiInspectorRenderableType() const = 0;
 		virtual std::string GetImGuiInspectorRenderableName() const = 0;
 		virtual void AddDefaultToEntity(Registry& _reg, Entity _entity) = 0;
+		virtual void CopyComponentToEntity(Registry& _reg, Entity _srcEntity, Entity _dstEntity) = 0;
 	};
 	
 }

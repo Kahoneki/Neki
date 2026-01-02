@@ -66,6 +66,7 @@ namespace NK
 		
 		
 		virtual void AddDefaultToEntity(Registry& _reg, const Entity _entity) override;
+		virtual void CopyComponentToEntity(Registry& _reg, const Entity _srcEntity, const Entity _dstEntity) override;
 		
 		
 		std::vector<Component> components; //All components of this component type

@@ -692,7 +692,7 @@ namespace NK
 		A,S,D,F,G,H,J,K,L,
 		Z,X,C,V,B,N,M,
 		NUM_1, NUM_2, NUM_3, NUM_4, NUM_5, NUM_6, NUM_7, NUM_8, NUM_9, NUM_0,
-		ESCAPE,
+		ESCAPE, DEL,
 	};
 
 	enum class MOUSE_BUTTON
