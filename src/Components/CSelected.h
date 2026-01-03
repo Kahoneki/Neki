@@ -9,7 +9,7 @@ namespace NK
     //Empty tag component to mark an object as being selected for the ImGuizmo rendering
     struct CSelected
     {
-        SERIALISE_MEMBER_FUNC()
+        SERIALISE_EMPTY
     };
     
 }

@@ -12,7 +12,54 @@ namespace NK
 	struct CCamera final : public CImGuiInspectorRenderable
 	{
 	public:
-		Camera* camera;
+		CCamera() = default;
+
+		CCamera(const CCamera& _other) : enableDOF(_other.enableDOF), focalDistance(_other.focalDistance), focalDepth(_other.focalDepth), maxBlurRadius(_other.maxBlurRadius), dofDebugMode(_other.dofDebugMode), acesExposure(_other.acesExposure), maxIrradiance(_other.maxIrradiance)
+		{
+			if (_other.camera)
+			{
+				if (PlayerCamera* pc{ dynamic_cast<PlayerCamera*>(_other.camera.get()) })
+				{
+					camera = UniquePtr<Camera>(NK_NEW(PlayerCamera, *pc));
+				}
+				else
+				{
+					camera = UniquePtr<Camera>(NK_NEW(Camera, *_other.camera));
+				}
+			}
+		}
+
+		CCamera& operator=(const CCamera& _other)
+		{
+			if (this == &_other) { return *this; }
+
+			enableDOF = _other.enableDOF;
+			focalDistance = _other.focalDistance;
+			focalDepth = _other.focalDepth;
+			maxBlurRadius = _other.maxBlurRadius;
+			dofDebugMode = _other.dofDebugMode;
+			acesExposure = _other.acesExposure;
+			maxIrradiance = _other.maxIrradiance;
+
+			camera.reset();
+			if (_other.camera)
+			{
+				if (PlayerCamera* pc{ dynamic_cast<PlayerCamera*>(_other.camera.get()) })
+				{
+					camera = UniquePtr<Camera>(NK_NEW(PlayerCamera, *pc));
+				}
+				else
+				{
+					camera = UniquePtr<Camera>(NK_NEW(Camera, *_other.camera));
+				}
+			}
+
+			return *this;
+		}
+
+		CCamera(CCamera&&) = default;
+		CCamera& operator=(CCamera&&) = default;
+		
 		
 		[[nodiscard]] inline bool GetEnableDepthOfField() const { return enableDOF; }
 		[[nodiscard]] inline float GetFocalDistance() const { return focalDistance; }
@@ -30,10 +77,12 @@ namespace NK
 		inline void SetACESExposure(const float _val) { acesExposure = _val; }
 		inline void SetMaxIrradiance(const float _val) { maxIrradiance = _val; }
 		
-		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Camera"; }
 		
 		SERIALISE_MEMBER_FUNC(enableDOF, focalDistance, focalDepth, maxBlurRadius, acesExposure, maxIrradiance)
+		
+		
+		UniquePtr<Camera> camera;
 		
 		
 	private:
@@ -75,7 +124,7 @@ namespace NK
 				camera->SetFarPlaneDistance(farPlane);
 			}
 
-			if (PlayerCamera* playerCamera{ dynamic_cast<PlayerCamera*>(camera) })
+			if (PlayerCamera* playerCamera{ dynamic_cast<PlayerCamera*>(camera.get()) })
 			{
 				//Movement Speed
 				float speed = playerCamera->GetMovementSpeed();

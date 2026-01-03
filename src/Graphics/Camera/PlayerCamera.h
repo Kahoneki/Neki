@@ -11,6 +11,7 @@ namespace NK
 	class PlayerCamera final : public Camera
 	{
 		friend class PlayerCameraLayer;
+		friend class cereal::access;
 		
 		
 	public:
@@ -30,6 +31,8 @@ namespace NK
 		
 	
 	private:
+		PlayerCamera() = default;
+		
 		float m_movementSpeed;
 		float m_mouseSensitivity;
 	};

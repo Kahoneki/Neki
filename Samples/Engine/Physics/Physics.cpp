@@ -37,7 +37,7 @@ static const NK::PhysicsObjectLayer floorObjectLayer{ 1, NK::KinematicBroadPhase
 class GameScene2 final : public NK::Scene
 {
 public:
-	explicit GameScene2() : Scene(128), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0.0f, 3.0f, -5.0f), 90.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
+	explicit GameScene2() : Scene(128)
 	{
 		//preprocessing step - ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
 		//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
@@ -109,7 +109,7 @@ public:
 		
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
-		camera.camera = m_playerCamera.get();
+		camera.camera = NK::UniquePtr<NK::Camera>(NK_NEW(NK::PlayerCamera, glm::vec3(0.0f, 3.0f, -5.0f), 90.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f));
 		m_reg.GetComponent<NK::CTransform>(m_cameraEntity).name = "Camera";
 
 
@@ -155,14 +155,13 @@ private:
 	NK::Entity m_lightEntity2;
 	NK::Entity m_lightEntity3;
 	NK::Entity m_cameraEntity;
-	NK::UniquePtr<NK::PlayerCamera> m_playerCamera;
 };
 
 
 class GameScene final : public NK::Scene
 {
 public:
-	explicit GameScene() : Scene(128), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0.0f, 3.0f, -5.0f), 90.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
+	explicit GameScene() : Scene(128)
 	{
 		//preprocessing step - ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
 		//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
@@ -249,7 +248,7 @@ public:
 		
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
-		camera.camera = m_playerCamera.get();
+		camera.camera = NK::UniquePtr<NK::Camera>(NK_NEW(NK::PlayerCamera, glm::vec3(0.0f, 3.0f, -5.0f), 90.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f));
 		m_reg.GetComponent<NK::CTransform>(m_cameraEntity).name = "Camera";
 
 
@@ -296,7 +295,6 @@ private:
 	NK::Entity m_lightEntity2;
 	NK::Entity m_lightEntity3;
 	NK::Entity m_cameraEntity;
-	NK::UniquePtr<NK::PlayerCamera> m_playerCamera;
 };
 
 

@@ -12,7 +12,6 @@
 #include <Components/CSelected.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
-#include <Components/CWindow.h>
 #include <Graphics/Camera/Camera.h>
 #include <Graphics/Camera/PlayerCamera.h>
 #include <Graphics/Lights/DirectionalLight.h>
@@ -35,6 +34,9 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(NK::Light, NK::DirectionalLight)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(NK::Light, NK::PointLight)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(NK::Light, NK::SpotLight)
 
+CEREAL_REGISTER_TYPE(NK::Camera);
+CEREAL_REGISTER_TYPE(NK::PlayerCamera);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(NK::Camera, NK::PlayerCamera);
 
 
 int main()
@@ -55,7 +57,6 @@ int main()
 	NK::TypeRegistry::Register<NK::CSelected>("C_SELECTED");
 	NK::TypeRegistry::Register<NK::CSkybox>("C_SKYBOX");
 	NK::TypeRegistry::Register<NK::CTransform>("C_TRANSFORM");
-	NK::TypeRegistry::Register<NK::CWindow>("C_WINDOW");
 	
 	engine.Run();
 }

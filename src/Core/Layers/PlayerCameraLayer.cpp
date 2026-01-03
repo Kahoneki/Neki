@@ -49,7 +49,7 @@ namespace NK
 
 		for (auto&& [camera, input] : m_reg.get().View<CCamera, CInput>())
 		{
-			PlayerCamera* pc{ dynamic_cast<PlayerCamera*>(camera.camera) };
+			PlayerCamera* pc{ dynamic_cast<PlayerCamera*>(camera.camera.get()) };
 			if (!pc) { continue; }
 			
 			for (std::unordered_map<ActionTypeMapKey, INPUT_STATE_VARIANT>::iterator it{ input.actionStates.begin() }; it != input.actionStates.end(); ++it)

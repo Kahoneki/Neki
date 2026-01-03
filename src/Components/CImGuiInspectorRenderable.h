@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Core/Utils/Serialisation/Serialisation.h>
+
 #include <imgui.h>
 #include <string>
 
@@ -18,7 +20,7 @@ namespace NK
     public:
         virtual ~CImGuiInspectorRenderable() = default;
         
-        SERIALISE_MEMBER_FUNC()
+        SERIALISE_EMPTY
         
         
     protected:

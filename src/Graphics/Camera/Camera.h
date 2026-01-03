@@ -16,6 +16,9 @@ namespace NK
 
 	class Camera
 	{
+		friend class cereal::access;
+		
+		
 	public:
 		//Neki is built on a left handed coordinate system (+X is right, +Y is up, +Z is forward)
 		//A yaw of 0 is equivalent to looking at the +X axis, increasing yaw will rotate the camera around the Y axis in an anti-clockwise direction measured in degrees
@@ -58,6 +61,8 @@ namespace NK
 		
 
 	protected:
+		Camera() { m_viewMatDirty = true; m_orthographicProjMatDirty = true; m_perspectiveProjMatDirty = true; }
+		
 		//Will update matrices if they're dirty
 		[[nodiscard]] glm::mat4 GetViewMatrix();
 		[[nodiscard]] glm::mat4 GetProjectionMatrix(const PROJECTION_METHOD _method);

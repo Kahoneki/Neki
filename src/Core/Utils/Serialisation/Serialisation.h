@@ -47,6 +47,13 @@
 	}
 
 
+#define SERIALISE_EMPTY \
+	template<class Archive> \
+	inline void serialize(Archive& a) \
+	{ \
+	}
+
+
 namespace glm
 {
 
