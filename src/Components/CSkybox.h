@@ -133,11 +133,11 @@ namespace NK
 		std::string prefilterFilepath;
 
 		//True if skyboxFilepath has been modified and the skybox hasn't yet been updated by RenderLayer
-		bool skyboxFilepathDirty{ false };
+		bool skyboxFilepathDirty{ true };
 		//True if irradianceFilepath has been modified and the skybox hasn't yet been updated by RenderLayer
-		bool irradianceFilepathDirty{ false };
+		bool irradianceFilepathDirty{ true };
 		//True if prefilterFilepath has been modified and the skybox hasn't yet been updated by RenderLayer
-		bool prefilterFilepathDirty{ false };
+		bool prefilterFilepathDirty{ true };
 		
 		bool skyboxFilepathNotFoundError{ false };
 		bool skyboxFileExtensionNotKTXError{ false };

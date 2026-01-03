@@ -18,7 +18,7 @@ namespace NK
 		//Get the half-dimensions of the orthographic projection matrix in world units (centred on the light's position)
 		[[nodiscard]] inline glm::vec3 GetDimensions() const { return m_dimensions; }
 		
-		SERIALISE_MEMBER_FUNC(m_dimensions)
+		SERIALISE_MEMBER_FUNC(cereal::base_class<Light>(this), m_dimensions)
 		
 
 	private:

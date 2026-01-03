@@ -2737,24 +2737,22 @@ namespace NK
 	void RenderLayer::OnSceneLoad(const SceneLoadEvent& _event)
 	{
 		m_graphicsQueue->WaitIdle();
+		m_gpuModelReferenceCounter.clear();
 		m_textureDeletionQueue.clear();
-		for (auto& [frame, models] : m_modelUnloadQueue)
-		{
-			for (const std::string& path : models)
-			{
-				if (m_gpuModelCache.contains(path))
-				{
-					if (m_gpuModelReferenceCounter[path] == 0)
-					{
-						ModelLoader::UnloadModel(path);
-						m_gpuModelCache.erase(path);
-					}
-				}
-			}
-		}
 		m_modelUnloadQueue.clear();
+		for (std::vector<Entity>& lookup : m_modelMatricesEntitiesLookups)
+		{
+			lookup.clear();
+		}
+		for (std::uint32_t i{ 0 }; i < m_desc.framesInFlight; ++i)
+		{
+			std::memset(m_modelVisibilityReadbackBufferMaps[i], 0, m_desc.maxModels * sizeof(std::uint32_t));
+		}
+		m_visibilityIndexAllocator = UniquePtr<FreeListAllocator>(NK_NEW(FreeListAllocator, m_desc.maxModels));
 		m_gpuUploader->Flush(true, nullptr, nullptr);
 		m_gpuUploader->Reset();
+		m_activeCamera = nullptr;
+		m_firstFrame = true;
 	}
 	
 }

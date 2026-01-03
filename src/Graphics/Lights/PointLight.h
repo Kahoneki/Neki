@@ -26,7 +26,7 @@ namespace NK
 		//Get the C term in attenuation formula 1 / (A + Bd + Cd^2)
 		[[nodiscard]] inline float GetQuadraticAttenuation() const { return m_quadraticAttenuation; }
 
-		SERIALISE_MEMBER_FUNC(m_constantAttenuation, m_linearAttenuation, m_quadraticAttenuation)
+		SERIALISE_MEMBER_FUNC(cereal::base_class<Light>(this), m_constantAttenuation, m_linearAttenuation, m_quadraticAttenuation)
 
 
 	private:

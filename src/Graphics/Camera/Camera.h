@@ -88,10 +88,10 @@ namespace NK
 		glm::mat4 m_viewMat;
 		glm::mat4 m_orthographicProjMat;
 		glm::mat4 m_perspectiveProjMat;
-		bool m_viewMatDirty; //True if m_pos, m_yaw, or m_pitch has been changed
+		bool m_viewMatDirty{ true }; //True if m_pos, m_yaw, or m_pitch has been changed
 		//Need two flags even though they're based on the same state so we don't have to unnecessarily recalculate, for example, orthographic matrix if user is only requesting perspective matrix
-		bool m_orthographicProjMatDirty; //True if m_fov, m_aspectRatio, m_nearPlaneDist, or m_farPlaneDist has been changed
-		bool m_perspectiveProjMatDirty; //True if m_fov, m_aspectRatio, m_nearPlaneDist, or m_farPlaneDist has been changed
+		bool m_orthographicProjMatDirty{ true }; //True if m_fov, m_aspectRatio, m_nearPlaneDist, or m_farPlaneDist has been changed
+		bool m_perspectiveProjMatDirty{ true }; //True if m_fov, m_aspectRatio, m_nearPlaneDist, or m_farPlaneDist has been changed
 
 		ViewFrustum m_frustum;
 	};
