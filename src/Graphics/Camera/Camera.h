@@ -3,6 +3,7 @@
 
 #include "ViewFrustum.h"
 
+#include <Core/Context.h>
 #include <Types/NekiTypes.h>
 
 #include <glm/glm.hpp>
@@ -58,6 +59,8 @@ namespace NK
 		inline void SetAspectRatio(const float _value) { m_aspectRatio = _value; m_orthographicProjMatDirty = true; m_perspectiveProjMatDirty = true; }
 		
 		SERIALISE_MEMBER_FUNC(m_pos, m_up, m_forward, m_right, m_yaw, m_pitch, m_nearPlaneDist, m_farPlaneDist, m_fov, m_aspectRatio)
+		inline void* operator new(const std::size_t size) { return Context::GetAllocator()->Allocate(size, "CerealImplicitCamera", 0, false); }
+		inline void operator delete(void* ptr) { Context::GetAllocator()->Free(ptr, false); }
 		
 
 	protected:

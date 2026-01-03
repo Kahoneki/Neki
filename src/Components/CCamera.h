@@ -79,7 +79,7 @@ namespace NK
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Camera"; }
 		
-		SERIALISE_MEMBER_FUNC(enableDOF, focalDistance, focalDepth, maxBlurRadius, acesExposure, maxIrradiance)
+		SERIALISE_MEMBER_FUNC(camera, enableDOF, focalDistance, focalDepth, maxBlurRadius, acesExposure, maxIrradiance)
 		
 		
 		UniquePtr<Camera> camera;

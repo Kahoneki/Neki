@@ -44,6 +44,19 @@ namespace NK
 			throw std::runtime_error("Registry::Load() - Failed to open filepath (" + _filepath +") for loading.");
 		}
 		
+		std::vector<Entity> entitiesToDestroy;
+		entitiesToDestroy.reserve(m_entityComponents.size());
+		for (const auto& [entity, components] : m_entityComponents)
+		{
+			entitiesToDestroy.push_back(entity);
+		}
+		for (const Entity entity : entitiesToDestroy)
+		{
+			Destroy(entity);
+		}
+		
+		EventManager::Trigger(SceneLoadEvent());
+		
 		m_entityComponents.clear();
 		m_componentPools.clear();
 		

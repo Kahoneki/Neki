@@ -97,6 +97,7 @@ namespace NK
 		
 		m_entityDestroyEventSubscriptionID = EventManager::Subscribe<RenderLayer, EntityDestroyEvent>(this, &RenderLayer::OnEntityDestroy);
 		m_componentRemoveEventSubscriptionID = EventManager::Subscribe<RenderLayer, ComponentRemoveEvent>(this, &RenderLayer::OnComponentRemove);
+		m_sceneLoadEventSubscriptionID = EventManager::Subscribe<RenderLayer, SceneLoadEvent>(this, &RenderLayer::OnSceneLoad);
 		
 		
 		m_logger.Unindent();
@@ -111,7 +112,8 @@ namespace NK
 
 		EventManager::Unsubscribe<EntityDestroyEvent>(m_entityDestroyEventSubscriptionID);
 		EventManager::Unsubscribe<ComponentRemoveEvent>(m_componentRemoveEventSubscriptionID);
-
+		EventManager::Unsubscribe<SceneLoadEvent>(m_sceneLoadEventSubscriptionID);
+		
 		m_graphicsQueue->WaitIdle();
 		#ifdef NEKI_VULKAN_SUPPORTED
 			if (m_desc.backend == GRAPHICS_BACKEND::VULKAN)
@@ -2560,8 +2562,8 @@ namespace NK
 		
 		if (bufferDirty)
 		{
-		}
 			memcpy(m_lightDataBufferMap, m_cpuLightData.data(), sizeof(LightShaderData) * m_cpuLightData.size());
+		}
 	}
 	
 	
@@ -2728,6 +2730,31 @@ namespace NK
 				if (m_prefilterMapViews[i]) { deletionBucket.views.push_back(std::move(m_prefilterMapViews[i])); }
 			}
 		}
+	}
+
+	
+	
+	void RenderLayer::OnSceneLoad(const SceneLoadEvent& _event)
+	{
+		m_graphicsQueue->WaitIdle();
+		m_textureDeletionQueue.clear();
+		for (auto& [frame, models] : m_modelUnloadQueue)
+		{
+			for (const std::string& path : models)
+			{
+				if (m_gpuModelCache.contains(path))
+				{
+					if (m_gpuModelReferenceCounter[path] == 0)
+					{
+						ModelLoader::UnloadModel(path);
+						m_gpuModelCache.erase(path);
+					}
+				}
+			}
+		}
+		m_modelUnloadQueue.clear();
+		m_gpuUploader->Flush(true, nullptr, nullptr);
+		m_gpuUploader->Reset();
 	}
 	
 }

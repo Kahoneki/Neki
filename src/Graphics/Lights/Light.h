@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/Context.h>
 #include <glm/glm.hpp>
 
 
@@ -28,6 +29,8 @@ namespace NK
 		[[nodiscard]] inline std::size_t GetShadowMapVectorIndex() const { return m_shadowMapVectorIndex; }
 		
 		SERIALISE_MEMBER_FUNC(m_colour, m_intensity)
+		inline void* operator new(const std::size_t size) { return Context::GetAllocator()->Allocate(size, "CerealImplicitLight", 0, false); }
+		inline void operator delete(void* ptr) { Context::GetAllocator()->Free(ptr, false); }
 
 		
 	protected:

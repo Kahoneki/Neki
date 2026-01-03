@@ -101,12 +101,12 @@ namespace NK
 		
 		
 		std::string modelPath{ "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel" };
-		bool modelPathDirty{ false };
+		bool modelPathDirty{ true };
 		bool filePathNotFoundError{ false };
 		bool nonNkModelError{ false };
 		
 		//Non-owning pointer. The RenderLayer owns and manages the GPUModel
-		GPUModel* model;
+		GPUModel* model{ nullptr };
 		
 		bool visible{ true };
 		std::uint32_t visibilityIndex{ 0xFFFFFFFF };

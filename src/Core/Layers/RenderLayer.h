@@ -96,6 +96,7 @@ namespace NK
 		
 		void OnEntityDestroy(const EntityDestroyEvent& _event);
 		void OnComponentRemove(const ComponentRemoveEvent& _event);
+		void OnSceneLoad(const SceneLoadEvent& _event);
 
 
 		//Dependency injections
@@ -365,8 +366,9 @@ namespace NK
 		std::unordered_map<std::uint64_t, DeferredTextureDeletions> m_textureDeletionQueue;
 
 		EventSubscriptionID m_entityDestroyEventSubscriptionID;
-		
 		EventSubscriptionID m_componentRemoveEventSubscriptionID;
+		EventSubscriptionID m_sceneLoadEventSubscriptionID;
+		
 		bool m_firstFrame;
 		
 		

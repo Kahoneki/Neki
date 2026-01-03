@@ -894,6 +894,12 @@ namespace NK
 		std::type_index componentIndex;
 	};
 	
+	//Triggered directly prior to a scene being loaded after all entities have been destroyed
+	struct SceneLoadEvent
+	{
+		
+	};
+	
 	static const PhysicsBroadPhaseLayer DynamicBroadPhaseLayer{ 0 };
 	static const PhysicsBroadPhaseLayer KinematicBroadPhaseLayer{ 1 };
 	static const PhysicsBroadPhaseLayer StaticBroadPhaseLayer{ 2 };
