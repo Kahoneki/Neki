@@ -12,6 +12,8 @@ namespace NK
 		
 		[[nodiscard]] inline std::uint8_t GetValue() const { return m_broadPhaseLayer; }
         
+		SERIALISE_MEMBER_FUNC(m_broadPhaseLayer)
+		
 		
 	private:
 		std::uint8_t m_broadPhaseLayer;

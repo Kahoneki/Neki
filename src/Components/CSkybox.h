@@ -65,6 +65,8 @@ namespace NK
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Skybox"; }
 		
+		SERIALISE_MEMBER_FUNC(skyboxFilepath, irradianceFilepath, prefilterFilepath)
+		
 		
 	private:
 		[[nodiscard]] virtual inline std::string GetComponentName() const override { return GetStaticName(); }

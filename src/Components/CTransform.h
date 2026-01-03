@@ -162,6 +162,9 @@ namespace NK
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Transform"; }
 		
+		SERIALISE_MEMBER_FUNC(localPos, localRot, localScale, name, serialisedParentID);
+		void OnBeforeSerialise(Registry& _reg);
+		
 		
 		std::string name{ "Unnamed" };
 		
@@ -262,6 +265,7 @@ namespace NK
 		}
 		
 		
+		Entity serialisedParentID{ UINT32_MAX };
 		CTransform* parent{ nullptr }; //nullptr = no parent
 		std::vector<CTransform*> children;
 		

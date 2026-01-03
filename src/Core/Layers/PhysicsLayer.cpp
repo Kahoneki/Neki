@@ -172,6 +172,18 @@ namespace NK
 			{
 				JPH::BoxShapeSettings newShapeSettings{ GLMToJPH(box.halfExtents * transform.GetWorldScale()) };
 				bodyInterface.SetShape(id, newShapeSettings.Create().Get(), true, JPH::EActivation::Activate);
+				
+				if (body.GetMass() > 0.0f)
+				{
+					JPH::Body* jphBody{ m_physicsSystem.GetBodyLockInterfaceNoLock().TryGetBody(id) };
+					if (jphBody)
+					{
+						JPH::MassProperties mp{ jphBody->GetShape()->GetMassProperties() };
+						mp.ScaleToMass(body.GetMass());
+						jphBody->GetMotionProperties()->SetMassProperties(JPH::EAllowedDOFs::All, mp);
+					}
+				}
+				
 				box.halfExtentsDirty = false;
 			}
 			

@@ -90,6 +90,8 @@ namespace NK
 		~CLight() override = default;
 
 		[[nodiscard]] inline static std::string GetStaticName() { return "Light"; }
+		
+		SERIALISE_MEMBER_FUNC(lightType, light);
 
 		
 		LIGHT_TYPE lightType{ LIGHT_TYPE::UNDEFINED };

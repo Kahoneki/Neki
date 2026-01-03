@@ -60,6 +60,8 @@ PUSH_CONSTANTS_BLOCK(
 
 	uint materialBufferIndex;
 	uint samplerIndex;
+	
+	float maxIrradiance;
 );
 
 

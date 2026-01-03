@@ -28,6 +28,8 @@ namespace NK
 			}
 			eventPacket.append(ss.str().c_str(), ss.str().size());
 		}
+		
+		SERIALISE_MEMBER_FUNC(eventPacket)
 
 
 		sf::Packet eventPacket;

@@ -18,6 +18,8 @@ namespace NK
     public:
         virtual ~CImGuiInspectorRenderable() = default;
         
+        SERIALISE_MEMBER_FUNC()
+        
         
     protected:
         virtual std::string GetComponentName() const = 0;

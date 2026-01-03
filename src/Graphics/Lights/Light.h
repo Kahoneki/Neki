@@ -8,6 +8,9 @@ namespace NK
 
 	class Light
 	{
+		friend class cereal::access;
+		
+		
 	public:
 		virtual ~Light() = default;
 
@@ -23,6 +26,8 @@ namespace NK
 		[[nodiscard]] inline bool GetShadowMapDirty() const { return m_shadowMapDirty; }
 		[[nodiscard]] inline ResourceIndex GetShadowMapIndex() const { return m_shadowMapIndex; }
 		[[nodiscard]] inline std::size_t GetShadowMapVectorIndex() const { return m_shadowMapVectorIndex; }
+		
+		SERIALISE_MEMBER_FUNC(m_colour, m_intensity)
 
 		
 	protected:
@@ -44,3 +49,4 @@ namespace NK
 	};
 	
 }
+

@@ -26,6 +26,8 @@ namespace NK
 		inline void SetMovementSpeed(const float _value) { m_movementSpeed = _value; }
 		inline void SetMouseSensitivity(const float _value) { m_mouseSensitivity = _value; }
 		
+		SERIALISE_MEMBER_FUNC(m_movementSpeed, m_mouseSensitivity)
+		
 	
 	private:
 		float m_movementSpeed;

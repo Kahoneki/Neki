@@ -18,6 +18,8 @@ namespace NK
 		{
 			return (m_objectLayer == _other.m_objectLayer);
 		}
+		
+		SERIALISE_MEMBER_FUNC(m_objectLayer, m_broadPhaseLayer)
         
 		
 	private:

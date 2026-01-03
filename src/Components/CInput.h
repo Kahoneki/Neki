@@ -13,10 +13,6 @@ namespace NK
 	struct CInput final
 	{
 	public:
-		//Map from user's action-types enum (represented as a pair of both the enum class' type index and the std::uint32_t underlying type) to its current state
-		std::unordered_map<ActionTypeMapKey, INPUT_STATE_VARIANT> actionStates;
-
-
 		//Helper function to add an action state to the actionStates map
 		template<typename ActionType>
 		inline void AddActionToMap(ActionType _action)
@@ -47,6 +43,13 @@ namespace NK
 			if (it == actionStates.end()) { return T{}; }
 			return std::get<T>(it->second);
 		}
+		
+		
+		SERIALISE_MEMBER_FUNC(actionStates)
+		
+		
+		//Map from user's action-types enum (represented as a pair of both the enum class' type index and the std::uint32_t underlying type) to its current state
+		std::unordered_map<ActionTypeMapKey, INPUT_STATE_VARIANT> actionStates;
 	};
 	
 }

@@ -20,6 +20,7 @@ namespace NK
 		[[nodiscard]] inline float GetMaxBlurRadius() const { return maxBlurRadius; }
 		[[nodiscard]] inline bool GetDOFDebugMode() const { return dofDebugMode; }
 		[[nodiscard]] inline float GetACESExposure() const { return acesExposure; }
+		[[nodiscard]] inline float GetMaxIrradiance() const { return maxIrradiance; }
 		
 		inline void SetEnableDepthOfField(const bool _val) { enableDOF = _val; }
 		inline void SetFocalDistance(const float _val) { focalDistance = _val; }
@@ -27,9 +28,12 @@ namespace NK
 		inline void SetMaxBlurRadius(const float _val) { maxBlurRadius = _val; }
 		inline void SetDOFDebugMode(const bool _val) { dofDebugMode = _val; }
 		inline void SetACESExposure(const float _val) { acesExposure = _val; }
+		inline void SetMaxIrradiance(const float _val) { maxIrradiance = _val; }
 		
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Camera"; }
+		
+		SERIALISE_MEMBER_FUNC(enableDOF, focalDistance, focalDepth, maxBlurRadius, acesExposure, maxIrradiance)
 		
 		
 	private:
@@ -39,6 +43,7 @@ namespace NK
 		float maxBlurRadius{ 0.0f };
 		bool dofDebugMode{ false };
 		float acesExposure{ 1.0f };
+		float maxIrradiance{ 10.0f };
 		
 		virtual inline std::string GetComponentName() const override { return GetStaticName(); }
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
@@ -101,6 +106,7 @@ namespace NK
 				}
 				
 				if (ImGui::DragFloat("Exposure", &acesExposure, 0.01f, 0.0f, 10.0f)) {}
+				if (ImGui::DragFloat("Maximum Irradiance", &maxIrradiance, 0.1f, 0.0f)) {}
 				
 				ImGui::Unindent();
 			}

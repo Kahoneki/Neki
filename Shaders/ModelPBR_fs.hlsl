@@ -61,6 +61,8 @@ PUSH_CONSTANTS_BLOCK(
 
 	uint materialBufferIndex;
 	uint samplerIndex;
+	
+	float maxIrradiance;
 );
 
 
@@ -191,6 +193,11 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
 
 	//Diffuse IBL (irradiance)
 	float3 irradiance = g_cubemaps[NonUniformResourceIndex(PC(irradianceCubemapIndex))].Sample(g_samplers[NonUniformResourceIndex(PC(samplerIndex))], _N).rgb;
+	if (!all(isfinite(irradiance))) 
+	{ 
+		irradiance = float3(0, 0, 0); 
+	}
+	irradiance = min(irradiance, PC(maxIrradiance));
 	float3 diffuseIBL = irradiance * _albedo * kD;
 
 	return diffuseIBL + specularIBL;
@@ -210,7 +217,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
     float4 metallicSample = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 roughnessSample = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 emissiveSample = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(linearSampler, vertexOutput.texCoord);
-
+	
     float3 albedo = pow(albedoSample.rgb, 2.2); //srgb -> linear
     float3 normal = normalize(mul(vertexOutput.TBN, normalSample.rgb * 2.0 - 1.0));
     float metallic = metallicSample.g;
@@ -305,9 +312,12 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	{
 		ambientLighting *= g_textures[NonUniformResourceIndex(material.aoIdx)].Sample(linearSampler, vertexOutput.texCoord).r;
 	}
+	
+	
+	float3 irradiance = g_cubemaps[NonUniformResourceIndex(PC(irradianceCubemapIndex))].Sample(g_samplers[NonUniformResourceIndex(PC(samplerIndex))], normal).rgb;
+	//if (irradiance.r > 2.0f || irradiance.g > 2.0f || irradiance.b > 2.0f) { return float4(1.0f, 0.0f, 1.0f, 1.0f); }
 
 
-	//Skip ambient for now
     float3 colour = totalDirectLighting + ambientLighting + emissive;
 
     return float4(colour, 1.0);

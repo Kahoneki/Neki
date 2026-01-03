@@ -320,10 +320,6 @@ public:
 		m_window = NK::UniquePtr<NK::Window>(NK_NEW(NK::Window, windowDesc));
 		m_window->SetCursorVisibility(false);
 
-		m_windowEntity = m_reg.Create();
-		NK::CWindow& windowComponent{ m_reg.AddComponent<NK::CWindow>(m_windowEntity) };
-		windowComponent.window = m_window.get();
-
 
 		//Pre-app layers
 		m_windowLayer = NK::UniquePtr<NK::WindowLayer>(NK_NEW(NK::WindowLayer, m_reg));
@@ -377,21 +373,26 @@ public:
 		#if NEKI_EDITOR
 			const bool inGame{ NK::InputManager::GetMouseButtonPressed(NK::MOUSE_BUTTON::RIGHT) && !ImGui::GetIO().WantCaptureMouse };
 			NK::Context::SetEditorActive(!inGame);
-
-		if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0)) { m_activeScene = 0; }
-		if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_1)) { m_activeScene = 1; }
 		
-		if (m_activeScene != oldActiveScene)
-		{
-			for (NK::ILayer* layer : m_preAppLayers)
+			if (!NK::Context::GetPopupOpen() && !ImGui::GetIO().WantTextInput)
 			{
-				layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
+				if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0)) { m_activeScene = 0; }
+				if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_1)) { m_activeScene = 1; }
+				if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_2)) { m_scenes[m_activeScene]->m_reg.Save("QuickSave.nkscene"); }
+				if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_3)) { m_scenes[m_activeScene]->m_reg.Load("QuickSave.nkscene"); }
 			}
-			for (NK::ILayer* layer : m_postAppLayers)
+		
+			if (m_activeScene != oldActiveScene)
 			{
-				layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
+				for (NK::ILayer* layer : m_preAppLayers)
+				{
+					layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
+				}
+				for (NK::ILayer* layer : m_postAppLayers)
+				{
+					layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
+				}
 			}
-		}
 		
 		
 			// if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0) && !m_editorActiveKeyPressedLastFrame)

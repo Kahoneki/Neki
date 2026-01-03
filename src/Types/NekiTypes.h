@@ -875,6 +875,7 @@ namespace NK
 	{
 		glm::vec3 forceVector;
 		FORCE_MODE mode;
+		SERIALISE_MEMBER_FUNC(forceVector, mode)
 	};
 	
 	//Triggered directly prior to an entity being removed from a registry

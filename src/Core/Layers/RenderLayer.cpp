@@ -1135,6 +1135,10 @@ namespace NK
 			pushConstantData.brdfLUTIndex = _texViews.Get("BRDF_LUT_VIEW")->GetIndex();
 			pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+			if (m_activeCamera)
+			{
+				pushConstantData.maxIrradiance = m_activeCamera->GetMaxIrradiance();
+			}
 
 			//Skybox
 			if (_texs.Get("SKYBOX"))
@@ -1660,11 +1664,11 @@ namespace NK
 				ImGui::PushID("AddComponent");
 				
 				//Get all components that inherit from CImGuiInspectorRenderable
-				const std::unordered_map<std::type_index, std::unique_ptr<IComponentPool>>& pools{ m_reg.get().GetPools() };
+				const std::unordered_map<std::type_index, UniquePtr<IComponentPool>>& pools{ m_reg.get().GetPools() };
 				std::vector<std::type_index> typeIndices{};
 				std::vector<std::string> componentNamesStorage{};
 				std::vector<const char*> componentNamesPointers{};
-				for (std::unordered_map<std::type_index, std::unique_ptr<IComponentPool>>::const_iterator it{ pools.begin() }; it != pools.end(); ++it)
+				for (std::unordered_map<std::type_index, UniquePtr<IComponentPool>>::const_iterator it{ pools.begin() }; it != pools.end(); ++it)
 				{
 					IComponentPool* pool{ it->second.get() };
 					if (pool->IsImGuiInspectorRenderableType())
@@ -1908,14 +1912,6 @@ namespace NK
 				if (glm::decompose(newLocalMatrix, scale, orientation, translation, skew, perspective))
 				{
 					transform.SetLocalPosition(translation);
-					//Local rotation needs delta inversion due to reflected coordinate frame
-					//I don't really understand the maths behind why this is necessary, but it works so....
-					if (m_currentGizmoOp == ImGuizmo::ROTATE && m_currentGizmoMode == ImGuizmo::LOCAL)
-					{
-						const glm::quat delta{ glm::normalize(orientation) * glm::inverse(originalOrientation) };
-						const glm::quat invertedDelta{ glm::conjugate(delta) };
-						orientation = invertedDelta * originalOrientation;
-					}
 					transform.SetLocalRotation(glm::normalize(orientation));
 					transform.SetLocalScale(scale);
 				}
@@ -2564,11 +2560,11 @@ namespace NK
 		
 		if (bufferDirty)
 		{
-			memcpy(m_lightDataBufferMap, m_cpuLightData.data(), sizeof(LightShaderData) * m_cpuLightData.size());
 		}
+			memcpy(m_lightDataBufferMap, m_cpuLightData.data(), sizeof(LightShaderData) * m_cpuLightData.size());
 	}
-
-
+	
+	
 
 	void RenderLayer::UpdateModelMatricesBuffer()
 	{

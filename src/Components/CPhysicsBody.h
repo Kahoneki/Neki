@@ -131,6 +131,8 @@ namespace NK
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Physics Body"; }
 		
+		SERIALISE_MEMBER_FUNC(initialObjectLayer, initialMotionType, initialMotionQuality, initialTrigger, initialLinearVelocity, initialAngularVelocity, mass, friction, restitution, linearDamping, angularDamping, gravityFactor, scale);
+		
 		
 		PhysicsObjectLayer initialObjectLayer{ DefaultObjectLayer };
 
@@ -154,12 +156,12 @@ namespace NK
 			float newLinearDamping{ GetLinearDamping() };
 			float newAngularDamping{ GetAngularDamping() };
 			float newGravityFactor{ GetGravityFactor() };
-			if (ImGui::DragFloat("Mass", &newMass, 0.05f)) { SetMass(newMass); }
-			if (ImGui::DragFloat("Friction", &newFriction, 0.05f)) { SetFriction(newFriction); }
-			if (ImGui::DragFloat("Restitution", &newRestitution, 0.05f)) { SetRestitution(newRestitution); }
-			if (ImGui::DragFloat("Linear Damping", &newLinearDamping, 0.05f)) { SetLinearDamping(newLinearDamping); }
-			if (ImGui::DragFloat("Angular Damping", &newAngularDamping, 0.05f)) { SetAngularDamping(newAngularDamping); }
-			if (ImGui::DragFloat("Gravity Factor", &newGravityFactor, 0.05f)) { SetGravityFactor(newGravityFactor); }
+			if (ImGui::DragFloat("Mass", &newMass, 0.05f)) { SetMass(std::max(0.0f, newMass)); }
+			if (ImGui::DragFloat("Friction", &newFriction, 0.05f)) { SetFriction(std::max(0.0f, newFriction)); }
+			if (ImGui::DragFloat("Restitution", &newRestitution, 0.05f)) { SetRestitution(std::max(0.0f, newRestitution)); }
+			if (ImGui::DragFloat("Linear Damping", &newLinearDamping, 0.05f)) { SetLinearDamping(std::max(0.0f, newLinearDamping)); }
+			if (ImGui::DragFloat("Angular Damping", &newAngularDamping, 0.05f)) { SetAngularDamping(std::max(0.0f, newAngularDamping)); }
+			if (ImGui::DragFloat("Gravity Factor", &newGravityFactor, 0.05f)) { SetGravityFactor(std::max(0.0f, newGravityFactor)); }
 			
 			if (ImGui::CollapsingHeader("Force Test"))
 			{

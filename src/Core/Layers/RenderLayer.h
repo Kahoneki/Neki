@@ -249,6 +249,8 @@ namespace NK
 
 			ResourceIndex materialBufferIndex;
 			SamplerIndex samplerIndex;
+	
+			float maxIrradiance;
 		};
 		UniquePtr<IRootSignature> m_meshPassRootSignature;
 

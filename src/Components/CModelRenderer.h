@@ -66,6 +66,8 @@ namespace NK
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Model Renderer"; }
 		
+		SERIALISE_MEMBER_FUNC(modelPath, localSpaceOrigin, localSpaceHalfExtents, visible);
+		
 		
 		//Volume in local space
 		glm::vec3 localSpaceOrigin{ 0,0,0 };

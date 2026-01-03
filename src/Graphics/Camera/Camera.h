@@ -54,7 +54,8 @@ namespace NK
 		inline void SetFOV(const float _value) { m_fov = _value; m_orthographicProjMatDirty = true; m_perspectiveProjMatDirty = true; }
 		inline void SetAspectRatio(const float _value) { m_aspectRatio = _value; m_orthographicProjMatDirty = true; m_perspectiveProjMatDirty = true; }
 		
-
+		SERIALISE_MEMBER_FUNC(m_pos, m_up, m_forward, m_right, m_yaw, m_pitch, m_nearPlaneDist, m_farPlaneDist, m_fov, m_aspectRatio)
+		
 
 	protected:
 		//Will update matrices if they're dirty

@@ -22,6 +22,8 @@ namespace NK
 		//Get the outer angle of the spot light, in radians
 		[[nodiscard]] inline float GetOuterAngle() const { return m_outerAngle; }
 
+		SERIALISE_MEMBER_FUNC(m_innerAngle, m_outerAngle)
+		
 
 	private:
 		//Inner angle of the spot light, in radians

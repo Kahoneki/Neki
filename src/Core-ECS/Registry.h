@@ -2,16 +2,18 @@
 
 #include "ComponentPool.h"
 
+#include <Components/CTransform.h>
 #include <Core/Memory/Allocation.h>
 #include <Core/Memory/FreeListAllocator.h>
+#include <Core/Utils/Serialisation/TypeRegistry.h>
 #include <Managers/EventManager.h>
 
 #include <algorithm>
 #include <memory>
 #include <typeindex>
 #include <unordered_map>
-
-#include "Components/CTransform.h"
+#include <fstream>
+#include <filesystem>
 
 
 namespace NK
@@ -31,7 +33,11 @@ namespace NK
 		
 	public:
 		explicit Registry(std::size_t _maxEntities)
-		: m_entityAllocator(NK_NEW(FreeListAllocator, _maxEntities)) {}
+		: m_entityAllocator(NK_NEW(FreeListAllocator, _maxEntities))
+		{
+			GetPool<CTransform>()->components.reserve(_maxEntities);
+			GetPool<CTransform>()->indexToEntity.reserve(_maxEntities);
+		}
 
 
 		~Registry()
@@ -48,6 +54,13 @@ namespace NK
 		//Looping through the entirety of the ComponentView's iterator will go through all entities with the provided Components combination 
 		template<typename... Components>
 		[[nodiscard]] inline ComponentView<Components...> View();
+		
+		
+		//Save registry to _filepath
+		void Save(const std::string& _filepath);
+		
+		//Load registry from _filepath
+		void Load(const std::string& _filepath);
 
 
 		//Add a new entity to the registry
@@ -312,7 +325,7 @@ namespace NK
 		[[nodiscard]] inline std::vector<std::type_index> GetEntityComponents(const Entity _entity) const { return m_entityComponents.at(_entity); }
 		[[nodiscard]] inline IComponentPool* GetPool(const std::type_index _index) const { return m_componentPools.at(_index).get(); }
 		[[nodiscard]] inline bool EntityInRegistry(const Entity _entity) const { return m_entityComponents.contains(_entity); }
-		[[nodiscard]] inline const std::unordered_map<std::type_index, std::unique_ptr<IComponentPool>>& GetPools() { return m_componentPools; }
+		[[nodiscard]] inline const std::unordered_map<std::type_index, UniquePtr<IComponentPool>>& GetPools() { return m_componentPools; }
 		
 		
 	private:
@@ -334,14 +347,14 @@ namespace NK
 			const std::type_index componentIndex{ std::type_index(typeid(Component)) };
 			if (!m_componentPools.contains(componentIndex))
 			{
-				m_componentPools[componentIndex] = std::make_unique<ComponentPool<Component>>();
+				m_componentPools[componentIndex] = UniquePtr<IComponentPool>(NK_NEW(ComponentPool<Component>));
 			}
 			return static_cast<ComponentPool<Component>*>(m_componentPools.at(componentIndex).get());
 		}
 
 		
 		//Map from component id to component pool containing all components in registry of that type
-		std::unordered_map<std::type_index, std::unique_ptr<IComponentPool>> m_componentPools;
+		std::unordered_map<std::type_index, UniquePtr<IComponentPool>> m_componentPools;
 
 		UniquePtr<FreeListAllocator> m_entityAllocator;
 
@@ -353,7 +366,7 @@ namespace NK
 
 
 template <typename Component>
-void NK::ComponentPool<Component>::AddDefaultToEntity(NK::Registry& _reg, const Entity _entity)
+inline void NK::ComponentPool<Component>::AddDefaultToEntity(NK::Registry& _reg, const Entity _entity)
 {
 	if constexpr (std::is_default_constructible_v<Component>)
 	{
@@ -367,7 +380,7 @@ void NK::ComponentPool<Component>::AddDefaultToEntity(NK::Registry& _reg, const 
 
 
 template <typename Component>
-void NK::ComponentPool<Component>::CopyComponentToEntity(NK::Registry& _reg, const Entity _srcEntity, const Entity _dstEntity)
+inline void NK::ComponentPool<Component>::CopyComponentToEntity(NK::Registry& _reg, const Entity _srcEntity, const Entity _dstEntity)
 {
 	if (entityToIndex.contains(_srcEntity))
 	{

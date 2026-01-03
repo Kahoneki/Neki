@@ -25,6 +25,8 @@ namespace NK
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Box Collider"; }
 		
+		SERIALISE_MEMBER_FUNC(halfExtents)
+		
 		
 	private:
 		virtual inline std::string GetComponentName() const override { return GetStaticName(); }

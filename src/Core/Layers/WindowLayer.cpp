@@ -20,10 +20,6 @@ namespace NK
 	void WindowLayer::Update()
 	{
 		glfwPollEvents();
-		for (auto&& [window] : m_reg.get().View<CWindow>())
-		{
-			
-		}
 	}
 	
 }

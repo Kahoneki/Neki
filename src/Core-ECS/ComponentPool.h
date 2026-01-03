@@ -65,6 +65,21 @@ namespace NK
 		}
 		
 		
+		virtual inline void Serialise(cereal::BinaryOutputArchive& _archive) override
+		{
+			_archive(components, entityToIndex, indexToEntity);
+		}
+		
+		
+		virtual inline void Deserialise(cereal::BinaryInputArchive& _archive) override
+		{
+			_archive(components, entityToIndex, indexToEntity);
+		}
+		
+		
+		virtual const std::vector<Entity>& GetEntities() const override { return indexToEntity; }
+		
+		
 		virtual void AddDefaultToEntity(Registry& _reg, const Entity _entity) override;
 		virtual void CopyComponentToEntity(Registry& _reg, const Entity _srcEntity, const Entity _dstEntity) override;
 		

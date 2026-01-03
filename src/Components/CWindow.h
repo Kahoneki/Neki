@@ -7,10 +7,11 @@
 namespace NK
 {
 
-	struct CWindow final
-	{
-	public:
-		Window* window;
-	};
+	//Unused
+	// struct CWindow final
+	// {
+	// public:
+	// 	Window* window;
+	// };
 	
 }
