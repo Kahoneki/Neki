@@ -3,9 +3,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-// Ensure we have the resize implementation
-// If you get linker errors about duplicate symbols, remove this define 
-// (assuming it's already defined in TextureCompressor.cpp)
 #ifndef STB_IMAGE_RESIZE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #endif

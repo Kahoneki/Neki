@@ -140,6 +140,21 @@ namespace NK
 		else { PostAppUpdate(); }
 	}
 
+	
+	
+	void RenderLayer::SetRegistry(Registry& _reg)
+	{
+		ILayer::SetRegistry(_reg);
+		m_activeCamera = nullptr;
+		for (auto& lookup : m_modelMatricesEntitiesLookups)
+		{
+			lookup.clear();
+		}
+		m_modelMatrices.clear();
+		m_cpuLightData.clear();
+		m_copiedEntity = UINT32_MAX;
+		m_firstFrame = true;
+	}
 
 
 	void RenderLayer::InitBaseResources()
@@ -1565,6 +1580,8 @@ namespace NK
 	
 	void RenderLayer::UpdateImGui(const CCamera& _camera)
 	{
+		Context::SetPopupOpen(false);
+		
 		if (ImGui::Begin("Hierarchy"))
 		{
 			ImGui::SameLine();
@@ -1598,6 +1615,10 @@ namespace NK
 					{
 						const Entity child{ *static_cast<const Entity*>(payload->Data) };
 						m_reg.get().GetComponent<CTransform>(child).SetParent(m_reg, nullptr);
+						if (m_reg.get().HasComponent<CBoxCollider>(child))
+						{
+							m_reg.get().GetComponent<CBoxCollider>(child).halfExtentsDirty = true;
+						}
 					}
 					ImGui::EndDragDropTarget();
 				}
@@ -1763,9 +1784,11 @@ namespace NK
 		
 		if (ImGui::Begin("Gizmo Settings"))
 		{
+			bool inputBlocked{ Context::GetPopupOpen() || ImGui::GetIO().WantTextInput };
+			
 			//Translate
 			const bool translateSelected{ ImGui::RadioButton("Translate", m_currentGizmoOp == ImGuizmo::TRANSLATE) };
-			if (translateSelected || (InputManager::GetKeyPressed(KEYBOARD::W) && Context::GetEditorActive()))
+			if (translateSelected || (InputManager::GetKeyPressed(KEYBOARD::W) && Context::GetEditorActive() && !inputBlocked))
 			{
 				m_currentGizmoOp = ImGuizmo::TRANSLATE;
 			}
@@ -1788,7 +1811,7 @@ namespace NK
 			ImGui::SameLine();
 			if (rotateWarning) { ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255,255,0,255)); }
 			const bool rotateSelected{ ImGui::RadioButton("Rotate", m_currentGizmoOp == ImGuizmo::ROTATE) };
-			if (rotateSelected || (InputManager::GetKeyPressed(KEYBOARD::E) && Context::GetEditorActive())) { m_currentGizmoOp = ImGuizmo::ROTATE; }
+			if (rotateSelected || (InputManager::GetKeyPressed(KEYBOARD::E) && Context::GetEditorActive() && !inputBlocked)) { m_currentGizmoOp = ImGuizmo::ROTATE; }
 			if (rotateWarning && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
 			{
 				ImGui::SetTooltip("Warning: non-uniform scaling in parent detected, and in a TRS system, this results in shear artifacts when rotating. Use at your own risk.");
@@ -1798,7 +1821,7 @@ namespace NK
 			//Scale
 			ImGui::SameLine();
 			const bool scaleSelected{ ImGui::RadioButton("Scale", m_currentGizmoOp == ImGuizmo::SCALE) };
-			if (scaleSelected || (InputManager::GetKeyPressed(KEYBOARD::R) && Context::GetEditorActive()))
+			if (scaleSelected || (InputManager::GetKeyPressed(KEYBOARD::R) && Context::GetEditorActive() && !inputBlocked))
 			{
 				m_currentGizmoOp = ImGuizmo::SCALE;
 			}
@@ -1951,6 +1974,8 @@ namespace NK
 		
 		if (ImGui::BeginPopupContextItem())
 		{
+			Context::SetPopupOpen(true);
+			
 			//Don't let user delete the active camera (it's required to render the imgui - by deleting the active camera, they have no way of getting it back)
 			const bool activeCamera{ m_reg.get().HasComponent<CCamera>(entity) && (&m_reg.get().GetComponent<CCamera>(entity) == m_activeCamera) };
 			ImGui::BeginDisabled(activeCamera);
@@ -1999,6 +2024,7 @@ namespace NK
 			ImGui::EndPopup();
 		}
 				
+		
 		//Drag source (the object being moved)
 		if (ImGui::BeginDragDropSource())
 		{

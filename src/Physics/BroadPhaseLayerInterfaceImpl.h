@@ -14,17 +14,21 @@ namespace NK
 	public:
 		explicit BroadPhaseLayerInterfaceImpl(const PhysicsLayerDesc& _desc)
 		{
-			m_numBroadPhaseLayers = 0;
-			for (const auto& layer : _desc.objectLayers)
-			{
-				m_numBroadPhaseLayers = std::max(m_numBroadPhaseLayers, layer.GetBroadPhaseLayer().GetValue());
-			}
-			++m_numBroadPhaseLayers;
+			std::vector<std::uint8_t> uniqueBroadPhaseLayerValues;
+			uniqueBroadPhaseLayerValues.push_back(DefaultObjectLayer.GetValue());
+			m_objectToBroadPhase[DefaultObjectLayer.GetValue()] = JPH::BroadPhaseLayer(DefaultObjectLayer.GetBroadPhaseLayer().GetValue());
 			
 			for (const PhysicsObjectLayer& objectLayer : _desc.objectLayers)
 			{
+				if (std::ranges::find(uniqueBroadPhaseLayerValues, objectLayer.GetBroadPhaseLayer().GetValue()) == uniqueBroadPhaseLayerValues.end())
+				{
+					//New unique broad phase layer value
+					uniqueBroadPhaseLayerValues.push_back(objectLayer.GetBroadPhaseLayer().GetValue());
+				}
 				m_objectToBroadPhase[objectLayer.GetValue()] = JPH::BroadPhaseLayer(objectLayer.GetBroadPhaseLayer().GetValue());
 			}
+			
+			m_numBroadPhaseLayers = uniqueBroadPhaseLayerValues.size();
 		}
 		
 		inline virtual JPH::uint GetNumBroadPhaseLayers() const override { return m_numBroadPhaseLayers; }

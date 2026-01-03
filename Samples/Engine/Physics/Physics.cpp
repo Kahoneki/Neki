@@ -33,6 +33,132 @@ static const NK::PhysicsObjectLayer helmetObjectLayer{ 0, NK::DynamicBroadPhaseL
 static const NK::PhysicsObjectLayer floorObjectLayer{ 1, NK::KinematicBroadPhaseLayer };
 
 
+
+class GameScene2 final : public NK::Scene
+{
+public:
+	explicit GameScene2() : Scene(128), m_playerCamera(NK::UniquePtr<NK::PlayerCamera>(NK_NEW(NK::PlayerCamera, glm::vec3(0.0f, 3.0f, -5.0f), 90.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f)))
+	{
+		//preprocessing step - ONLY NEEDS TO BE CALLED ONCE - serialises the model into a persistent .nkmodel file that can then be loaded
+		//		std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel") };
+		//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath.string(), true, true);
+		//		serialisedModelOutputPath = std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel");
+		//		NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Cube.gltf", serialisedModelOutputPath.string(), true, true);
+
+
+		m_skyboxEntity = m_reg.Create();
+		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
+		m_reg.GetComponent<NK::CTransform>(m_skyboxEntity).name = "Skybox";
+		skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
+		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
+		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
+
+		m_lightEntity1 = m_reg.Create();
+		NK::CTransform& directionalLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity1) };
+		directionalLightTransform.name = "Directional Light";
+		directionalLightTransform.SetLocalRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
+		directionalLightTransform.SetLocalPosition({ 0.0f, 10.0f, 5.0f });
+		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
+		directionalLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
+		directionalLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
+		directionalLight.light->SetColour({ 1,0,0 });
+		directionalLight.light->SetIntensity(0.06f);
+		dynamic_cast<NK::DirectionalLight*>(directionalLight.light.get())->SetDimensions({ 50, 50, 50 });
+		
+		m_lightEntity2 = m_reg.Create();
+		NK::CTransform& pointLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity2) };
+		pointLightTransform.SetLocalPosition({ -2.399, 3.01, 2.95 });
+		pointLightTransform.name = "Point Light";
+		NK::CLight& pointLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity2) };
+		pointLight.lightType = NK::LIGHT_TYPE::POINT;
+		pointLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
+		pointLight.light->SetColour({ 0.9f, 0.3f, 0.3f });
+		pointLight.light->SetIntensity(1.1f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetConstantAttenuation(0.74f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetLinearAttenuation(0.46f);
+		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetQuadraticAttenuation(0.05f);
+		
+		m_lightEntity3 = m_reg.Create();
+		NK::CTransform& spotLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity3) };
+		spotLightTransform.name = "Spot Light";
+		spotLightTransform.SetLocalPosition({ 5.231f, 8.95f, 2.255f });
+		spotLightTransform.SetLocalRotation({ glm::radians(-108.061f), glm::radians(42.646f), glm::radians(162.954f) });
+		NK::CLight& spotLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity3) };
+		spotLight.lightType = NK::LIGHT_TYPE::SPOT;
+		spotLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::SpotLight));
+		spotLight.light->SetColour({ 0,1,0 });
+		spotLight.light->SetIntensity(2.6f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetConstantAttenuation(0.88f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetLinearAttenuation(0.88f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetQuadraticAttenuation(0.18f);
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetInnerAngle(glm::radians(4.25f));
+		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetOuterAngle(glm::radians(37.84f));
+
+		m_floorEntity = m_reg.Create();
+		NK::CModelRenderer& floorModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_floorEntity) };
+		floorModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel");
+		NK::CTransform& floorTransform{ m_reg.GetComponent<NK::CTransform>(m_floorEntity) };
+		floorTransform.name = "Floor";
+		floorTransform.SetLocalPosition({ 0, 0.0f, 0.0f });
+		floorTransform.SetLocalScale({ 5.0f, 0.2f, 5.0f });
+		NK::CPhysicsBody& floorPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_floorEntity) };
+		floorPhysicsBody.initialMotionType = NK::MOTION_TYPE::KINEMATIC;
+		floorPhysicsBody.initialObjectLayer = floorObjectLayer;
+		NK::CBoxCollider& floorCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_floorEntity) };
+		floorCollider.SetHalfExtents({ 1.0f, 1.0f, 1.0f });
+		
+		m_cameraEntity = m_reg.Create();
+		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
+		camera.camera = m_playerCamera.get();
+		m_reg.GetComponent<NK::CTransform>(m_cameraEntity).name = "Camera";
+
+
+		//Inputs
+		NK::ButtonBinding aBinding{ NK::KEYBOARD::A };
+		NK::ButtonBinding dBinding{ NK::KEYBOARD::D };
+		NK::ButtonBinding sBinding{ NK::KEYBOARD::S };
+		NK::ButtonBinding wBinding{ NK::KEYBOARD::W };
+		NK::Axis1DBinding camMoveHorizontalBinding{ { aBinding, dBinding }, { -1, 1 } };
+		NK::Axis1DBinding camMoveVerticalBinding{ { sBinding, wBinding }, { -1, 1 } };
+		NK::Axis2DBinding camMoveBinding{ NK::Axis2DBinding({ camMoveHorizontalBinding, camMoveVerticalBinding }) };
+		NK::Axis2DBinding mouseDiffBinding{ NK::Axis2DBinding(NK::MOUSE::POSITION_DIFFERENCE) };
+		NK::InputManager::BindActionToInput(NK::PLAYER_CAMERA_ACTIONS::MOVE, camMoveBinding);
+		NK::InputManager::BindActionToInput(NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH, mouseDiffBinding);
+
+		NK::CInput& input{ m_reg.AddComponent<NK::CInput>(m_cameraEntity) };
+		input.AddActionToMap(NK::PLAYER_CAMERA_ACTIONS::MOVE);
+		input.AddActionToMap(NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH);
+		
+		
+		//Collision event
+		NK::EventManager::Subscribe<GameScene2, NK::CollisionEvent>(this, &GameScene2::OnCollision);
+	}
+
+
+
+	virtual void Update() override
+	{
+	}
+	
+	
+	
+	inline void OnCollision(const NK::CollisionEvent& _event)
+	{
+		std::cout << "Collision occurred\n";
+	}
+
+
+private:
+	NK::Entity m_skyboxEntity;
+	NK::Entity m_floorEntity;
+	NK::Entity m_lightEntity1;
+	NK::Entity m_lightEntity2;
+	NK::Entity m_lightEntity3;
+	NK::Entity m_cameraEntity;
+	NK::UniquePtr<NK::PlayerCamera> m_playerCamera;
+};
+
+
 class GameScene final : public NK::Scene
 {
 public:
@@ -183,6 +309,7 @@ public:
 		NK::TypeRegistry::Register<NK::PLAYER_CAMERA_ACTIONS>("PLAYER_CAMERA_ACTIONS");
 
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
+		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene2)));
 		m_activeScene = 0;
 
 
@@ -241,6 +368,8 @@ public:
 
 	virtual void Update() override
 	{
+		const std::size_t oldActiveScene{ m_activeScene };
+		
 		m_scenes[m_activeScene]->Update();
 
 		glfwSetWindowShouldClose(m_window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
@@ -248,6 +377,22 @@ public:
 		#if NEKI_EDITOR
 			const bool inGame{ NK::InputManager::GetMouseButtonPressed(NK::MOUSE_BUTTON::RIGHT) && !ImGui::GetIO().WantCaptureMouse };
 			NK::Context::SetEditorActive(!inGame);
+
+		if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0)) { m_activeScene = 0; }
+		if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_1)) { m_activeScene = 1; }
+		
+		if (m_activeScene != oldActiveScene)
+		{
+			for (NK::ILayer* layer : m_preAppLayers)
+			{
+				layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
+			}
+			for (NK::ILayer* layer : m_postAppLayers)
+			{
+				layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
+			}
+		}
+		
 		
 			// if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0) && !m_editorActiveKeyPressedLastFrame)
 			// {

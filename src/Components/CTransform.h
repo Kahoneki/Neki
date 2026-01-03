@@ -149,7 +149,7 @@ namespace NK
 			localScale = _val;
 			localMatrixDirty = true;
 			lightBufferDirty = true;
-			InvalidateChildTree(true, true, false);
+			InvalidateChildTree(true, true, true);
 		}
 		
 		//Immediately set the world position - note: this will result in any residual linear and angular velocity being zeroed out
@@ -168,20 +168,37 @@ namespace NK
 		
 	private:
 		//To be called by the PhysicsLayer
-		inline void SyncPosition(const glm::vec3 _val) { localPos = (parent ? glm::vec3(glm::inverse(parent->GetModelMatrix()) * glm::vec4(_val, 1.0f)) : _val); localMatrixDirty = true; lightBufferDirty = true; }
+		inline void SyncPosition(const glm::vec3 _val)
+		{
+			localPos = (parent ? glm::vec3(glm::inverse(parent->GetModelMatrix()) * glm::vec4(_val, 1.0f)) : _val);
+			localMatrixDirty = true;
+			lightBufferDirty = true;
+			InvalidateChildTree(true, true, true, true);
+		}
 		//To be called by the PhysicsLayer
 		//Set quaternion rotation
-		inline void SyncRotation(const glm::quat _val) { localRot = (parent ? glm::inverse(parent->GetWorldRotationQuat()) * _val : _val); localMatrixDirty = true; lightBufferDirty = true;  }
+		inline void SyncRotation(const glm::quat _val)
+		{
+			localRot = (parent ? glm::inverse(parent->GetWorldRotationQuat()) * _val : _val);
+			localMatrixDirty = true;
+			lightBufferDirty = true;
+			InvalidateChildTree(true, true, true, true);
+		}
 		
 		
-		inline void InvalidateChildTree(const bool _localMat, const bool _lightBuf, const bool _physicsSync) const
+		inline void InvalidateChildTree(const bool _localMat, const bool _lightBuf, const bool _physicsSync, const bool _isPhysicsDrivenSource = false) const
 		{
 			for (CTransform* child : children)
 			{
-				child->localMatrixDirty = _localMat;
-				child->lightBufferDirty = _lightBuf;
-				child->physicsSyncDirty = _physicsSync;
-				child->InvalidateChildTree(_localMat, _lightBuf, _physicsSync);
+				if (_localMat) { child->localMatrixDirty = true; }
+				if (_lightBuf) { child->lightBufferDirty = true; }
+				if (_physicsSync) { child->physicsSyncDirty = true; }
+				child->InvalidateChildTree(_localMat, _lightBuf, _physicsSync, _isPhysicsDrivenSource);
+				
+				if (_isPhysicsDrivenSource) 
+				{
+					child->ancestorMovedByPhysics = true;
+				}
 			}
 		}
 		
@@ -260,6 +277,8 @@ namespace NK
 		//For lights
 		//True if pos, rot, and/or scale have been changed but the light buffer hasn't been updated yet by RenderLayer
 		bool lightBufferDirty{ true };
+		
+		bool ancestorMovedByPhysics{ false };
 		
 		glm::vec3 localPos{ glm::vec3(0.0f) };
 		glm::quat localRot{ glm::quat(1.0f, 0.0f, 0.0f, 0.0f) }; //identity quaternion (wxyz: .w=1, .xyz=0)

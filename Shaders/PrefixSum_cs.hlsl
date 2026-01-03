@@ -77,6 +77,8 @@ void CSMain(uint3 GroupThreadID : SV_GroupThreadID, uint3 GroupID : SV_GroupID)
         sharedData[id * 2] += runningSum;
         sharedData[id * 2 + 1] += runningSum;
         
+        GroupMemoryBarrierWithGroupSync();
+        
         //Write shared data to output image, transposing data to prepare for next dispatch on columns. After two passes, image will be back to original orientation
         if (p1.x < PC(dimensions).x && p1.y < PC(dimensions).y)
         {

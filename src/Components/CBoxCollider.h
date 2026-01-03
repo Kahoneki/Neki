@@ -22,7 +22,7 @@ namespace NK
 		
 		//Note: quite expensive, use sparingly (e.g.: avoid calling every frame for continuous updates, just set once at end of updates instead)
 		inline void SetHalfExtents(const glm::vec3 _val) { halfExtents = _val; halfExtentsEditedInInspector = false; halfExtentsDirty = true; }
-	
+		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Box Collider"; }
 		
 		
@@ -33,7 +33,7 @@ namespace NK
 		
 		
 		bool halfExtentsEditedInInspector{ false }; //setting halfExtentsDirty is expensive, so we want to avoid it for continuous updates (i.e.: ImGui::DragFloat3) - use this if the half extents have been edited but the apply button hasn't been pressed yet
-		bool halfExtentsDirty{ false };
+		bool halfExtentsDirty{ true };
 		glm::vec3 halfExtents{ 0.5f, 0.5f, 0.5f };
 	};
 	

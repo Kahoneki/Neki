@@ -15,6 +15,7 @@ namespace NK
 	LAYER_UPDATE_STATE Context::m_layerUpdateState{ LAYER_UPDATE_STATE::PRE_APP };
 	bool Context::m_editorActive{ false };
 	bool Context::m_paused{ false };
+	bool Context::m_popupOpen{ false };
 	float Context::m_fixedUpdateTimestep{ 1 / 60.0f };
 
 

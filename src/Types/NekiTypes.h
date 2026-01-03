@@ -897,5 +897,5 @@ namespace NK
 	static const PhysicsBroadPhaseLayer KinematicBroadPhaseLayer{ 1 };
 	static const PhysicsBroadPhaseLayer StaticBroadPhaseLayer{ 2 };
 	
-	static const PhysicsObjectLayer DefaultObjectLayer{ UINT16_MAX, StaticBroadPhaseLayer };
+	static const PhysicsObjectLayer DefaultObjectLayer{ UINT16_MAX - 1, StaticBroadPhaseLayer }; //jolt uses UINT16_MAX internally for invalid layer, so subtract 1
 }

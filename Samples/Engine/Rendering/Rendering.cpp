@@ -43,9 +43,9 @@ public:
 		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
 
 		m_lightEntity1 = m_reg.Create();
-		NK::CTransform& directionalLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity1) };
-		directionalLightTransform.SetRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
-		directionalLightTransform.SetPosition({ 0.0f, 50.0f, -5.0f });
+		NK::CTransform& directionalLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity1) };
+		directionalLightTransform.SetLocalRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
+		directionalLightTransform.SetLocalPosition({ 0.0f, 50.0f, -5.0f });
 		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
 		directionalLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
 		directionalLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
@@ -54,9 +54,9 @@ public:
 		dynamic_cast<NK::DirectionalLight*>(directionalLight.light.get())->SetDimensions({ 500, 500, 500 });
 
 		m_lightEntity2 = m_reg.Create();
-		NK::CTransform& spotLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity2) };
-		spotLightTransform.SetPosition({ -4.2f, -49.95f, -10.65f });
-		spotLightTransform.SetRotation({ glm::radians(75.4f), 0.0f, glm::radians(10.5f) });
+		NK::CTransform& spotLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity2) };
+		spotLightTransform.SetLocalPosition({ -4.2f, -49.95f, -10.65f });
+		spotLightTransform.SetLocalRotation({ glm::radians(75.4f), 0.0f, glm::radians(10.5f) });
 		NK::CLight& spotLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity2) };
 		spotLight.lightType = NK::LIGHT_TYPE::SPOT;
 		spotLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::SpotLight));
@@ -69,8 +69,8 @@ public:
 		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetOuterAngle(glm::radians(60.0f));
 
 		m_lightEntity3 = m_reg.Create();
-		NK::CTransform& pointLightTransform{ m_reg.AddComponent<NK::CTransform>(m_lightEntity3) };
-		pointLightTransform.SetPosition({ -4.3f, -47.7f, -4.85f });
+		NK::CTransform& pointLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity3) };
+		pointLightTransform.SetLocalPosition({ -4.3f, -47.7f, -4.85f });
 		NK::CLight& pointLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity3) };
 		pointLight.lightType = NK::LIGHT_TYPE::POINT;
 		pointLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
@@ -80,16 +80,16 @@ public:
 
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		helmetModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel";
-		NK::CTransform& helmetTransform{ m_reg.AddComponent<NK::CTransform>(m_helmetEntity) };
-		helmetTransform.SetPosition({ 0, -58.0f, -5.0f });
-		helmetTransform.SetScale({ 5.0f, 5.0f, 5.0f });
-		helmetTransform.SetRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
+		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/DamagedHelmet/DamagedHelmet.nkmodel");
+		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+		helmetTransform.SetLocalPosition({ 0, -58.0f, -5.0f });
+		helmetTransform.SetLocalScale({ 5.0f, 5.0f, 5.0f });
+		helmetTransform.SetLocalRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 
 		m_sponzaEntity = m_reg.Create();
 //		NK::CModelRenderer& sponzaModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_sponzaEntity) };
 //		sponzaModelRenderer.modelPath = "Samples/Resource-Files/nkmodels/Sponza/Sponza.nkmodel";
-//		NK::CTransform& sponzaTransform{ m_reg.AddComponent<NK::CTransform>(m_sponzaEntity) };
+//		NK::CTransform& sponzaTransform{ m_reg.GetComponent<NK::CTransform>(m_sponzaEntity) };
 //		sponzaTransform.SetScale({ 0.1f, 0.1f, 0.1f });
 //		sponzaTransform.SetPosition(glm::vec3(0, -3, -3));
 
@@ -123,7 +123,7 @@ public:
 		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		constexpr float speed{ 50.0f };
 		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
-		helmetTransform.SetRotation(helmetTransform.GetLocalRotation() + glm::vec3(0, rotationAmount, 0));
+		helmetTransform.SetLocalRotation(helmetTransform.GetLocalRotation() + glm::vec3(0, rotationAmount, 0));
 
 
 		//ImGui for lights
@@ -140,14 +140,14 @@ public:
 					glm::vec3 pos{ transform.GetLocalPosition() };
 					if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
 					{
-						transform.SetPosition(pos);
+						transform.SetLocalPosition(pos);
 					}
 
 					//Rotation
 					glm::vec3 rot{ glm::degrees(transform.GetLocalRotation()) };
 					if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f))
 					{
-						transform.SetRotation(glm::radians(rot));
+						transform.SetLocalRotation(glm::radians(rot));
 					}
 
 
@@ -204,7 +204,7 @@ public:
 				glm::vec3 pos{ transform.GetLocalPosition() };
 				if (ImGui::DragFloat3("Position", &pos.x, 0.05f))
 				{
-					transform.SetPosition(pos);
+					transform.SetLocalPosition(pos);
 				}
 				ImGui::PopID();
 			}

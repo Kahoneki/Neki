@@ -24,6 +24,7 @@ namespace NK
 		virtual ~PhysicsLayer() override;
 
 		virtual void FixedUpdate() override;
+		virtual void SetRegistry(Registry& _reg) override;
 		
 		
 	private:

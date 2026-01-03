@@ -100,7 +100,7 @@ namespace NK
 		case DATA_FORMAT::BC4_R_SNORM:
 			return 8;
 
-		// 16 Bytes per block (128 bits)
+		//16 Bytes per block (128 bits)
 		case DATA_FORMAT::BC3_RGBA_UNORM:
 		case DATA_FORMAT::BC3_RGBA_SRGB:
 		case DATA_FORMAT::BC5_RG_UNORM:

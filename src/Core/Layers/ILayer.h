@@ -14,7 +14,7 @@ namespace NK
 		explicit ILayer(Registry& _reg) : m_logger(*Context::GetLogger()), m_reg(_reg) {}
 		virtual ~ILayer() = default;
 
-		inline void SetRegistry(Registry& _reg) { m_reg = _reg; }
+		inline virtual void SetRegistry(Registry& _reg) { m_reg = _reg; }
 		
 		virtual void Update() {}
 		inline virtual void FixedUpdate() {}

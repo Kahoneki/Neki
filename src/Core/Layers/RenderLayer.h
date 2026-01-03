@@ -52,6 +52,7 @@ namespace NK
 		virtual ~RenderLayer() override;
 
 		virtual void Update() override;
+		void SetRegistry(Registry& _reg) override;
 
 
 	private:

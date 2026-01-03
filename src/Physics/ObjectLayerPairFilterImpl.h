@@ -29,7 +29,12 @@ namespace NK
 		
 		inline virtual bool ShouldCollide(const JPH::ObjectLayer _inLayer1, const JPH::ObjectLayer _inLayer2) const override
 		{
-			//todo: this is really inefficient, use a 2d bitmask lut instead
+			if (_inLayer1 == DefaultObjectLayer.GetValue() || _inLayer2 == DefaultObjectLayer.GetValue())
+			{
+				return true;
+			}
+			
+			//todo: this is really inefficient (O(n)), use a 2d bitmask lut instead
 			return (std::ranges::find(m_objectLayerCollisionPartners.at(_inLayer1), _inLayer2) != m_objectLayerCollisionPartners.at(_inLayer1).end());
 		}
 		

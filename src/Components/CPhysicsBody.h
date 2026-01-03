@@ -60,6 +60,56 @@ namespace NK
 			return *this;
 		}
 		
+		CPhysicsBody(CPhysicsBody&& _other) noexcept
+	: initialObjectLayer(_other.initialObjectLayer),
+	  initialMotionType(_other.initialMotionType),
+	  initialMotionQuality(_other.initialMotionQuality),
+	  initialTrigger(_other.initialTrigger),
+	  initialLinearVelocity(_other.initialLinearVelocity),
+	  initialAngularVelocity(_other.initialAngularVelocity),
+	  bodyID(_other.bodyID),
+	  dirtyFlags(_other.dirtyFlags),
+	  mass(_other.mass),
+	  friction(_other.friction),
+	  restitution(_other.restitution),
+	  linearDamping(_other.linearDamping),
+	  angularDamping(_other.angularDamping),
+	  gravityFactor(_other.gravityFactor),
+	  scale(_other.scale),
+	  forceQueue(std::move(_other.forceQueue))
+		{
+			_other.bodyID = UINT32_MAX; 
+		}
+
+		CPhysicsBody& operator=(CPhysicsBody&& _other) noexcept
+		{
+			if (this == &_other) return *this;
+
+			initialObjectLayer = _other.initialObjectLayer;
+			initialMotionType = _other.initialMotionType;
+			initialMotionQuality = _other.initialMotionQuality;
+			initialTrigger = _other.initialTrigger;
+			initialLinearVelocity = _other.initialLinearVelocity;
+			initialAngularVelocity = _other.initialAngularVelocity;
+
+			bodyID = _other.bodyID;
+			dirtyFlags = _other.dirtyFlags;
+        
+			mass = _other.mass;
+			friction = _other.friction;
+			restitution = _other.restitution;
+			linearDamping = _other.linearDamping;
+			angularDamping = _other.angularDamping;
+			gravityFactor = _other.gravityFactor;
+			scale = _other.scale;
+        
+			forceQueue = std::move(_other.forceQueue);
+
+			_other.bodyID = UINT32_MAX;
+        
+			return *this;
+		}
+		
 		
 		[[nodiscard]] inline float GetMass() const { return mass; }
 		[[nodiscard]] inline float GetFriction() const { return friction; }
@@ -84,7 +134,7 @@ namespace NK
 		
 		PhysicsObjectLayer initialObjectLayer{ DefaultObjectLayer };
 
-		MOTION_TYPE initialMotionType{ MOTION_TYPE::STATIC };
+		MOTION_TYPE initialMotionType{ MOTION_TYPE::DYNAMIC };
 		MOTION_QUALITY initialMotionQuality{ MOTION_QUALITY::DISCRETE };
 
 		bool initialTrigger{ false };

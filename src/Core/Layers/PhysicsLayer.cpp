@@ -123,13 +123,23 @@ namespace NK
 			
 			if (transform.physicsSyncDirty)
 			{
-				//The transform was updated by something other than the jolt->ctransform sync (e.g.: imgui), perform a ctransform->jolt sync
-				bodyInterface.SetPositionAndRotation(JPH::BodyID(body.bodyID), GLMToJPH(transform.GetWorldPosition()), GLMToJPH(transform.GetWorldRotationQuat()), JPH::EActivation::Activate);
-				
-				//Zero out the velocity to avoid a large jump
-				bodyInterface.SetLinearAndAngularVelocity(JPH::BodyID(body.bodyID), JPH::Vec3::sZero(), JPH::Vec3::sZero());
-				
+				bool shouldTeleport = true;
+				if (transform.ancestorMovedByPhysics)
+				{
+					if (body.initialMotionType == MOTION_TYPE::DYNAMIC)
+					{
+						shouldTeleport = false;
+					}
+				}
+
+				if (shouldTeleport)
+				{
+					bodyInterface.SetPositionAndRotation(JPH::BodyID(body.bodyID), GLMToJPH(transform.GetWorldPosition()), GLMToJPH(transform.GetWorldRotationQuat()), JPH::EActivation::Activate);
+					bodyInterface.SetLinearAndAngularVelocity(JPH::BodyID(body.bodyID), JPH::Vec3::sZero(), JPH::Vec3::sZero());
+				}
+    
 				transform.physicsSyncDirty = false;
+				transform.ancestorMovedByPhysics = false;
 			}
 
 			JPH::BodyID id(body.bodyID);
@@ -198,6 +208,26 @@ namespace NK
 	}
 
 	
+	
+	void PhysicsLayer::SetRegistry(Registry& _reg)
+	{
+		JPH::BodyInterface& bodyInterface{ m_physicsSystem.GetBodyInterface() };
+		for (auto&& [body] : m_reg.get().View<CPhysicsBody>())
+		{
+			if (body.bodyID != UINT32_MAX)
+			{
+				JPH::BodyID id(body.bodyID);
+				bodyInterface.RemoveBody(id);
+				bodyInterface.DestroyBody(id);
+				body.bodyID = UINT32_MAX;
+				body.forceQueue = {};
+			}
+		}
+		
+		ILayer::SetRegistry(_reg);
+	}
+
+
 	
 	void PhysicsLayer::OnEntityDestroy(const EntityDestroyEvent& _event)
 	{
