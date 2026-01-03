@@ -314,7 +314,7 @@ public:
 		//Window
 		NK::WindowDesc windowDesc;
 		windowDesc.name = "Rendering Sample";
-		windowDesc.size = { 3840, 2160 };
+		windowDesc.size = { 1920, 1080 };
 		m_window = NK::UniquePtr<NK::Window>(NK_NEW(NK::Window, windowDesc));
 		m_window->SetCursorVisibility(false);
 
@@ -325,10 +325,10 @@ public:
 		m_inputLayer = NK::UniquePtr<NK::InputLayer>(NK_NEW(NK::InputLayer, m_scenes[m_activeScene]->m_reg, inputLayerDesc));
 		
 		NK::RenderLayerDesc renderLayerDesc{};
-		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
+		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::D3D12;
 		renderLayerDesc.enableMSAA = false;
 		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
-		renderLayerDesc.enableSSAA = true;
+		renderLayerDesc.enableSSAA = false;
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.window = m_window.get();
 		renderLayerDesc.framesInFlight = 3;

@@ -49,7 +49,7 @@ namespace NK
 		}
 		
 		
-		virtual constexpr inline bool IsImGuiInspectorRenderableType() const override
+		virtual inline bool IsImGuiInspectorRenderableType() const override
 		{
 			return std::is_base_of_v<CImGuiInspectorRenderable, Component>;
 		}
@@ -57,7 +57,7 @@ namespace NK
 		
 		virtual inline std::string GetImGuiInspectorRenderableName() const override
 		{
-			if constexpr (IsImGuiInspectorRenderableType())
+			if constexpr (std::is_base_of_v<CImGuiInspectorRenderable, Component>)
 			{
 				return Component::GetStaticName();
 			}

@@ -16,6 +16,9 @@
 #ifdef AddJob
 	#undef AddJob
 #endif
+#ifdef ERROR
+	#undef ERROR
+#endif
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <SFML/Network.hpp>

@@ -44,6 +44,9 @@ namespace NK
 			return std::get<T>(it->second);
 		}
 		
+
+		[[nodiscard]] inline static std::string GetStaticName() { return "Input"; }
+
 		
 		SERIALISE_MEMBER_FUNC(actionStates)
 		

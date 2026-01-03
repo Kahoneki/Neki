@@ -3,7 +3,6 @@
 #include <Components/CBoxCollider.h>
 #include <Components/CPhysicsBody.h>
 #include <Components/CTransform.h>
-#include <oneapi/tbb/profiling.h>
 
 
 #ifdef AddJob

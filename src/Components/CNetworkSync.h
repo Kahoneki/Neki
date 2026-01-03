@@ -12,6 +12,8 @@ namespace NK
 	struct CNetworkSync final
 	{
 	public:
+		[[nodiscard]] inline static std::string GetStaticName() { return "Network Sync"; }
+
 		SERIALISE_MEMBER_FUNC(networkID, owner)
 		
 		

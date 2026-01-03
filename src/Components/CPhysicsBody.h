@@ -2,6 +2,9 @@
 
 #include <Physics/PhysicsObjectLayer.h>
 #include <Types/NekiTypes.h>
+#ifdef max
+	#undef max
+#endif
 
 
 namespace NK

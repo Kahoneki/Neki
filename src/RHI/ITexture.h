@@ -6,6 +6,9 @@
 
 #include <stdexcept>
 #include <glm/glm.hpp>
+#ifdef ERROR
+	#undef ERROR
+#endif
 
 
 namespace NK
