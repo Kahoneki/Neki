@@ -1596,6 +1596,12 @@ namespace NK
 				m_reg.get().Load(m_pendingLoadScenePath);
 				m_pendingLoadScenePath.clear();
 			}
+		
+			if (!m_firstFrame)
+			{
+				const bool inGame{ InputManager::GetMouseButtonPressed(MOUSE_BUTTON::RIGHT) && !ImGui::GetIO().WantCaptureMouse };
+				Context::SetEditorActive(!inGame);
+			}
 		#endif
 	}
 	

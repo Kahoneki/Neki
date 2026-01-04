@@ -342,8 +342,8 @@ public:
 		
 		m_preAppLayers.push_back(m_windowLayer.get());
 		m_preAppLayers.push_back(m_inputLayer.get());
-		m_preAppLayers.push_back(m_playerCameraLayer.get());
 		m_preAppLayers.push_back(m_renderLayer.get());
+		m_preAppLayers.push_back(m_playerCameraLayer.get());
 		
 
 		//Post-app layers
@@ -371,10 +371,6 @@ public:
 		m_scenes[m_activeScene]->Update();
 		
 		#if NEKI_EDITOR
-			//todo: i have no idea why this has to be in here, but no matter where i seem to put it in the render layer, the camera's yaw and pitch end up uninitialised until the first time you press right click, so for now it lives here
-			const bool inGame{ NK::InputManager::GetMouseButtonPressed(NK::MOUSE_BUTTON::RIGHT) && !ImGui::GetIO().WantCaptureMouse };
-			NK::Context::SetEditorActive(!inGame);
-		
 			m_window->SetCursorVisibility(NK::Context::GetEditorActive());
 		#endif
 		

@@ -14,7 +14,7 @@ namespace NK
 	IAllocator* Context::m_allocator{ nullptr };
 	LAYER_UPDATE_STATE Context::m_layerUpdateState{ LAYER_UPDATE_STATE::PRE_APP };
 	CLight* Context::m_activeLightView{ nullptr };
-	bool Context::m_editorActive{ true };
+	bool Context::m_editorActive{ false };
 	bool Context::m_paused{ false };
 	bool Context::m_popupOpen{ false };
 	float Context::m_fixedUpdateTimestep{ 1 / 60.0f };
