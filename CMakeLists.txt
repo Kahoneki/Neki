@@ -101,7 +101,7 @@ elseif(UNIX AND NOT APPLE)
             URL "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/linux_dxc_2025_07_14.x86_64.tar.gz"
     )
 else()
-    message(FATAL_ERROR "Platform not supported. Supported platforms = Windows, Linux, PS5")
+    message(FATAL_ERROR "Platform not supported. Supported platforms = Windows, Linux")
 endif ()
 FetchContent_MakeAvailable(dxc_artifacts)
 if(WIN32)
