@@ -2,6 +2,7 @@
 
 #include "ImageLoader.h"
 
+#include <Core/Memory/Allocation.h>
 #include <Types/NekiTypes.h>
 
 #ifdef NEKI_VULKAN_SUPPORTED
@@ -302,9 +303,14 @@ namespace NK
 	class TextureCompressor
 	{
 	public:
+		~TextureCompressor();
+		
 		//Takes the file at _inputFilepath and compresses it to a .ktx2, saving the result to _outputFilepath
 		static void KTXCompress(const std::string& _inputFilepath, const bool _srgb, const bool _flipImage, const std::string& _outputFilepath);
 		[[nodiscard]] static ImageData* LoadImage(const std::string& _filepath, bool _flipImage, bool _srgb);
+		
+		static void FreeImage(const ImageData* _imageData);
+		static void ClearCache();
 
 
 	private:
@@ -313,7 +319,7 @@ namespace NK
 
 
 		//To avoid unnecessary duplicate loads
-		static std::unordered_map<std::string, ImageData> m_filepathToImageDataCache;
+		static std::unordered_map<std::string, UniquePtr<ImageData>> m_filepathToImageDataCache;
 	};
 	
 }

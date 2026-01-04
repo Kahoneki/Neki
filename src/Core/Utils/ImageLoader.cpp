@@ -16,14 +16,22 @@
 namespace NK
 {
 	
-	std::unordered_map<std::string, ImageData> ImageLoader::m_filepathToImageDataCache;
+	std::unordered_map<std::string, UniquePtr<ImageData>> ImageLoader::m_filepathToImageDataCache;
 
+
+	ImageLoader::~ImageLoader()
+	{
+		ClearCache();
+	}
+
+	
+	
 	ImageData* ImageLoader::LoadImage(const std::string& _filepath, bool _flipImage, bool _srgb)
 	{
-		const std::unordered_map<std::string, ImageData>::iterator it{ m_filepathToImageDataCache.find(_filepath) };
+		const std::unordered_map<std::string, UniquePtr<ImageData>>::iterator it{ m_filepathToImageDataCache.find(_filepath) };
 		if (it != m_filepathToImageDataCache.end())
 		{
-			return &(it->second);
+			return it->second.get();
 		}
 
 		stbi_set_flip_vertically_on_load(_flipImage);
@@ -97,8 +105,8 @@ namespace NK
 		}
 
 		//Add to cache
-		m_filepathToImageDataCache[_filepath] = imageData;
-		return &(m_filepathToImageDataCache[_filepath]);
+		m_filepathToImageDataCache[_filepath] = UniquePtr<ImageData>(NK_NEW(ImageData, imageData));
+		return m_filepathToImageDataCache[_filepath].get();
 	}
 
 
@@ -107,9 +115,9 @@ namespace NK
 	{
 		if (!_imageData || !_imageData->data) { throw std::runtime_error("ImageLoader::FreeImage() - Attempted to free uninitialised / already freed image."); }
 
-		for (std::unordered_map<std::string, ImageData>::iterator it{ m_filepathToImageDataCache.begin() }; it != m_filepathToImageDataCache.end(); ++it)
+		for (std::unordered_map<std::string, UniquePtr<ImageData>>::iterator it{ m_filepathToImageDataCache.begin() }; it != m_filepathToImageDataCache.end(); ++it)
 		{
-			if (&(it->second) == _imageData)
+			if (it->second.get() == _imageData)
 			{
 				//Use free instead of stbi_image_free because the memory was allocated with malloc
 				free(_imageData->data); 
@@ -119,4 +127,18 @@ namespace NK
 		}
 	}
 
+	
+	
+	void ImageLoader::ClearCache()
+	{
+		for (std::unordered_map<std::string, UniquePtr<ImageData>>::iterator it{ m_filepathToImageDataCache.begin() }; it != m_filepathToImageDataCache.end(); ++it)
+		{
+			if (it->second->data)
+			{
+				free(it->second->data);
+			}
+		}
+		m_filepathToImageDataCache.clear();
+	}
+	
 }

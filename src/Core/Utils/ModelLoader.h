@@ -146,6 +146,8 @@ namespace NK
 		
 		[[nodiscard]] static VertexInputDesc GetModelVertexInputDescription();
 
+		static void ClearCache();
+		
 
 	private:
 		[[nodiscard]] static const CPUModel* LoadNKModel(const std::string& _filepath);

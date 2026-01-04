@@ -82,12 +82,14 @@ namespace NK
 			
 			if (ImGui::Button((std::string("...##") + "Model Filepath").c_str()))
 			{
+				const std::filesystem::path currentPath{ std::filesystem::current_path() };
 				const std::vector<std::string> selection = pfd::open_file("Select File", lastAccessedFilepath, { "Neki Models", "*.nkmodel", "All Files", "*" }).result();
 				if (!selection.empty())
 				{
 					SetModelPath(std::filesystem::relative(selection[0], NEKI_BUILD_DIR).string());
 					lastAccessedFilepath = selection[0];
 				}
+				std::filesystem::current_path(currentPath);
 			}
 		        
 			ImGui::SameLine();

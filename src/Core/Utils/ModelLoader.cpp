@@ -44,7 +44,48 @@ namespace NK
 		{
 			throw std::invalid_argument("ModelLoader::UnloadModel() - _filepath not in cache");
 		}
+
+		const CPUModel& modelToRemove = m_filepathToModelDataCache.at(_filepath);
+
+		//Get all the textures used by the model 
+		std::vector<ImageData*> texturesToRemove;
+		for (const CPUMaterial& mat : modelToRemove.materials)
+		{
+			for (ImageData* img : mat.allTextures)
+			{
+				if (img) texturesToRemove.push_back(img);
+			}
+		}
+
 		m_filepathToModelDataCache.erase(_filepath);
+
+		//For each texture, check if any other remaining model is using it
+		for (ImageData* img : texturesToRemove)
+		{
+			bool isShared = false;
+			for (const auto& [path, otherModel] : m_filepathToModelDataCache)
+			{
+				for (const CPUMaterial& mat : otherModel.materials)
+				{
+					for (const ImageData* otherImg : mat.allTextures)
+					{
+						if (otherImg == img)
+						{
+							isShared = true;
+							goto checkDone; //forgive me bjarne stroustrup, im sorry, im so sorry, ill think of a better way later
+						}
+					}
+				}
+			}
+			checkDone:
+
+			//If no other model uses this texture, free it from the ImageLoader's cache
+			if (!isShared)
+			{
+				ImageLoader::FreeImage(img);
+				TextureCompressor::FreeImage(img);
+			}
+		}
 	}
 
 
@@ -101,8 +142,17 @@ namespace NK
 		return vertexInputDesc;
 	}
 
+	
+	
+	void ModelLoader::ClearCache()
+	{
+		m_filepathToModelDataCache.clear();
+		ImageLoader::ClearCache();
+		TextureCompressor::ClearCache();
+	}
 
 
+	
 	void ModelLoader::SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures)
 	{
 		//Create output filepath if it doesn't exist

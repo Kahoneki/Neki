@@ -1609,12 +1609,14 @@ namespace NK
 				if (ImGui::MenuItem("Open Scene", "Ctrl+O"))
 				{
 					//todo: check for scene diff and prompt for save
+					const std::filesystem::path currentPath{ std::filesystem::current_path() };
 					const std::vector<std::string> selection{ pfd::open_file("Open Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
 					if (!selection.empty())
 					{
 						//todo: input validation
 						m_reg.get().Load(selection[0]);
 					}
+					std::filesystem::current_path(currentPath);
 				}
 				
 				if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
@@ -1623,11 +1625,13 @@ namespace NK
 					if (filepath.empty())
 					{
 						//Mimic "Save As" logic
+						const std::filesystem::path currentPath{ std::filesystem::current_path() };
 						const std::string dest{ pfd::save_file("Save Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
 						if (!dest.empty())
 						{
 							m_reg.get().Save(dest);
 						}
+						std::filesystem::current_path(currentPath);
 					}
 					else
 					{
@@ -1637,11 +1641,13 @@ namespace NK
 				
 				if (ImGui::MenuItem("Save Scene As"))
 				{
+					const std::filesystem::path currentPath{ std::filesystem::current_path() };
 					const std::string dest{ pfd::save_file("Save Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
 					if (!dest.empty())
 					{
 						m_reg.get().Save(dest);
 					}
+					std::filesystem::current_path(currentPath);
 				}
 				
 				if (ImGui::MenuItem("Exit", "Alt+F4"))
@@ -2825,6 +2831,8 @@ namespace NK
 		m_gpuModelReferenceCounter.clear();
 		m_textureDeletionQueue.clear();
 		m_modelUnloadQueue.clear();
+		m_gpuModelCache.clear();
+		ModelLoader::ClearCache();
 		for (std::vector<Entity>& lookup : m_modelMatricesEntitiesLookups)
 		{
 			lookup.clear();

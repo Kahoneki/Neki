@@ -77,12 +77,14 @@ namespace NK
 		    {
 		        if (ImGui::Button((std::string("...##") + _label).c_str()))
 		        {
+		        	const std::filesystem::path currentPath{ std::filesystem::current_path() };
 		            const std::vector<std::string> selection = pfd::open_file("Select File", lastAccessedFilepath, { "KTX Files", "*.ktx *.ktx2", "All Files", "*" }).result();
 		            if (!selection.empty())
 		            {
 		                (this->*_setter)(std::filesystem::relative(selection[0], NEKI_BUILD_DIR).string());
 		                lastAccessedFilepath = selection[0];
 		            }
+		        	std::filesystem::current_path(currentPath);
 		        }
 		        
 		        ImGui::SameLine();
@@ -97,6 +99,7 @@ namespace NK
 			
 		    if (ImGui::Button("Auto-Populate from Directory"))
 		    {
+		    	const std::filesystem::path currentPath{ std::filesystem::current_path() };
 		        const std::string folder = pfd::select_folder("Select Skybox Directory", lastAccessedFilepath).result();
 		        if (!folder.empty())
 		        {
@@ -108,6 +111,7 @@ namespace NK
 		            SetPrefilterFilepath((relFolder / "prefilter.ktx").string());
 		            lastAccessedFilepath = folder;
 		        }
+		    	std::filesystem::current_path(currentPath);
 		    }
 		    if (ImGui::IsItemHovered())
 		    {

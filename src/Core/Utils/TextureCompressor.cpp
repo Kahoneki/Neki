@@ -12,7 +12,13 @@
 namespace NK
 {
 
-	std::unordered_map<std::string, ImageData> TextureCompressor::m_filepathToImageDataCache;
+	std::unordered_map<std::string, UniquePtr<ImageData>> TextureCompressor::m_filepathToImageDataCache;
+
+
+	TextureCompressor::~TextureCompressor()
+	{
+		ClearCache();
+	}
 
 	
 	
@@ -181,11 +187,11 @@ namespace NK
 
 	ImageData* TextureCompressor::LoadImage(const std::string& _filepath, bool _flipImage, bool _srgb)
 	{
-		const std::unordered_map<std::string, ImageData>::iterator it{ m_filepathToImageDataCache.find(_filepath) };
+		const std::unordered_map<std::string, UniquePtr<ImageData>>::iterator it{ m_filepathToImageDataCache.find(_filepath) };
 		if (it != m_filepathToImageDataCache.end())
 		{
 			//Image has already been loaded, pull from cache
-			return &(it->second);
+			return it->second.get();
 		}
 		
 		ktxTexture* texture;
@@ -341,8 +347,40 @@ namespace NK
 		ktxTexture_Destroy(texture);
 
 		//Add to cache
-		m_filepathToImageDataCache[_filepath] = imageData;
-		return &(m_filepathToImageDataCache[_filepath]);
+		m_filepathToImageDataCache[_filepath] = UniquePtr<ImageData>(NK_NEW(ImageData, imageData));
+		return m_filepathToImageDataCache[_filepath].get();
+	}
+	
+	
+	
+	void TextureCompressor::FreeImage(const ImageData* _imageData)
+	{
+		if (!_imageData || !_imageData->data) { return; }
+		for (std::unordered_map<std::string, UniquePtr<ImageData>>::iterator it{ m_filepathToImageDataCache.begin() }; it != m_filepathToImageDataCache.end(); ++it)
+		{
+			if (it->second.get() == _imageData)
+			{
+				free(it->second->data);
+				it->second->data = nullptr;
+				m_filepathToImageDataCache.erase(it);
+				return;
+			}
+		}
+	}
+
+	
+	
+	void TextureCompressor::ClearCache()
+	{
+		for (std::unordered_map<std::string, UniquePtr<ImageData>>::iterator it{ m_filepathToImageDataCache.begin() }; it != m_filepathToImageDataCache.end(); ++it)
+		{
+			if (it->second->data)
+			{
+				free(it->second->data);
+				it->second->data = nullptr;
+			}
+		}
+		m_filepathToImageDataCache.clear();
 	}
 
 

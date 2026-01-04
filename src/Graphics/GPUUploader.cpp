@@ -473,7 +473,6 @@ void GPUUploader::EnqueueTextureDataUpload(const void* _data, ITexture* _dstText
 		m_stagingBufferSubregions.clear();
 		while (!m_imageDataPointers.empty())
 		{
-			ImageLoader::FreeImage(m_imageDataPointers.back());
 			m_imageDataPointers.pop();
 		}
 		m_flushing = false;

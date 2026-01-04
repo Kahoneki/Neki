@@ -66,4 +66,6 @@ int main()
 	NK::Engine engine{ engineConfig };
 	
 	engine.Run();
+	
+	NK::ModelLoader::ClearCache(); 
 }
