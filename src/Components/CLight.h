@@ -14,6 +14,9 @@ namespace NK
 	
 	struct CLight final : public CImGuiInspectorRenderable
 	{
+		friend class PlayerCameraLayer;
+		
+		
 	public:
 		CLight() : lightType(LIGHT_TYPE::UNDEFINED), light(nullptr) {}
 		//Deep copy constructor
@@ -191,10 +194,21 @@ namespace NK
 					if (ImGui::DragFloat("Outer Angle (degrees)", &outerAngle, 0.01f, 0.0f, 360.0f)) { spotLight->SetOuterAngle(glm::radians(outerAngle)); }
 				}
 			}
+			
+			if (ImGui::Button(Context::GetActiveLightView() == this ? "View From Camera Perspective" : "View From Light Perspective"))
+			{
+				Context::SetActiveLightView(Context::GetActiveLightView() == this ? nullptr : this);
+				firstFrame = true;
+			}
 		}
 		
 		
 		LIGHT_TYPE lightType{ LIGHT_TYPE::UNDEFINED };
+		
+		//For point light debug view
+		float pitch{ 0.0f };
+		float yaw{ 0.0f };
+		bool firstFrame{ false }; //first frame the component is active
 	};
 	
 }

@@ -378,14 +378,29 @@ namespace NK
 		ImGuizmo::MODE m_currentGizmoMode{ ImGuizmo::WORLD };
 		CCamera* m_activeCamera{ nullptr };
 		Entity m_copiedEntity{ UINT32_MAX };
+		std::string m_pendingLoadScenePath;
+		bool m_pendingNewScene{ false };
 		
 		bool m_showEditor{ true }; //catch-all for below
 		bool m_showHierarchy{ true };
 		bool m_showInspector{ true };
 		bool m_showGizmoSettings{ true };
 		bool m_showEditorSettings{ true };
-		std::string m_pendingLoadScenePath;
-		bool m_pendingNewScene{ false };
+		
+		//By default, Neki is currently only set up to stream from RAM to VRAM and vice versa. Eventually, I will get around to making a proper streaming system from disk to vram (wip on 'streaming' git branch)
+		//For now though, full disk->ram->vram and vice versa streaming can be enabled with this flag, though there is no ram caching or threading, so it results in large stutters that are painfully slow. Enable at your own risk!
+		bool m_fullDiskStreaming{ false };
+		
+		//Pause the visibility state of all models (used for demonstration to see the culling in action)
+		bool m_freezeVisibility{ false };
+		
+		//For shortcuts (required so that, e.g., ctrl+c will copy but c+ctrl won't)
+		bool cPressedLastFrame{ false }; //Ctrl+C = copy
+		bool vPressedLastFrame{ false }; //Ctrl+V = paste
+		bool sPressedLastFrame{ false }; //Ctrl+S = save
+		bool oPressedLastFrame{ false }; //Ctrl+O = open
+		bool ePressedLastFrame{ false }; //Ctrl+E = toggle editor
+		bool f4PressedLastFrame{ false }; //Alt+F4 = exit
 	};
 
 }

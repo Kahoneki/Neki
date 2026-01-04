@@ -1946,11 +1946,29 @@ namespace NK
 		
 		if (m_showEditor && m_showEditorSettings && ImGui::Begin("Editor Settings"))
 		{
+			//Physics
 			bool paused{ Context::GetPaused() };
 			int fixedUpdatesPerSecond{ static_cast<int>(std::round(1.0f / Context::GetFixedUpdateTimestep())) };
 			if (ImGui::Checkbox("Pause", &paused)) { Context::SetPaused(paused); }
 			ImGui::SameLine();
 			if (ImGui::DragInt("Fixed Updates Per Second", &fixedUpdatesPerSecond, 1, 1)) { Context::SetFixedUpdateTimestep(1.0f / std::max(1, fixedUpdatesPerSecond)); }
+			
+			ImGui::Separator();
+			
+			//Streaming
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255,255,0,255));
+			ImGui::Checkbox("Full Disk Asset Streaming", &m_fullDiskStreaming);
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("By default, Neki is currently only set up to stream from RAM to VRAM and vice versa. Eventually, I will get around to making a proper streaming system from disk to vram (wip on 'streaming' git branch)\nFor now though, full disk->ram->vram and vice versa streaming can be enabled with this flag, though there is no ram caching or threading, so it results in large stutters that are painfully slow.\nEnable at your own risk!");
+			}
+			ImGui::PopStyleColor();
+			ImGui::SameLine();
+			ImGui::Checkbox("Freeze Current Visibility", &m_freezeVisibility);
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Pause the visibility state of all models (used for demonstration to see the culling in action)");
+			}
 		}
 		if (m_showEditor && m_showEditorSettings) { ImGui::End(); }
 		
@@ -1978,7 +1996,7 @@ namespace NK
 			
 			CTransform& transform{ m_reg.get().GetComponent<CTransform>(selectedEntity) };
 			glm::mat4 modelMatrix{ transform.GetModelMatrix() };
-			CameraShaderData camData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
+			CameraShaderData camData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(_camera)).GetModelMatrix()) };
 		
 			const float aspect{ static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y };
 			
@@ -2180,7 +2198,7 @@ namespace NK
 		{
 			if (m_gpuModelReferenceCounter[m_modelUnloadQueue[m_globalFrame].back()] == 0)
 			{
-				ModelLoader::UnloadModel(m_modelUnloadQueue[m_globalFrame].back());
+				if (m_fullDiskStreaming) { ModelLoader::UnloadModel(m_modelUnloadQueue[m_globalFrame].back()); }
 				m_gpuModelCache.erase(m_modelUnloadQueue[m_globalFrame].back());
 			}
 			m_modelUnloadQueue[m_globalFrame].pop_back();
@@ -2202,23 +2220,76 @@ namespace NK
 		}
 
 
-		//Update camera
-		found = false;
-		for (auto&& [camera] : m_reg.get().View<CCamera>())
+		//Update active light view / camera
+		if (Context::GetActiveLightView() != nullptr)
 		{
-			if (found)
-			{
-				//Multiple cameras, notify the user only the first one is being considered for rendering - todo: change this (probably let the user specify on CModelRenderer which camera they want to use)
-				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
-				break;
-			}
-			found = true;
-			UpdateCameraBuffer(camera);
-			m_activeCamera = &camera;
+			for (auto&& [light, transform] : m_reg.get().View<CLight, CTransform>())
+            {
+                if (&light == Context::GetActiveLightView() && light.light)
+                {
+                    CameraShaderData camData{};
+                    camData.pos = glm::vec4(transform.GetWorldPosition(), 1.0f);
+
+                    //View matrix
+                	if (light.GetLightType() == LIGHT_TYPE::POINT)
+                    {
+                        camData.viewMat = glm::inverse(transform.GetModelMatrix());
+                    }
+                    else
+                    {
+                        camData.viewMat = glm::inverse(transform.GetModelMatrix());
+                    }
+
+                    //Projection Matrix
+                    if (light.GetLightType() == LIGHT_TYPE::DIRECTIONAL)
+                    {
+                        const glm::vec3& d{ static_cast<DirectionalLight*>(light.light.get())->GetDimensions() };
+                        camData.projMat = glm::orthoLH(-d.x, d.x, -d.y, d.y, -d.z, d.z);
+                    }
+                    else if (light.GetLightType() == LIGHT_TYPE::SPOT)
+                    {
+                        SpotLight* spotLight = static_cast<SpotLight*>(light.light.get());
+                        camData.projMat = glm::perspectiveLH(spotLight->GetOuterAngle() * 2.0f, static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y, 0.01f, 1000.0f); 
+                    }
+                    else
+                    {
+                        camData.projMat = glm::perspectiveLH(glm::radians(90.0f), static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y, 0.01f, 1000.0f);
+                    }
+                	
+                	//Upload
+                    memcpy(m_camDataBufferMaps[m_currentFrame], &camData, sizeof(CameraShaderData));
+                    if (m_firstFrame)
+                    {
+                        memcpy(m_camDataBufferPreviousFrameMaps[m_currentFrame], &camData, sizeof(CameraShaderData));
+                    }
+                	else
+                	{
+                        memcpy(m_camDataBufferPreviousFrameMaps[m_currentFrame], m_camDataBufferMaps[(m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight], sizeof(CameraShaderData));
+                    }
+                	
+                    break;
+                }
+            }
 		}
-		if (!found)
+		else
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
+			found = false;
+			for (auto&& [camera] : m_reg.get().View<CCamera>())
+			{
+				if (found)
+				{
+					//Multiple cameras, notify the user only the first one is being considered for rendering - todo: change this (probably let the user specify on CModelRenderer which camera they want to use)
+					m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
+					break;
+				}
+				found = true;
+				UpdateCameraBuffer(camera);
+				m_activeCamera = &camera;
+			}
+			if (!found)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
+			}
 		}
 
 		
@@ -2239,31 +2310,34 @@ namespace NK
 			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
 			CTransform& transform{ m_reg.get().GetComponent<CTransform>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
 			
-			//Update visibility
-			bool isVisible{ (visibilityMap[modelRenderer.visibilityIndex] == 1) }; //GPU visibility result
-			if (!isVisible && m_activeCamera)
+			//Update visibility if not frozen
+			if (!m_freezeVisibility)
 			{
-				//If camera is within model's bounds, the depth buffer may contain residual data from the model, and since the AABB lies outside this extent, it may not be rendered and so the gpu visibility check will fail
-				//Check if camera is within model bounds, and if so, override gpu's result and set visible to true
-				
-				//Transform camera position from world space -> model's local space
-				const glm::vec3 modelLocalCamPos{ glm::vec3(glm::inverse(transform.GetModelMatrix()) * glm::vec4(m_activeCamera->camera->GetPosition(), 1.0f)) };
-				
-				float bufferRegion{ 1.05f };
-				const glm::vec3 bufferedExtents{ modelRenderer.localSpaceHalfExtents * 1.05f };
-				const glm::vec3 minBound{ modelRenderer.localSpaceOrigin - bufferedExtents };
-				const glm::vec3 maxBound{ modelRenderer.localSpaceOrigin + bufferedExtents };
-				if (modelLocalCamPos.x >= minBound.x && modelLocalCamPos.x <= maxBound.x &&
-					modelLocalCamPos.y >= minBound.y && modelLocalCamPos.y <= maxBound.y &&
-					modelLocalCamPos.z >= minBound.z && modelLocalCamPos.z <= maxBound.z)
+				bool isVisible{ (visibilityMap[modelRenderer.visibilityIndex] == 1) }; //GPU visibility result
+				if (!isVisible && m_activeCamera)
 				{
-					//Inside model, so override visibility flag
-					isVisible = true;
+					//If camera is within model's bounds, the depth buffer may contain residual data from the model, and since the AABB lies outside this extent, it may not be rendered and so the gpu visibility check will fail
+					//Check if camera is within model bounds, and if so, override gpu's result and set visible to true
+				
+					//Transform camera position from world space -> model's local space
+					const glm::vec3 modelLocalCamPos{ glm::vec3(glm::inverse(transform.GetModelMatrix()) * glm::vec4(m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)).GetWorldPosition(), 1.0f)) };
+				
+					float bufferRegion{ 1.05f };
+					const glm::vec3 bufferedExtents{ modelRenderer.localSpaceHalfExtents * 1.05f };
+					const glm::vec3 minBound{ modelRenderer.localSpaceOrigin - bufferedExtents };
+					const glm::vec3 maxBound{ modelRenderer.localSpaceOrigin + bufferedExtents };
+					if (modelLocalCamPos.x >= minBound.x && modelLocalCamPos.x <= maxBound.x &&
+						modelLocalCamPos.y >= minBound.y && modelLocalCamPos.y <= maxBound.y &&
+						modelLocalCamPos.z >= minBound.z && modelLocalCamPos.z <= maxBound.z)
+					{
+						//Inside model, so override visibility flag
+						isVisible = true;
+					}
 				}
-			}
-			if (modelRenderer.visibilityIndex != 0xFFFFFFFF)
-			{
-				modelRenderer.visible = isVisible;
+				if (modelRenderer.visibilityIndex != 0xFFFFFFFF)
+				{
+					modelRenderer.visible = isVisible;
+				}
 			}
 			
 			
@@ -2535,7 +2609,7 @@ namespace NK
 
 
 		//Update m_camDataBufferMap with the camera data from this frame
-		const CameraShaderData camShaderData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
+		const CameraShaderData camShaderData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(_camera)).GetModelMatrix()) };
 		memcpy(m_camDataBufferMaps[m_currentFrame], &camShaderData, sizeof(CameraShaderData));
 		if (m_firstFrame)
 		{

@@ -106,8 +106,11 @@ public:
 		
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
-		camera.camera = NK::UniquePtr<NK::Camera>(NK_NEW(NK::PlayerCamera, glm::vec3(0.0f, 3.0f, -5.0f), 90.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f));
-		m_reg.GetComponent<NK::CTransform>(m_cameraEntity).name = "Camera";
+		camera.camera = NK::UniquePtr<NK::Camera>(NK_NEW(NK::PlayerCamera, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f));
+		NK::CTransform& camTransform{ m_reg.GetComponent<NK::CTransform>(m_cameraEntity) };
+		camTransform.name = "Camera";
+		camTransform.SetLocalPosition({ 0.0f, 3.0f, -5.0f });
+		camTransform.SetLocalRotation(glm::vec3(glm::radians(-15.0f), glm::radians(90.0f), 0.0f));
 
 
 		//Inputs
@@ -242,8 +245,14 @@ public:
 		
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
-		camera.camera = NK::UniquePtr<NK::Camera>(NK_NEW(NK::PlayerCamera, glm::vec3(0.0f, 3.0f, -5.0f), 90.0f, -15.0f, 0.01f, 1000.0f, 90.0f, WIN_ASPECT_RATIO, 30.0f, 0.05f));
-		m_reg.GetComponent<NK::CTransform>(m_cameraEntity).name = "Camera";
+		camera.SetCameraType(NK::CAMERA_TYPE::PLAYER_CAMERA);
+		camera.camera->SetNearPlaneDistance(0.01f);
+		camera.camera->SetFarPlaneDistance(1000.0f);
+		camera.camera->SetFOV(90.0f);
+		NK::CTransform& camTransform{ m_reg.GetComponent<NK::CTransform>(m_cameraEntity) };
+		camTransform.name = "Camera";
+		camTransform.SetLocalPosition({ 0.0f, 3.0f, -5.0f });
+		camTransform.SetLocalRotation(glm::vec3(glm::radians(-15.0f), glm::radians(90.0f), 0.0f));
 
 
 		//Inputs

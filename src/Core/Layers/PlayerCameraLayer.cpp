@@ -2,9 +2,12 @@
 
 #include <Components/CCamera.h>
 #include <Components/CInput.h>
+#include <Components/CLight.h>
 #include <Graphics/Camera/PlayerCamera.h>
 #include <Managers/InputManager.h>
 #include <Managers/TimeManager.h>
+
+#include <glm/gtx/norm.hpp>
 
 
 namespace NK
@@ -47,49 +50,89 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PLAYER_CAMERA_LAYER, "PlayerCameraLayer::Update() - PLAYER_CAMERA_ACTIONS::YAW_PITCH is not bound to INPUT_TYPE::AXIS_2D as required");
 		}
 
-		for (auto&& [camera, input] : m_reg.get().View<CCamera, CInput>())
+		
+		CLight* debugLight{ Context::GetActiveLightView() };
+		if (debugLight)
+		{
+			if (debugLight->GetLightType() == LIGHT_TYPE::POINT)
+			{
+				CTransform& transform{ m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*debugLight)) };
+				const Axis2DState mouseState{ InputManager::GetAxis2DState(PLAYER_CAMERA_ACTIONS::YAW_PITCH) };
+				
+				if (mouseState.values.x != 0.0f || mouseState.values.y != 0.0f || debugLight->firstFrame)
+				{
+					constexpr float sensitivity{ 0.05f };
+				
+					const float pitchDelta{ glm::radians(mouseState.values.y * sensitivity) };
+					const float yawDelta{ glm::radians(mouseState.values.x * sensitivity) };
+            
+					debugLight->pitch += pitchDelta;
+					debugLight->yaw += yawDelta;
+
+					//Clamp pitch
+					constexpr float pitchLimit = glm::radians(89.0f);
+					debugLight->pitch = std::clamp(debugLight->pitch, -pitchLimit, pitchLimit);
+
+					//one fresh quaternion coming right up! (hold the euler extraction!)
+					glm::quat pitchQuat = glm::angleAxis(debugLight->pitch, glm::vec3(1.0f, 0.0f, 0.0f));
+					glm::quat yawQuat = glm::angleAxis(debugLight->yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+					transform.SetLocalRotation(yawQuat * pitchQuat);
+				
+					debugLight->firstFrame = false;
+				}
+			}
+			
+			//Don't process regular camera movement if debug light is active
+			return;
+		}
+		
+		
+		for (auto&& [camera, input, transform] : m_reg.get().View<CCamera, CInput, CTransform>())
 		{
 			PlayerCamera* pc{ dynamic_cast<PlayerCamera*>(camera.camera.get()) };
 			if (!pc) { continue; }
 			
-			for (std::unordered_map<ActionTypeMapKey, INPUT_STATE_VARIANT>::iterator it{ input.actionStates.begin() }; it != input.actionStates.end(); ++it)
+			//Rotation
+			const Axis2DState mouseState{ input.GetActionState<Axis2DState>(PLAYER_CAMERA_ACTIONS::YAW_PITCH) };
+			if (mouseState.values.x != 0.0f || mouseState.values.y != 0.0f || pc->m_firstFrame)
 			{
-				//Process movement
-				const Axis2DState moveState{ input.GetActionState<Axis2DState>(PLAYER_CAMERA_ACTIONS::MOVE) };
-				glm::vec3 movementDirection{ 0, 0, 0 };
-				movementDirection += pc->m_right * moveState.values.x;
-				movementDirection += pc->m_forward * moveState.values.y;
-				if (movementDirection != glm::vec3(0))
+				const float pitchDelta{ glm::radians(mouseState.values.y * pc->GetMouseSensitivity()) };
+				const float yawDelta{ glm::radians(mouseState.values.x * pc->GetMouseSensitivity()) };
+            
+				pc->m_pitch += pitchDelta;
+				pc->m_yaw += yawDelta;
+
+				//Clamp pitch
+				constexpr float pitchLimit = glm::radians(89.0f);
+				pc->m_pitch = std::clamp(pc->m_pitch, -pitchLimit, pitchLimit);
+
+				//one fresh quaternion coming right up! (hold the euler extraction!)
+				glm::quat pitchQuat = glm::angleAxis(pc->m_pitch, glm::vec3(1.0f, 0.0f, 0.0f));
+				glm::quat yawQuat = glm::angleAxis(pc->m_yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+				transform.SetLocalRotation(yawQuat * pitchQuat);
+				
+				pc->m_firstFrame = false;
+			}
+
+
+			//Movement
+			const Axis2DState moveState{ input.GetActionState<Axis2DState>(PLAYER_CAMERA_ACTIONS::MOVE) };
+			if (moveState.values.x != 0.0f || moveState.values.y != 0.0f)
+			{
+				const glm::quat orientation{ transform.GetLocalRotationQuat() };
+				glm::vec3 forward{ orientation * glm::vec3(0.0f, 0.0f, 1.0f) };
+				if (!pc->GetFlightEnabled()) { forward = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z)); }
+				constexpr glm::vec3 worldUp{ 0.0f, 1.0f, 0.0f };
+				const glm::vec3 globalRight{ glm::normalize(glm::cross(worldUp, forward)) };
+
+				glm::vec3 movementDirection{ 0.0f };
+				movementDirection += globalRight * moveState.values.x;
+				movementDirection += forward * moveState.values.y;
+
+				if (glm::length2(movementDirection) > 0.0001f)
 				{
-					pc->m_pos += glm::normalize(movementDirection) * pc->m_movementSpeed * static_cast<float>(TimeManager::GetDeltaTime());
+					transform.SetLocalPosition(transform.GetLocalPosition() + glm::normalize(movementDirection) * pc->GetMovementSpeed() * static_cast<float>(TimeManager::GetDeltaTime()));
 				}
-
-				//Process mouse movement
-				const Axis2DState mouseState{ input.GetActionState<Axis2DState>(PLAYER_CAMERA_ACTIONS::YAW_PITCH) }; //Expected to be bound to mouse-diff
-				const float pitchOffset{ mouseState.values.y * pc->m_mouseSensitivity };
-				const float yawOffset{ mouseState.values.x * pc->m_mouseSensitivity };
-				pc->m_pitch -= pitchOffset;
-				pc->m_yaw -= yawOffset;
-
-				//Constrain pitch for first person camera
-				if		(pc->m_pitch > 89.0f) { pc->m_pitch = 89.0f; }
-				else if (pc->m_pitch < -89.0f) { pc->m_pitch = -89.0f; }
-
-				pc->m_viewMatDirty = true;
-				pc->m_perspectiveProjMatDirty = true;
-				pc->m_orthographicProjMatDirty = true;
-
-				//Calculate new forward vector
-				glm::vec3 front;
-				front.x = static_cast<float>(cos(glm::radians(pc->m_yaw)) * cos(glm::radians(pc->m_pitch)));
-				front.y = static_cast<float>(sin(glm::radians(pc->m_pitch)));
-				front.z = static_cast<float>(sin(glm::radians(pc->m_yaw)) * cos(glm::radians(pc->m_pitch)));
-				pc->m_forward = glm::normalize(front);
-
-				//Re-calculate right and up vectors
-				constexpr glm::vec3 worldUp{ glm::vec3(0, 1, 0) };
-				pc->m_right = glm::normalize(glm::cross(worldUp, pc->m_forward));
-				pc->m_up = glm::normalize(glm::cross(pc->m_forward, pc->m_right));
 			}
 		}
 	}
