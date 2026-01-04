@@ -11,6 +11,9 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 #include <cereal/archives/binary.hpp>
+#ifdef max
+	#undef max
+#endif
 
 
 namespace NK
