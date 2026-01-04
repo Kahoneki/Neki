@@ -384,6 +384,8 @@ namespace NK
 		bool m_showInspector{ true };
 		bool m_showGizmoSettings{ true };
 		bool m_showEditorSettings{ true };
+		std::string m_pendingLoadScenePath;
+		bool m_pendingNewScene{ false };
 	};
 
 }

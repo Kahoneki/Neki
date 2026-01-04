@@ -1585,6 +1585,17 @@ namespace NK
 					m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
 				}
 			}
+		
+			if (m_pendingNewScene)
+			{
+				m_reg.get().Clear();
+				m_pendingNewScene = false;
+			}
+			else if (!m_pendingLoadScenePath.empty())
+			{
+				m_reg.get().Load(m_pendingLoadScenePath);
+				m_pendingLoadScenePath.clear();
+			}
 		#endif
 	}
 	
@@ -1603,7 +1614,7 @@ namespace NK
 				if (ImGui::MenuItem("New Scene"))
 				{
 					//todo: check for scene diff and prompt for save
-					m_reg.get().Clear();
+					m_pendingNewScene = true;
 				}
 				
 				if (ImGui::MenuItem("Open Scene", "Ctrl+O"))
@@ -1614,7 +1625,7 @@ namespace NK
 					if (!selection.empty())
 					{
 						//todo: input validation
-						m_reg.get().Load(selection[0]);
+						m_pendingLoadScenePath = selection[0];
 					}
 					std::filesystem::current_path(currentPath);
 				}
