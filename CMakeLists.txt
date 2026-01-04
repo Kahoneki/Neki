@@ -51,7 +51,8 @@ endif()
 if(NEKI_ENABLE_EDITOR)
     target_compile_definitions(Neki PUBLIC NEKI_EDITOR=1)
 endif()
-target_compile_definitions(Neki PUBLIC NEKI_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\")
+
+target_compile_definitions(Neki PUBLIC NEKI_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\")
 target_compile_definitions(Neki PUBLIC NEKI_BUILD_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\")
 
 
@@ -63,7 +64,7 @@ include(FetchContent)
 if(NEKI_BUILD_VULKAN)
     find_package(Vulkan REQUIRED)
     target_link_libraries(Neki PUBLIC Vulkan::Vulkan)
-    
+
     #VMA
     FetchContent_Declare(
             vma
@@ -81,9 +82,9 @@ if(NEKI_BUILD_D3D12)
 
     #D3D12MA
     FetchContent_Declare(
-        d3d12ma
-        GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git
-        GIT_TAG v3.0.1
+            d3d12ma
+            GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git
+            GIT_TAG v3.0.1
     )
     FetchContent_MakeAvailable(d3d12ma)
     target_link_libraries(Neki PUBLIC D3D12MemoryAllocator)
@@ -241,7 +242,7 @@ target_link_libraries(Neki PUBLIC ImGui)
 function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
 
     #Get relative path from project directory (maintain subdirectory structure)
-    file(RELATIVE_PATH SHADER_RELATIVE_PATH "${CMAKE_SOURCE_DIR}" ${SHADER_SOURCE})
+    file(RELATIVE_PATH SHADER_RELATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}" ${SHADER_SOURCE})
 
     #Get directory and filename without extension
     get_filename_component(SHADER_DIRECTORY ${SHADER_RELATIVE_PATH} PATH)
@@ -263,7 +264,7 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
 
 
     #Add include directory to shader files for the root directory of source tree
-    set(SHADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/src")
+    set(SHADER_INCLUDE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
     set(LOCAL_SHADER_OUTPUTS "")
 
@@ -308,7 +309,38 @@ endfunction()
 
 
 
+#Shader compilation
 
+#Define shader files
+file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.hlsl" "${CMAKE_CURRENT_SOURCE_DIR}/Samples/Graphics/Shaders/*.hlsl")
+message(STATUS "---- Found Shader Files ----")
+foreach(FILE ${SHADER_SOURCES})
+    message(STATUS "  ${FILE}")
+endforeach()
+message(STATUS "--------------------------------")
+
+#Compile all shaders
+set(ALL_SHADER_OUTPUTS "")
+foreach(SHADER_SRC ${SHADER_SOURCES})
+    set(CURRENT_SHADER_OUTPUTS "")
+    if(SHADER_SRC MATCHES ".*_vs\\.hlsl$")
+        CompileShader(${SHADER_SRC} "vs_6_6" "VSMain" CURRENT_SHADER_OUTPUTS)
+    elseif(SHADER_SRC MATCHES ".*_fs\\.hlsl$")
+        CompileShader(${SHADER_SRC} "ps_6_6" "FSMain" CURRENT_SHADER_OUTPUTS)
+    elseif(SHADER_SRC MATCHES ".*_cs\\.hlsl$")
+        CompileShader(${SHADER_SRC} "cs_6_6" "CSMain" CURRENT_SHADER_OUTPUTS)
+    endif()
+
+    list(APPEND ALL_SHADER_OUTPUTS ${CURRENT_SHADER_OUTPUTS})
+endforeach()
+
+#Create phony target that depends on all the compiled shaders
+add_custom_target(
+        Shaders
+        DEPENDS ${ALL_SHADER_OUTPUTS}
+)
+
+add_dependencies(Neki Shaders)
 
 
 
@@ -319,43 +351,11 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 
     #Copy all resource files to the output directory, maintaining subdirectory structure
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Samples/Resource-Files/" DESTINATION "${CMAKE_BINARY_DIR}/Samples/Resource-Files/")
-    
-
-    #Shader compilation
-
-    #Define shader files
-    file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/Shaders/*.hlsl" "${CMAKE_SOURCE_DIR}/Samples/Graphics/Shaders/*.hlsl")
-    message(STATUS "---- Found Shader Files ----")
-    foreach(FILE ${SHADER_SOURCES})
-        message(STATUS "  ${FILE}")
-    endforeach()
-    message(STATUS "--------------------------------")
-
-    #Compile all shaders
-    set(ALL_SHADER_OUTPUTS "")
-    foreach(SHADER_SRC ${SHADER_SOURCES})
-        set(CURRENT_SHADER_OUTPUTS "")
-        if(SHADER_SRC MATCHES ".*_vs\\.hlsl$")
-            CompileShader(${SHADER_SRC} "vs_6_6" "VSMain" CURRENT_SHADER_OUTPUTS)
-        elseif(SHADER_SRC MATCHES ".*_fs\\.hlsl$")
-            CompileShader(${SHADER_SRC} "ps_6_6" "FSMain" CURRENT_SHADER_OUTPUTS)
-        elseif(SHADER_SRC MATCHES ".*_cs\\.hlsl$")
-            CompileShader(${SHADER_SRC} "cs_6_6" "CSMain" CURRENT_SHADER_OUTPUTS)
-        endif()
-
-        list(APPEND ALL_SHADER_OUTPUTS ${CURRENT_SHADER_OUTPUTS})
-    endforeach()
-
-    #Create phony target that depends on all the compiled shaders
-    add_custom_target(
-            Shaders
-            DEPENDS ${ALL_SHADER_OUTPUTS}
-    )
 
 
 
     #Create executables
-    
+
     #Graphics
     if(NEKI_BUILD_VULKAN)
         add_executable(NKVulkanSample_Library "Samples/Graphics/Vulkan/Library/Library.cpp")
@@ -434,9 +434,9 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
         target_link_libraries(NKD3D12Sample_Model PRIVATE Neki)
         add_dependencies(NKD3D12Sample_Model Shaders)
     endif()
-    
-    
-    
+
+
+
     #Engine
     add_executable(NKEngineSample_ECS "Samples/Engine/ECS/ECS.cpp")
     target_include_directories(NKEngineSample_ECS PUBLIC "${CMAKE_SOURCE_DIR}/src")
