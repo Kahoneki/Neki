@@ -1658,7 +1658,7 @@ namespace NK
 		{
 			SaveScene();
 		}
-		if (InputManager::GetKeyPressed(KEYBOARD::ALT) && InputManager::GetKeyPressed(KEYBOARD::F4) && !m_f4PressedLastFrame)
+ 		if (InputManager::GetKeyPressed(KEYBOARD::ALT) && InputManager::GetKeyPressed(KEYBOARD::F4) && !m_f4PressedLastFrame)
 		{
 			Exit();
 		}

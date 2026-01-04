@@ -22,7 +22,7 @@ namespace NK
 		
 
 	private:
-		glm::vec3 m_dimensions;
+		glm::vec3 m_dimensions{ 50.0f, 50.0f, 50.0f };
 	};
 	
 }

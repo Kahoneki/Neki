@@ -342,8 +342,8 @@ public:
 		
 		m_preAppLayers.push_back(m_windowLayer.get());
 		m_preAppLayers.push_back(m_inputLayer.get());
-		m_preAppLayers.push_back(m_renderLayer.get());
 		m_preAppLayers.push_back(m_playerCameraLayer.get());
+		m_preAppLayers.push_back(m_renderLayer.get());
 		
 
 		//Post-app layers
@@ -369,42 +369,26 @@ public:
 		const std::size_t oldActiveScene{ m_activeScene };
 		
 		m_scenes[m_activeScene]->Update();
-
-		glfwSetWindowShouldClose(m_window->GetGLFWWindow(), NK::InputManager::GetKeyPressed(NK::KEYBOARD::ESCAPE));
 		
 		#if NEKI_EDITOR
+			//todo: i have no idea why this has to be in here, but no matter where i seem to put it in the render layer, the camera's yaw and pitch end up uninitialised until the first time you press right click, so for now it lives here
 			const bool inGame{ NK::InputManager::GetMouseButtonPressed(NK::MOUSE_BUTTON::RIGHT) && !ImGui::GetIO().WantCaptureMouse };
 			NK::Context::SetEditorActive(!inGame);
 		
-			if (!NK::Context::GetPopupOpen() && !ImGui::GetIO().WantTextInput)
-			{
-				if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0)) { m_activeScene = 0; }
-				if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_1)) { m_activeScene = 1; }
-				if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_2)) { m_scenes[m_activeScene]->m_reg.Save("QuickSave.nkscene"); }
-				if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_3)) { m_scenes[m_activeScene]->m_reg.Load("QuickSave.nkscene"); }
-			}
-		
-			if (m_activeScene != oldActiveScene)
-			{
-				for (NK::ILayer* layer : m_preAppLayers)
-				{
-					layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
-				}
-				for (NK::ILayer* layer : m_postAppLayers)
-				{
-					layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
-				}
-			}
-		
-		
-			// if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0) && !m_editorActiveKeyPressedLastFrame)
-			// {
-			// 	NK::Context::SetEditorActive(!NK::Context::GetEditorActive());
-			// }
-			// m_editorActiveKeyPressedLastFrame = NK::InputManager::GetKeyPressed(NK::KEYBOARD::NUM_0);
-
 			m_window->SetCursorVisibility(NK::Context::GetEditorActive());
 		#endif
+		
+		if (m_activeScene != oldActiveScene)
+		{
+			for (NK::ILayer* layer : m_preAppLayers)
+			{
+				layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
+			}
+			for (NK::ILayer* layer : m_postAppLayers)
+			{
+				layer->SetRegistry(m_scenes[m_activeScene]->m_reg);
+			}
+		}
 		
 		m_shutdown = m_window->ShouldClose();
 	}

@@ -175,6 +175,12 @@ namespace NK
 				light->SetIntensity(intensity);
 			}
 
+			if (DirectionalLight* directionalLight{ dynamic_cast<DirectionalLight*>(light.get()) })
+			{
+				glm::vec3 dimensions{ directionalLight->GetDimensions() };
+				if (ImGui::DragFloat3("Orthographic Half-Extents", &dimensions.x, 0.01f, 0.0f, 1000.0f)) { directionalLight->SetDimensions(dimensions); }
+			}
+			
 			if (PointLight* pointLight{ dynamic_cast<PointLight*>(light.get()) })
 			{
 				//Attenuation
