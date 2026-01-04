@@ -926,4 +926,17 @@ namespace NK
 		CAMERA,
 		PLAYER_CAMERA,
 	};
+	
+	
+	enum class STREAMING_STATE
+	{
+		UNLOADED, //On disk
+		PENDING_LOAD, //On disk and is waiting to be loaded into RAM
+		LOADING, //Currently being loaded from disk into RAM
+		LOADED_RAM, //In RAM
+		UPLOADING, //Currently being uploaded from RAM into VRAM
+		READY, //In VRAM
+		PENDING_UNLOAD, //Reference count = 0, waiting for unload timer
+	};
+	
 }

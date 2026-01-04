@@ -77,10 +77,18 @@ namespace NK
 		PHYSICALLY_BASED,
 	};
 	
+	struct CPUTextureLoadData
+	{
+		std::string filepath;
+		bool srgb;
+		bool flipImage;
+	};
+	SERIALISE(CPUTextureLoadData, v.filepath, v.srgb, v.flipImage)
+	
 	struct CPUMaterial
 	{
 		LIGHTING_MODEL lightingModel;
-		std::array<ImageData*, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //Every texture for every texture type for this material (limited to 1 texture per texture type per material)
+		std::array<CPUTextureLoadData, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //Every texture for every texture type for this material (limited to 1 texture per texture type per material)
 
 		//There's a bit of translation going on here to communicate to the GPUUploader
 		//The bool flags in the material type will be populated by ModelLoader with the actual correct values that will end up going to the GPU
@@ -159,7 +167,7 @@ namespace NK
 		//Translate an Assimp mesh to an NK::Mesh
 		static CPUMesh ProcessMesh(aiMesh* _mesh, const aiScene* _scene, const std::string& _directory);
 
-		static ImageData* LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture);
+		static CPUTextureLoadData LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture);
 		static std::pair<std::string, bool> GetMaterialTextureDataForSerialisation(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory); //std::pair of filepath and srgb-flag
 		
 		

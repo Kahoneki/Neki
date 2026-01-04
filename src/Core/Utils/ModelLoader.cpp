@@ -1,7 +1,6 @@
 #include "ModelLoader.h"
 
 #include "FileUtils.h"
-#include "ImageLoader.h"
 #include "TextureCompressor.h"
 
 #include <filesystem>
@@ -45,47 +44,7 @@ namespace NK
 			throw std::invalid_argument("ModelLoader::UnloadModel() - _filepath not in cache");
 		}
 
-		const CPUModel& modelToRemove = m_filepathToModelDataCache.at(_filepath);
-
-		//Get all the textures used by the model 
-		std::vector<ImageData*> texturesToRemove;
-		for (const CPUMaterial& mat : modelToRemove.materials)
-		{
-			for (ImageData* img : mat.allTextures)
-			{
-				if (img) texturesToRemove.push_back(img);
-			}
-		}
-
 		m_filepathToModelDataCache.erase(_filepath);
-
-		//For each texture, check if any other remaining model is using it
-		for (ImageData* img : texturesToRemove)
-		{
-			bool isShared = false;
-			for (const auto& [path, otherModel] : m_filepathToModelDataCache)
-			{
-				for (const CPUMaterial& mat : otherModel.materials)
-				{
-					for (const ImageData* otherImg : mat.allTextures)
-					{
-						if (otherImg == img)
-						{
-							isShared = true;
-							goto checkDone; //forgive me bjarne stroustrup, im sorry, im so sorry, ill think of a better way later
-						}
-					}
-				}
-			}
-			checkDone:
-
-			//If no other model uses this texture, free it from the ImageLoader's cache
-			if (!isShared)
-			{
-				ImageLoader::FreeImage(img);
-				TextureCompressor::FreeImage(img);
-			}
-		}
 	}
 
 
@@ -219,8 +178,7 @@ namespace NK
 				const std::pair<std::string, bool> texLoadData{ serialisedModel.materials[matIndex].allTextures[texIndex] };
 				if (!texLoadData.first.empty())
 				{
-					model.materials[matIndex].allTextures[texIndex] = TextureCompressor::LoadImage(std::filesystem::path(_filepath).parent_path().string() + "/" + texLoadData.first, serialisedModel.header.flipTextures, texLoadData.second);
-					model.materials[matIndex].allTextures[texIndex]->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
+					model.materials[matIndex].allTextures[texIndex] = { texLoadData.first, texLoadData.second, serialisedModel.header.flipTextures };
 				}
 			}
 		}
@@ -347,14 +305,14 @@ namespace NK
 			load(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION);
 
 			//If NORMAL_CAMERA wasn't available, fall back to NORMAL
-			if ((nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)] == nullptr) && (nekiMaterialSerialised.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)].first.empty()))
+			if ((nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)].filepath.empty()) && (nekiMaterialSerialised.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)].first.empty()))
 			{
 				load(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMALS);
 			}
 
 
 			//Determine lighting model
-			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return (nekiMaterial.allTextures[std::to_underlying(_tex)] != nullptr) || (!nekiMaterialSerialised.allTextures[std::to_underlying(_tex)].first.empty()); } };
+			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return (nekiMaterial.allTextures[std::to_underlying(_tex)].filepath.empty()) || (!nekiMaterialSerialised.allTextures[std::to_underlying(_tex)].first.empty()); } };
 			const bool isPBR{	hasTex(MODEL_TEXTURE_TYPE::METALNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::ROUGHNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR)			||
@@ -542,7 +500,7 @@ namespace NK
 
 
 
-	ImageData* ModelLoader::LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture)
+	CPUTextureLoadData ModelLoader::LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture)
 	{
 		const aiTextureType assimpType{ static_cast<aiTextureType>(_assimpType) };
 		
@@ -570,9 +528,8 @@ namespace NK
 			}
 		};
 
-		ImageData* const imageData{ ImageLoader::LoadImage(filepath, _flipTexture, isColour()) };
-		imageData->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
-		return imageData;
+		const CPUTextureLoadData loadData{ filepath, isColour(), _flipTexture };
+		return loadData;
 	}
 
 
