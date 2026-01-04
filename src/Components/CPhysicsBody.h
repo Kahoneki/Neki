@@ -19,9 +19,9 @@ namespace NK
 		CPhysicsBody() = default;
 
 		CPhysicsBody(const CPhysicsBody& _other)
-			: initialObjectLayer(_other.initialObjectLayer),
-			  initialMotionType(_other.initialMotionType),
-			  initialMotionQuality(_other.initialMotionQuality),
+			: objectLayer(_other.objectLayer),
+			  motionType(_other.motionType),
+			  motionQuality(_other.motionQuality),
 			  initialTrigger(_other.initialTrigger),
 			  initialLinearVelocity(_other.initialLinearVelocity),
 			  initialAngularVelocity(_other.initialAngularVelocity),
@@ -41,9 +41,9 @@ namespace NK
 		{
 			if (this == &_other) return *this;
 
-			initialObjectLayer = _other.initialObjectLayer;
-			initialMotionType = _other.initialMotionType;
-			initialMotionQuality = _other.initialMotionQuality;
+			objectLayer = _other.objectLayer;
+			motionType = _other.motionType;
+			motionQuality = _other.motionQuality;
 			initialTrigger = _other.initialTrigger;
 			initialLinearVelocity = _other.initialLinearVelocity;
 			initialAngularVelocity = _other.initialAngularVelocity;
@@ -64,22 +64,22 @@ namespace NK
 		}
 		
 		CPhysicsBody(CPhysicsBody&& _other) noexcept
-	: initialObjectLayer(_other.initialObjectLayer),
-	  initialMotionType(_other.initialMotionType),
-	  initialMotionQuality(_other.initialMotionQuality),
-	  initialTrigger(_other.initialTrigger),
-	  initialLinearVelocity(_other.initialLinearVelocity),
-	  initialAngularVelocity(_other.initialAngularVelocity),
-	  bodyID(_other.bodyID),
-	  dirtyFlags(_other.dirtyFlags),
-	  mass(_other.mass),
-	  friction(_other.friction),
-	  restitution(_other.restitution),
-	  linearDamping(_other.linearDamping),
-	  angularDamping(_other.angularDamping),
-	  gravityFactor(_other.gravityFactor),
-	  scale(_other.scale),
-	  forceQueue(std::move(_other.forceQueue))
+			: initialTrigger(_other.initialTrigger),
+			  initialLinearVelocity(_other.initialLinearVelocity),
+			  initialAngularVelocity(_other.initialAngularVelocity),
+			  bodyID(_other.bodyID),
+			  dirtyFlags(_other.dirtyFlags),
+			  objectLayer(_other.objectLayer),
+			  motionType(_other.motionType),
+			  motionQuality(_other.motionQuality),
+			  mass(_other.mass),
+			  friction(_other.friction),
+			  restitution(_other.restitution),
+			  linearDamping(_other.linearDamping),
+			  angularDamping(_other.angularDamping),
+			  gravityFactor(_other.gravityFactor),
+			  scale(_other.scale),
+			  forceQueue(std::move(_other.forceQueue))
 		{
 			_other.bodyID = UINT32_MAX; 
 		}
@@ -88,9 +88,9 @@ namespace NK
 		{
 			if (this == &_other) return *this;
 
-			initialObjectLayer = _other.initialObjectLayer;
-			initialMotionType = _other.initialMotionType;
-			initialMotionQuality = _other.initialMotionQuality;
+			objectLayer = _other.objectLayer;
+			motionType = _other.motionType;
+			motionQuality = _other.motionQuality;
 			initialTrigger = _other.initialTrigger;
 			initialLinearVelocity = _other.initialLinearVelocity;
 			initialAngularVelocity = _other.initialAngularVelocity;
@@ -114,6 +114,9 @@ namespace NK
 		}
 		
 		
+		[[nodiscard]] inline PhysicsObjectLayer GetObjectLayer() const { return objectLayer; }
+		[[nodiscard]] inline MOTION_TYPE GetMotionType() const { return motionType; }
+		[[nodiscard]] inline MOTION_QUALITY GetMotionQuality() const { return motionQuality; }
 		[[nodiscard]] inline float GetMass() const { return mass; }
 		[[nodiscard]] inline float GetFriction() const { return friction; }
 		[[nodiscard]] inline float GetRestitution() const { return restitution; }
@@ -121,6 +124,9 @@ namespace NK
 		[[nodiscard]] inline float GetAngularDamping() const { return angularDamping; }
 		[[nodiscard]] inline float GetGravityFactor() const { return gravityFactor; }
 		
+		inline void SetObjectLayer(const PhysicsObjectLayer& _val) { objectLayer = _val; dirtyFlags |= PHYSICS_DIRTY_FLAGS::OBJECT_LAYER; }
+		inline void SetMotionType(const MOTION_TYPE _val) { motionType = _val; dirtyFlags |= PHYSICS_DIRTY_FLAGS::MOTION_TYPE; }
+		inline void SetMotionQuality(const MOTION_QUALITY _val) { motionQuality = _val; dirtyFlags |= PHYSICS_DIRTY_FLAGS::MOTION_QUALITY; }
 		inline void SetMass(const float _val) { mass = _val; dirtyFlags |= PHYSICS_DIRTY_FLAGS::MASS; }
 		inline void SetFriction(const float _val) { friction = _val; dirtyFlags |= PHYSICS_DIRTY_FLAGS::FRICTION; }
 		inline void SetRestitution(const float _val) { restitution = _val; dirtyFlags |= PHYSICS_DIRTY_FLAGS::RESTITUTION; }
@@ -134,13 +140,7 @@ namespace NK
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Physics Body"; }
 		
-		SERIALISE_MEMBER_FUNC(initialObjectLayer, initialMotionType, initialMotionQuality, initialTrigger, initialLinearVelocity, initialAngularVelocity, mass, friction, restitution, linearDamping, angularDamping, gravityFactor, scale);
-		
-		
-		PhysicsObjectLayer initialObjectLayer{ DefaultObjectLayer };
-
-		MOTION_TYPE initialMotionType{ MOTION_TYPE::DYNAMIC };
-		MOTION_QUALITY initialMotionQuality{ MOTION_QUALITY::DISCRETE };
+		SERIALISE_MEMBER_FUNC(motionQuality, initialTrigger, initialLinearVelocity, initialAngularVelocity, objectLayer, motionType, mass, friction, restitution, linearDamping, angularDamping, gravityFactor, scale);
 
 		bool initialTrigger{ false };
 
@@ -153,6 +153,40 @@ namespace NK
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
 		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
 		{
+			const std::vector<PhysicsObjectLayer>& objectLayers{ TypeRegistry::GetObjectLayers() };
+			const PhysicsObjectLayer currentLayer{ GetObjectLayer() };
+			const std::string currentLayerName{ currentLayer.GetName() };
+			if (ImGui::BeginCombo("Object Layer", currentLayerName.c_str()))
+			{
+				for (const PhysicsObjectLayer& layer : objectLayers)
+				{
+					const bool isSelected{ currentLayer.GetValue() == layer.GetValue() };
+					if (ImGui::Selectable(layer.GetName().c_str(), isSelected))
+					{
+						SetObjectLayer(layer);
+					}
+					if (isSelected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+			
+			const char* motionTypes[]{ "Static", "Kinematic", "Dynamic" };
+			int currentMotionType{ static_cast<int>(GetMotionType()) };
+			if (ImGui::Combo("Motion Type", &currentMotionType, motionTypes, IM_ARRAYSIZE(motionTypes)))
+			{
+				SetMotionType(static_cast<MOTION_TYPE>(currentMotionType));
+			}
+			
+			const char* motionQualities[]{ "Discrete", "Linear Cast" };
+			int currentMotionQuality{ static_cast<int>(GetMotionQuality()) };
+			if (ImGui::Combo("Motion Quality", &currentMotionQuality, motionQualities, IM_ARRAYSIZE(motionQualities)))
+			{
+				SetMotionQuality(static_cast<MOTION_QUALITY>(currentMotionQuality));
+			}
+			
 			float newMass{ GetMass() };
 			float newFriction{ GetFriction() };
 			float newRestitution{ GetRestitution() };
@@ -194,6 +228,11 @@ namespace NK
 		
 		std::uint32_t bodyID{ UINT32_MAX };
 		PHYSICS_DIRTY_FLAGS dirtyFlags{ PHYSICS_DIRTY_FLAGS::CLEAN };
+		
+		PhysicsObjectLayer objectLayer{ DefaultObjectLayer };
+
+		MOTION_TYPE motionType{ MOTION_TYPE::DYNAMIC };
+		MOTION_QUALITY motionQuality{ MOTION_QUALITY::DISCRETE };
 
 		float mass{ 0.0f };
 		float friction{ 0.2f };

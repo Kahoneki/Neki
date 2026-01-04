@@ -159,6 +159,7 @@ namespace NK
 	}
 
 
+	#pragma region INIT
 	void RenderLayer::InitBaseResources()
 	{
 		//Initialise device
@@ -294,6 +295,9 @@ namespace NK
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		io.ConfigFlags |= ImGuiConfigFlags_IsSRGB;
 		ImGui::StyleColorsDark();
+		ImGuiStyle& style{ ImGui::GetStyle() };
+		style.Alpha = 1.0f; //"Global alpha applies to everything in Dear ImGui"....
+		style.Colors[ImGuiCol_PopupBg].w = 1.0f; //....but clearly not
 		
 		if (m_desc.backend == GRAPHICS_BACKEND::VULKAN)
 		{
@@ -1054,7 +1058,7 @@ namespace NK
 			for (std::size_t i{ 0 }; i < m_cpuLightData.size(); ++i, ++lightIt)
 			{
 				auto [light, transform] = *lightIt;
-				if (light.lightType == LIGHT_TYPE::UNDEFINED || !light.light) { continue; }
+				if (light.GetLightType() == LIGHT_TYPE::UNDEFINED || !light.light) { continue; }
 				ITexture* shadowMap{ nullptr };
 				const LightShaderData& lightData{ m_cpuLightData[i] };
 				if (lightData.type == LIGHT_TYPE::POINT)
@@ -1489,7 +1493,7 @@ namespace NK
 		shadowMapDesc.format = (m_desc.backend == GRAPHICS_BACKEND::D3D12 ? DATA_FORMAT::R16_TYPELESS : DATA_FORMAT::D16_UNORM);
 		shadowMapDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		shadowMapDesc.sampleCount = SAMPLE_COUNT::BIT_1;
-		if (_light.lightType == LIGHT_TYPE::POINT)
+		if (_light.GetLightType() == LIGHT_TYPE::POINT)
 		{
 			shadowMapDesc.size = glm::ivec3(m_shadowMapBaseResolution * glm::ivec2(m_desc.enableSSAA ? m_desc.ssaaMultiplier : 1), 6);
 			shadowMapDesc.arrayTexture = true;
@@ -1509,7 +1513,7 @@ namespace NK
 		TextureViewDesc shadowMapViewDesc{};
 		shadowMapViewDesc.format = DATA_FORMAT::D16_UNORM;
 		shadowMapViewDesc.type = TEXTURE_VIEW_TYPE::DEPTH;
-		if (_light.lightType == LIGHT_TYPE::POINT)
+		if (_light.GetLightType() == LIGHT_TYPE::POINT)
 		{
 			shadowMapViewDesc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2D_ARRAY;
 			
@@ -1539,9 +1543,11 @@ namespace NK
 			m_shadowMap2DSRVs.push_back(m_device->CreateShaderResourceTextureView(m_shadowMaps2D[m_shadowMaps2D.size() - 1].get(), shadowMapViewDesc));
 		}
 	}
+	#pragma endregion INIT
 
 
 
+	#pragma region UPDATE
 	void RenderLayer::PreAppUpdate()
 	{
 		#ifdef NEKI_VULKAN_SUPPORTED
@@ -1584,11 +1590,85 @@ namespace NK
 	
 	
 	
+	#pragma region EDITOR
 	void RenderLayer::UpdateImGui(const CCamera& _camera)
 	{
 		Context::SetPopupOpen(false);
 		
-		if (ImGui::Begin("Hierarchy"))
+		
+		if (ImGui::BeginMainMenuBar())
+		{
+			if (ImGui::BeginMenu("File"))
+			{
+				if (ImGui::MenuItem("New Scene"))
+				{
+					//todo: check for scene diff and prompt for save
+					m_reg.get().Clear();
+				}
+				
+				if (ImGui::MenuItem("Open Scene", "Ctrl+O"))
+				{
+					//todo: check for scene diff and prompt for save
+					const std::vector<std::string> selection{ pfd::open_file("Open Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
+					if (!selection.empty())
+					{
+						//todo: input validation
+						m_reg.get().Load(selection[0]);
+					}
+				}
+				
+				if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
+				{
+					std::string filepath{ m_reg.get().GetFilepath() };
+					if (filepath.empty())
+					{
+						//Mimic "Save As" logic
+						const std::string dest{ pfd::save_file("Save Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
+						if (!dest.empty())
+						{
+							m_reg.get().Save(dest);
+						}
+					}
+					else
+					{
+						m_reg.get().Save(m_reg.get().GetFilepath());
+					}
+				}
+				
+				if (ImGui::MenuItem("Save Scene As"))
+				{
+					const std::string dest{ pfd::save_file("Save Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
+					if (!dest.empty())
+					{
+						m_reg.get().Save(dest);
+					}
+				}
+				
+				if (ImGui::MenuItem("Exit", "Alt+F4"))
+				{
+					m_desc.window->SetCursorVisibility(true);
+					glfwSetWindowShouldClose(m_desc.window->GetGLFWWindow(), true);
+				}
+				
+				ImGui::EndMenu();
+			}
+			
+			
+			if (ImGui::BeginMenu("View"))
+			{
+				ImGui::MenuItem("Editor", "Ctrl+E", &m_showEditor);
+				ImGui::MenuItem("Hierarchy", nullptr, &m_showHierarchy, m_showEditor);
+				ImGui::MenuItem("Inspector", nullptr, &m_showInspector, m_showEditor);
+				ImGui::MenuItem("Gizmo Settings", nullptr, &m_showGizmoSettings, m_showEditor);
+				ImGui::MenuItem("Editor Settings", nullptr, &m_showEditorSettings, m_showEditor);
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndMainMenuBar();
+		}
+		
+		
+		if (m_showEditor && m_showHierarchy && ImGui::Begin("Hierarchy"))
 		{
 			ImGui::SameLine();
 			if (ImGui::Button("Create New Entity"))
@@ -1647,7 +1727,7 @@ namespace NK
 			}
 			
 		}
-		ImGui::End();
+		if (m_showEditor && m_showHierarchy) { ImGui::End(); }
 		
 		if (m_entityPendingDeletion != UINT32_MAX)
 		{
@@ -1656,7 +1736,7 @@ namespace NK
 		}
 		
 		
-		if (ImGui::Begin("Inspector"))
+		if (m_showEditor && m_showInspector && ImGui::Begin("Inspector"))
 		{
 			for (auto&& [selected] : m_reg.get().View<CSelected>())
 			{
@@ -1785,10 +1865,10 @@ namespace NK
 				ImGui::PopID();
 			}
 		}
-		ImGui::End();
+		if (m_showEditor && m_showInspector) { ImGui::End(); }
 		
 		
-		if (ImGui::Begin("Gizmo Settings"))
+		if (m_showEditor && m_showGizmoSettings && ImGui::Begin("Gizmo Settings"))
 		{
 			bool inputBlocked{ Context::GetPopupOpen() || ImGui::GetIO().WantTextInput };
 			
@@ -1844,10 +1924,10 @@ namespace NK
 				m_currentGizmoMode = ImGuizmo::WORLD;
 			}
 		}
-		ImGui::End();
+		if (m_showEditor && m_showGizmoSettings) { ImGui::End(); }
 		
 		
-		if (ImGui::Begin("Editor Settings"))
+		if (m_showEditor && m_showEditorSettings && ImGui::Begin("Editor Settings"))
 		{
 			bool paused{ Context::GetPaused() };
 			int fixedUpdatesPerSecond{ static_cast<int>(std::round(1.0f / Context::GetFixedUpdateTimestep())) };
@@ -1855,7 +1935,7 @@ namespace NK
 			ImGui::SameLine();
 			if (ImGui::DragInt("Fixed Updates Per Second", &fixedUpdatesPerSecond, 1, 1)) { Context::SetFixedUpdateTimestep(1.0f / std::max(1, fixedUpdatesPerSecond)); }
 		}
-		ImGui::End();
+		if (m_showEditor && m_showEditorSettings) { ImGui::End(); }
 		
 		
 		// if (ImGui::Begin("Asset Browser"))_path
@@ -1946,6 +2026,7 @@ namespace NK
 		ImGui::Unindent();
 	}
 
+	
 
 	void RenderLayer::DrawImGuiHierarchyNode(CTransform& _transform)
 	{
@@ -2062,7 +2143,9 @@ namespace NK
 		
 		ImGui::PopID();
 	}
+	#pragma endregion EDITOR
 
+	
 
 	void RenderLayer::PostAppUpdate()
 	{
@@ -2386,7 +2469,7 @@ namespace NK
 		if (_skybox.irradianceFilepathDirty) { m_irradianceDirtyCounter = m_desc.framesInFlight; _skybox.irradianceFilepathDirty = false; }
 		if (_skybox.prefilterFilepathDirty) { m_prefilterDirtyCounter = m_desc.framesInFlight; _skybox.prefilterFilepathDirty = false; }
 		
-		if (m_skyboxDirtyCounter != 0)
+		if (m_skyboxDirtyCounter != 0 && !_skybox.GetSkyboxFilepath().empty())
 		{
 			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetSkyboxFilepath(), false, true) };
 			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
@@ -2398,7 +2481,7 @@ namespace NK
 		}
 
 		
-		if (m_irradianceDirtyCounter != 0)
+		if (m_irradianceDirtyCounter != 0 && !_skybox.GetIrradianceFilepath().empty())
 		{
 			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetIrradianceFilepath(), false, true) };
 			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
@@ -2410,7 +2493,7 @@ namespace NK
 		}
 
 		
-		if (m_prefilterDirtyCounter != 0)
+		if (m_prefilterDirtyCounter != 0 && !_skybox.GetPrefilterFilepath().empty())
 		{
 			ImageData* data{ TextureCompressor::LoadImage(_skybox.GetSkyboxFilepath(), false, true) };
 			data->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
@@ -2461,7 +2544,7 @@ namespace NK
 		
 		for (auto&& [transform, light] : m_reg.get().View<CTransform, CLight>())
 		{
-			if (light.lightType == LIGHT_TYPE::UNDEFINED || !light.light) { continue; }
+			if (light.GetLightType() == LIGHT_TYPE::UNDEFINED || !light.light) { continue; }
 			
 			//Buffer is dirty if either transform.lightBufferDirty or light.light->dirty
 			if (transform.lightBufferDirty || light.light->GetDirty())
@@ -2472,7 +2555,7 @@ namespace NK
 			if (light.light->GetShadowMapDirty())
 			{
 				InitShadowMapForLight(light);
-				if (light.lightType == LIGHT_TYPE::POINT)
+				if (light.GetLightType() == LIGHT_TYPE::POINT)
 				{
 					const std::size_t vecIdx = m_shadowMapsCube.size() - 1;
 					light.light->SetShadowMapVectorIndex(vecIdx);
@@ -2490,7 +2573,7 @@ namespace NK
 			shaderData.colour = light.light->GetColour();
 			shaderData.intensity = light.light->GetIntensity();
 			shaderData.position = transform.GetWorldPosition();
-			shaderData.type = light.lightType;
+			shaderData.type = light.GetLightType();
 			shaderData.shadowMapIndex = light.light->GetShadowMapIndex();
 
 			//Calculate direction and view matrix from rotation
@@ -2500,11 +2583,11 @@ namespace NK
 			const glm::vec3 up{ glm::normalize(orientation * glm::vec3(0, 1, 0)) };
 			const glm::mat4 viewMat{ glm::lookAtLH(transform.GetWorldPosition(), transform.GetWorldPosition() + forward, up) };
 			
-			switch (light.lightType)
+			switch (light.GetLightType())
 			{
 			case LIGHT_TYPE::UNDEFINED:
 			{
-				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "UpdateLightDataBuffer() - light.lightType = LIGHT_TYPE::UNDEFINED\n");
+				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "UpdateLightDataBuffer() - light.GetLightType() = LIGHT_TYPE::UNDEFINED\n");
 				throw std::runtime_error("");
 				break;
 			}
@@ -2604,9 +2687,9 @@ namespace NK
 		
 		memcpy(m_modelMatricesBufferMaps[m_currentFrame], shaderData.data(), shaderData.size() * sizeof(ModelMatrixShaderData));
 	}
-
-
-
+	
+	
+	
 	glm::mat4 RenderLayer::GetPointLightViewMatrix(const glm::vec3& _lightPos, const std::size_t _faceIndex)
 	{
 		//Standard cubemap face order: +X, -X, +Y, -Y, +Z, -Z
@@ -2621,9 +2704,11 @@ namespace NK
 		default:	{ throw std::invalid_argument("RenderLayer::GetPointLightViewMatrix() - _faceIndex (" + std::to_string(_faceIndex) + ")" + " is not in the allowed range of 0 to 5"); }
 		}
 	}
-
+	#pragma endregion UPDATE
 	
 	
+	
+	#pragma region EVENTS
 	void RenderLayer::OnEntityDestroy(const EntityDestroyEvent& _event)
 	{
 		if (_event.reg->HasComponent<CModelRenderer>(_event.entity))	{ OnComponentRemove({ _event.reg, _event.entity, typeid(CModelRenderer) }); }
@@ -2664,23 +2749,23 @@ namespace NK
 		else if (_event.componentIndex == typeid(CLight))
 		{
 			const CLight& light{ _event.reg->GetComponent<CLight>(_event.entity) };
-			if (light.lightType == LIGHT_TYPE::UNDEFINED || !light.light) { return; }
+			if (light.GetLightType() == LIGHT_TYPE::UNDEFINED || !light.light) { return; }
 			
 			if (light.light && !light.light->GetShadowMapDirty())
 			{
 				const std::uint64_t safeFrame{ m_globalFrame + m_desc.framesInFlight + 1 };
 				DeferredTextureDeletions& deletionBucket{ m_textureDeletionQueue[safeFrame] };
 				const std::size_t vecIdx{ light.light->GetShadowMapVectorIndex() };
-				std::vector<UniquePtr<ITexture>>& targetVec{ (light.lightType == LIGHT_TYPE::POINT ? m_shadowMapsCube : m_shadowMaps2D) };
+				std::vector<UniquePtr<ITexture>>& targetVec{ (light.GetLightType() == LIGHT_TYPE::POINT ? m_shadowMapsCube : m_shadowMaps2D) };
 				deletionBucket.textures.push_back(std::move(targetVec[vecIdx]));
 				targetVec[vecIdx] = std::move(targetVec.back());
 				targetVec.pop_back();
-				const bool light2D{ (light.lightType == LIGHT_TYPE::DIRECTIONAL || light.lightType == LIGHT_TYPE::SPOT) };
+				const bool light2D{ (light.GetLightType() == LIGHT_TYPE::DIRECTIONAL || light.GetLightType() == LIGHT_TYPE::SPOT) };
 				for (auto&& [otherLight] : m_reg.get().View<CLight>())
 				{
-					if (otherLight.lightType == LIGHT_TYPE::UNDEFINED || otherLight.light == nullptr) { continue; }
+					if (otherLight.GetLightType() == LIGHT_TYPE::UNDEFINED || otherLight.light == nullptr) { continue; }
 					if (light.light == otherLight.light) { continue; }
-					const bool otherLight2D{ (otherLight.lightType == LIGHT_TYPE::DIRECTIONAL || otherLight.lightType == LIGHT_TYPE::SPOT) };
+					const bool otherLight2D{ (otherLight.GetLightType() == LIGHT_TYPE::DIRECTIONAL || otherLight.GetLightType() == LIGHT_TYPE::SPOT) };
 					if ((light2D == otherLight2D) && (otherLight.light->GetShadowMapVectorIndex() == targetVec.size()))
 					{
 						otherLight.light->SetShadowMapVectorIndex(vecIdx);
@@ -2688,7 +2773,7 @@ namespace NK
 					}
 				}
 				
-				if (light.lightType == LIGHT_TYPE::POINT)
+				if (light.GetLightType() == LIGHT_TYPE::POINT)
 				{
 					deletionBucket.views.push_back(std::move(m_shadowMapCubeSRVs[vecIdx]));
 					m_shadowMapCubeSRVs[vecIdx] = std::move(m_shadowMapCubeSRVs.back());
@@ -2754,5 +2839,6 @@ namespace NK
 		m_activeCamera = nullptr;
 		m_firstFrame = true;
 	}
+	#pragma endregion EVENTS
 	
 }

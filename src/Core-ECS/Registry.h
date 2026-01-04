@@ -61,6 +61,9 @@ namespace NK
 		
 		//Load registry from _filepath
 		void Load(const std::string& _filepath);
+	
+		//Clear the registry (after calling, entity count will be 0)
+		void Clear();
 
 
 		//Add a new entity to the registry
@@ -127,6 +130,8 @@ namespace NK
 			{
 				throw std::invalid_argument("Registry::AddComponent() - provided _entity (" + std::to_string(_entity) + ") already has the provided Component.");
 			}
+			
+			EventManager::Trigger(ComponentAddEvent(this, _entity, std::type_index(typeid(Component))));
 			
 			//Add new component to pool
 			ComponentPool<Component>* pool{ GetPool<Component>() };
@@ -326,6 +331,7 @@ namespace NK
 		[[nodiscard]] inline IComponentPool* GetPool(const std::type_index _index) const { return m_componentPools.at(_index).get(); }
 		[[nodiscard]] inline bool EntityInRegistry(const Entity _entity) const { return m_entityComponents.contains(_entity); }
 		[[nodiscard]] inline const std::unordered_map<std::type_index, UniquePtr<IComponentPool>>& GetPools() { return m_componentPools; }
+		[[nodiscard]] inline std::string GetFilepath() { return m_filepath; }
 		
 		
 	private:
@@ -360,6 +366,9 @@ namespace NK
 
 		//Map from entity to all component ids the entity has
 		std::unordered_map<Entity, std::vector<std::type_index>> m_entityComponents;
+		
+		//If registry has been loaded from a filepath (or has been saved to a filepath), this stores that filepath relative to NEKI_SOURCE_DIR
+		std::string m_filepath{};
 	};
 
 }

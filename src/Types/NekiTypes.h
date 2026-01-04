@@ -860,11 +860,14 @@ namespace NK
 	enum class PHYSICS_DIRTY_FLAGS : std::uint32_t
 	{
 		CLEAN = 0,
-		FRICTION = 1 << 0,
-		RESTITUTION = 1 << 1,
-		DAMPING = 1 << 2,
-		GRAVITY = 1 << 3,
-		MASS = 1 << 4,
+		OBJECT_LAYER = 1 << 0,
+		MOTION_TYPE = 1 << 1,
+		MOTION_QUALITY = 1 << 2,
+		MASS = 1 << 3,
+		FRICTION = 1 << 4,
+		RESTITUTION = 1 << 5,
+		DAMPING = 1 << 6,
+		GRAVITY = 1 << 7,
 	};
 	ENABLE_BITMASK_OPERATORS(PHYSICS_DIRTY_FLAGS)
 	
@@ -897,6 +900,14 @@ namespace NK
 		std::type_index componentIndex;
 	};
 	
+	//Triggered directly prior to a component being added to an entity
+	struct ComponentAddEvent
+	{
+		Registry* reg;
+		Entity entity;
+		std::type_index componentIndex;
+	};
+	
 	//Triggered directly prior to a scene being loaded after all entities have been destroyed
 	struct SceneLoadEvent
 	{
@@ -907,5 +918,12 @@ namespace NK
 	static const PhysicsBroadPhaseLayer KinematicBroadPhaseLayer{ 1 };
 	static const PhysicsBroadPhaseLayer StaticBroadPhaseLayer{ 2 };
 	
-	static const PhysicsObjectLayer DefaultObjectLayer{ UINT16_MAX - 1, StaticBroadPhaseLayer }; //jolt uses UINT16_MAX internally for invalid layer, so subtract 1
+	static const PhysicsObjectLayer DefaultObjectLayer{ "Default", UINT16_MAX - 1, DynamicBroadPhaseLayer }; //jolt uses UINT16_MAX internally for invalid layer, so subtract 1
+	
+	
+	enum class CAMERA_TYPE
+	{
+		CAMERA,
+		PLAYER_CAMERA,
+	};
 }

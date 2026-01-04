@@ -30,6 +30,11 @@ namespace NK
 	private:
 		void OnEntityDestroy(const EntityDestroyEvent& _event);
 		void OnComponentRemove(const ComponentRemoveEvent& _event);
+		void OnComponentAdd(const ComponentAddEvent& _event);
+		
+		static JPH::EMotionType GetJPHMotionType(const MOTION_TYPE _type);
+		static JPH::EMotionQuality GetJPHMotionQuality(const MOTION_QUALITY _quality);
+		
 		
 		JPH::PhysicsSystem m_physicsSystem;
 		JPH::TempAllocatorImpl* m_tempAllocator;
@@ -41,6 +46,7 @@ namespace NK
 		
 		EventSubscriptionID m_entityDestroyEventSubscriptionID;
 		EventSubscriptionID m_componentRemoveEventSubscriptionID;
+		EventSubscriptionID m_componentAddEventSubscriptionID;
 	};
 
 }

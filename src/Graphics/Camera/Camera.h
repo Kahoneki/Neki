@@ -25,6 +25,13 @@ namespace NK
 		//A yaw of 0 is equivalent to looking at the +X axis, increasing yaw will rotate the camera around the Y axis in an anti-clockwise direction measured in degrees
 		//E.g.: setting the yaw to +90 will have the camera look along +Z, +-180 will be -X, and -90 will be -Z
 		explicit Camera(glm::vec3 _pos, float _yaw, float _pitch, float _nearPlaneDist, float _farPlaneDist, float _fov, float _aspectRatio);
+		Camera() : m_yaw(0), m_pitch(0), m_nearPlaneDist(0), m_farPlaneDist(0), m_fov(0), m_aspectRatio(0), m_frustum()
+		{
+			m_viewMatDirty = true;
+			m_orthographicProjMatDirty = true;
+			m_perspectiveProjMatDirty = true;
+		}
+
 		virtual ~Camera() = default;
 		
 		//Matrices are cached and only updated when necessary - virtually no overhead in calling this function
@@ -64,8 +71,6 @@ namespace NK
 		
 
 	protected:
-		Camera() { m_viewMatDirty = true; m_orthographicProjMatDirty = true; m_perspectiveProjMatDirty = true; }
-		
 		//Will update matrices if they're dirty
 		[[nodiscard]] glm::mat4 GetViewMatrix();
 		[[nodiscard]] glm::mat4 GetProjectionMatrix(const PROJECTION_METHOD _method);

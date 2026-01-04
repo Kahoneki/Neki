@@ -378,6 +378,12 @@ namespace NK
 		ImGuizmo::MODE m_currentGizmoMode{ ImGuizmo::WORLD };
 		CCamera* m_activeCamera{ nullptr };
 		Entity m_copiedEntity{ UINT32_MAX };
+		
+		bool m_showEditor{ true }; //catch-all for below
+		bool m_showHierarchy{ true };
+		bool m_showInspector{ true };
+		bool m_showGizmoSettings{ true };
+		bool m_showEditorSettings{ true };
 	};
 
 }

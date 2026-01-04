@@ -83,6 +83,7 @@ namespace NK
 		[[nodiscard]] static bool GetMouseButtonReleased(const MOUSE_BUTTON _button);
 		[[nodiscard]] static glm::vec2 GetMouseDiff();
 		[[nodiscard]] static glm::vec2 GetMousePosition();
+		static INPUT_BINDING_TYPE GetActionInputType(const ActionTypeMapKey& _key);
 		
 
 	private:
@@ -95,7 +96,6 @@ namespace NK
 		
 		
 		//Used by InputLayer
-		static INPUT_BINDING_TYPE GetActionInputType(const ActionTypeMapKey& _key);
 		[[nodiscard]] static ButtonState GetButtonState(const ActionTypeMapKey& _key);
 		[[nodiscard]] static Axis1DState GetAxis1DState(const ActionTypeMapKey& _key);
 		[[nodiscard]] static Axis2DState GetAxis2DState(const ActionTypeMapKey& _key);

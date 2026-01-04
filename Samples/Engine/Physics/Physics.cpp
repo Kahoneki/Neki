@@ -29,8 +29,8 @@
 
 
 
-static const NK::PhysicsObjectLayer helmetObjectLayer{ 0, NK::DynamicBroadPhaseLayer };
-static const NK::PhysicsObjectLayer floorObjectLayer{ 1, NK::KinematicBroadPhaseLayer };
+static const NK::PhysicsObjectLayer helmetObjectLayer{ "Helmet", 0, NK::DynamicBroadPhaseLayer };
+static const NK::PhysicsObjectLayer floorObjectLayer{ "Floor", 1, NK::KinematicBroadPhaseLayer };
 
 
 
@@ -59,8 +59,7 @@ public:
 		directionalLightTransform.SetLocalRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
 		directionalLightTransform.SetLocalPosition({ 0.0f, 10.0f, 5.0f });
 		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
-		directionalLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
-		directionalLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
+		directionalLight.SetLightType(NK::LIGHT_TYPE::DIRECTIONAL);
 		directionalLight.light->SetColour({ 1,0,0 });
 		directionalLight.light->SetIntensity(0.06f);
 		dynamic_cast<NK::DirectionalLight*>(directionalLight.light.get())->SetDimensions({ 50, 50, 50 });
@@ -70,8 +69,7 @@ public:
 		pointLightTransform.SetLocalPosition({ -2.399, 3.01, 2.95 });
 		pointLightTransform.name = "Point Light";
 		NK::CLight& pointLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity2) };
-		pointLight.lightType = NK::LIGHT_TYPE::POINT;
-		pointLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
+		pointLight.SetLightType(NK::LIGHT_TYPE::POINT);
 		pointLight.light->SetColour({ 0.9f, 0.3f, 0.3f });
 		pointLight.light->SetIntensity(1.1f);
 		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetConstantAttenuation(0.74f);
@@ -84,8 +82,7 @@ public:
 		spotLightTransform.SetLocalPosition({ 5.231f, 8.95f, 2.255f });
 		spotLightTransform.SetLocalRotation({ glm::radians(-108.061f), glm::radians(42.646f), glm::radians(162.954f) });
 		NK::CLight& spotLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity3) };
-		spotLight.lightType = NK::LIGHT_TYPE::SPOT;
-		spotLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::SpotLight));
+		spotLight.SetLightType(NK::LIGHT_TYPE::SPOT);
 		spotLight.light->SetColour({ 0,1,0 });
 		spotLight.light->SetIntensity(2.6f);
 		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetConstantAttenuation(0.88f);
@@ -102,8 +99,8 @@ public:
 		floorTransform.SetLocalPosition({ 0, 0.0f, 0.0f });
 		floorTransform.SetLocalScale({ 5.0f, 0.2f, 5.0f });
 		NK::CPhysicsBody& floorPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_floorEntity) };
-		floorPhysicsBody.initialMotionType = NK::MOTION_TYPE::KINEMATIC;
-		floorPhysicsBody.initialObjectLayer = floorObjectLayer;
+		floorPhysicsBody.SetMotionType(NK::MOTION_TYPE::KINEMATIC);
+		floorPhysicsBody.SetObjectLayer(floorObjectLayer);
 		NK::CBoxCollider& floorCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_floorEntity) };
 		floorCollider.SetHalfExtents({ 1.0f, 1.0f, 1.0f });
 		
@@ -183,8 +180,7 @@ public:
 		directionalLightTransform.SetLocalRotation({ glm::radians(95.2f), glm::radians(54.3f), glm::radians(-24.6f) });
 		directionalLightTransform.SetLocalPosition({ 0.0f, 10.0f, 5.0f });
 		NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
-		directionalLight.lightType = NK::LIGHT_TYPE::DIRECTIONAL;
-		directionalLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::DirectionalLight));
+		directionalLight.SetLightType(NK::LIGHT_TYPE::DIRECTIONAL);
 		directionalLight.light->SetColour({ 1,0,0 });
 		directionalLight.light->SetIntensity(0.06f);
 		dynamic_cast<NK::DirectionalLight*>(directionalLight.light.get())->SetDimensions({ 50, 50, 50 });
@@ -194,8 +190,7 @@ public:
 		pointLightTransform.SetLocalPosition({ -2.399, 3.01, 2.95 });
 		pointLightTransform.name = "Point Light";
 		NK::CLight& pointLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity2) };
-		pointLight.lightType = NK::LIGHT_TYPE::POINT;
-		pointLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::PointLight));
+		pointLight.SetLightType(NK::LIGHT_TYPE::POINT);
 		pointLight.light->SetColour({ 0.9f, 0.3f, 0.3f });
 		pointLight.light->SetIntensity(1.1f);
 		dynamic_cast<NK::PointLight*>(pointLight.light.get())->SetConstantAttenuation(0.74f);
@@ -208,8 +203,7 @@ public:
 		spotLightTransform.SetLocalPosition({ 5.231f, 8.95f, 2.255f });
 		spotLightTransform.SetLocalRotation({ glm::radians(-108.061f), glm::radians(42.646f), glm::radians(162.954f) });
 		NK::CLight& spotLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity3) };
-		spotLight.lightType = NK::LIGHT_TYPE::SPOT;
-		spotLight.light = NK::UniquePtr<NK::Light>(NK_NEW(NK::SpotLight));
+		spotLight.SetLightType(NK::LIGHT_TYPE::SPOT);
 		spotLight.light->SetColour({ 0,1,0 });
 		spotLight.light->SetIntensity(2.6f);
 		dynamic_cast<NK::SpotLight*>(spotLight.light.get())->SetConstantAttenuation(0.88f);
@@ -226,8 +220,8 @@ public:
 		floorTransform.SetLocalPosition({ 0, 0.0f, 0.0f });
 		floorTransform.SetLocalScale({ 5.0f, 0.2f, 5.0f });
 		NK::CPhysicsBody& floorPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_floorEntity) };
-		floorPhysicsBody.initialMotionType = NK::MOTION_TYPE::KINEMATIC;
-		floorPhysicsBody.initialObjectLayer = floorObjectLayer;
+		floorPhysicsBody.SetMotionType(NK::MOTION_TYPE::KINEMATIC);
+		floorPhysicsBody.SetObjectLayer(floorObjectLayer);
 		NK::CBoxCollider& floorCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_floorEntity) };
 		floorCollider.SetHalfExtents({ 1.0f, 1.0f, 1.0f });
 		
@@ -241,8 +235,8 @@ public:
 		helmetTransform.SetLocalRotation({ glm::radians(70.0f), glm::radians(-30.0f), glm::radians(180.0f) });
 		NK::CPhysicsBody& helmetPhysicsBody{ m_reg.AddComponent<NK::CPhysicsBody>(m_helmetEntity) };
 		helmetPhysicsBody.SetMass(1.0f);
-		helmetPhysicsBody.initialMotionType = NK::MOTION_TYPE::DYNAMIC;
-		helmetPhysicsBody.initialObjectLayer = helmetObjectLayer;
+		helmetPhysicsBody.SetMotionType(NK::MOTION_TYPE::DYNAMIC);
+		helmetPhysicsBody.SetObjectLayer(helmetObjectLayer);
 		NK::CBoxCollider& helmetCollider{ m_reg.AddComponent<NK::CBoxCollider>(m_helmetEntity) };
 		helmetCollider.SetHalfExtents({ 0.944977, 1.000000, 0.900984 });
 		
@@ -304,7 +298,8 @@ public:
 	explicit GameApp() : Application(1)
 	{
 		//Register types
-		NK::TypeRegistry::Register<NK::PLAYER_CAMERA_ACTIONS>("PLAYER_CAMERA_ACTIONS");
+		NK::TypeRegistry::Register(helmetObjectLayer);
+		NK::TypeRegistry::Register(floorObjectLayer);
 
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene)));
 		m_scenes.push_back(NK::UniquePtr<NK::Scene>(NK_NEW(GameScene2)));
@@ -314,7 +309,7 @@ public:
 		//Window
 		NK::WindowDesc windowDesc;
 		windowDesc.name = "Rendering Sample";
-		windowDesc.size = { 1920, 1080 };
+		windowDesc.size = { 3840, 2160 };
 		m_window = NK::UniquePtr<NK::Window>(NK_NEW(NK::Window, windowDesc));
 		m_window->SetCursorVisibility(false);
 
@@ -325,10 +320,10 @@ public:
 		m_inputLayer = NK::UniquePtr<NK::InputLayer>(NK_NEW(NK::InputLayer, m_scenes[m_activeScene]->m_reg, inputLayerDesc));
 		
 		NK::RenderLayerDesc renderLayerDesc{};
-		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::D3D12;
+		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 		renderLayerDesc.enableMSAA = false;
 		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
-		renderLayerDesc.enableSSAA = false;
+		renderLayerDesc.enableSSAA = true;
 		renderLayerDesc.ssaaMultiplier = 4;
 		renderLayerDesc.window = m_window.get();
 		renderLayerDesc.framesInFlight = 3;

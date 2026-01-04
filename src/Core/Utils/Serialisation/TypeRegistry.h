@@ -31,7 +31,6 @@ namespace NK
 			m_poolFactories[hashVal] = []{ return UniquePtr<IComponentPool>(NK_NEW(ComponentPool<T>)); };
 		}
 
-
 		[[nodiscard]] inline static std::uint32_t GetConstant(const std::type_index _typeIndex) { return m_typeIndexToRegistryValue.at(_typeIndex); }
 		[[nodiscard]] inline static std::type_index GetTypeIndex(const std::uint32_t _constant) { return m_registryValueToTypeIndex.at(_constant); }
 		
@@ -40,6 +39,21 @@ namespace NK
 			if (!m_poolFactories.contains(_hash)) { throw std::invalid_argument("TypeRegistry::CreatePoolFromHash() - Unknown component hash. Did you forget to TypeRegistry::Register() it?"); }
 			return m_poolFactories[_hash]();
 		}
+		
+		
+		inline static void Register(const PhysicsObjectLayer& _layer)
+		{
+			m_physicsObjectLayers.push_back(_layer);
+		}
+		[[nodiscard]] inline static std::vector<PhysicsObjectLayer>& GetObjectLayers() { return m_physicsObjectLayers; }
+		
+		
+		template<typename ActionType>
+		inline static void RegisterInputAction(const std::string& _name, ActionType _action)
+		{
+			m_inputActions.insert_or_assign(_name, std::pair<std::type_index, std::uint32_t>(typeid(_action), static_cast<std::uint32_t>(std::to_underlying(_action))));
+		}
+		[[nodiscard]] inline static std::unordered_map<std::string, std::pair<std::type_index, std::uint32_t>>& GetInputActions() { return m_inputActions; }
 		
 		
 	private:
@@ -60,7 +74,9 @@ namespace NK
 		
 		inline static std::unordered_map<std::uint32_t, std::type_index> m_registryValueToTypeIndex{};
 		inline static std::unordered_map<std::type_index, std::uint32_t> m_typeIndexToRegistryValue{}; //Reverse mapping of m_registryValueToTypeIndex
-		static inline std::unordered_map<std::uint32_t, std::function<UniquePtr<IComponentPool>()>> m_poolFactories{};
+		inline static std::unordered_map<std::uint32_t, std::function<UniquePtr<IComponentPool>()>> m_poolFactories{};
+		inline static std::vector<PhysicsObjectLayer> m_physicsObjectLayers;
+		inline static std::unordered_map<std::string, std::pair<std::type_index, std::uint32_t>> m_inputActions{};
 	};
 	
 }

@@ -16,7 +16,6 @@ namespace NK
 	{
 	public:
 		CLight() : lightType(LIGHT_TYPE::UNDEFINED), light(nullptr) {}
-
 		//Deep copy constructor
 		CLight(const CLight& _other) : lightType(_other.lightType)
 		{
@@ -43,7 +42,6 @@ namespace NK
 				light = nullptr;
 			}
 		}
-
 		//Deep copy assignment
 		CLight& operator=(const CLight& _other)
 		{
@@ -72,12 +70,10 @@ namespace NK
 			
 			return *this;
 		}
-
 		CLight(CLight&& _other) noexcept : lightType(_other.lightType), light(std::move(_other.light))
 		{
 			_other.lightType = LIGHT_TYPE::UNDEFINED;
 		}
-
 		CLight& operator=(CLight&& _other) noexcept
 		{
 			if (this == &_other) { return *this; }
@@ -86,15 +82,58 @@ namespace NK
 			_other.lightType = LIGHT_TYPE::UNDEFINED;
 			return *this;
 		}
-
 		~CLight() override = default;
 
+		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Light"; }
 		
-		SERIALISE_MEMBER_FUNC(lightType, light);
-
+		[[nodiscard]] inline LIGHT_TYPE GetLightType() const { return lightType; }
 		
-		LIGHT_TYPE lightType{ LIGHT_TYPE::UNDEFINED };
+		
+		inline void SetLightType(const LIGHT_TYPE _type)
+		{
+			//Need to recreate light
+					
+			//Preserve existing properties if existing
+			const glm::vec3 oldColour{ light ? light->GetColour() : glm::vec3(1.0f) };
+			const float oldIntensity{ light ? light->GetIntensity() : 1.0f };
+			const glm::vec3 oldAttenuation{ (lightType == LIGHT_TYPE::POINT || lightType == LIGHT_TYPE::SPOT) ? glm::vec3(dynamic_cast<PointLight*>(light.get())->GetConstantAttenuation(), dynamic_cast<PointLight*>(light.get())->GetLinearAttenuation(), dynamic_cast<PointLight*>(light.get())->GetQuadraticAttenuation()) : glm::vec3(0.0f) };
+
+			lightType = _type;
+
+			switch (lightType)
+			{
+			case LIGHT_TYPE::DIRECTIONAL:
+				light = UniquePtr<Light>(NK_NEW(DirectionalLight));
+				break;
+			case LIGHT_TYPE::POINT:
+				light = UniquePtr<Light>(NK_NEW(PointLight));
+				break;
+			case LIGHT_TYPE::SPOT:
+				light = UniquePtr<Light>(NK_NEW(SpotLight));
+				break;
+			default:
+				light = nullptr;
+				break;
+			}
+
+			if (light)
+			{
+				light->SetColour(oldColour);
+				light->SetIntensity(oldIntensity);
+				if (lightType == LIGHT_TYPE::POINT || lightType == LIGHT_TYPE::SPOT)
+				{
+					dynamic_cast<PointLight*>(light.get())->SetConstantAttenuation(oldAttenuation.x);
+					dynamic_cast<PointLight*>(light.get())->SetConstantAttenuation(oldAttenuation.y);
+					dynamic_cast<PointLight*>(light.get())->SetConstantAttenuation(oldAttenuation.z);
+				}
+			}
+		}
+		
+		
+		SERIALISE_MEMBER_FUNC(lightType, light);
+		
+		
 		UniquePtr<Light> light;
 		
 		
@@ -105,48 +144,12 @@ namespace NK
 		{
 			const char* lightTypeNames[]{ "Undefined", "Directional", "Point", "Spot" };
 			int currentTypeIndex{ static_cast<int>(lightType) };
-
 			if (ImGui::Combo("Type", &currentTypeIndex, lightTypeNames, IM_ARRAYSIZE(lightTypeNames)))
 			{
 				const LIGHT_TYPE newType{ static_cast<LIGHT_TYPE>(currentTypeIndex) };
 				if (newType != lightType)
 				{
-					//Need to recreated light
-					
-					//Preserve existing properties if existing
-					const glm::vec3 oldColour{ light ? light->GetColour() : glm::vec3(1.0f) };
-					const float oldIntensity{ light ? light->GetIntensity() : 1.0f };
-					const glm::vec3 oldAttenuation{ (lightType == LIGHT_TYPE::POINT || lightType == LIGHT_TYPE::SPOT) ? glm::vec3(dynamic_cast<PointLight*>(light.get())->GetConstantAttenuation(), dynamic_cast<PointLight*>(light.get())->GetLinearAttenuation(), dynamic_cast<PointLight*>(light.get())->GetQuadraticAttenuation()) : glm::vec3(0.0f) };
-
-					lightType = newType;
-
-					switch (lightType)
-					{
-					case LIGHT_TYPE::DIRECTIONAL:
-						light = UniquePtr<Light>(NK_NEW(DirectionalLight));
-						break;
-					case LIGHT_TYPE::POINT:
-						light = UniquePtr<Light>(NK_NEW(PointLight));
-						break;
-					case LIGHT_TYPE::SPOT:
-						light = UniquePtr<Light>(NK_NEW(SpotLight));
-						break;
-					default:
-						light = nullptr;
-						break;
-					}
-
-					if (light)
-					{
-						light->SetColour(oldColour);
-						light->SetIntensity(oldIntensity);
-						if (lightType == LIGHT_TYPE::POINT || lightType == LIGHT_TYPE::SPOT)
-						{
-							dynamic_cast<PointLight*>(light.get())->SetConstantAttenuation(oldAttenuation.x);
-							dynamic_cast<PointLight*>(light.get())->SetConstantAttenuation(oldAttenuation.y);
-							dynamic_cast<PointLight*>(light.get())->SetConstantAttenuation(oldAttenuation.z);
-						}
-					}
+					SetLightType(newType);
 				}
 			}
 
@@ -189,6 +192,9 @@ namespace NK
 				}
 			}
 		}
+		
+		
+		LIGHT_TYPE lightType{ LIGHT_TYPE::UNDEFINED };
 	};
 	
 }

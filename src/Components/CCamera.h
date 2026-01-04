@@ -12,7 +12,10 @@ namespace NK
 	struct CCamera final : public CImGuiInspectorRenderable
 	{
 	public:
-		CCamera() = default;
+		CCamera()
+		{
+			SetCameraType(CAMERA_TYPE::CAMERA);
+		}
 
 		CCamera(const CCamera& _other) : enableDOF(_other.enableDOF), focalDistance(_other.focalDistance), focalDepth(_other.focalDepth), maxBlurRadius(_other.maxBlurRadius), dofDebugMode(_other.dofDebugMode), acesExposure(_other.acesExposure), maxIrradiance(_other.maxIrradiance)
 		{
@@ -82,18 +85,39 @@ namespace NK
 		SERIALISE_MEMBER_FUNC(camera, enableDOF, focalDistance, focalDepth, maxBlurRadius, acesExposure, maxIrradiance)
 		
 		
+		inline void SetCameraType(const CAMERA_TYPE _type)
+		{
+			const glm::vec3 oldPos = camera ? camera->GetPosition() : glm::vec3(0.0f);
+			const float oldYaw = camera ? camera->GetYaw() : 0.0f;
+			const float oldPitch = camera ? camera->GetPitch() : 0.0f;
+			const float oldNear = camera ? camera->GetNearPlaneDistance() : 0.1f;
+			const float oldFar = camera ? camera->GetFarPlaneDistance() : 1000.0f;
+			const float oldFov = camera ? camera->GetFOV() : 90.0f;
+			const float oldAspect = camera ? camera->GetAspectRatio() : WIN_ASPECT_RATIO;
+
+			camera.reset();
+
+			cameraType = _type;
+			
+			switch (_type)
+			{
+			case CAMERA_TYPE::CAMERA:
+				camera = UniquePtr<Camera>(NK_NEW(Camera, oldPos, oldYaw, oldPitch, oldNear, oldFar, oldFov, oldAspect));
+				break;
+			case CAMERA_TYPE::PLAYER_CAMERA:
+				//Default values: speed = 30.0f, sensitivity = 0.05f
+				camera = UniquePtr<Camera>(NK_NEW(PlayerCamera, oldPos, oldYaw, oldPitch, oldNear, oldFar, oldFov, oldAspect, 30.0f, 0.05f));
+				break;
+			default:
+				break;
+			}
+		}
+		
+		
 		UniquePtr<Camera> camera;
 		
 		
 	private:
-		bool enableDOF{ false };
-		float focalDistance{ 0.0f };
-		float focalDepth{ 0.0f };
-		float maxBlurRadius{ 0.0f };
-		bool dofDebugMode{ false };
-		float acesExposure{ 1.0f };
-		float maxIrradiance{ 10.0f };
-		
 		virtual inline std::string GetComponentName() const override { return GetStaticName(); }
 		virtual inline ImGuiTreeNodeFlags GetTreeNodeFlags() const override { return ImGuiTreeNodeFlags_DefaultOpen; }
 		virtual inline void RenderImGuiInspectorContents(Registry& _reg) override
@@ -101,6 +125,17 @@ namespace NK
 			if (camera == nullptr)
 			{
 				return;
+			}
+			
+			const char* cameraTypeNames[]{ "Camera", "Player Camera" };
+			int currentTypeIndex{ static_cast<int>(cameraType) };
+			if (ImGui::Combo("Type", &currentTypeIndex, cameraTypeNames, IM_ARRAYSIZE(cameraTypeNames)))
+			{
+				const CAMERA_TYPE newType{ static_cast<CAMERA_TYPE>(currentTypeIndex) };
+				if (newType != cameraType)
+				{
+					SetCameraType(newType);
+				}
 			}
 			
 			//FOV
@@ -160,6 +195,16 @@ namespace NK
 				ImGui::Unindent();
 			}
 		}
+		
+		
+		CAMERA_TYPE cameraType;
+		bool enableDOF{ false };
+		float focalDistance{ 0.0f };
+		float focalDepth{ 0.0f };
+		float maxBlurRadius{ 0.0f };
+		bool dofDebugMode{ false };
+		float acesExposure{ 1.0f };
+		float maxIrradiance{ 10.0f };
 	};
 	
 }

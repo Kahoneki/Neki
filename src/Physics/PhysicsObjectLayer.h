@@ -8,8 +8,9 @@ namespace NK
 	class PhysicsObjectLayer final
 	{
 	public:
-		explicit PhysicsObjectLayer(const std::uint16_t _id, const PhysicsBroadPhaseLayer _broadPhaseLayer) : m_objectLayer(_id), m_broadPhaseLayer(_broadPhaseLayer) {}
+		explicit PhysicsObjectLayer(const std::string& _name, const std::uint16_t _id, const PhysicsBroadPhaseLayer _broadPhaseLayer) : m_name(_name), m_objectLayer(_id), m_broadPhaseLayer(_broadPhaseLayer) {}
 		
+		[[nodiscard]] inline std::string GetName() const { return m_name; }
 		[[nodiscard]] inline std::uint16_t GetValue() const { return m_objectLayer; }
 		[[nodiscard]] inline PhysicsBroadPhaseLayer GetBroadPhaseLayer() const { return m_broadPhaseLayer; }
 		
@@ -23,6 +24,7 @@ namespace NK
         
 		
 	private:
+		std::string m_name;
 		std::uint16_t m_objectLayer;
 		PhysicsBroadPhaseLayer m_broadPhaseLayer;
 	};

@@ -2,6 +2,9 @@
 
 #include "ComponentView.h"
 
+#include <Components/CCamera.h>
+
+
 namespace NK
 {
 
@@ -34,6 +37,8 @@ namespace NK
 			archive(TypeRegistry::GetConstant(it->first));
 			it->second->Serialise(archive);
 		}
+		
+		m_filepath = _filepath;
 	}
 	
 	
@@ -103,6 +108,27 @@ namespace NK
 				transform.SetParent(*this, nullptr);
 			}
 		}
+		
+		m_filepath = _filepath;
     }
+
 	
+	
+	inline void Registry::Clear()
+	{
+		std::vector<Entity> entitiesToDestroy;
+		for (std::unordered_map<Entity, std::vector<std::type_index>>::iterator it{ m_entityComponents.begin() }; it != m_entityComponents.end(); ++it)
+		{
+			entitiesToDestroy.push_back(it->first);
+		}
+		for (const Entity entity : entitiesToDestroy)
+		{
+			Destroy(entity);
+		}
+		
+		//Add a main camera
+		const Entity cameraEntity{ Create() };
+		AddComponent<CCamera>(cameraEntity).SetCameraType(CAMERA_TYPE::CAMERA);
+		GetComponent<CTransform>(cameraEntity).name = "Camera";
+	}
 }

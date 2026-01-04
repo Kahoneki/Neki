@@ -48,6 +48,7 @@ namespace NK
 		
 		m_entityDestroyEventSubscriptionID = EventManager::Subscribe<PhysicsLayer, EntityDestroyEvent>(this, &PhysicsLayer::OnEntityDestroy);
 		m_componentRemoveEventSubscriptionID = EventManager::Subscribe<PhysicsLayer, ComponentRemoveEvent>(this, &PhysicsLayer::OnComponentRemove);
+		m_componentAddEventSubscriptionID = EventManager::Subscribe<PhysicsLayer, ComponentAddEvent>(this, &PhysicsLayer::OnComponentAdd);
 
 		m_logger.Unindent();
 	}
@@ -58,6 +59,7 @@ namespace NK
 	{
 		EventManager::Unsubscribe<EntityDestroyEvent>(m_entityDestroyEventSubscriptionID);
 		EventManager::Unsubscribe<ComponentRemoveEvent>(m_componentRemoveEventSubscriptionID);
+		EventManager::Unsubscribe<ComponentAddEvent>(m_componentAddEventSubscriptionID);
 	}
 
 
@@ -74,21 +76,8 @@ namespace NK
 				box.halfExtentsDirty = false;
 				JPH::ScaledShapeSettings scaledShapeSettings{ baseShapeSettings, GLMToJPH(transform.GetWorldScale()) };
 				JPH::ShapeSettings::ShapeResult shapeResult{ scaledShapeSettings.Create() };
-
-				JPH::EMotionType motionType{};
-				switch (body.initialMotionType)
-				{
-				case MOTION_TYPE::STATIC:		motionType = JPH::EMotionType::Static; break;
-				case MOTION_TYPE::KINEMATIC:	motionType = JPH::EMotionType::Kinematic; break;
-				case MOTION_TYPE::DYNAMIC:		motionType = JPH::EMotionType::Dynamic; break;
-				default:
-				{
-					m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::PHYSICS_LAYER, "FixedUpdate() - body.initialMotionType of new body was not identified in switch case (value = " + std::to_string(std::to_underlying(body.initialMotionType)) + ")\n");
-					throw std::invalid_argument("");
-				}
-				}
-
-				JPH::BodyCreationSettings creationSettings{ shapeResult.Get(), GLMToJPH(transform.GetWorldPosition()), GLMToJPH(transform.GetWorldRotationQuat()), motionType, body.initialObjectLayer.GetValue() };
+				
+				JPH::BodyCreationSettings creationSettings{ shapeResult.Get(), GLMToJPH(transform.GetWorldPosition()), GLMToJPH(transform.GetWorldRotationQuat()), GetJPHMotionType(body.GetMotionType()), body.GetObjectLayer().GetValue() };
 				creationSettings.mFriction = body.GetFriction();
 				creationSettings.mRestitution = body.GetRestitution();
 				creationSettings.mLinearDamping = body.GetLinearDamping();
@@ -97,12 +86,7 @@ namespace NK
 				creationSettings.mIsSensor = body.initialTrigger;
 				creationSettings.mLinearVelocity = GLMToJPH(body.initialLinearVelocity);
 				creationSettings.mAngularVelocity = GLMToJPH(body.initialAngularVelocity);
-
-				if (body.initialMotionQuality == MOTION_QUALITY::LINEAR_CAST)
-				{
-					creationSettings.mMotionQuality = JPH::EMotionQuality::LinearCast;
-				}
-
+				creationSettings.mMotionQuality = GetJPHMotionQuality(body.GetMotionQuality());
 				if (body.GetMass() > 0.0f)
 				{
 					creationSettings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
@@ -125,7 +109,7 @@ namespace NK
 				bool shouldTeleport = true;
 				if (transform.ancestorMovedByPhysics)
 				{
-					if (body.initialMotionType == MOTION_TYPE::DYNAMIC)
+					if (body.motionType == MOTION_TYPE::DYNAMIC)
 					{
 						shouldTeleport = false;
 					}
@@ -145,6 +129,19 @@ namespace NK
 			if (body.dirtyFlags != PHYSICS_DIRTY_FLAGS::CLEAN)
 			{
 				JPH::Body* jphBody{ m_physicsSystem.GetBodyLockInterfaceNoLock().TryGetBody(id) };
+				
+				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::OBJECT_LAYER)) { bodyInterface.SetObjectLayer(id, body.GetObjectLayer().GetValue()); }
+				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::MOTION_TYPE)) { bodyInterface.SetMotionType(id, GetJPHMotionType(body.GetMotionType()), JPH::EActivation::Activate); }
+				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::MOTION_QUALITY)) { bodyInterface.SetMotionQuality(id, GetJPHMotionQuality(body.GetMotionQuality())); }
+				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::MASS))
+				{
+					if (JPH::MotionProperties* mp{ jphBody->GetMotionProperties() })
+					{
+						JPH::MassProperties mpScaled{ jphBody->GetShape()->GetMassProperties() };
+						mpScaled.ScaleToMass(body.GetMass());
+						mp->SetMassProperties(JPH::EAllowedDOFs::All, mpScaled);
+					}
+				}
 				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::FRICTION)) bodyInterface.SetFriction(id, body.GetFriction());
 				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::RESTITUTION)) bodyInterface.SetRestitution(id, body.GetRestitution());
 				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::GRAVITY)) bodyInterface.SetGravityFactor(id, body.GetGravityFactor());
@@ -154,15 +151,6 @@ namespace NK
 					{
 						mp->SetLinearDamping(body.linearDamping);
 						mp->SetAngularDamping(body.angularDamping);
-					}
-				}
-				if (EnumUtils::Contains(body.dirtyFlags, PHYSICS_DIRTY_FLAGS::MASS))
-				{
-					if (JPH::MotionProperties* mp{ jphBody->GetMotionProperties() })
-					{
-						JPH::MassProperties mpScaled{ jphBody->GetShape()->GetMassProperties() };
-						mpScaled.ScaleToMass(body.GetMass());
-						mp->SetMassProperties(JPH::EAllowedDOFs::All, mpScaled);
 					}
 				}
 				body.dirtyFlags = PHYSICS_DIRTY_FLAGS::CLEAN;
@@ -208,7 +196,7 @@ namespace NK
 		//Sync jolt -> ctransform
 		for (auto&& [body, transform] : m_reg.get().View<CPhysicsBody, CTransform>())
 		{
-			if (body.bodyID == 0xFFFFFFFF || body.initialMotionType != MOTION_TYPE::DYNAMIC)
+			if (body.bodyID == 0xFFFFFFFF || body.motionType != MOTION_TYPE::DYNAMIC)
 			{
 				continue;
 			}
@@ -254,16 +242,13 @@ namespace NK
 
 		if (_event.componentIndex == typeid(CPhysicsBody))
 		{
-			if (_event.reg->HasComponent<CPhysicsBody>(_event.entity))
+			CPhysicsBody& body{ _event.reg->GetComponent<CPhysicsBody>(_event.entity) };
+			if (body.bodyID != UINT32_MAX)
 			{
-				CPhysicsBody& body{ _event.reg->GetComponent<CPhysicsBody>(_event.entity) };
-				if (body.bodyID != UINT32_MAX)
-				{
-					const JPH::BodyID id(body.bodyID);
-					bodyInterface.RemoveBody(id);
-					bodyInterface.DestroyBody(id);
-					body.bodyID = UINT32_MAX;
-				}
+				const JPH::BodyID id{ body.bodyID };
+				bodyInterface.RemoveBody(id);
+				bodyInterface.DestroyBody(id);
+				body.bodyID = UINT32_MAX;
 			}
 		}
 		
@@ -274,12 +259,57 @@ namespace NK
 				CPhysicsBody& body{ _event.reg->GetComponent<CPhysicsBody>(_event.entity) };
 				if (body.bodyID != UINT32_MAX)
 				{
-					const JPH::BodyID id(body.bodyID);
+					const JPH::BodyID id{ body.bodyID };
 					bodyInterface.RemoveBody(id);
 					bodyInterface.DestroyBody(id);
 					body.bodyID = UINT32_MAX;
 				}
 			}
+		}
+	}
+
+	
+	
+	void PhysicsLayer::OnComponentAdd(const ComponentAddEvent& _event)
+	{
+		if (_event.componentIndex == typeid(CPhysicsBody))
+		{
+			if (!_event.reg->HasComponent(_event.entity, typeid(CBoxCollider)))
+			{
+				//All physics bodies must have a collider
+				_event.reg->AddComponent<CBoxCollider>(_event.entity);
+			}
+		}
+	}
+
+	
+
+	JPH::EMotionType PhysicsLayer::GetJPHMotionType(const MOTION_TYPE _type)
+	{
+		switch (_type)
+		{
+		case MOTION_TYPE::STATIC:		return JPH::EMotionType::Static;
+		case MOTION_TYPE::KINEMATIC:	return JPH::EMotionType::Kinematic;
+		case MOTION_TYPE::DYNAMIC:		return JPH::EMotionType::Dynamic;
+		default:
+		{
+			throw std::invalid_argument("PhysicsLayer::GetJPHMotionType() - _type was not identified in switch case (value = " + std::to_string(std::to_underlying(_type)) + ")\n");
+		}
+		}
+	}
+
+	
+	
+	JPH::EMotionQuality PhysicsLayer::GetJPHMotionQuality(const MOTION_QUALITY _quality)
+	{
+		switch (_quality)
+		{
+		case MOTION_QUALITY::DISCRETE:		return JPH::EMotionQuality::Discrete;
+		case MOTION_QUALITY::LINEAR_CAST:	return JPH::EMotionQuality::Discrete;
+		default:
+		{
+			throw std::invalid_argument("PhysicsLayer::GetJPHMotionQuality() - _quality was not identified in switch case (value = " + std::to_string(std::to_underlying(_quality)) + ")\n");
+		}
 		}
 	}
 	

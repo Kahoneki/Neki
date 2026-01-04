@@ -41,12 +41,6 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(NK::Camera, NK::PlayerCamera);
 
 int main()
 {
-	const NK::ContextConfig contextConfig{ CreateContext() };
-	NK::RAIIContext context{ contextConfig };
-	
-	const NK::EngineConfig engineConfig{ CreateEngine() };
-	NK::Engine engine{ engineConfig };
-	
 	NK::TypeRegistry::Register<NK::CBoxCollider>("C_BOX_COLLIDER");
 	NK::TypeRegistry::Register<NK::CCamera>("C_CAMERA");
 	NK::TypeRegistry::Register<NK::CInput>("C_INPUT");
@@ -57,6 +51,19 @@ int main()
 	NK::TypeRegistry::Register<NK::CSelected>("C_SELECTED");
 	NK::TypeRegistry::Register<NK::CSkybox>("C_SKYBOX");
 	NK::TypeRegistry::Register<NK::CTransform>("C_TRANSFORM");
+	
+	NK::TypeRegistry::Register(NK::DefaultObjectLayer);
+	
+	NK::TypeRegistry::Register<NK::PLAYER_CAMERA_ACTIONS>("PLAYER_CAMERA_ACTIONS");
+	NK::TypeRegistry::RegisterInputAction<NK::PLAYER_CAMERA_ACTIONS>("MOVE", NK::PLAYER_CAMERA_ACTIONS::MOVE);
+	NK::TypeRegistry::RegisterInputAction<NK::PLAYER_CAMERA_ACTIONS>("YAW_PITCH", NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH);
+	
+	
+	const NK::ContextConfig contextConfig{ CreateContext() };
+	NK::RAIIContext context{ contextConfig };
+	
+	const NK::EngineConfig engineConfig{ CreateEngine() };
+	NK::Engine engine{ engineConfig };
 	
 	engine.Run();
 }
