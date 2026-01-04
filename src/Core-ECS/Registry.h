@@ -391,7 +391,7 @@ inline void NK::ComponentPool<Component>::AddDefaultToEntity(NK::Registry& _reg,
 template <typename Component>
 inline void NK::ComponentPool<Component>::CopyComponentToEntity(NK::Registry& _reg, const Entity _srcEntity, const Entity _dstEntity)
 {
-	if (entityToIndex.contains(_srcEntity))
+	if (entityToIndex.contains(_srcEntity) && !_reg.HasComponent<Component>(_dstEntity))
 	{
 		_reg.AddComponent<Component>(_dstEntity, components[entityToIndex.at(_srcEntity)]);
 	}

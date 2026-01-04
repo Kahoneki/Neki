@@ -1603,6 +1603,15 @@ namespace NK
 				Context::SetEditorActive(!inGame);
 			}
 		#endif
+		
+		if (m_entityPendingDeletion != UINT32_MAX)
+		{
+			if (m_reg.get().EntityInRegistry(m_entityPendingDeletion))
+			{
+				m_reg.get().Destroy(m_entityPendingDeletion);
+			}
+			m_entityPendingDeletion = UINT32_MAX;
+		}
 	}
 	
 	
@@ -1789,12 +1798,6 @@ namespace NK
 			
 		}
 		if (m_showEditor && m_showHierarchy) { ImGui::End(); }
-		
-		if (m_entityPendingDeletion != UINT32_MAX)
-		{
-			m_reg.get().Destroy(m_entityPendingDeletion);
-			m_entityPendingDeletion = UINT32_MAX;
-		}
 		
 		
 		if (m_showEditor && m_showInspector && ImGui::Begin("Inspector"))
@@ -2025,84 +2028,92 @@ namespace NK
 		
 		
 		//ImGuizmo transform
-		ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
-		ImGuizmo::SetOrthographic(false);
-		for (auto&& [selected] : m_reg.get().View<CSelected>())
+		if (Context::GetActiveLightView() == nullptr) //Don't render if in light debug view
 		{
-			//Entity is selected
-			const Entity selectedEntity{ m_reg.get().GetEntity(selected) };
-			
-			if (InputManager::GetKeyPressed(KEYBOARD::DEL))
+			ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
+			ImGuizmo::SetOrthographic(false);
+			for (auto&& [selected] : m_reg.get().View<CSelected>())
 			{
-				m_entityPendingDeletion = selectedEntity;
-				continue;
-			}
-			if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::C) && !m_cPressedLastFrame)
-			{
-				m_copiedEntity = selectedEntity;
-				continue;
-			}
-			if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::V) && !m_vPressedLastFrame)
-			{
-				Entity newEntity{ m_reg.get().CopyEntity(m_copiedEntity) };
-				
-				//The copied entity should be pasted to the same tree-level as the selected entity (i.e.: the pasted entity's parent should be set to the selected entity's parent)
-				CTransform& newEntityTransform{ m_reg.get().GetComponent<CTransform>(newEntity) };
-				const CTransform& selectedEntityTransform{ m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(selected)) };
-				newEntityTransform.SetParent(m_reg.get(), selectedEntityTransform.GetParent());
-				continue; //It's currently not possible to select more than one entity, if i ever add this functionality though, then todo: figure out what to do about pasting when multiple entities are selected
-			}
+				//Entity is selected
+				const Entity selectedEntity{ m_reg.get().GetEntity(selected) };
 			
-			CTransform& transform{ m_reg.get().GetComponent<CTransform>(selectedEntity) };
-			glm::mat4 modelMatrix{ transform.GetModelMatrix() };
-			CameraShaderData camData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(_camera)).GetModelMatrix()) };
-		
-			const float aspect{ static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y };
-			
-			//ImGuizmo uses right-handed coordinate system, so we need to flip the Z on our matrices
-			const glm::mat4 flipZ{ glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, -1.0f)) };
-			glm::mat4 modelMatrixRH{ flipZ * modelMatrix * flipZ };
-			glm::mat4 viewRH{ flipZ * camData.viewMat * flipZ };
-			const glm::mat4 projRH{ glm::perspectiveRH_ZO(glm::radians(_camera.camera->GetFOV()), aspect, _camera.camera->GetNearPlaneDistance(), _camera.camera->GetFarPlaneDistance()) };
-			
-			const glm::quat originalOrientation{ transform.GetLocalRotation() };
-			
-			ImGuizmo::Manipulate(glm::value_ptr(viewRH), glm::value_ptr(projRH), m_currentGizmoOp, m_currentGizmoMode, glm::value_ptr(modelMatrixRH));
-
-			//If the user updated the gizmo, we need to convert it back to left-handed to update the transform
-			//what a palaver, an absolute kerfuffle, such a silly conundrum....
-			//when will people learn to stop using right handed systems
-			if (ImGuizmo::IsUsing())
-			{
-				const glm::mat4 modelMatrixLH{ flipZ * modelMatrixRH * flipZ };
-				glm::mat4 newLocalMatrix{ modelMatrixLH };
-				if (transform.GetParent())
+				if (InputManager::GetKeyPressed(KEYBOARD::DEL))
 				{
-					glm::mat4 parentInverse = glm::inverse(transform.GetParent()->GetModelMatrix());
-					newLocalMatrix = parentInverse * modelMatrixLH;
+					m_entityPendingDeletion = selectedEntity;
+					continue;
 				}
-
-				glm::vec3 scale, translation, skew;
-				glm::quat orientation;
-				glm::vec4 perspective;
-				if (glm::decompose(newLocalMatrix, scale, orientation, translation, skew, perspective))
+				if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::C) && !m_cPressedLastFrame)
 				{
-					transform.SetLocalPosition(translation);
-					transform.SetLocalRotation(glm::normalize(orientation));
-					transform.SetLocalScale(scale);
+					m_copiedEntity = selectedEntity;
+					continue;
 				}
-				
-				//Reshaping an object's collider is very expensive so don't apply continuous updates as scale changes, only do it when the user lets go
-				bool isUsing{ ImGuizmo::IsUsing() };
-				static bool wasUsing{ false };
-				if (wasUsing && !isUsing && m_currentGizmoOp == ImGuizmo::SCALE)
+				if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::V) && !m_vPressedLastFrame)
 				{
-					if (m_reg.get().HasComponent<CBoxCollider>(selectedEntity))
+					//The copied entity should be pasted to the same tree-level as the selected entity (i.e.: the pasted entity's parent should be set to the selected entity's parent)
+					const Entity contextEntityID{ m_reg.get().GetEntity(selected) };
+					Entity newEntity{ m_reg.get().CopyEntity(m_copiedEntity) };
+					CTransform& newEntityTransform{ m_reg.get().GetComponent<CTransform>(newEntity) };
+					CTransform* parentTransform = m_reg.get().GetComponent<CTransform>(contextEntityID).GetParent();
+					newEntityTransform.SetParent(m_reg.get(), parentTransform);
+					if (m_reg.get().HasComponent<CSelected>(newEntity))
 					{
-						m_reg.get().GetComponent<CBoxCollider>(selectedEntity).halfExtentsDirty = true;
+						m_reg.get().RemoveComponent<CSelected>(newEntity);
 					}
+
+					continue;  //It's currently not possible to select more than one entity, if i ever add this functionality though, then todo: figure out what to do about pasting when multiple entities are selected
 				}
-				wasUsing = isUsing;
+			
+				CTransform& transform{ m_reg.get().GetComponent<CTransform>(selectedEntity) };
+				glm::mat4 modelMatrix{ transform.GetModelMatrix() };
+				CameraShaderData camData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(_camera)).GetModelMatrix()) };
+		
+				const float aspect{ static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y };
+			
+				//ImGuizmo uses right-handed coordinate system, so we need to flip the Z on our matrices
+				const glm::mat4 flipZ{ glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, -1.0f)) };
+				glm::mat4 modelMatrixRH{ flipZ * modelMatrix * flipZ };
+				glm::mat4 viewRH{ flipZ * camData.viewMat * flipZ };
+				const glm::mat4 projRH{ glm::perspectiveRH_ZO(glm::radians(_camera.camera->GetFOV()), aspect, _camera.camera->GetNearPlaneDistance(), _camera.camera->GetFarPlaneDistance()) };
+			
+				const glm::quat originalOrientation{ transform.GetLocalRotation() };
+			
+				ImGuizmo::Manipulate(glm::value_ptr(viewRH), glm::value_ptr(projRH), m_currentGizmoOp, m_currentGizmoMode, glm::value_ptr(modelMatrixRH));
+
+				//If the user updated the gizmo, we need to convert it back to left-handed to update the transform
+				//what a palaver, an absolute kerfuffle, such a silly conundrum....
+				//when will people learn to stop using right handed systems
+				if (ImGuizmo::IsUsing())
+				{
+					const glm::mat4 modelMatrixLH{ flipZ * modelMatrixRH * flipZ };
+					glm::mat4 newLocalMatrix{ modelMatrixLH };
+					if (transform.GetParent())
+					{
+						glm::mat4 parentInverse = glm::inverse(transform.GetParent()->GetModelMatrix());
+						newLocalMatrix = parentInverse * modelMatrixLH;
+					}
+
+					glm::vec3 scale, translation, skew;
+					glm::quat orientation;
+					glm::vec4 perspective;
+					if (glm::decompose(newLocalMatrix, scale, orientation, translation, skew, perspective))
+					{
+						transform.SetLocalPosition(translation);
+						transform.SetLocalRotation(glm::normalize(orientation));
+						transform.SetLocalScale(scale);
+					}
+				
+					//Reshaping an object's collider is very expensive so don't apply continuous updates as scale changes, only do it when the user lets go
+					bool isUsing{ ImGuizmo::IsUsing() };
+					static bool wasUsing{ false };
+					if (wasUsing && !isUsing && m_currentGizmoOp == ImGuizmo::SCALE)
+					{
+						if (m_reg.get().HasComponent<CBoxCollider>(selectedEntity))
+						{
+							m_reg.get().GetComponent<CBoxCollider>(selectedEntity).halfExtentsDirty = true;
+						}
+					}
+					wasUsing = isUsing;
+				}
 			}
 		}
 		

@@ -99,13 +99,14 @@ namespace NK
 			{
 				if (HasComponent<CTransform>(transform.serialisedParentID))
 				{
-					CTransform* parentPtr = &GetComponent<CTransform>(transform.serialisedParentID);
-					transform.SetParent(*this, parentPtr);
+					CTransform* parentPtr{ &GetComponent<CTransform>(transform.serialisedParentID) };
+					transform.parent = parentPtr;
+					parentPtr->children.push_back(&transform);
 				}
 			}
 			else
 			{
-				transform.SetParent(*this, nullptr);
+				transform.parent = nullptr;
 			}
 		}
 		
