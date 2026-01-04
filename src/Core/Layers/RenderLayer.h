@@ -395,12 +395,12 @@ namespace NK
 		bool m_freezeVisibility{ false };
 		
 		//For shortcuts (required so that, e.g., ctrl+c will copy but c+ctrl won't)
-		bool cPressedLastFrame{ false }; //Ctrl+C = copy
-		bool vPressedLastFrame{ false }; //Ctrl+V = paste
-		bool sPressedLastFrame{ false }; //Ctrl+S = save
-		bool oPressedLastFrame{ false }; //Ctrl+O = open
-		bool ePressedLastFrame{ false }; //Ctrl+E = toggle editor
-		bool f4PressedLastFrame{ false }; //Alt+F4 = exit
+		bool m_cPressedLastFrame{ false }; //Ctrl+C = copy
+		bool m_vPressedLastFrame{ false }; //Ctrl+V = paste
+		bool m_sPressedLastFrame{ false }; //Ctrl+S = save
+		bool m_oPressedLastFrame{ false }; //Ctrl+O = open
+		bool m_ePressedLastFrame{ false }; //Ctrl+E = toggle editor
+		bool m_f4PressedLastFrame{ false }; //Alt+F4 = exit
 	};
 
 }

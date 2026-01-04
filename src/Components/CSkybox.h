@@ -81,7 +81,7 @@ namespace NK
 		            const std::vector<std::string> selection = pfd::open_file("Select File", lastAccessedFilepath, { "KTX Files", "*.ktx *.ktx2", "All Files", "*" }).result();
 		            if (!selection.empty())
 		            {
-		                (this->*_setter)(std::filesystem::relative(selection[0], NEKI_BUILD_DIR).string());
+		                (this->*_setter)(std::filesystem::relative(selection[0], NEKI_SOURCE_DIR).string());
 		                lastAccessedFilepath = selection[0];
 		            }
 		        	std::filesystem::current_path(currentPath);
@@ -103,7 +103,7 @@ namespace NK
 		        const std::string folder = pfd::select_folder("Select Skybox Directory", lastAccessedFilepath).result();
 		        if (!folder.empty())
 		        {
-		            const std::filesystem::path root(NEKI_BUILD_DIR);
+		            const std::filesystem::path root(NEKI_SOURCE_DIR);
 		            const std::filesystem::path relFolder{ std::filesystem::relative(folder, root) };
 		            
 		            SetSkyboxFilepath((relFolder / "skybox.ktx").string());
@@ -152,7 +152,7 @@ namespace NK
 		
 		
 		//UI
-		std::string lastAccessedFilepath{ NEKI_BUILD_DIR };
+		std::string lastAccessedFilepath{ NEKI_SOURCE_DIR };
 	};
 	
 }

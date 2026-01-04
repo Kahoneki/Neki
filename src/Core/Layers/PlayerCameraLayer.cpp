@@ -73,9 +73,9 @@ namespace NK
 					constexpr float pitchLimit = glm::radians(89.0f);
 					debugLight->pitch = std::clamp(debugLight->pitch, -pitchLimit, pitchLimit);
 
-					//one fresh quaternion coming right up! (hold the euler extraction!)
-					glm::quat pitchQuat = glm::angleAxis(debugLight->pitch, glm::vec3(1.0f, 0.0f, 0.0f));
-					glm::quat yawQuat = glm::angleAxis(debugLight->yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+					//one fresh quaternion coming right up! (hold the euler!)
+					glm::quat pitchQuat{ glm::angleAxis(debugLight->pitch, glm::vec3(1.0f, 0.0f, 0.0f)) };
+					glm::quat yawQuat{ glm::angleAxis(debugLight->yaw, glm::vec3(0.0f, 1.0f, 0.0f)) };
 					transform.SetLocalRotation(yawQuat * pitchQuat);
 				
 					debugLight->firstFrame = false;
@@ -106,9 +106,9 @@ namespace NK
 				constexpr float pitchLimit = glm::radians(89.0f);
 				pc->m_pitch = std::clamp(pc->m_pitch, -pitchLimit, pitchLimit);
 
-				//one fresh quaternion coming right up! (hold the euler extraction!)
-				glm::quat pitchQuat = glm::angleAxis(pc->m_pitch, glm::vec3(1.0f, 0.0f, 0.0f));
-				glm::quat yawQuat = glm::angleAxis(pc->m_yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+				//one fresh quaternion coming right up! (hold the euler!)
+				glm::quat pitchQuat{ glm::angleAxis(pc->m_pitch, glm::vec3(1.0f, 0.0f, 0.0f)) };
+				glm::quat yawQuat{ glm::angleAxis(pc->m_yaw, glm::vec3(0.0f, 1.0f, 0.0f)) };
 				transform.SetLocalRotation(yawQuat * pitchQuat);
 				
 				pc->m_firstFrame = false;

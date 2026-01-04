@@ -1606,7 +1606,69 @@ namespace NK
 	{
 		Context::SetPopupOpen(false);
 		
+
+		auto OpenScene{ [&]()
+		{
+			//todo: check for scene diff and prompt for save
+			const std::filesystem::path currentPath{ std::filesystem::current_path() };
+			const std::vector<std::string> selection{ pfd::open_file("Open Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
+			if (!selection.empty())
+			{
+				//todo: input validation
+				m_pendingLoadScenePath = selection[0];
+			}
+			std::filesystem::current_path(currentPath);
+		} };
 		
+		
+		auto SaveScene{ [&]()
+		{
+			const std::string filepath{ m_reg.get().GetFilepath() };
+			if (filepath.empty())
+			{
+				//Mimic "Save As" logic
+				const std::filesystem::path currentPath{ std::filesystem::current_path() };
+				const std::string dest{ pfd::save_file("Save Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
+				if (!dest.empty())
+				{
+					m_reg.get().Save(dest);
+				}
+				std::filesystem::current_path(currentPath);
+			}
+			else
+			{
+				m_reg.get().Save(m_reg.get().GetFilepath());
+			}
+		} };
+		
+		
+		auto Exit{ [&]()
+		{
+			m_desc.window->SetCursorVisibility(true);
+			glfwSetWindowShouldClose(m_desc.window->GetGLFWWindow(), true);
+		} };
+		
+		
+		//Shortcuts
+		if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::O) && !m_oPressedLastFrame)
+		{
+			OpenScene();
+		}
+		if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::S) && !m_sPressedLastFrame)
+		{
+			SaveScene();
+		}
+		if (InputManager::GetKeyPressed(KEYBOARD::ALT) && InputManager::GetKeyPressed(KEYBOARD::F4) && !m_f4PressedLastFrame)
+		{
+			Exit();
+		}
+		if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::E) && !m_ePressedLastFrame)
+		{
+			m_showEditor = !m_showEditor;
+		}
+		
+		
+		//Menu Bar
 		if (ImGui::BeginMainMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -1619,35 +1681,12 @@ namespace NK
 				
 				if (ImGui::MenuItem("Open Scene", "Ctrl+O"))
 				{
-					//todo: check for scene diff and prompt for save
-					const std::filesystem::path currentPath{ std::filesystem::current_path() };
-					const std::vector<std::string> selection{ pfd::open_file("Open Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
-					if (!selection.empty())
-					{
-						//todo: input validation
-						m_pendingLoadScenePath = selection[0];
-					}
-					std::filesystem::current_path(currentPath);
+					OpenScene();
 				}
 				
 				if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
 				{
-					std::string filepath{ m_reg.get().GetFilepath() };
-					if (filepath.empty())
-					{
-						//Mimic "Save As" logic
-						const std::filesystem::path currentPath{ std::filesystem::current_path() };
-						const std::string dest{ pfd::save_file("Save Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
-						if (!dest.empty())
-						{
-							m_reg.get().Save(dest);
-						}
-						std::filesystem::current_path(currentPath);
-					}
-					else
-					{
-						m_reg.get().Save(m_reg.get().GetFilepath());
-					}
+					SaveScene();
 				}
 				
 				if (ImGui::MenuItem("Save Scene As"))
@@ -1663,8 +1702,7 @@ namespace NK
 				
 				if (ImGui::MenuItem("Exit", "Alt+F4"))
 				{
-					m_desc.window->SetCursorVisibility(true);
-					glfwSetWindowShouldClose(m_desc.window->GetGLFWWindow(), true);
+					Exit();
 				}
 				
 				ImGui::EndMenu();
@@ -1990,8 +2028,23 @@ namespace NK
 			
 			if (InputManager::GetKeyPressed(KEYBOARD::DEL))
 			{
-				m_reg.get().Destroy(selectedEntity);
+				m_entityPendingDeletion = selectedEntity;
 				continue;
+			}
+			if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::C) && !m_cPressedLastFrame)
+			{
+				m_copiedEntity = selectedEntity;
+				continue;
+			}
+			if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::V) && !m_vPressedLastFrame)
+			{
+				Entity newEntity{ m_reg.get().CopyEntity(m_copiedEntity) };
+				
+				//The copied entity should be pasted to the same tree-level as the selected entity (i.e.: the pasted entity's parent should be set to the selected entity's parent)
+				CTransform& newEntityTransform{ m_reg.get().GetComponent<CTransform>(newEntity) };
+				const CTransform& selectedEntityTransform{ m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(selected)) };
+				newEntityTransform.SetParent(m_reg.get(), selectedEntityTransform.GetParent());
+				continue; //It's currently not possible to select more than one entity, if i ever add this functionality though, then todo: figure out what to do about pasting when multiple entities are selected
 			}
 			
 			CTransform& transform{ m_reg.get().GetComponent<CTransform>(selectedEntity) };
@@ -2046,6 +2099,14 @@ namespace NK
 				wasUsing = isUsing;
 			}
 		}
+		
+		
+		m_cPressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::C);
+		m_vPressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::V);
+		m_sPressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::S);
+		m_oPressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::O);
+		m_ePressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::E);
+		m_f4PressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::F4);
 	}
 
 	
