@@ -22,6 +22,7 @@
 #include <Graphics/Lights/PointLight.h>
 #include <Graphics/Lights/SpotLight.h>
 #include <Managers/InputManager.h>
+#include <Managers/TimeManager.h>
 
 #include <glm/gtx/string_cast.hpp>
 
@@ -38,12 +39,23 @@ public:
 	explicit GameScene2() : Scene(128)
 	{
 		m_reg.Load("Scenes/DemoScene.nkscene");
+		for (auto&& [transform] : m_reg.View<NK::CTransform>())
+		{
+			if (transform.name == "Helmet")
+			{
+				m_helmetEntity = m_reg.GetEntity(transform);
+			}
+		}
 	}
 
 
 
 	virtual void Update() override
 	{
+		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+		constexpr float speed{ 50.0f };
+		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
+		helmetTransform.SetLocalRotation(helmetTransform.GetLocalRotation() + glm::vec3(0, rotationAmount, 0));
 	}
 	
 	
@@ -52,6 +64,10 @@ public:
 	{
 		std::cout << "Collision occurred\n";
 	}
+	
+	
+private:
+	NK::Entity m_helmetEntity;
 };
 
 
@@ -267,6 +283,12 @@ public:
 		const std::size_t oldActiveScene{ m_activeScene };
 		
 		m_scenes[m_activeScene]->Update();
+		
+		//For demonstration
+		if (NK::InputManager::GetKeyPressed(NK::KEYBOARD::CTRL) && NK::InputManager::GetKeyPressed(NK::KEYBOARD::K))
+		{
+			m_activeScene = 1;
+		}
 		
 		#if NEKI_EDITOR
 			m_window->SetCursorVisibility(NK::Context::GetEditorActive());

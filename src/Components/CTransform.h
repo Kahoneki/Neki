@@ -28,7 +28,7 @@ namespace NK
 		[[nodiscard]] inline CTransform* GetParent() const { return parent; }
 		
 		[[nodiscard]] inline glm::vec3 GetLocalPosition() const { return localPos; }
-		[[nodiscard]] inline glm::vec3 GetLocalRotation() const { return glm::eulerAngles(localRot); }
+		[[nodiscard]] inline glm::vec3 GetLocalRotation() const { return localEulerAngles; }
 		[[nodiscard]] inline glm::quat GetLocalRotationQuat() const { return localRot; }
 		[[nodiscard]] inline glm::vec3 GetLocalScale() const { return localScale; }
 		
@@ -38,7 +38,7 @@ namespace NK
 		[[nodiscard]] inline glm::vec3 GetWorldScale()
 		{
 			glm::mat4 m = GetModelMatrix();
-			return glm::vec3(glm::length(glm::vec3(m[0])), glm::length(glm::vec3(m[1])), glm::length(glm::vec3(m[2])));
+			return { glm::length(glm::vec3(m[0])), glm::length(glm::vec3(m[1])), glm::length(glm::vec3(m[2])) };
 		}
 		
 		[[nodiscard]] inline glm::mat4 GetModelMatrix()
@@ -109,6 +109,8 @@ namespace NK
 				glm::vec4 perspective;
 				glm::decompose(oldWorldMatrix, localScale, localRot, localPos, skew, perspective);
 			}
+
+			localEulerAngles = glm::eulerAngles(localRot);
 			
 			localMatrixDirty = true;
 			lightBufferDirty = true;
@@ -117,7 +119,8 @@ namespace NK
 			
 			return true;
 		}
-		//Immediately set the local position - note: this will result in any residual linear and angular velocity being zeroed out
+
+		//Immediately set the local position
 		inline void SetLocalPosition(const glm::vec3 _val)
 		{
 			localPos = _val;
@@ -126,24 +129,29 @@ namespace NK
 			physicsSyncDirty = true;
 			InvalidateChildTree(true, true, true);
 		}
-		//Immediately set the local euler rotation in radians - note: this will result in any residual linear and angular velocity being zeroed out
+
+		//Immediately set the local euler rotation in radians
 		inline void SetLocalRotation(const glm::vec3 _val)
 		{
+			localEulerAngles = _val;
 			localRot = glm::normalize(glm::quat(_val));
 			localMatrixDirty = true;
 			lightBufferDirty = true;
 			physicsSyncDirty = true;
 			InvalidateChildTree(true, true, true);
 		}
-		//Immediately set the local quaternion rotation - note: this will result in any residual linear and angular velocity being zeroed out
+
+		//Immediately set the local quaternion rotation
 		inline void SetLocalRotation(const glm::quat _val)
 		{
 			localRot = _val;
+			localEulerAngles = glm::eulerAngles(_val);
 			localMatrixDirty = true;
 			lightBufferDirty = true;
 			physicsSyncDirty = true;
 			InvalidateChildTree(true, true, true);
 		}
+
 		inline void SetLocalScale(const glm::vec3 _val)
 		{
 			localScale = _val;
@@ -152,17 +160,17 @@ namespace NK
 			InvalidateChildTree(true, true, true);
 		}
 		
-		//Immediately set the world position - note: this will result in any residual linear and angular velocity being zeroed out
+		//Immediately set the world position
 		inline void SetWorldPosition(const glm::vec3 _val) { SetLocalPosition(parent ? glm::vec3(glm::inverse(parent->GetModelMatrix()) * glm::vec4(_val, 1.0f)) : _val); }
-		//Immediately set the world euler rotation in radians - note: this will result in any residual linear and angular velocity being zeroed out
+		//Immediately set the world euler rotation in radians
 		inline void SetWorldRotation(const glm::vec3 _val) { SetWorldRotation(glm::quat(_val));  }
-		//Immediately set the world quaternion rotation - note: this will result in any residual linear and angular velocity being zeroed out
+		//Immediately set the world quaternion rotation
 		inline void SetWorldRotation(const glm::quat _val) { SetLocalRotation(parent ? glm::inverse(parent->GetWorldRotationQuat()) * _val : _val); }
 		inline void SetWorldScale(const glm::vec3 _val) { SetLocalScale(parent ? _val / parent->GetWorldScale() : _val); }
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Transform"; }
 		
-		SERIALISE_MEMBER_FUNC(localPos, localRot, localScale, name, serialisedParentID);
+		SERIALISE_MEMBER_FUNC(localPos, localRot, localEulerAngles, localScale, name, serialisedParentID);
 		void OnBeforeSerialise(Registry& _reg);
 		
 		
@@ -183,6 +191,7 @@ namespace NK
 		inline void SyncRotation(const glm::quat _val)
 		{
 			localRot = (parent ? glm::inverse(parent->GetWorldRotationQuat()) * _val : _val);
+			localEulerAngles = glm::eulerAngles(localRot);
 			localMatrixDirty = true;
 			lightBufferDirty = true;
 			InvalidateChildTree(true, true, true, true);
@@ -213,12 +222,19 @@ namespace NK
 			if (ImGui::RadioButton("Local", local)) { local = true; }
 			ImGui::SameLine();
 			if (ImGui::RadioButton("World", !local)) { local = false; }
+			
 			glm::vec3 pos{ local ? GetLocalPosition() : GetWorldPosition() };
-			glm::vec3 rot{ glm::degrees(local ? GetLocalRotation() : GetWorldRotation()) };
+			
+			glm::vec3 rot{ glm::degrees(local ? localEulerAngles : GetWorldRotation()) };
+			
 			glm::vec3 scale{ local ? GetLocalScale() : GetWorldScale() };
+			
 			if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) { local ? SetLocalPosition(pos) : SetWorldPosition(pos); }
-			if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f)) { local ? SetLocalRotation(glm::radians(rot)) : SetWorldRotation(rot); }
+			
+			if (ImGui::DragFloat3("Rotation", &rot.x, 0.05f)) { local ? SetLocalRotation(glm::radians(rot)) : SetWorldRotation(glm::radians(rot)); }
+			
 			if (ImGui::DragFloat3("Scale", &scale.x, 0.05f)) { local ? SetLocalScale(scale) : SetWorldScale(scale); }
+			
 			if (ImGui::CollapsingHeader("Matrices"))
 			{
 				ImGui::Indent();
@@ -275,7 +291,6 @@ namespace NK
 		bool localMatrixDirty{ true };
 
 		//True if pos and/or rot have been changed by anything other than the physics layer's jolt->ctransform sync but the cjolt sync hasn't happened yet
-		//In other words, this flag gets set everytime anything other than the physics layer changes the transform, and it marks to the physics layer that the underlying jolt values have to be synced to match
 		bool physicsSyncDirty{ true };
 		
 		//For lights
@@ -286,6 +301,7 @@ namespace NK
 		
 		glm::vec3 localPos{ glm::vec3(0.0f) };
 		glm::quat localRot{ glm::quat(1.0f, 0.0f, 0.0f, 0.0f) }; //identity quaternion (wxyz: .w=1, .xyz=0)
+		glm::vec3 localEulerAngles{ 0.0f, 0.0f, 0.0f };
 		glm::vec3 localScale{ glm::vec3(1.0f) };
 		
 		
