@@ -52,10 +52,13 @@ public:
 
 	virtual void Update() override
 	{
-		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
-		constexpr float speed{ 50.0f };
-		const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
-		helmetTransform.SetLocalRotation(helmetTransform.GetLocalRotation() + glm::vec3(0, rotationAmount, 0));
+		if (m_reg.EntityInRegistry(m_helmetEntity) && m_reg.GetComponent<NK::CTransform>(m_helmetEntity).name == "Helmet")
+		{
+			NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+			constexpr float speed{ 50.0f };
+			const float rotationAmount{ glm::radians(speed * static_cast<float>(NK::TimeManager::GetDeltaTime())) };
+			helmetTransform.SetLocalRotation(helmetTransform.GetLocalRotation() + glm::vec3(0, rotationAmount, 0));
+		}
 	}
 	
 	
