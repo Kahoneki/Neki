@@ -103,7 +103,11 @@ namespace NK
 			//If entity has a parent, remove this entity from its children vector
 			if (transform.GetParent() != nullptr)
 			{
-				transform.GetParent()->children.erase(std::ranges::find(transform.GetParent()->children, &transform));
+				std::vector<CTransform*>::iterator it{ std::ranges::find(transform.GetParent()->children, &transform) };
+				if (it != transform.GetParent()->children.end())
+				{
+					transform.GetParent()->children.erase(it);
+				}
 			}
 			
 				
