@@ -12,6 +12,9 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#ifdef max
+	#undef max
+#endif
 
 namespace NK
 {

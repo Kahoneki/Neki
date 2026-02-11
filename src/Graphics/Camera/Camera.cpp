@@ -10,27 +10,18 @@
 namespace NK
 {
 
-	Camera::Camera(glm::vec3 _pos, float _yaw, float _pitch, float _nearPlaneDist, float _farPlaneDist, float _fov, float _aspectRatio)
-	: m_pos(_pos), m_yaw(_yaw), m_pitch(_pitch), m_nearPlaneDist(_nearPlaneDist), m_farPlaneDist(_farPlaneDist), m_fov(_fov), m_aspectRatio(_aspectRatio)
+	Camera::Camera(float _nearPlaneDist, float _farPlaneDist, float _fov, float _aspectRatio)
+	: m_nearPlaneDist(_nearPlaneDist), m_farPlaneDist(_farPlaneDist), m_fov(_fov), m_aspectRatio(_aspectRatio)
 	{
-		m_viewMatDirty = true;
 		m_orthographicProjMatDirty = true;
 		m_perspectiveProjMatDirty = true;
-		UpdateCameraVectors();
 	}
 
 
 
-	glm::mat4 Camera::GetViewMatrix()
+	glm::mat4 Camera::GetViewMatrix(const glm::mat4& _transformationMatrix) const
 	{
-		if (m_viewMatDirty)
-		{
-			UpdateCameraVectors();
-			m_viewMat = glm::lookAtLH(m_pos, m_pos + m_forward, m_up);
-			m_viewMatDirty = false;
-		}
-		
-		return m_viewMat;
+		return glm::inverse(_transformationMatrix);
 	}
 
 
@@ -60,6 +51,7 @@ namespace NK
 			if (m_perspectiveProjMatDirty)
 			{
 				m_perspectiveProjMat = glm::perspectiveLH(glm::radians(m_fov), m_aspectRatio, m_nearPlaneDist, m_farPlaneDist);
+				m_perspectiveProjMatDirty = false;
 			}
 			return m_perspectiveProjMat;
 		}
@@ -73,30 +65,13 @@ namespace NK
 
 
 
-	CameraShaderData Camera::GetCurrentCameraShaderData(const PROJECTION_METHOD _method)
+	CameraShaderData Camera::GetCurrentCameraShaderData(const PROJECTION_METHOD _method, const glm::mat4& _transformationMatrix)
 	{
 		CameraShaderData camData{};
-		camData.viewMat = GetViewMatrix();
+		camData.viewMat = GetViewMatrix(_transformationMatrix);
 		camData.projMat = GetProjectionMatrix(_method);
-		camData.pos = glm::vec4(GetPosition(), 0.0);
+		camData.pos = _transformationMatrix[3];
 		return camData;
-	}
-
-
-
-	void Camera::UpdateCameraVectors()
-	{
-		//Calculate new forward vector
-		glm::vec3 front;
-		front.x = static_cast<float>(cos(glm::radians(m_yaw)) * cos(glm::radians(m_pitch)));
-		front.y = static_cast<float>(sin(glm::radians(m_pitch)));
-		front.z = static_cast<float>(sin(glm::radians(m_yaw)) * cos(glm::radians(m_pitch)));
-		m_forward = glm::normalize(front);
-
-		//Re-calculate right and up vectors
-		constexpr glm::vec3 worldUp{ glm::vec3(0, 1, 0) };
-		m_right = glm::normalize(glm::cross(worldUp, m_forward));
-		m_up = glm::normalize(glm::cross(m_forward, m_right));
 	}
 	
 }

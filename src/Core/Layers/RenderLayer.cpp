@@ -1596,7 +1596,22 @@ namespace NK
 				m_reg.get().Load(m_pendingLoadScenePath);
 				m_pendingLoadScenePath.clear();
 			}
+		
+			if (!m_firstFrame)
+			{
+				const bool inGame{ InputManager::GetMouseButtonPressed(MOUSE_BUTTON::RIGHT) && !ImGui::GetIO().WantCaptureMouse };
+				Context::SetEditorActive(!inGame);
+			}
 		#endif
+		
+		if (m_entityPendingDeletion != UINT32_MAX)
+		{
+			if (m_reg.get().EntityInRegistry(m_entityPendingDeletion))
+			{
+				m_reg.get().Destroy(m_entityPendingDeletion);
+			}
+			m_entityPendingDeletion = UINT32_MAX;
+		}
 	}
 	
 	
@@ -1606,7 +1621,69 @@ namespace NK
 	{
 		Context::SetPopupOpen(false);
 		
+
+		auto OpenScene{ [&]()
+		{
+			//todo: check for scene diff and prompt for save
+			const std::filesystem::path currentPath{ std::filesystem::current_path() };
+			const std::vector<std::string> selection{ pfd::open_file("Open Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
+			if (!selection.empty())
+			{
+				//todo: input validation
+				m_pendingLoadScenePath = selection[0];
+			}
+			std::filesystem::current_path(currentPath);
+		} };
 		
+		
+		auto SaveScene{ [&]()
+		{
+			const std::string filepath{ m_reg.get().GetFilepath() };
+			if (filepath.empty())
+			{
+				//Mimic "Save As" logic
+				const std::filesystem::path currentPath{ std::filesystem::current_path() };
+				const std::string dest{ pfd::save_file("Save Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
+				if (!dest.empty())
+				{
+					m_reg.get().Save(dest);
+				}
+				std::filesystem::current_path(currentPath);
+			}
+			else
+			{
+				m_reg.get().Save(m_reg.get().GetFilepath());
+			}
+		} };
+		
+		
+		auto Exit{ [&]()
+		{
+			m_desc.window->SetCursorVisibility(true);
+			glfwSetWindowShouldClose(m_desc.window->GetGLFWWindow(), true);
+		} };
+		
+		
+		//Shortcuts
+		if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::O) && !m_oPressedLastFrame)
+		{
+			OpenScene();
+		}
+		if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::S) && !m_sPressedLastFrame)
+		{
+			SaveScene();
+		}
+ 		if (InputManager::GetKeyPressed(KEYBOARD::ALT) && InputManager::GetKeyPressed(KEYBOARD::F4) && !m_f4PressedLastFrame)
+		{
+			Exit();
+		}
+		if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::E) && !m_ePressedLastFrame)
+		{
+			m_showEditor = !m_showEditor;
+		}
+		
+		
+		//Menu Bar
 		if (ImGui::BeginMainMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -1619,35 +1696,12 @@ namespace NK
 				
 				if (ImGui::MenuItem("Open Scene", "Ctrl+O"))
 				{
-					//todo: check for scene diff and prompt for save
-					const std::filesystem::path currentPath{ std::filesystem::current_path() };
-					const std::vector<std::string> selection{ pfd::open_file("Open Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
-					if (!selection.empty())
-					{
-						//todo: input validation
-						m_pendingLoadScenePath = selection[0];
-					}
-					std::filesystem::current_path(currentPath);
+					OpenScene();
 				}
 				
 				if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
 				{
-					std::string filepath{ m_reg.get().GetFilepath() };
-					if (filepath.empty())
-					{
-						//Mimic "Save As" logic
-						const std::filesystem::path currentPath{ std::filesystem::current_path() };
-						const std::string dest{ pfd::save_file("Save Scene", NEKI_SOURCE_DIR, { "Neki Scene", "*.nkscene" }).result() };
-						if (!dest.empty())
-						{
-							m_reg.get().Save(dest);
-						}
-						std::filesystem::current_path(currentPath);
-					}
-					else
-					{
-						m_reg.get().Save(m_reg.get().GetFilepath());
-					}
+					SaveScene();
 				}
 				
 				if (ImGui::MenuItem("Save Scene As"))
@@ -1663,8 +1717,7 @@ namespace NK
 				
 				if (ImGui::MenuItem("Exit", "Alt+F4"))
 				{
-					m_desc.window->SetCursorVisibility(true);
-					glfwSetWindowShouldClose(m_desc.window->GetGLFWWindow(), true);
+					Exit();
 				}
 				
 				ImGui::EndMenu();
@@ -1745,12 +1798,6 @@ namespace NK
 			
 		}
 		if (m_showEditor && m_showHierarchy) { ImGui::End(); }
-		
-		if (m_entityPendingDeletion != UINT32_MAX)
-		{
-			m_reg.get().Destroy(m_entityPendingDeletion);
-			m_entityPendingDeletion = UINT32_MAX;
-		}
 		
 		
 		if (m_showEditor && m_showInspector && ImGui::Begin("Inspector"))
@@ -1946,11 +1993,29 @@ namespace NK
 		
 		if (m_showEditor && m_showEditorSettings && ImGui::Begin("Editor Settings"))
 		{
+			//Physics
 			bool paused{ Context::GetPaused() };
 			int fixedUpdatesPerSecond{ static_cast<int>(std::round(1.0f / Context::GetFixedUpdateTimestep())) };
 			if (ImGui::Checkbox("Pause", &paused)) { Context::SetPaused(paused); }
 			ImGui::SameLine();
 			if (ImGui::DragInt("Fixed Updates Per Second", &fixedUpdatesPerSecond, 1, 1)) { Context::SetFixedUpdateTimestep(1.0f / std::max(1, fixedUpdatesPerSecond)); }
+			
+			ImGui::Separator();
+			
+			//Streaming
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255,255,0,255));
+			ImGui::Checkbox("Full Disk Asset Streaming", &m_fullDiskStreaming);
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("By default, Neki is currently only set up to stream from RAM to VRAM and vice versa. Eventually, I will get around to making a proper streaming system from disk to vram (wip on 'streaming' git branch)\nFor now though, full disk->ram->vram and vice versa streaming can be enabled with this flag, though there is no ram caching or threading, so it results in large stutters that are painfully slow.\nEnable at your own risk!");
+			}
+			ImGui::PopStyleColor();
+			ImGui::SameLine();
+			ImGui::Checkbox("Freeze Current Visibility", &m_freezeVisibility);
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Pause the visibility state of all models (used for demonstration to see the culling in action)");
+			}
 		}
 		if (m_showEditor && m_showEditorSettings) { ImGui::End(); }
 		
@@ -1963,71 +2028,102 @@ namespace NK
 		
 		
 		//ImGuizmo transform
-		ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
-		ImGuizmo::SetOrthographic(false);
-		for (auto&& [selected] : m_reg.get().View<CSelected>())
+		if (Context::GetActiveLightView() == nullptr) //Don't render if in light debug view
 		{
-			//Entity is selected
-			const Entity selectedEntity{ m_reg.get().GetEntity(selected) };
-			
-			if (InputManager::GetKeyPressed(KEYBOARD::DEL))
+			ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
+			ImGuizmo::SetOrthographic(false);
+			for (auto&& [selected] : m_reg.get().View<CSelected>())
 			{
-				m_reg.get().Destroy(selectedEntity);
-				continue;
-			}
+				//Entity is selected
+				const Entity selectedEntity{ m_reg.get().GetEntity(selected) };
 			
-			CTransform& transform{ m_reg.get().GetComponent<CTransform>(selectedEntity) };
-			glm::mat4 modelMatrix{ transform.GetModelMatrix() };
-			CameraShaderData camData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
-		
-			const float aspect{ static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y };
-			
-			//ImGuizmo uses right-handed coordinate system, so we need to flip the Z on our matrices
-			const glm::mat4 flipZ{ glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, -1.0f)) };
-			glm::mat4 modelMatrixRH{ flipZ * modelMatrix * flipZ };
-			glm::mat4 viewRH{ flipZ * camData.viewMat * flipZ };
-			const glm::mat4 projRH{ glm::perspectiveRH_ZO(glm::radians(_camera.camera->GetFOV()), aspect, _camera.camera->GetNearPlaneDistance(), _camera.camera->GetFarPlaneDistance()) };
-			
-			const glm::quat originalOrientation{ transform.GetLocalRotation() };
-			
-			ImGuizmo::Manipulate(glm::value_ptr(viewRH), glm::value_ptr(projRH), m_currentGizmoOp, m_currentGizmoMode, glm::value_ptr(modelMatrixRH));
-
-			//If the user updated the gizmo, we need to convert it back to left-handed to update the transform
-			//what a palaver, an absolute kerfuffle, such a silly conundrum....
-			//when will people learn to stop using right handed systems
-			if (ImGuizmo::IsUsing())
-			{
-				const glm::mat4 modelMatrixLH{ flipZ * modelMatrixRH * flipZ };
-				glm::mat4 newLocalMatrix{ modelMatrixLH };
-				if (transform.GetParent())
+				if (InputManager::GetKeyPressed(KEYBOARD::DEL))
 				{
-					glm::mat4 parentInverse = glm::inverse(transform.GetParent()->GetModelMatrix());
-					newLocalMatrix = parentInverse * modelMatrixLH;
+					m_entityPendingDeletion = selectedEntity;
+					continue;
 				}
-
-				glm::vec3 scale, translation, skew;
-				glm::quat orientation;
-				glm::vec4 perspective;
-				if (glm::decompose(newLocalMatrix, scale, orientation, translation, skew, perspective))
+				if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::C) && !m_cPressedLastFrame)
 				{
-					transform.SetLocalPosition(translation);
-					transform.SetLocalRotation(glm::normalize(orientation));
-					transform.SetLocalScale(scale);
+					m_copiedEntity = selectedEntity;
+					continue;
 				}
-				
-				//Reshaping an object's collider is very expensive so don't apply continuous updates as scale changes, only do it when the user lets go
-				bool isUsing{ ImGuizmo::IsUsing() };
-				static bool wasUsing{ false };
-				if (wasUsing && !isUsing && m_currentGizmoOp == ImGuizmo::SCALE)
+				if (InputManager::GetKeyPressed(KEYBOARD::CTRL) && InputManager::GetKeyPressed(KEYBOARD::V) && !m_vPressedLastFrame)
 				{
-					if (m_reg.get().HasComponent<CBoxCollider>(selectedEntity))
+					//The copied entity should be pasted to the same tree-level as the selected entity (i.e.: the pasted entity's parent should be set to the selected entity's parent)
+					const Entity contextEntityID{ m_reg.get().GetEntity(selected) };
+					Entity newEntity{ m_reg.get().CopyEntity(m_copiedEntity) };
+					CTransform& newEntityTransform{ m_reg.get().GetComponent<CTransform>(newEntity) };
+					CTransform* parentTransform = m_reg.get().GetComponent<CTransform>(contextEntityID).GetParent();
+					newEntityTransform.SetParent(m_reg.get(), parentTransform);
+					if (m_reg.get().HasComponent<CSelected>(newEntity))
 					{
-						m_reg.get().GetComponent<CBoxCollider>(selectedEntity).halfExtentsDirty = true;
+						m_reg.get().RemoveComponent<CSelected>(newEntity);
 					}
+
+					continue;  //It's currently not possible to select more than one entity, if i ever add this functionality though, then todo: figure out what to do about pasting when multiple entities are selected
 				}
-				wasUsing = isUsing;
+			
+				CTransform& transform{ m_reg.get().GetComponent<CTransform>(selectedEntity) };
+				glm::mat4 modelMatrix{ transform.GetModelMatrix() };
+				CameraShaderData camData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(_camera)).GetModelMatrix()) };
+		
+				const float aspect{ static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y };
+			
+				//ImGuizmo uses right-handed coordinate system, so we need to flip the Z on our matrices
+				const glm::mat4 flipZ{ glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, -1.0f)) };
+				glm::mat4 modelMatrixRH{ flipZ * modelMatrix * flipZ };
+				glm::mat4 viewRH{ flipZ * camData.viewMat * flipZ };
+				const glm::mat4 projRH{ glm::perspectiveRH_ZO(glm::radians(_camera.camera->GetFOV()), aspect, _camera.camera->GetNearPlaneDistance(), _camera.camera->GetFarPlaneDistance()) };
+			
+				const glm::quat originalOrientation{ transform.GetLocalRotation() };
+			
+				ImGuizmo::Manipulate(glm::value_ptr(viewRH), glm::value_ptr(projRH), m_currentGizmoOp, m_currentGizmoMode, glm::value_ptr(modelMatrixRH));
+
+				//If the user updated the gizmo, we need to convert it back to left-handed to update the transform
+				//what a palaver, an absolute kerfuffle, such a silly conundrum....
+				//when will people learn to stop using right handed systems
+				if (ImGuizmo::IsUsing())
+				{
+					const glm::mat4 modelMatrixLH{ flipZ * modelMatrixRH * flipZ };
+					glm::mat4 newLocalMatrix{ modelMatrixLH };
+					if (transform.GetParent())
+					{
+						glm::mat4 parentInverse = glm::inverse(transform.GetParent()->GetModelMatrix());
+						newLocalMatrix = parentInverse * modelMatrixLH;
+					}
+
+					glm::vec3 scale, translation, skew;
+					glm::quat orientation;
+					glm::vec4 perspective;
+					if (glm::decompose(newLocalMatrix, scale, orientation, translation, skew, perspective))
+					{
+						transform.SetLocalPosition(translation);
+						transform.SetLocalRotation(glm::normalize(orientation));
+						transform.SetLocalScale(scale);
+					}
+				
+					//Reshaping an object's collider is very expensive so don't apply continuous updates as scale changes, only do it when the user lets go
+					bool isUsing{ ImGuizmo::IsUsing() };
+					static bool wasUsing{ false };
+					if (wasUsing && !isUsing && m_currentGizmoOp == ImGuizmo::SCALE)
+					{
+						if (m_reg.get().HasComponent<CBoxCollider>(selectedEntity))
+						{
+							m_reg.get().GetComponent<CBoxCollider>(selectedEntity).halfExtentsDirty = true;
+						}
+					}
+					wasUsing = isUsing;
+				}
 			}
 		}
+		
+		
+		m_cPressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::C);
+		m_vPressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::V);
+		m_sPressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::S);
+		m_oPressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::O);
+		m_ePressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::E);
+		m_f4PressedLastFrame = InputManager::GetKeyPressed(KEYBOARD::F4);
 	}
 
 	
@@ -2180,7 +2276,7 @@ namespace NK
 		{
 			if (m_gpuModelReferenceCounter[m_modelUnloadQueue[m_globalFrame].back()] == 0)
 			{
-				ModelLoader::UnloadModel(m_modelUnloadQueue[m_globalFrame].back());
+				if (m_fullDiskStreaming) { ModelLoader::UnloadModel(m_modelUnloadQueue[m_globalFrame].back()); }
 				m_gpuModelCache.erase(m_modelUnloadQueue[m_globalFrame].back());
 			}
 			m_modelUnloadQueue[m_globalFrame].pop_back();
@@ -2202,23 +2298,76 @@ namespace NK
 		}
 
 
-		//Update camera
-		found = false;
-		for (auto&& [camera] : m_reg.get().View<CCamera>())
+		//Update active light view / camera
+		if (Context::GetActiveLightView() != nullptr)
 		{
-			if (found)
-			{
-				//Multiple cameras, notify the user only the first one is being considered for rendering - todo: change this (probably let the user specify on CModelRenderer which camera they want to use)
-				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
-				break;
-			}
-			found = true;
-			UpdateCameraBuffer(camera);
-			m_activeCamera = &camera;
+			for (auto&& [light, transform] : m_reg.get().View<CLight, CTransform>())
+            {
+                if (&light == Context::GetActiveLightView() && light.light)
+                {
+                    CameraShaderData camData{};
+                    camData.pos = glm::vec4(transform.GetWorldPosition(), 1.0f);
+
+                    //View matrix
+                	if (light.GetLightType() == LIGHT_TYPE::POINT)
+                    {
+                        camData.viewMat = glm::inverse(transform.GetModelMatrix());
+                    }
+                    else
+                    {
+                        camData.viewMat = glm::inverse(transform.GetModelMatrix());
+                    }
+
+                    //Projection Matrix
+                    if (light.GetLightType() == LIGHT_TYPE::DIRECTIONAL)
+                    {
+                        const glm::vec3& d{ static_cast<DirectionalLight*>(light.light.get())->GetDimensions() };
+                        camData.projMat = glm::orthoLH(-d.x, d.x, -d.y, d.y, -d.z, d.z);
+                    }
+                    else if (light.GetLightType() == LIGHT_TYPE::SPOT)
+                    {
+                        SpotLight* spotLight = static_cast<SpotLight*>(light.light.get());
+                        camData.projMat = glm::perspectiveLH(spotLight->GetOuterAngle() * 2.0f, static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y, 0.01f, 1000.0f); 
+                    }
+                    else
+                    {
+                        camData.projMat = glm::perspectiveLH(glm::radians(90.0f), static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y, 0.01f, 1000.0f);
+                    }
+                	
+                	//Upload
+                    memcpy(m_camDataBufferMaps[m_currentFrame], &camData, sizeof(CameraShaderData));
+                    if (m_firstFrame)
+                    {
+                        memcpy(m_camDataBufferPreviousFrameMaps[m_currentFrame], &camData, sizeof(CameraShaderData));
+                    }
+                	else
+                	{
+                        memcpy(m_camDataBufferPreviousFrameMaps[m_currentFrame], m_camDataBufferMaps[(m_currentFrame + m_desc.framesInFlight - 1) % m_desc.framesInFlight], sizeof(CameraShaderData));
+                    }
+                	
+                    break;
+                }
+            }
 		}
-		if (!found)
+		else
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
+			found = false;
+			for (auto&& [camera] : m_reg.get().View<CCamera>())
+			{
+				if (found)
+				{
+					//Multiple cameras, notify the user only the first one is being considered for rendering - todo: change this (probably let the user specify on CModelRenderer which camera they want to use)
+					m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "Multiple `CCamera`s found in registry. Note that currently, only one camera is supported - only the first camera will be used.\n");
+					break;
+				}
+				found = true;
+				UpdateCameraBuffer(camera);
+				m_activeCamera = &camera;
+			}
+			if (!found)
+			{
+				m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::RENDER_LAYER, "No `CCamera`s found in registry.\n");
+			}
 		}
 
 		
@@ -2239,31 +2388,34 @@ namespace NK
 			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
 			CTransform& transform{ m_reg.get().GetComponent<CTransform>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
 			
-			//Update visibility
-			bool isVisible{ (visibilityMap[modelRenderer.visibilityIndex] == 1) }; //GPU visibility result
-			if (!isVisible && m_activeCamera)
+			//Update visibility if not frozen
+			if (!m_freezeVisibility)
 			{
-				//If camera is within model's bounds, the depth buffer may contain residual data from the model, and since the AABB lies outside this extent, it may not be rendered and so the gpu visibility check will fail
-				//Check if camera is within model bounds, and if so, override gpu's result and set visible to true
-				
-				//Transform camera position from world space -> model's local space
-				const glm::vec3 modelLocalCamPos{ glm::vec3(glm::inverse(transform.GetModelMatrix()) * glm::vec4(m_activeCamera->camera->GetPosition(), 1.0f)) };
-				
-				float bufferRegion{ 1.05f };
-				const glm::vec3 bufferedExtents{ modelRenderer.localSpaceHalfExtents * 1.05f };
-				const glm::vec3 minBound{ modelRenderer.localSpaceOrigin - bufferedExtents };
-				const glm::vec3 maxBound{ modelRenderer.localSpaceOrigin + bufferedExtents };
-				if (modelLocalCamPos.x >= minBound.x && modelLocalCamPos.x <= maxBound.x &&
-					modelLocalCamPos.y >= minBound.y && modelLocalCamPos.y <= maxBound.y &&
-					modelLocalCamPos.z >= minBound.z && modelLocalCamPos.z <= maxBound.z)
+				bool isVisible{ (visibilityMap[modelRenderer.visibilityIndex] == 1) }; //GPU visibility result
+				if (!isVisible && m_activeCamera)
 				{
-					//Inside model, so override visibility flag
-					isVisible = true;
+					//If camera is within model's bounds, the depth buffer may contain residual data from the model, and since the AABB lies outside this extent, it may not be rendered and so the gpu visibility check will fail
+					//Check if camera is within model bounds, and if so, override gpu's result and set visible to true
+				
+					//Transform camera position from world space -> model's local space
+					const glm::vec3 modelLocalCamPos{ glm::vec3(glm::inverse(transform.GetModelMatrix()) * glm::vec4(m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)).GetWorldPosition(), 1.0f)) };
+				
+					float bufferRegion{ 1.05f };
+					const glm::vec3 bufferedExtents{ modelRenderer.localSpaceHalfExtents * 1.05f };
+					const glm::vec3 minBound{ modelRenderer.localSpaceOrigin - bufferedExtents };
+					const glm::vec3 maxBound{ modelRenderer.localSpaceOrigin + bufferedExtents };
+					if (modelLocalCamPos.x >= minBound.x && modelLocalCamPos.x <= maxBound.x &&
+						modelLocalCamPos.y >= minBound.y && modelLocalCamPos.y <= maxBound.y &&
+						modelLocalCamPos.z >= minBound.z && modelLocalCamPos.z <= maxBound.z)
+					{
+						//Inside model, so override visibility flag
+						isVisible = true;
+					}
 				}
-			}
-			if (modelRenderer.visibilityIndex != 0xFFFFFFFF)
-			{
-				modelRenderer.visible = isVisible;
+				if (modelRenderer.visibilityIndex != 0xFFFFFFFF)
+				{
+					modelRenderer.visible = isVisible;
+				}
 			}
 			
 			
@@ -2535,7 +2687,7 @@ namespace NK
 
 
 		//Update m_camDataBufferMap with the camera data from this frame
-		const CameraShaderData camShaderData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE) };
+		const CameraShaderData camShaderData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(_camera)).GetModelMatrix()) };
 		memcpy(m_camDataBufferMaps[m_currentFrame], &camShaderData, sizeof(CameraShaderData));
 		if (m_firstFrame)
 		{

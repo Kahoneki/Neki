@@ -87,9 +87,6 @@ namespace NK
 		
 		inline void SetCameraType(const CAMERA_TYPE _type)
 		{
-			const glm::vec3 oldPos = camera ? camera->GetPosition() : glm::vec3(0.0f);
-			const float oldYaw = camera ? camera->GetYaw() : 0.0f;
-			const float oldPitch = camera ? camera->GetPitch() : 0.0f;
 			const float oldNear = camera ? camera->GetNearPlaneDistance() : 0.1f;
 			const float oldFar = camera ? camera->GetFarPlaneDistance() : 1000.0f;
 			const float oldFov = camera ? camera->GetFOV() : 90.0f;
@@ -102,11 +99,11 @@ namespace NK
 			switch (_type)
 			{
 			case CAMERA_TYPE::CAMERA:
-				camera = UniquePtr<Camera>(NK_NEW(Camera, oldPos, oldYaw, oldPitch, oldNear, oldFar, oldFov, oldAspect));
+				camera = UniquePtr<Camera>(NK_NEW(Camera, oldNear, oldFar, oldFov, oldAspect));
 				break;
 			case CAMERA_TYPE::PLAYER_CAMERA:
 				//Default values: speed = 30.0f, sensitivity = 0.05f
-				camera = UniquePtr<Camera>(NK_NEW(PlayerCamera, oldPos, oldYaw, oldPitch, oldNear, oldFar, oldFov, oldAspect, 30.0f, 0.05f));
+				camera = UniquePtr<Camera>(NK_NEW(PlayerCamera, oldNear, oldFar, oldFov, oldAspect, 30.0f, 0.05f));
 				break;
 			default:
 				break;
@@ -139,21 +136,21 @@ namespace NK
 			}
 			
 			//FOV
-			float fov = camera->GetFOV();
+			float fov{ camera->GetFOV() };
 			if (ImGui::DragFloat("FOV", &fov, 0.1f, 1.0f, 179.0f))
 			{
 				camera->SetFOV(fov);
 			}
 
 			//Near Plane
-			float nearPlane = camera->GetNearPlaneDistance();
+			float nearPlane{ camera->GetNearPlaneDistance() };
 			if (ImGui::DragFloat("Near Plane", &nearPlane, 0.01f, 0.001f, 10.0f))
 			{
 				camera->SetNearPlaneDistance(nearPlane);
 			}
 
 			//Far Plane
-			float farPlane = camera->GetFarPlaneDistance();
+			float farPlane{ camera->GetFarPlaneDistance() };
 			if (ImGui::DragFloat("Far Plane", &farPlane, 1.0f, 1.0f, 10000.0f))
 			{
 				camera->SetFarPlaneDistance(farPlane);
@@ -161,15 +158,22 @@ namespace NK
 
 			if (PlayerCamera* playerCamera{ dynamic_cast<PlayerCamera*>(camera.get()) })
 			{
+				//Flight
+				bool flightEnabled{ playerCamera->GetFlightEnabled() };
+				if (ImGui::Checkbox("Flight Enabled", &flightEnabled))
+				{
+					playerCamera->SetFlightEnabled(flightEnabled);
+				}
+				
 				//Movement Speed
-				float speed = playerCamera->GetMovementSpeed();
+				float speed{ playerCamera->GetMovementSpeed() };
 				if (ImGui::DragFloat("Movement Speed", &speed, 0.1f, 0.0f, 1000.0f))
 				{
 					playerCamera->SetMovementSpeed(speed);
 				}
 
 				//Mouse Sensitivity
-				float sensitivity = playerCamera->GetMouseSensitivity();
+				float sensitivity{ playerCamera->GetMouseSensitivity() };
 				if (ImGui::DragFloat("Mouse Sensitivity", &sensitivity, 0.01f, 0.0f, 10.0f))
 				{
 					playerCamera->SetMouseSensitivity(sensitivity);
@@ -193,6 +197,14 @@ namespace NK
 				if (ImGui::DragFloat("Maximum Irradiance", &maxIrradiance, 0.1f, 0.0f)) {}
 				
 				ImGui::Unindent();
+			}
+			
+			if (Context::GetActiveLightView() != nullptr)
+			{
+				if (ImGui::Button("View From Camera Perspective"))
+				{
+					Context::SetActiveLightView(nullptr);
+				}
 			}
 		}
 		

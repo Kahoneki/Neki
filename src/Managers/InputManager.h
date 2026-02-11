@@ -29,7 +29,7 @@ namespace NK
 		[[nodiscard]] inline static ButtonState GetButtonState(const ActionType _action)
 		{
 			ValidateActionTypeUtil("GetButtonState()", _action, INPUT_BINDING_TYPE::BUTTON);
-			const ActionTypeMapKey key{ std::type_index(typeid(ActionType)), std::to_underlying(_action) };
+			const ActionTypeMapKey key{ TypeRegistry::GetConstant(std::type_index(typeid(ActionType))), std::to_underlying(_action) };
 			return GetButtonState(key);
 		}
 
@@ -38,7 +38,7 @@ namespace NK
 		[[nodiscard]] inline static Axis1DState GetAxis1DState(const ActionType _action)
 		{
 			ValidateActionTypeUtil("GetAxis1DState()", _action, INPUT_BINDING_TYPE::AXIS_1D);
-			const ActionTypeMapKey key{ typeid(ActionType).name(), std::to_underlying(_action) };
+			const ActionTypeMapKey key{ TypeRegistry::GetConstant(std::type_index(typeid(ActionType))), std::to_underlying(_action) };
 			return GetAxis1DState(key);
 		}
 
@@ -47,7 +47,7 @@ namespace NK
 		[[nodiscard]] inline static Axis2DState GetAxis2DState(const ActionType _action)
 		{
 			ValidateActionTypeUtil("GetAxis2DState()", _action, INPUT_BINDING_TYPE::AXIS_2D);
-			const ActionTypeMapKey key{ std::type_index(typeid(ActionType)), std::to_underlying(_action) };
+			const ActionTypeMapKey key{ TypeRegistry::GetConstant(std::type_index(typeid(ActionType))), std::to_underlying(_action) };
 			return GetAxis2DState(key);
 		}
 		

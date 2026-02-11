@@ -103,7 +103,11 @@ namespace NK
 			//If entity has a parent, remove this entity from its children vector
 			if (transform.GetParent() != nullptr)
 			{
-				transform.GetParent()->children.erase(std::ranges::find(transform.GetParent()->children, &transform));
+				std::vector<CTransform*>::iterator it{ std::ranges::find(transform.GetParent()->children, &transform) };
+				if (it != transform.GetParent()->children.end())
+				{
+					transform.GetParent()->children.erase(it);
+				}
 			}
 			
 				
@@ -391,7 +395,7 @@ inline void NK::ComponentPool<Component>::AddDefaultToEntity(NK::Registry& _reg,
 template <typename Component>
 inline void NK::ComponentPool<Component>::CopyComponentToEntity(NK::Registry& _reg, const Entity _srcEntity, const Entity _dstEntity)
 {
-	if (entityToIndex.contains(_srcEntity))
+	if (entityToIndex.contains(_srcEntity) && !_reg.HasComponent<Component>(_dstEntity))
 	{
 		_reg.AddComponent<Component>(_dstEntity, components[entityToIndex.at(_srcEntity)]);
 	}

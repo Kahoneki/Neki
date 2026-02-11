@@ -86,7 +86,7 @@ namespace NK
 				const std::vector<std::string> selection = pfd::open_file("Select File", lastAccessedFilepath, { "Neki Models", "*.nkmodel", "All Files", "*" }).result();
 				if (!selection.empty())
 				{
-					SetModelPath(std::filesystem::relative(selection[0], NEKI_BUILD_DIR).string());
+					SetModelPath(std::filesystem::relative(selection[0], NEKI_SOURCE_DIR).string());
 					lastAccessedFilepath = selection[0];
 				}
 				std::filesystem::current_path(currentPath);
@@ -114,7 +114,7 @@ namespace NK
 		std::uint32_t visibilityIndex{ 0xFFFFFFFF };
 		
 		//UI
-		std::string lastAccessedFilepath{ NEKI_BUILD_DIR };
+		std::string lastAccessedFilepath{ NEKI_SOURCE_DIR };
 	};
 	
 }
