@@ -54,6 +54,22 @@ namespace NK
 		m_logger.Unindent();
 	}
 
+	
+	
+	bool VulkanFence::GetSignalled()
+	{
+		const VkResult result{ vkGetFenceStatus(dynamic_cast<VulkanDevice&>(m_device).GetDevice(), m_fence) };
+		switch (result)
+		{
+		case VK_SUCCESS:	{ return true; }
+		case VK_NOT_READY:	{ return false; }
+		default:
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::FENCE, "Default case for GetSignalled() reached - result: " + std::to_string(result) + "\n");
+			throw std::runtime_error("");
+		}
+		}
+	}
 
 
 	void VulkanFence::Wait()

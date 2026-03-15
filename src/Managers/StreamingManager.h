@@ -16,6 +16,9 @@ namespace NK
     class StreamingManager final
     {
     public:
+        //Sets the device that will be used for creating fences that track the upload state of assets
+        static void SetDevice(IDevice* _device);
+        
         //Registers interest in asset
         //Returns asset pointer if resident on GPU, otherwise returns nullptr
         //If not loaded, begins the loading process
@@ -29,7 +32,7 @@ namespace NK
         //Decrements reference count. If 0, moves to STREAMING_STATE::PENDING_UNLOAD
         static void ReleaseModel(const std::string& _filepath);
         
-        //Decreements reference count. If 0, moves to STREAMING_STATE::PENDING_UNLOAD
+        //Decrements reference count. If 0, moves to STREAMING_STATE::PENDING_UNLOAD
         static void ReleaseTexture(const std::string& _filepath);
         
         //To be called once per frame
@@ -47,6 +50,8 @@ namespace NK
             STREAMING_STATE state{ STREAMING_STATE::UNLOADED };
             std::uint32_t refCount{ 0 };
             float timeSinceLastUse{ 0.0f }; //for unload timer
+            std::uint32_t memoryCost{ 0 };
+            UniquePtr<IFence> vramUploadStatusFence;
         };
 
         struct ModelStreamingInfo : public StreamingInfoBase
@@ -60,12 +65,17 @@ namespace NK
             ImageData* cpuImage{ nullptr };
             UniquePtr<ITexture> gpuTexture{ nullptr };
         };
+        
+        inline static IDevice* m_device{ nullptr };
 
         inline static std::unordered_map<std::string, ModelStreamingInfo> m_models{};
         inline static std::unordered_map<std::string, TextureStreamingInfo> m_textures{};
 
+        inline static std::uint32_t m_ramUsage{ 0 };
+        inline static std::uint32_t m_vramUsage{ 0 };
         
         //Config
+        static constexpr std::uint32_t RAM_BUDGET{ 8 * 1024 * 1024 }; //8GiB
         static constexpr std::uint32_t VRAM_BUDGET{ 4 * 1024 * 1024 }; //4GiB
         static constexpr std::uint32_t MAX_UPLOAD_BYTES_PER_FRAME{ 20 * 1024 * 1024 }; //20 MiB
         static constexpr float UNLOAD_TIME{ 5.0f }; //Time (in seconds) to keep non-visible assets

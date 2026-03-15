@@ -12,6 +12,7 @@ namespace NK
 		explicit VulkanFence(ILogger& _logger, IAllocator& _allocator, IDevice& _device, const FenceDesc& _desc);
 		virtual ~VulkanFence() override;
 
+		virtual bool GetSignalled() override;
 		virtual void Wait() override;
 		virtual void Reset() override;
 

@@ -17,6 +17,7 @@ namespace NK
 	public:
 		virtual ~IFence() = default;
 
+		virtual bool GetSignalled() = 0;
 		virtual void Wait() = 0;
 		virtual void Reset() = 0;
 
