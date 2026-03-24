@@ -99,6 +99,19 @@ namespace NK
 		void OnSceneLoad(const SceneLoadEvent& _event);
 
 
+		//VERY temp
+		Neural::NTCModel* m_ntcModel;
+		UniquePtr<IBuffer> m_latentTexBuffer;
+		void* m_latentTexBufferMap;
+		UniquePtr<IBufferView> m_latentTexBufferView;
+		UniquePtr<IBuffer> m_latentTexBuffer2;
+		void* m_latentTexBufferMap2;
+		UniquePtr<IBufferView> m_latentTexBufferView2;
+		UniquePtr<IBuffer> m_mlpBuffer;
+		void* m_mlpBufferMap;
+		UniquePtr<IBufferView> m_mlpBufferView;
+		
+		
 		//Dependency injections
 		IAllocator& m_allocator;
 		const RenderLayerDesc m_desc;

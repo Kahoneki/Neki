@@ -594,8 +594,12 @@ namespace NK
 		m_modelVisibilityFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Shadow_fs";
 		m_shadowFragShader = m_device->CreateShader(fragShaderDesc);
-		fragShaderDesc.filepath = "Shaders/ModelBlinnPhong_fs";
+
+		// fragShaderDesc.filepath = "Shaders/ModelBlinnPhong_fs";
+		//VERY temp
+		fragShaderDesc.filepath = "Shaders/NTCModel_fs";
 		m_blinnPhongFragShader = m_device->CreateShader(fragShaderDesc);
+		
 		fragShaderDesc.filepath = "Shaders/ModelPBR_fs";
 		m_pbrFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Skybox_fs";
@@ -1139,8 +1143,13 @@ namespace NK
 			pushConstantData.irradianceCubemapIndex = _texViews.Get("IRRADIANCE_MAP_VIEW") ? _texViews.Get("IRRADIANCE_MAP_VIEW")->GetIndex() : 0;
 			pushConstantData.prefilterCubemapIndex = _texViews.Get("PREFILTER_MAP_VIEW") ? _texViews.Get("PREFILTER_MAP_VIEW")->GetIndex() : 0;
 			pushConstantData.brdfLUTIndex = _texViews.Get("BRDF_LUT_VIEW")->GetIndex();
-			pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
-			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+			
+			//VERY temp
+			// pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
+			pushConstantData.brdfLUTSamplerIndex = m_mlpBufferView->GetIndex();
+			// pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+			pushConstantData.samplerIndex = m_latentTexBufferView2->GetIndex();
+			
 			if (m_activeCamera)
 			{
 				pushConstantData.maxIrradiance = m_activeCamera->GetMaxIrradiance();
@@ -1169,7 +1178,11 @@ namespace NK
 				for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
 				{
 					const GPUMesh* mesh{ model->meshes[i].get() };
-					pushConstantData.materialBufferIndex = model->materials[mesh->materialIndex]->bufferIndex;
+					// pushConstantData.materialBufferIndex = model->materials[mesh->materialIndex]->bufferIndex;
+					
+					//VERY temp
+					pushConstantData.materialBufferIndex = m_latentTexBufferView->GetIndex();
+					
 					_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
 					IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
 					_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
@@ -2491,6 +2504,70 @@ namespace NK
 					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
 					m_newGPUUploaderUpload = true;
 					m_gpuModelReferenceCounter[modelRenderer.modelPath] = 0;
+					
+					
+					//VERY temp
+					if (!m_latentTexBuffer)
+					{
+						m_ntcModel = modelRenderer.ntcModel;
+						BufferDesc desc{};
+						desc.size = (m_ntcModel->featureLevels[0].g0.numElementsPacked + 3) & ~3; //round up to the nearest multiple of 4
+						desc.type = MEMORY_TYPE::HOST;
+						desc.usage = BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
+						m_latentTexBuffer = m_device->CreateBuffer(desc);
+						m_latentTexBufferMap = m_latentTexBuffer->GetMap();
+						memcpy(m_latentTexBufferMap, m_ntcModel->featureLevels[0].g0.data, desc.size);
+						BufferViewDesc viewDesc{};
+						viewDesc.size = desc.size;
+						viewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
+						viewDesc.offset = 0;
+						viewDesc.stride = 0;
+						m_latentTexBufferView = m_device->CreateBufferView(m_latentTexBuffer.get(), viewDesc);
+						
+						desc.size = (m_ntcModel->featureLevels[0].g1.numElementsPacked + 3) & ~3; //round up to the nearest multiple of 4
+						desc.type = MEMORY_TYPE::HOST;
+						desc.usage = BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
+						m_latentTexBuffer2 = m_device->CreateBuffer(desc);
+						m_latentTexBufferMap2 = m_latentTexBuffer2->GetMap();
+						memcpy(m_latentTexBufferMap2, m_ntcModel->featureLevels[0].g1.data, desc.size);
+						viewDesc.size = desc.size;
+						viewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
+						viewDesc.offset = 0;
+						viewDesc.stride = 0;
+						m_latentTexBufferView2 = m_device->CreateBufferView(m_latentTexBuffer2.get(), viewDesc);
+						
+						std::vector<std::uint32_t> packedMLP;
+						packedMLP.push_back(m_ntcModel->header.numLinearLayers);
+						for (const auto& layer : m_ntcModel->mlp)
+						{
+							packedMLP.push_back(layer.inFeatures);
+							packedMLP.push_back(layer.outFeatures);
+							for (std::size_t ii = 0; ii < layer.weights.size(); ii += 2)
+							{
+								std::uint32_t lower = layer.weights[ii];
+								std::uint32_t upper = (ii + 1 < layer.weights.size()) ? layer.weights[ii + 1] : 0;
+								packedMLP.push_back(lower | (upper << 16));
+							}
+							for (std::size_t ii = 0; ii < layer.biases.size(); ii += 2)
+							{
+								std::uint32_t lower = layer.biases[ii];
+								std::uint32_t upper = (ii + 1 < layer.biases.size()) ? layer.biases[ii + 1] : 0;
+								packedMLP.push_back(lower | (upper << 16));
+							}
+						}
+						
+						desc.size = (packedMLP.size() + 3) & ~3; //round up to the nearest multiple of 4
+						desc.type = MEMORY_TYPE::HOST;
+						desc.usage = BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
+						m_mlpBuffer = m_device->CreateBuffer(desc);
+						m_mlpBufferMap = m_mlpBuffer->GetMap();
+						memcpy(m_mlpBufferMap, packedMLP.data(), desc.size);
+						viewDesc.size = desc.size;
+						viewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
+						viewDesc.offset = 0;
+						viewDesc.stride = 0;
+						m_mlpBufferView = m_device->CreateBufferView(m_mlpBuffer.get(), viewDesc);
+					}
 				}
 				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
 				++m_gpuModelReferenceCounter[modelRenderer.modelPath];

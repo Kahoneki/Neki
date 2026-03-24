@@ -156,6 +156,7 @@ FetchContent_MakeAvailable(ktx)
 target_link_libraries(Neki PUBLIC ktx)
 
 #Assimp
+set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
 FetchContent_Declare(assimp GIT_REPOSITORY "https://github.com/assimp/assimp.git" GIT_TAG v5.4.1)
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
@@ -467,5 +468,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     target_include_directories(NKEngineSample_Physics PUBLIC "${CMAKE_SOURCE_DIR}/src")
     target_link_libraries(NKEngineSample_Physics PRIVATE Neki)
     add_dependencies(NKEngineSample_Physics Shaders)
+    
+    
+    
+    #Demos
+    add_subdirectory(NTCDemo)
 
 endif()

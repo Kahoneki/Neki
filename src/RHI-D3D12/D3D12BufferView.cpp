@@ -66,11 +66,21 @@ namespace NK
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
-			srvDesc.Buffer.FirstElement = _desc.offset / std::max(std::size_t(1u), _desc.stride);
-			srvDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / std::max(std::size_t(1u), _desc.stride));
-			srvDesc.Buffer.StructureByteStride = _desc.stride;
-			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-
+			if (_desc.stride == 0)
+			{
+				srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+				srvDesc.Buffer.FirstElement = _desc.offset / 4;
+				srvDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / 4);
+				srvDesc.Buffer.StructureByteStride = 0;
+				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+			}
+			else
+			{
+				srvDesc.Buffer.FirstElement = _desc.offset / std::max(std::size_t(1u), _desc.stride);
+				srvDesc.Buffer.NumElements = static_cast<UINT>(_desc.size / std::max(std::size_t(1u), _desc.stride));
+				srvDesc.Buffer.StructureByteStride = _desc.stride;
+				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+			}
 			dynamic_cast<D3D12Device&>(m_device).GetDevice()->CreateShaderResourceView(d3d12Buffer->GetBuffer(), &srvDesc, addr);
 			break;
 		}

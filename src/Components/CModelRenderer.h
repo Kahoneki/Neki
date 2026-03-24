@@ -4,6 +4,7 @@
 
 #include "CImGuiInspectorRenderable.h"
 
+#include <Core/Utils/NTCLoader.h>
 #include <Graphics/GPUUploader.h>
 
 
@@ -72,6 +73,10 @@ namespace NK
 		//Volume in local space
 		glm::vec3 localSpaceOrigin{ 0,0,0 };
 		glm::vec3 localSpaceHalfExtents{ 0,0,0 };
+		
+		
+		//VERY temp
+		Neural::NTCModel* ntcModel;
 		
 		
 	private:
