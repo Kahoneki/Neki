@@ -2516,7 +2516,7 @@ namespace NK
 						desc.usage = BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
 						m_latentTexBuffer = m_device->CreateBuffer(desc);
 						m_latentTexBufferMap = m_latentTexBuffer->GetMap();
-						memcpy(m_latentTexBufferMap, m_ntcModel->featureLevels[0].g0.data, desc.size);
+						memcpy(m_latentTexBufferMap, m_ntcModel->featureLevels[0].g0.data, m_ntcModel->featureLevels[0].g0.numElementsPacked);
 						BufferViewDesc viewDesc{};
 						viewDesc.size = desc.size;
 						viewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
@@ -2529,7 +2529,7 @@ namespace NK
 						desc.usage = BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
 						m_latentTexBuffer2 = m_device->CreateBuffer(desc);
 						m_latentTexBufferMap2 = m_latentTexBuffer2->GetMap();
-						memcpy(m_latentTexBufferMap2, m_ntcModel->featureLevels[0].g1.data, desc.size);
+						memcpy(m_latentTexBufferMap2, m_ntcModel->featureLevels[0].g1.data, m_ntcModel->featureLevels[0].g1.numElementsPacked);
 						viewDesc.size = desc.size;
 						viewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
 						viewDesc.offset = 0;
@@ -2538,7 +2538,7 @@ namespace NK
 						
 						std::vector<std::uint32_t> packedMLP;
 						packedMLP.push_back(m_ntcModel->header.numLinearLayers);
-						for (const auto& layer : m_ntcModel->mlp)
+						for (const Neural::NTCLinearLayer& layer : m_ntcModel->mlp)
 						{
 							packedMLP.push_back(layer.inFeatures);
 							packedMLP.push_back(layer.outFeatures);
@@ -2556,7 +2556,7 @@ namespace NK
 							}
 						}
 						
-						desc.size = (packedMLP.size() + 3) & ~3; //round up to the nearest multiple of 4
+						desc.size = packedMLP.size() * sizeof(std::uint32_t);
 						desc.type = MEMORY_TYPE::HOST;
 						desc.usage = BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
 						m_mlpBuffer = m_device->CreateBuffer(desc);
