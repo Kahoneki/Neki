@@ -278,6 +278,7 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
                 -T ${SHADER_TYPE}
                 -E ${ENTRY_POINT}
                 -spirv
+                -fspv-target-env=vulkan1.3
                 -fspv-debug=vulkan-with-source
                 -Fo ${SPV_OUTPUT}
                 DEPENDS ${SHADER_SOURCE}

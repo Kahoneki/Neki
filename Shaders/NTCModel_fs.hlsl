@@ -80,29 +80,19 @@ struct G1Features
 G0Features SampleG0(int2 p)
 {
 	G0Features output;
-	for (uint c=0; c<12; ++c)
+	uint pixelIdx = p.y * 2048 + p.x;
+	uint byteOffset = pixelIdx * 3;
+	
+	uint alignedOffset = byteOffset & ~3;
+	uint byteShift = (byteOffset & 3) * 8;
+	uint2 words = g0Buffer[PC(g0BufferIndex)].Load2(alignedOffset);
+	uint packed24 = words.x >> byteShift;
+	if (byteShift > 0) { packed24 |= (words.y << (32 - byteShift)); }
+	for (uint c = 0; c < 12; ++c)
 	{
-		//4 values are packed into every byte in the buffer
-		uint linearIdx = uint(c * 2048 * 2048 + p.y * 2048 + p.x); //Index of the packed value
-		uint byteOffset = linearIdx / 4; //Index of the actual byte to be loaded that contains the desired value
-		uint packed = (g0Buffer[PC(g0BufferIndex)].Load(byteOffset & ~3) >> ((byteOffset & 3) * 8)) & 0xFF;
-		
-		//linearIdx % 4 gives which of the 4 positions within the byte the value is stored (0,1,2,3)
-		//(3 - (linearIdx % 4)) * 2 computes the bit shift to reach that position
-		//linearIdx % 4		shift		extracts
-		//0					6			bits 7-6 (val0)
-		//1					4			bits 5-4 (val1)
-		//2					2			bits 3-2 (val2)
-		//3					0			bits 1-0 (val3)
-		uint shift = (3 - (linearIdx % 4)) * 2;
-		
-		//Shift desired two bits to the bottom and mask with 0b11 to isolate
-		uint raw = (packed >> shift) & 0b11;
-		
-		//Re-quantise from {0b00 (0), 0b01 (1), 0b10 (2), 0b11 (3)} to {0, 1/3, 2/3, 1}
-		float value = raw / 3.0;
-		
-		output.channels[c] = value;
+		uint bitShift = (c / 4) * 8 + (3 - (c % 4)) * 2;
+		uint raw = (packed24 >> bitShift) & 0b11;
+		output.channels[c] = float(raw) * 0.33333333f;
 	}
 	
 	return output;
@@ -113,18 +103,27 @@ G0Features SampleG0(int2 p)
 G1Features SampleG1(int2 p)
 {
 	G1Features output;
-	for (uint c=0; c<10; ++c)
+	uint pixelIdx = p.y * 1024 + p.x;
+	uint byteOffset = pixelIdx * 5;
+	uint alignedOffset = byteOffset & ~3;
+	uint byteShift = (byteOffset & 3) * 8;
+	uint2 words = g1Buffer[PC(g1BufferIndex)].Load2(alignedOffset);
+	uint packedLow = words.x >> byteShift;
+	if (byteShift > 0) { packedLow |= (words.y << (32 - byteShift)); }
+	uint packedHigh = words.y >> byteShift;
+	for (uint c = 0; c < 10; ++c)
 	{
-		//2 values are packed into every byte in the buffer
-		uint linearIdx = uint(c * 1024 * 1024 + p.y * 1024 + p.x); //Index of the packed value
-		uint byteOffset = linearIdx / 2; //Index of the actual byte to be loaded that contains the desired value
-		uint packed = (g1Buffer[PC(g1BufferIndex)].Load(byteOffset & ~3) >> ((byteOffset & 3) * 8)) & 0xFF;
-		uint raw = (linearIdx % 2 == 0) ? (packed >> 4) : (packed & 0xF);
-		
-		//Re-quantise
-		float value = raw / 15.0;
-		
-		output.channels[c] = value;
+		uint bitShift = (c / 2) * 8 + (1 - (c % 2)) * 4;
+		uint raw = 0;
+		if (bitShift < 32)
+		{
+			raw = (packedLow >> bitShift) & 0xF;
+		}
+		else
+		{
+			raw = (packedHigh >> (bitShift - 32)) & 0xF;
+		}
+		output.channels[c] = float(raw) * 0.06666666f;
 	}
 	
 	return output;
