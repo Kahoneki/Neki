@@ -34,13 +34,34 @@ class GameScene final : public NK::Scene
 public:
 	explicit GameScene() : Scene(128)
 	{
+		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Plane.nkmodel") };
+		// NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Plane.gltf", serialisedModelOutputPath.string(), true, true);
+		
 		m_floorEntity = m_reg.Create();
 		NK::CModelRenderer& floorModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_floorEntity) };
-		floorModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel");
+		floorModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/Prefabs/Plane.nkmodel");
 		NK::CTransform& floorTransform{ m_reg.GetComponent<NK::CTransform>(m_floorEntity) };
 		floorTransform.name = "Floor";
 		floorTransform.SetLocalPosition({ 0, 0.0f, 0.0f });
 		floorTransform.SetLocalScale({ 5.0f, 0.2f, 5.0f });
+		
+		m_skyboxEntity = m_reg.Create();
+		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
+		m_reg.GetComponent<NK::CTransform>(m_skyboxEntity).name = "Skybox";
+		skybox.SetSkyboxFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/skybox.ktx");
+		skybox.SetIrradianceFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/irradiance.ktx");
+		skybox.SetPrefilterFilepath("Samples/Resource-Files/Skyboxes/The Sky is On Fire/prefilter.ktx");
+
+		// m_lightEntity1 = m_reg.Create();
+		// NK::CTransform& directionalLightTransform{ m_reg.GetComponent<NK::CTransform>(m_lightEntity1) };
+		// directionalLightTransform.name = "Directional Light";
+		// directionalLightTransform.SetLocalRotation({ glm::radians(90.0f), glm::radians(0.0f), glm::radians(0.0f) });
+		// directionalLightTransform.SetLocalPosition({ 0.0f, 10.0f, 5.0f });
+		// NK::CLight& directionalLight{ m_reg.AddComponent<NK::CLight>(m_lightEntity1) };
+		// directionalLight.SetLightType(NK::LIGHT_TYPE::DIRECTIONAL);
+		// directionalLight.light->SetColour({ 1,1,1 });
+		// directionalLight.light->SetIntensity(1.0f);
+		// dynamic_cast<NK::DirectionalLight*>(directionalLight.light.get())->SetDimensions({ 50, 50, 50 });
 		
 		m_cameraEntity = m_reg.Create();
 		NK::CCamera& camera{ m_reg.AddComponent<NK::CCamera>(m_cameraEntity) };
@@ -82,6 +103,8 @@ public:
 private:
 	NK::Entity m_floorEntity;
 	NK::Entity m_cameraEntity;
+	NK::Entity m_skyboxEntity;
+	NK::Entity m_lightEntity1;
 };
 
 
@@ -112,8 +135,9 @@ public:
 		renderLayerDesc.enableMSAA = false;
 		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
 		renderLayerDesc.enableSSAA = true;
-		renderLayerDesc.ssaaMultiplier = 4;
+		renderLayerDesc.ssaaMultiplier = 2;
 		renderLayerDesc.window = m_window.get();
+		renderLayerDesc.renderResolution = glm::ivec2(1920, 1080);
 		renderLayerDesc.framesInFlight = 3;
 		m_renderLayer = NK::UniquePtr<NK::RenderLayer>(NK_NEW(NK::RenderLayer, m_scenes[m_activeScene]->m_reg, renderLayerDesc));
 		

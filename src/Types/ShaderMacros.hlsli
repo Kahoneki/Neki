@@ -24,7 +24,7 @@
 #define PC_DEF_NAME pushConstants
 
 
-#if defined(__spirv__)
+#if defined(__spirv__) || defined(__TARGET_SPIRV__)
 	#define PUSH_CONSTANTS_BLOCK(DATA) \
 	struct PC_DECL_NAME { DATA }; \
 	[[vk::push_constant]] PC_DECL_NAME PC_DEF_NAME

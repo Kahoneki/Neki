@@ -29,12 +29,13 @@ namespace NK
 	public:
 		virtual ~IShader() = default;
 
-		[[nodiscard]] const std::vector<char>& GetBytecode() const { return m_bytecode; }
+		[[nodiscard]] inline const std::vector<char>& GetBytecode() const { return m_bytecode; }
+		[[nodiscard]] inline bool GetSlang() const { return m_slang; }
 
 		
 	protected:
-		IShader(ILogger& _logger, const ShaderDesc& _desc)
-		: m_logger(_logger), m_type(_desc.type) {}
+		IShader(ILogger& _logger, const ShaderDesc& _desc, const bool _slang=false)
+		: m_logger(_logger), m_type(_desc.type), m_slang(_slang) {}
 
 
 		//Dependency injections
@@ -42,6 +43,7 @@ namespace NK
 		
 		SHADER_TYPE m_type;
 		std::vector<char> m_bytecode;
+		bool m_slang;
 	};
 	
 }

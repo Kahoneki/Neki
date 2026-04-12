@@ -31,7 +31,7 @@ namespace NK
 		[[nodiscard]] virtual UniquePtr<ICommandPool> CreateCommandPool(const CommandPoolDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<ISurface> CreateSurface(Window* _window) override;
 		[[nodiscard]] virtual UniquePtr<ISwapchain> CreateSwapchain(const SwapchainDesc& _desc) override;
-		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc) override;
+		[[nodiscard]] virtual UniquePtr<IShader> CreateShader(const ShaderDesc& _desc, bool _slang=false) override;
 		[[nodiscard]] virtual UniquePtr<IRootSignature> CreateRootSignature(const RootSignatureDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IPipeline> CreatePipeline(const PipelineDesc& _desc) override;
 		[[nodiscard]] virtual UniquePtr<IQueue> CreateQueue(const QueueDesc& _desc) override;
@@ -115,10 +115,10 @@ namespace NK
 		VkDescriptorSetLayout m_globalDescriptorSetLayout{ VK_NULL_HANDLE };
 		VkDescriptorSet m_globalDescriptorSet{ VK_NULL_HANDLE };
 		
-		bool m_enableInstanceValidationLayers = true;
+		bool m_enableInstanceValidationLayers = false;
 		const std::array<const char*, 1> m_instanceValidationLayers{ "VK_LAYER_KHRONOS_validation" };
 		const std::array<const char*, 1> m_requiredInstanceExtensions{ VK_KHR_SURFACE_EXTENSION_NAME };
-		const std::array<const char*, 4> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader", "VK_EXT_mutable_descriptor_type", "VK_KHR_shader_non_semantic_info" };
+		const std::array<const char*, 6> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader", "VK_EXT_mutable_descriptor_type", "VK_KHR_shader_non_semantic_info", VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME, VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME };
 
 		VmaAllocator m_vmaAllocator;
 	};

@@ -32,8 +32,8 @@ namespace NK
 		CreateShaderModules(_desc.computeShader, _desc.vertexShader, _desc.fragmentShader);
 		switch (m_type)
 		{
-		case PIPELINE_TYPE::COMPUTE: CreateComputePipeline(); break;
-		case PIPELINE_TYPE::GRAPHICS: CreateGraphicsPipeline(); break;
+		case PIPELINE_TYPE::COMPUTE: CreateComputePipeline(_desc.computeShader->GetSlang()); break;
+		case PIPELINE_TYPE::GRAPHICS: CreateGraphicsPipeline(_desc.vertexShader->GetSlang(), _desc.fragmentShader->GetSlang()); break;
 		}
 
 
@@ -127,7 +127,7 @@ namespace NK
 
 
 
-	void VulkanPipeline::CreateComputePipeline()
+	void VulkanPipeline::CreateComputePipeline(bool _csSlang)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::PIPELINE, "Creating compute pipeline\n");
@@ -138,7 +138,7 @@ namespace NK
 		compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		compShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 		compShaderStageInfo.module = m_computeShaderModule;
-		compShaderStageInfo.pName = "CSMain";
+		compShaderStageInfo.pName = (_csSlang ? "main" : "CSMain");
 
 		//Create pipeline
 		VkComputePipelineCreateInfo pipelineInfo{};
@@ -162,7 +162,7 @@ namespace NK
 
 
 
-	void VulkanPipeline::CreateGraphicsPipeline()
+	void VulkanPipeline::CreateGraphicsPipeline(bool _vsSlang, bool _fsSlang)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::PIPELINE, "Creating graphics pipeline\n");
@@ -174,14 +174,14 @@ namespace NK
 		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
 		vertShaderStageInfo.module = m_vertexShaderModule;
-		vertShaderStageInfo.pName = "VSMain";
+		vertShaderStageInfo.pName = (_vsSlang ? "main" : "VSMain");
 		shaderStages.push_back(vertShaderStageInfo);
 
 		VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
 		fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 		fragShaderStageInfo.module = m_fragmentShaderModule;
-		fragShaderStageInfo.pName = "FSMain";
+		fragShaderStageInfo.pName = (_fsSlang ? "main" : "FSMain");
 		shaderStages.push_back(fragShaderStageInfo);
 
 		//todo: add tessellation support

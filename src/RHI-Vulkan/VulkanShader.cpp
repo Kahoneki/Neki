@@ -7,8 +7,8 @@
 namespace NK
 {
 
-	VulkanShader::VulkanShader(ILogger& _logger, const ShaderDesc& _desc)
-	: IShader(_logger, _desc)
+	VulkanShader::VulkanShader(ILogger& _logger, const ShaderDesc& _desc, const bool _slang)
+	: IShader(_logger, _desc, _slang)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::SHADER, "Initialising VulkanShader\n");

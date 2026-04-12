@@ -31,8 +31,8 @@ namespace NK
 
 	private:
 		void CreateShaderModules(IShader* _compute, IShader* _vertex, IShader* _fragment);
-		void CreateComputePipeline();
-		void CreateGraphicsPipeline();
+		void CreateComputePipeline(bool _csSlang);
+		void CreateGraphicsPipeline(bool _vsSlang, bool _fsSlang);
 		
 		[[nodiscard]] VkShaderModule CreateShaderModule(IShader* _shader) const;
 		

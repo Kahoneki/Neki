@@ -156,7 +156,7 @@ namespace NK
 
 
 	
-	void ModelLoader::SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures)
+	void ModelLoader::SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures, NTCSerialisationInfo _ntc)
 	{
 		//Create output filepath if it doesn't exist
 		const std::filesystem::path outputPath{ _outputFilepath };

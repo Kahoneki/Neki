@@ -117,6 +117,28 @@ message(STATUS "Found DXC: ${DXC_EXECUTABLE}")
 if(UNIX AND NOT APPLE)
     execute_process(COMMAND chmod +x "${DXC_EXECUTABLE}")
 endif()
+#Slang
+if(WIN32)
+    FetchContent_Declare(
+            slang_artifacts
+            URL "https://github.com/shader-slang/slang/releases/download/v2026.5.2/slang-2026.5.2-windows-x86_64.zip"
+    )
+elseif(UNIX AND NOT APPLE)
+    FetchContent_Declare(
+            slang_artifacts
+            URL "https://github.com/shader-slang/slang/releases/download/v2026.5.2/slang-2026.5.2-linux-x86_64.tar.gz"
+    )
+else()
+    message(FATAL_ERROR "Slang: Platform not supported.")
+endif()
+FetchContent_MakeAvailable(slang_artifacts)
+if(WIN32)
+    set(SLANGC_EXECUTABLE "${slang_artifacts_SOURCE_DIR}/bin/slangc.exe")
+else()
+    set(SLANGC_EXECUTABLE "${slang_artifacts_SOURCE_DIR}/bin/slangc")
+    execute_process(COMMAND chmod +x "${SLANGC_EXECUTABLE}")
+endif()
+message(STATUS "Found Slang: ${SLANGC_EXECUTABLE}")
 
 #GLM
 FetchContent_Declare(glm GIT_REPOSITORY https://github.com/g-truc/glm.git GIT_TAG 1.0.1)
@@ -278,7 +300,6 @@ function(CompileShader SHADER_SOURCE SHADER_TYPE ENTRY_POINT OUTPUT_LIST)
                 -T ${SHADER_TYPE}
                 -E ${ENTRY_POINT}
                 -spirv
-                -fspv-target-env=vulkan1.3
                 -fspv-debug=vulkan-with-source
                 -Fo ${SPV_OUTPUT}
                 DEPENDS ${SHADER_SOURCE}
@@ -311,6 +332,66 @@ endfunction()
 
 
 
+function(CompileSlangShader SHADER_SOURCE SHADER_STAGE ENTRY_POINT OUTPUT_LIST)
+
+    file(RELATIVE_PATH SHADER_RELATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}" ${SHADER_SOURCE})
+
+    get_filename_component(SHADER_DIRECTORY ${SHADER_RELATIVE_PATH} PATH)
+    get_filename_component(SHADER_NAME_WE ${SHADER_RELATIVE_PATH} NAME_WE)
+
+    if(SHADER_DIRECTORY)
+        set(SHADER_OUTPUT_PATH "${SHADER_DIRECTORY}/${SHADER_NAME_WE}")
+    else()
+        set(SHADER_OUTPUT_PATH "${SHADER_NAME_WE}")
+    endif()
+
+    set(SPV_OUTPUT "${PROJECT_BINARY_DIR}/${SHADER_OUTPUT_PATH}.spv")
+    set(DXIL_OUTPUT "${PROJECT_BINARY_DIR}/${SHADER_OUTPUT_PATH}.dxil")
+
+    get_filename_component(OUTPUT_DIRECTORY ${SPV_OUTPUT} DIRECTORY)
+    file(MAKE_DIRECTORY ${OUTPUT_DIRECTORY})
+
+    set(SHADER_INCLUDE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    set(LOCAL_SHADER_OUTPUTS "")
+
+    if(NEKI_BUILD_VULKAN)
+        add_custom_command(
+                OUTPUT ${SPV_OUTPUT}
+                COMMAND ${SLANGC_EXECUTABLE}
+                ${SHADER_SOURCE}
+                -I ${SHADER_INCLUDE_PATH}
+                -target spirv
+                -stage ${SHADER_STAGE}
+                -entry ${ENTRY_POINT}
+                -o ${SPV_OUTPUT}
+                DEPENDS ${SHADER_SOURCE}
+                COMMENT "Compiling ${SHADER_SOURCE} to SPIR-V (Slang)"
+        )
+        list(APPEND LOCAL_SHADER_OUTPUTS ${SPV_OUTPUT})
+    endif()
+
+    if(NEKI_BUILD_D3D12)
+        add_custom_command(
+                OUTPUT ${DXIL_OUTPUT}
+                COMMAND ${SLANGC_EXECUTABLE}
+                ${SHADER_SOURCE}
+                -I ${SHADER_INCLUDE_PATH}
+                -target dxil
+                -stage ${SHADER_STAGE}
+                -entry ${ENTRY_POINT}
+                -o ${DXIL_OUTPUT}
+                DEPENDS ${SHADER_SOURCE}
+                COMMENT "Compiling ${SHADER_SOURCE} to DXIL (Slang)"
+        )
+        list(APPEND LOCAL_SHADER_OUTPUTS ${DXIL_OUTPUT})
+    endif()
+
+    set(${OUTPUT_LIST} ${LOCAL_SHADER_OUTPUTS} PARENT_SCOPE)
+
+endfunction()
+
+
+
 #Shader compilation
 
 #Define shader files
@@ -326,15 +407,42 @@ set(ALL_SHADER_OUTPUTS "")
 foreach(SHADER_SRC ${SHADER_SOURCES})
     set(CURRENT_SHADER_OUTPUTS "")
     if(SHADER_SRC MATCHES ".*_vs\\.hlsl$")
-        CompileShader(${SHADER_SRC} "vs_6_6" "VSMain" CURRENT_SHADER_OUTPUTS)
+        CompileShader(${SHADER_SRC} "vs_6_9" "VSMain" CURRENT_SHADER_OUTPUTS)
     elseif(SHADER_SRC MATCHES ".*_fs\\.hlsl$")
-        CompileShader(${SHADER_SRC} "ps_6_6" "FSMain" CURRENT_SHADER_OUTPUTS)
+        CompileShader(${SHADER_SRC} "ps_6_9" "FSMain" CURRENT_SHADER_OUTPUTS)
     elseif(SHADER_SRC MATCHES ".*_cs\\.hlsl$")
-        CompileShader(${SHADER_SRC} "cs_6_6" "CSMain" CURRENT_SHADER_OUTPUTS)
+        CompileShader(${SHADER_SRC} "cs_6_9" "CSMain" CURRENT_SHADER_OUTPUTS)
     endif()
 
     list(APPEND ALL_SHADER_OUTPUTS ${CURRENT_SHADER_OUTPUTS})
 endforeach()
+
+
+#Compile all Slang shaders
+file(GLOB_RECURSE SLANG_SHADER_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.slang"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Samples/Graphics/Shaders/*.slang"
+)
+if(SLANG_SHADER_SOURCES)
+    message(STATUS "---- Found Slang Shader Files ----")
+    foreach(FILE ${SLANG_SHADER_SOURCES})
+        message(STATUS "  ${FILE}")
+    endforeach()
+    message(STATUS "-----------------------------------")
+endif()
+
+foreach(SHADER_SRC ${SLANG_SHADER_SOURCES})
+    set(CURRENT_SHADER_OUTPUTS "")
+    if(SHADER_SRC MATCHES ".*_vs\\.slang$")
+        CompileSlangShader(${SHADER_SRC} "vertex" "main" CURRENT_SHADER_OUTPUTS)
+    elseif(SHADER_SRC MATCHES ".*_fs\\.slang$")
+        CompileSlangShader(${SHADER_SRC} "fragment" "main" CURRENT_SHADER_OUTPUTS)
+    elseif(SHADER_SRC MATCHES ".*_cs\\.slang$")
+        CompileSlangShader(${SHADER_SRC} "compute" "main" CURRENT_SHADER_OUTPUTS)
+    endif()
+    list(APPEND ALL_SHADER_OUTPUTS ${CURRENT_SHADER_OUTPUTS})
+endforeach()
+
 
 #Create phony target that depends on all the compiled shaders
 add_custom_target(

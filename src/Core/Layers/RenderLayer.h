@@ -37,6 +37,7 @@ namespace NK
 		std::uint32_t ssaaMultiplier{ 1 };
 
 		Window* window{ nullptr };
+		glm::ivec2 renderResolution{ 1920, 1080 };
 
 		std::uint32_t framesInFlight{ 3 };
 
@@ -108,9 +109,23 @@ namespace NK
 		void* m_latentTexBufferMap2;
 		UniquePtr<IBufferView> m_latentTexBufferView2;
 		UniquePtr<IBuffer> m_mlpBuffer;
-		void* m_mlpBufferMap;
 		UniquePtr<IBufferView> m_mlpBufferView;
-		
+		std::uint32_t m_layer0_W_offset;
+		std::uint32_t m_layer0_B_offset;
+		std::uint32_t m_layer1_W_offset;
+		std::uint32_t m_layer1_B_offset;
+		std::uint32_t m_layer2_W_offset;
+		std::uint32_t m_layer2_B_offset;
+		std::uint32_t m_g0Channels;
+		std::uint32_t m_g1Channels;
+		std::uint32_t m_g0QuantLevels;
+		std::uint32_t m_g1QuantLevels;
+		std::uint32_t m_g0Resolution;
+		std::uint32_t m_imageResolution;
+		std::uint32_t m_numOctaves;
+		std::uint32_t m_tileSize;
+		std::uint32_t m_numLayers;
+		std::uint32_t m_numHiddenNeurons;
 		
 		//Dependency injections
 		IAllocator& m_allocator;
@@ -265,8 +280,44 @@ namespace NK
 			SamplerIndex samplerIndex;
 	
 			float maxIrradiance;
+			
+			//todo: VERY temp
+			std::uint32_t g0BufferIndex;
+			std::uint32_t g1BufferIndex;
+			std::uint32_t mlpBufferIndex;
+			std::uint32_t layer0_W_offset;
+			std::uint32_t layer0_B_offset;
+			std::uint32_t layer1_W_offset;
+			std::uint32_t layer1_B_offset;
+			std::uint32_t layer2_W_offset;
+			std::uint32_t layer2_B_offset;
+			std::uint32_t g0Channels;
+			std::uint32_t g1Channels;
+			std::uint32_t g0QuantLevels;
+			std::uint32_t g1QuantLevels;
+			std::uint32_t g0Resolution;
+			std::uint32_t imageResolution;
+			std::uint32_t numOctaves;
+			std::uint32_t tileSize;
+			std::uint32_t numLayers;
+			std::uint32_t hiddenNeurons;
+			std::uint32_t frameIndex;
 		};
 		UniquePtr<IRootSignature> m_meshPassRootSignature;
+		
+		struct NTCPassPushConstantData
+		{
+			std::uint32_t g0BufferIndex;
+			std::uint32_t g1BufferIndex;
+			std::uint32_t mlpBufferIndex;
+			std::uint32_t layer0_W_offset;
+			std::uint32_t layer0_B_offset;
+			std::uint32_t layer1_W_offset;
+			std::uint32_t layer1_B_offset;
+			std::uint32_t layer2_W_offset;
+			std::uint32_t layer2_B_offset;
+		};
+		UniquePtr<IRootSignature> m_NTCPassRootSignature;
 
 		struct PrefixSumPassPushConstantData
 		{

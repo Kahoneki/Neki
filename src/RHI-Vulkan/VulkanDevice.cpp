@@ -50,6 +50,20 @@ namespace NK
 		CreateDescriptorPool();
 		CreateDescriptorSetLayout();
 		CreateDescriptorSet();
+		
+		auto pfnGetProps = reinterpret_cast<PFN_vkGetPhysicalDeviceCooperativeVectorPropertiesNV>(
+	vkGetInstanceProcAddr(m_instance, "vkGetPhysicalDeviceCooperativeVectorPropertiesNV"));
+
+		uint32_t count = 0;
+		pfnGetProps(m_physicalDevice, &count, nullptr);
+		std::vector<VkCooperativeVectorPropertiesNV> props(count);
+		for (auto& p : props) p.sType = VK_STRUCTURE_TYPE_COOPERATIVE_VECTOR_PROPERTIES_NV;
+		pfnGetProps(m_physicalDevice, &count, props.data());
+
+		for (auto& p : props) {
+			printf("Input: %d, Matrix: %d, Result: %d\n",
+				p.inputType, p.matrixInterpretation, p.resultType);
+		}
 
 		
 		m_logger.Unindent();
@@ -205,9 +219,9 @@ namespace NK
 
 
 
-	UniquePtr<IShader> VulkanDevice::CreateShader(const ShaderDesc& _desc)
+	UniquePtr<IShader> VulkanDevice::CreateShader(const ShaderDesc& _desc, bool _slang)
 	{
-		return UniquePtr<IShader>(NK_NEW(VulkanShader, m_logger, _desc));
+		return UniquePtr<IShader>(NK_NEW(VulkanShader, m_logger, _desc, _slang));
 	}
 
 
@@ -536,6 +550,9 @@ namespace NK
 		features12.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
 		features12.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
 		features12.bufferDeviceAddress = VK_TRUE;
+		//Allow half-fp type
+		features12.shaderFloat16 = VK_TRUE;
+		features12.vulkanMemoryModel = VK_TRUE;
 
 		VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES };
 		dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
@@ -550,12 +567,22 @@ namespace NK
 		VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutableTypeFeatures{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT };
 		mutableTypeFeatures.mutableDescriptorType = VK_TRUE;
 		mutableTypeFeatures.pNext = &deviceFeatures2;
+		
+		VkPhysicalDeviceCooperativeVectorFeaturesNV coopVecFeatures{};
+		coopVecFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_VECTOR_FEATURES_NV;
+		coopVecFeatures.cooperativeVector = VK_TRUE;
+		coopVecFeatures.pNext = &mutableTypeFeatures;
+		
+		VkPhysicalDeviceShaderReplicatedCompositesFeaturesEXT compositeFeatures{};
+		compositeFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_REPLICATED_COMPOSITES_FEATURES_EXT;
+		compositeFeatures.shaderReplicatedComposites = VK_TRUE;
+		compositeFeatures.pNext = &coopVecFeatures;
 
 
 		//Create device
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		deviceCreateInfo.pNext = &mutableTypeFeatures;
+		deviceCreateInfo.pNext = &compositeFeatures;
 		deviceCreateInfo.queueCreateInfoCount = static_cast<std::uint32_t>(queueCreateInfos.size());
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 		deviceCreateInfo.enabledExtensionCount = requiredDeviceExtensions.size();

@@ -8,6 +8,7 @@
 #include <Components/CSelected.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
+#include <Core/Utils/NTCMatrixLayerConverter.h>
 #include <Core/Utils/TextureCompressor.h>
 #include <Graphics/Lights/DirectionalLight.h>
 #include <Graphics/Lights/PointLight.h>
@@ -52,7 +53,7 @@ namespace NK
 {
 
 	RenderLayer::RenderLayer(Registry& _reg, const RenderLayerDesc& _desc)
-	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_globalFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.window->GetFramebufferSize()), m_visibilityIndexAllocator(NK_NEW(FreeListAllocator, _desc.maxModels)), m_firstFrame(true)
+	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_globalFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.renderResolution), m_visibilityIndexAllocator(NK_NEW(FreeListAllocator, _desc.maxModels)), m_firstFrame(true)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Initialising Render Layer\n");
@@ -598,7 +599,7 @@ namespace NK
 		// fragShaderDesc.filepath = "Shaders/ModelBlinnPhong_fs";
 		//VERY temp
 		fragShaderDesc.filepath = "Shaders/NTCModel_fs";
-		m_blinnPhongFragShader = m_device->CreateShader(fragShaderDesc);
+		m_blinnPhongFragShader = m_device->CreateShader(fragShaderDesc, true);
 		
 		fragShaderDesc.filepath = "Shaders/ModelPBR_fs";
 		m_pbrFragShader = m_device->CreateShader(fragShaderDesc);
@@ -623,6 +624,8 @@ namespace NK
 		m_shadowPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.num32BitPushConstantValues = sizeof(MeshPassPushConstantData) / 4;
 		m_meshPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
+		rootSigDesc.num32BitPushConstantValues = sizeof(NTCPassPushConstantData) / 4;
+		m_NTCPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.num32BitPushConstantValues = sizeof(PostprocessPassPushConstantData) / 4;
 		m_postprocessPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.bindPoint = PIPELINE_BIND_POINT::COMPUTE;
@@ -978,8 +981,8 @@ namespace NK
 
 				_cmdBuf->BindRootSignature(m_modelVisibilityPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetFramebufferSize() });
-				_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetFramebufferSize() });
+				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
+				_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
 
 				ModelVisibilityPassPushConstantData pushConstantData{};
 				pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW")->GetIndex();
@@ -1132,8 +1135,8 @@ namespace NK
 			
 			_cmdBuf->BindRootSignature(m_meshPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetFramebufferSize() });
-			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.window->GetFramebufferSize() });
+			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
+			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
 
 			MeshPassPushConstantData pushConstantData{};
 			pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_VIEW")->GetIndex();
@@ -1143,12 +1146,30 @@ namespace NK
 			pushConstantData.irradianceCubemapIndex = _texViews.Get("IRRADIANCE_MAP_VIEW") ? _texViews.Get("IRRADIANCE_MAP_VIEW")->GetIndex() : 0;
 			pushConstantData.prefilterCubemapIndex = _texViews.Get("PREFILTER_MAP_VIEW") ? _texViews.Get("PREFILTER_MAP_VIEW")->GetIndex() : 0;
 			pushConstantData.brdfLUTIndex = _texViews.Get("BRDF_LUT_VIEW")->GetIndex();
+			pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
+			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 			
 			//VERY temp
-			// pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
-			pushConstantData.brdfLUTSamplerIndex = m_mlpBufferView->GetIndex();
-			// pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
-			pushConstantData.samplerIndex = m_latentTexBufferView2->GetIndex();
+			pushConstantData.g0BufferIndex = m_latentTexBufferView->GetIndex();
+			pushConstantData.g1BufferIndex = m_latentTexBufferView2->GetIndex();
+			pushConstantData.mlpBufferIndex = m_mlpBufferView->GetIndex();
+			pushConstantData.layer0_W_offset = m_layer0_W_offset;
+			pushConstantData.layer0_B_offset = m_layer0_B_offset;
+			pushConstantData.layer1_W_offset = m_layer1_W_offset;
+			pushConstantData.layer1_B_offset = m_layer1_B_offset;
+			pushConstantData.layer2_W_offset = m_layer2_W_offset;
+			pushConstantData.layer2_B_offset = m_layer2_B_offset;
+			pushConstantData.g0Channels = m_g0Channels;
+			pushConstantData.g1Channels = m_g1Channels;
+			pushConstantData.g0QuantLevels = m_g0QuantLevels;
+			pushConstantData.g1QuantLevels = m_g1QuantLevels;
+			pushConstantData.g0Resolution = m_g0Resolution;
+			pushConstantData.imageResolution = m_imageResolution;
+			pushConstantData.numOctaves = m_numOctaves;
+			pushConstantData.tileSize = m_tileSize;
+			pushConstantData.numLayers = m_numLayers;
+			pushConstantData.hiddenNeurons = m_numHiddenNeurons;
+			pushConstantData.frameIndex = m_globalFrame;
 			
 			if (m_activeCamera)
 			{
@@ -1358,7 +1379,7 @@ namespace NK
 		TextureDesc sceneColourDesc{};
 		sceneColourDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		sceneColourDesc.format = DATA_FORMAT::R16G16B16A16_SFLOAT;
-		sceneColourDesc.size = glm::ivec3(m_desc.window->GetFramebufferSize(), 1);
+		sceneColourDesc.size = glm::ivec3(m_desc.renderResolution, 1);
 		sceneColourDesc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		sceneColourDesc.arrayTexture = false;
 		sceneColourDesc.sampleCount = SAMPLE_COUNT::BIT_1;
@@ -1407,7 +1428,7 @@ namespace NK
 		TextureDesc sceneDepthDesc{};
 		sceneDepthDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		sceneDepthDesc.format = (m_desc.backend == GRAPHICS_BACKEND::D3D12 ? DATA_FORMAT::R32_TYPELESS : DATA_FORMAT::D32_SFLOAT);
-		sceneDepthDesc.size = glm::ivec3(m_desc.window->GetFramebufferSize(), 1);
+		sceneDepthDesc.size = glm::ivec3(m_desc.renderResolution, 1);
 		sceneDepthDesc.usage = TEXTURE_USAGE_FLAGS::DEPTH_STENCIL_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		sceneDepthDesc.arrayTexture = false;
 		sceneDepthDesc.sampleCount = SAMPLE_COUNT::BIT_1;
@@ -1456,7 +1477,7 @@ namespace NK
 		TextureDesc satDesc{};
 		satDesc.dimension = TEXTURE_DIMENSION::DIM_2;
 		satDesc.format = DATA_FORMAT::R32G32B32A32_SFLOAT;
-		glm::ivec2 winDimensions{ m_desc.window->GetFramebufferSize().x, m_desc.window->GetFramebufferSize().y };
+		glm::ivec2 winDimensions{ m_desc.renderResolution.x, m_desc.renderResolution.y };
 		satDesc.size = m_desc.enableSSAA ? glm::ivec3(m_supersampleResolution, 1) : glm::ivec3(winDimensions.y, winDimensions.x, 1);
 		satDesc.usage = TEXTURE_USAGE_FLAGS::READ_ONLY | TEXTURE_USAGE_FLAGS::READ_WRITE | TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
 		satDesc.arrayTexture = false;
@@ -2340,11 +2361,11 @@ namespace NK
                     else if (light.GetLightType() == LIGHT_TYPE::SPOT)
                     {
                         SpotLight* spotLight = static_cast<SpotLight*>(light.light.get());
-                        camData.projMat = glm::perspectiveLH(spotLight->GetOuterAngle() * 2.0f, static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y, 0.01f, 1000.0f); 
+                        camData.projMat = glm::perspectiveLH(spotLight->GetOuterAngle() * 2.0f, static_cast<float>(m_desc.renderResolution.x) / m_desc.renderResolution.y, 0.01f, 1000.0f); 
                     }
                     else
                     {
-                        camData.projMat = glm::perspectiveLH(glm::radians(90.0f), static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y, 0.01f, 1000.0f);
+                        camData.projMat = glm::perspectiveLH(glm::radians(90.0f), static_cast<float>(m_desc.renderResolution.x) / m_desc.renderResolution.y, 0.01f, 1000.0f);
                     }
                 	
                 	//Upload
@@ -2536,37 +2557,77 @@ namespace NK
 						viewDesc.stride = 0;
 						m_latentTexBufferView2 = m_device->CreateBufferView(m_latentTexBuffer2.get(), viewDesc);
 						
-						std::vector<std::uint32_t> packedMLP;
-						packedMLP.push_back(m_ntcModel->header.numLinearLayers);
+						std::vector<std::uint8_t> packedMLP;
+						const auto align16{ [](const std::size_t _x) -> std::size_t { return (_x+15) & ~15; } };
+						const auto appendAligned{ [&](const void* _data, std::size_t _size) -> std::uint32_t
+						{
+							const std::size_t offset{ align16(packedMLP.size()) };
+							packedMLP.resize(offset + _size);
+							memcpy(packedMLP.data() + offset, _data, _size);
+							return static_cast<std::uint32_t>(offset);
+						}};
+						struct LayerOffsets
+						{
+							std::uint32_t W;
+							std::uint32_t B;
+						};
+						
+						std::vector<LayerOffsets> layerOffsets;
 						for (const Neural::NTCLinearLayer& layer : m_ntcModel->mlp)
 						{
-							packedMLP.push_back(layer.inFeatures);
-							packedMLP.push_back(layer.outFeatures);
-							for (std::size_t ii = 0; ii < layer.weights.size(); ii += 2)
-							{
-								std::uint32_t lower = layer.weights[ii];
-								std::uint32_t upper = (ii + 1 < layer.weights.size()) ? layer.weights[ii + 1] : 0;
-								packedMLP.push_back(lower | (upper << 16));
-							}
-							for (std::size_t ii = 0; ii < layer.biases.size(); ii += 2)
-							{
-								std::uint32_t lower = layer.biases[ii];
-								std::uint32_t upper = (ii + 1 < layer.biases.size()) ? layer.biases[ii + 1] : 0;
-								packedMLP.push_back(lower | (upper << 16));
-							}
+							//Convert weights from row-major fp16 to InferencingOptimal
+							Neural::ConvertedLayer convertedLayer{ Neural::NTCMatrixLayerConverter::ConvertLayer(
+								dynamic_cast<VulkanDevice*>(m_device.get())->GetDevice(),
+								layer.weights.data(),
+								layer.weights.size() * sizeof(std::uint16_t),
+								layer.biases.data(),
+								layer.biases.size() * sizeof(std::uint16_t),
+								layer.outFeatures,
+								layer.inFeatures
+								) };
+							
+							LayerOffsets offsets;
+							offsets.W = appendAligned(convertedLayer.weightData.data(), convertedLayer.weightData.size());
+							offsets.B = appendAligned(convertedLayer.biasData.data(), convertedLayer.biasData.size());
+							layerOffsets.push_back(offsets);
 						}
 						
-						desc.size = packedMLP.size() * sizeof(std::uint32_t);
-						desc.type = MEMORY_TYPE::HOST;
-						desc.usage = BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
+						desc.size = packedMLP.size();
+						desc.type = MEMORY_TYPE::DEVICE;
+						desc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
 						m_mlpBuffer = m_device->CreateBuffer(desc);
-						m_mlpBufferMap = m_mlpBuffer->GetMap();
-						memcpy(m_mlpBufferMap, packedMLP.data(), desc.size);
+						m_gpuUploader->EnqueueBufferDataUpload(packedMLP.data(), m_mlpBuffer.get(), RESOURCE_STATE::UNDEFINED);
+						m_newGPUUploaderUpload = true;
+						m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_mlpBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::SHADER_RESOURCE);
 						viewDesc.size = desc.size;
 						viewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
 						viewDesc.offset = 0;
 						viewDesc.stride = 0;
 						m_mlpBufferView = m_device->CreateBufferView(m_mlpBuffer.get(), viewDesc);
+						
+						m_g0Channels = m_ntcModel->header.g0Channels;
+						m_g1Channels = m_ntcModel->header.g1Channels;
+						m_g0QuantLevels = m_ntcModel->header.g0QuantLevels;
+						m_g1QuantLevels = m_ntcModel->header.g1QuantLevels;
+						m_imageResolution = m_ntcModel->header.baseImageRes;
+						m_g0Resolution = (m_ntcModel->header.qualityValue < 2) ? (m_imageResolution * 0.25f) : (m_imageResolution * 0.5f);
+						m_numOctaves = m_ntcModel->header.numOctaves;
+						m_tileSize = m_ntcModel->header.tileSize;
+						m_numLayers = m_ntcModel->header.numLinearLayers;
+						m_numHiddenNeurons = m_ntcModel->header.hiddenNeurons;
+						
+						m_layer0_W_offset = layerOffsets[0].W;
+						m_layer0_B_offset = layerOffsets[0].B;
+						if (m_numLayers >= 2)
+						{
+							m_layer1_W_offset = layerOffsets[1].W;
+							m_layer1_B_offset = layerOffsets[1].B;
+						}
+						if (m_numLayers >= 3)
+						{
+							m_layer2_W_offset = layerOffsets[2].W;
+							m_layer2_B_offset = layerOffsets[2].B;
+						}
 					}
 				}
 				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
@@ -2759,7 +2820,7 @@ namespace NK
 		constexpr float epsilon{ 0.1f }; //Buffer for floating-point-comparison-imprecision mitigation
 		if (std::abs(_camera.camera->GetAspectRatio() - WIN_ASPECT_RATIO) < epsilon)
 		{
-			_camera.camera->SetAspectRatio(static_cast<float>(m_desc.window->GetFramebufferSize().x) / m_desc.window->GetFramebufferSize().y);
+			_camera.camera->SetAspectRatio(static_cast<float>(m_desc.renderResolution.x) / m_desc.renderResolution.y);
 		}
 
 

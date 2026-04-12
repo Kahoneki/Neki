@@ -123,6 +123,14 @@ namespace NK
 		std::vector<CPUMaterial_Serialised> materials;
 	};
 	SERIALISE(CPUModel_Serialised, v.header, v.meshes, v.materials)
+	
+	//Passed to SerialiseNKModel() if using NTC
+	struct NTCSerialisationInfo
+	{
+	public:
+		bool enabled{ false };
+		std::string filepath{ "" };
+	};
 
 
 	//To avoid having to include assimp headers in public Neki library
@@ -137,9 +145,9 @@ namespace NK
 
 		//Removes the specified model from the cache
 		static void UnloadModel(const std::string& _filepath);
-
+		
 		//Serialise a model of any type (.gltf, .fbx, .obj, etc.) from _inputFilepath into a .nkmodel file at _outputFilepath
-		static void SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures);
+		static void SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures, NTCSerialisationInfo _ntc={});
 
 		//Get the header of a .nkmodel
 		static CPUModel_SerialisedHeader GetNKModelHeader(const std::string& _filepath);
