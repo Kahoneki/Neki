@@ -13,6 +13,7 @@
 #include <Graphics/Window.h>
 #include <RHI/ICommandBuffer.h>
 #include <RHI/IDevice.h>
+#include <RHI/ISurface.h>
 #include <Types/NekiTypes.h>
 
 #include <ImGuizmo.h>
@@ -23,8 +24,8 @@ namespace NK
 
 	struct RenderLayerDesc
 	{
-		explicit RenderLayerDesc(const GRAPHICS_BACKEND _backend, const bool _enableMSAA, const SAMPLE_COUNT _msaaSampleCount, const bool _enableSSAA, const std::uint32_t _ssaaMultiplier, Window* _window, const std::uint32_t _framesInFlight, const std::uint32_t _maxModels, const std::uint32_t _maxLights)
-			: backend(_backend), enableMSAA(_enableMSAA), msaaSampleCount(_msaaSampleCount), enableSSAA(_enableSSAA), ssaaMultiplier(_ssaaMultiplier), window(_window), framesInFlight(_framesInFlight), maxModels(_maxModels), maxLights(_maxLights) {}
+		explicit RenderLayerDesc(const GRAPHICS_BACKEND _backend, const bool _enableMSAA, const SAMPLE_COUNT _msaaSampleCount, const bool _enableSSAA, const std::uint32_t _ssaaMultiplier, Window* _window, const std::uint32_t _framesInFlight, const std::uint32_t _maxModels, const std::uint32_t _maxMeshesPerModel, const std::uint32_t _maxLights)
+			: backend(_backend), enableMSAA(_enableMSAA), msaaSampleCount(_msaaSampleCount), enableSSAA(_enableSSAA), ssaaMultiplier(_ssaaMultiplier), window(_window), framesInFlight(_framesInFlight), maxModels(_maxModels), maxMeshesPerModel(_maxMeshesPerModel), maxLights(_maxLights) {}
 
 		RenderLayerDesc() {}
 
@@ -41,7 +42,8 @@ namespace NK
 
 		std::uint32_t framesInFlight{ 3 };
 
-		std::uint32_t maxModels{ 10'000 };
+		std::uint32_t maxModels{ 1'000 };
+		std::uint32_t maxMeshesPerModel{ 100 };
 		std::uint32_t maxLights{ 16 };
 	};
 
@@ -63,12 +65,12 @@ namespace NK
 		void InitCameraBuffers();
 		void InitLightDataBuffer();
 		void InitModelMatricesBuffer();
-		void InitModelVisibilityBuffers();
+		void InitMeshVisibilityBuffers();
 		void InitCube();
 		void InitScreenQuad();
 
 		void InitShadersAndPipelines();
-		void InitModelVisibilityPipeline();
+		void InitMeshVisibilityPipeline();
 		void InitShadowPipeline();
 		void InitSkyboxPipeline();
 		void InitGraphicsPipelines();
@@ -196,20 +198,20 @@ namespace NK
 			std::uint32_t visibilityIndex;
 			std::uint32_t padding[3];
 		};
-		//Stores the model matrices for all models - regardless of whether the model is loaded or not
-		//(parallel to m_modelVisibilityBuffers)
+		//Stores the model matrices for all meshes - regardless of whether the mesh is loaded or not
+		//(parallel to m_meshVisibilityBuffers)
 		//(one for each frame in flight)
 		std::vector<UniquePtr<IBuffer>> m_modelMatricesBuffers;
 		std::vector<UniquePtr<IBufferView>> m_modelMatricesBufferViews;
 		std::vector<void*> m_modelMatricesBufferMaps;
 
-		//Stores a 32-bit uint for every model in the scene indicating whether it's visible or not - regardless of whether the model is loaded or not
+		//Stores a 32-bit uint for every mesh in the scene indicating whether it's visible or not - regardless of whether the model is loaded or not
 		//(all vectors parallel to m_modelMatricesBuffers)
 		//(one for each frame in flight)
-		std::vector<UniquePtr<IBuffer>> m_modelVisibilityDeviceBuffers;
-		std::vector<UniquePtr<IBuffer>> m_modelVisibilityReadbackBuffers;
-		std::vector<UniquePtr<IBufferView>> m_modelVisibilityDeviceBufferViews;
-		std::vector<void*> m_modelVisibilityReadbackBufferMaps;
+		std::vector<UniquePtr<IBuffer>> m_meshVisibilityDeviceBuffers;
+		std::vector<UniquePtr<IBuffer>> m_meshVisibilityReadbackBuffers;
+		std::vector<UniquePtr<IBufferView>> m_meshVisibilityDeviceBufferViews;
+		std::vector<void*> m_meshVisibilityReadbackBufferMaps;
 
 		//(one for each frame in flight)
 		std::size_t m_skyboxDirtyCounter;
@@ -238,23 +240,23 @@ namespace NK
 		UniquePtr<IShader> m_meshVertShader;
 		UniquePtr<IShader> m_skyboxVertShader;
 		UniquePtr<IShader> m_screenQuadVertShader;
-		UniquePtr<IShader> m_modelVisibilityVertShader;
+		UniquePtr<IShader> m_meshVisibilityVertShader;
 
 		UniquePtr<IShader> m_shadowFragShader;
 		UniquePtr<IShader> m_skyboxFragShader;
 		UniquePtr<IShader> m_blinnPhongFragShader;
 		UniquePtr<IShader> m_pbrFragShader;
 		UniquePtr<IShader> m_postprocessFragShader;
-		UniquePtr<IShader> m_modelVisibilityFragShader;
+		UniquePtr<IShader> m_meshVisibilityFragShader;
 		UniquePtr<IShader> m_prefixSumCompShader;
 
-		struct ModelVisibilityPassPushConstantData
+		struct MeshVisibilityPassPushConstantData
 		{
 			ResourceIndex camDataBufferIndex;
 			ResourceIndex modelMatricesBufferIndex;
-			ResourceIndex modelVisibilityBufferIndex;
+			ResourceIndex meshVisibilityBufferIndex;
 		};
-		UniquePtr<IRootSignature> m_modelVisibilityPassRootSignature;
+		UniquePtr<IRootSignature> m_meshVisibilityPassRootSignature;
 
 		struct ShadowPassPushConstantData
 		{
@@ -282,26 +284,26 @@ namespace NK
 			float maxIrradiance;
 			
 			//todo: VERY temp
-			std::uint32_t g0BufferIndex;
-			std::uint32_t g1BufferIndex;
-			std::uint32_t mlpBufferIndex;
-			std::uint32_t layer0_W_offset;
-			std::uint32_t layer0_B_offset;
-			std::uint32_t layer1_W_offset;
-			std::uint32_t layer1_B_offset;
-			std::uint32_t layer2_W_offset;
-			std::uint32_t layer2_B_offset;
-			std::uint32_t g0Channels;
-			std::uint32_t g1Channels;
-			std::uint32_t g0QuantLevels;
-			std::uint32_t g1QuantLevels;
-			std::uint32_t g0Resolution;
-			std::uint32_t imageResolution;
-			std::uint32_t numOctaves;
-			std::uint32_t tileSize;
-			std::uint32_t numLayers;
-			std::uint32_t hiddenNeurons;
-			std::uint32_t frameIndex;
+			// std::uint32_t g0BufferIndex;
+			// std::uint32_t g1BufferIndex;
+			// std::uint32_t mlpBufferIndex;
+			// std::uint32_t layer0_W_offset;
+			// std::uint32_t layer0_B_offset;
+			// std::uint32_t layer1_W_offset;
+			// std::uint32_t layer1_B_offset;
+			// std::uint32_t layer2_W_offset;
+			// std::uint32_t layer2_B_offset;
+			// std::uint32_t g0Channels;
+			// std::uint32_t g1Channels;
+			// std::uint32_t g0QuantLevels;
+			// std::uint32_t g1QuantLevels;
+			// std::uint32_t g0Resolution;
+			// std::uint32_t imageResolution;
+			// std::uint32_t numOctaves;
+			// std::uint32_t tileSize;
+			// std::uint32_t numLayers;
+			// std::uint32_t hiddenNeurons;
+			// std::uint32_t frameIndex;
 		};
 		UniquePtr<IRootSignature> m_meshPassRootSignature;
 		
@@ -349,7 +351,7 @@ namespace NK
 		};
 		UniquePtr<IRootSignature> m_postprocessPassRootSignature;
 
-		UniquePtr<IPipeline> m_modelVisibilityPipeline;
+		UniquePtr<IPipeline> m_meshVisibilityPipeline;
 		UniquePtr<IPipeline> m_shadowPipeline;
 		UniquePtr<IPipeline> m_skyboxPipeline;
 		UniquePtr<IPipeline> m_blinnPhongPipeline;
@@ -412,15 +414,35 @@ namespace NK
 		std::vector<std::vector<Entity>> m_modelMatricesEntitiesLookups;
 
 
-		//RenderLayer owns and is responsible for all GPUModels - todo: move to out-of-core rendering with HLODs
-		std::unordered_map<std::string, UniquePtr<GPUModel>> m_gpuModelCache;
+		//RenderLayer owns and is responsible for all GPUMesh - todo: move to out-of-core rendering with HLODs
+		std::map<std::pair<std::string, std::uint64_t>, UniquePtr<GPUMesh>> m_gpuMeshCache;
 
-		//For each model, this tracks how many CModelRenderers use it - so we know when to unload it
-		std::unordered_map<std::string, std::uint32_t> m_gpuModelReferenceCounter;
+		//For each mesh, this tracks how many CModelRenderers use it - so we know when to unload it
+		std::map<std::pair<std::string, std::uint64_t>, std::uint32_t> m_gpuMeshReferenceCounter;
 
-		//A model can't be unloaded until it's done being used by the GPU, keep track of all models we need to unload and the global frame count on which it is safe to do so
-		//Once the appropriate fence has been signalled, unload all models in the corresponding vector
-		std::unordered_map<std::uint64_t, std::vector<std::string>> m_modelUnloadQueue;
+		//A mesh can't be unloaded until it's done being used by the GPU, keep track of all meshes we need to unload and the global frame count on which it is safe to do so
+		//Once the appropriate fence has been signalled, unload all meshes in the corresponding vector
+		std::unordered_map<std::uint64_t, std::vector<std::pair<std::string, std::uint64_t>>> m_meshUnloadQueue;
+		
+		//RenderLayer owns and is responsible for all GPUMaterial - todo: move to out-of-core rendering with HLODs
+		std::map<std::string, UniquePtr<GPUMaterial>> m_gpuMaterialCache;
+
+		//For each material, this tracks how many meshes use it - so we know when to unload it
+		std::map<std::string, std::uint32_t> m_gpuMaterialReferenceCounter;
+		
+		//A material can't be unloaded until it's done being used by the GPU, keep track of all materials we need to unload and the global frame count on which it is safe to do so
+		//Once the appropriate fence has been signalled, unload all materials in the corresponding vector
+		std::unordered_map<std::uint64_t, std::vector<std::string>> m_materialUnloadQueue;
+
+		//RenderLayer owns and is responsible for all GPUTexture - todo: move to out-of-core rendering with HLODs
+		std::map<std::string, UniquePtr<GPUTexture>> m_gpuTextureCache;
+
+		//For each texture, this tracks how many Materials use it - so we know when to unload it
+		std::map<std::string, std::uint32_t> m_gpuTextureReferenceCounter;
+		
+		//A texture can't be unloaded until it's done being used by the GPU, keep track of all textures we need to unload and the global frame count on which it is safe to do so
+		//Once the appropriate fence has been signalled, unload all textures in the corresponding vector
+		std::unordered_map<std::uint64_t, std::vector<std::string>> m_textureUnloadQueue;
 		
 		struct DeferredTextureDeletions
 		{

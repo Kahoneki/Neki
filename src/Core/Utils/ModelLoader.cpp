@@ -19,80 +19,96 @@
 namespace NK
 {
 
-	std::unordered_map<std::string, CPUModel> ModelLoader::m_filepathToModelDataCache;
+	std::map<std::pair<std::string, std::uint64_t>, UniquePtr<CPUMeshData>> ModelLoader::m_filepathToMeshDataCache;
 
 
 
-	const CPUModel* ModelLoader::LoadModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures)
+	const CPUMeshData* ModelLoader::LoadMesh(const std::string& _filepath, std::uint64_t _offset)
 	{
-		const std::unordered_map<std::string, CPUModel>::iterator it{ m_filepathToModelDataCache.find(_filepath) };
-		if (it != m_filepathToModelDataCache.end())
+		if (!std::filesystem::path(_filepath).has_extension() || std::filesystem::path(_filepath).extension() != ".nkmeshdata")
 		{
-			//Model has already been loaded, pull from cache
-			return &(it->second);
+			throw std::invalid_argument("ModelLoader::LoadMesh() - _filepath does not end in .nkmeshdata as required. _filepath = " + _filepath);
 		}
 		
-		if (FileUtils::GetFileExtension(_filepath) == ".nkmodel")
+		const std::map<std::pair<std::string, std::uint64_t>, UniquePtr<CPUMeshData>>::iterator it{ m_filepathToMeshDataCache.find(std::make_pair(_filepath, _offset)) };
+		if (it != m_filepathToMeshDataCache.end())
 		{
-			return LoadNKModel(_filepath);
+			//Model has already been loaded, pull from cache
+			return it->second.get();
 		}
-		return std::get<CPUModel*>(LoadNonNKModel(_filepath, _flipFaceWinding, _flipTextures, false));
+		
+		CPUMeshData cpuMeshData{};
+		std::ifstream fs(_filepath, std::ios::binary);
+		if (!fs)
+		{
+			throw std::invalid_argument("ModelLoader::LoadMesh() - failed to open model at _filepath (" + _filepath + ")");
+		}
+		
+		fs.seekg(_offset);
+		cereal::BinaryInputArchive meshArch(fs);
+		meshArch(cpuMeshData);
+		m_filepathToMeshDataCache[std::make_pair(_filepath, _offset)] = UniquePtr<CPUMeshData>(NK_NEW(CPUMeshData, cpuMeshData));
+		return m_filepathToMeshDataCache[std::make_pair(_filepath, _offset)].get();
 	}
 
+	
 
-
-	void ModelLoader::UnloadModel(const std::string& _filepath)
+	void ModelLoader::UnloadMesh(const std::string& _filepath, std::uint64_t _offset)
 	{
-		if (!m_filepathToModelDataCache.contains(_filepath))
+		if (!m_filepathToMeshDataCache.contains(std::make_pair(_filepath, _offset)))
 		{
-			throw std::invalid_argument("ModelLoader::UnloadModel() - _filepath not in cache");
+			throw std::invalid_argument("ModelLoader::UnloadModel() - _filepath-offset pair not in cache");
 		}
+		m_filepathToMeshDataCache.erase(std::make_pair(_filepath, _offset));
+	}
 
-		const CPUModel& modelToRemove = m_filepathToModelDataCache.at(_filepath);
-
-		//Get all the textures used by the model 
-		std::vector<ImageData*> texturesToRemove;
-		for (const CPUMaterial& mat : modelToRemove.materials)
+	
+	
+	std::variant<CPUMaterial, CPUMaterialNTC> ModelLoader::GetMaterialHeader(const std::string& _filepath)
+	{
+		if (!std::filesystem::path(_filepath).has_extension() || std::filesystem::path(_filepath).extension() != ".nkmaterial")
 		{
-			for (ImageData* img : mat.allTextures)
-			{
-				if (img) texturesToRemove.push_back(img);
-			}
+			throw std::invalid_argument("ModelLoader::GetMaterialHeader() - _filepath does not end in .nkmaterial as required. _filepath = " + _filepath);
 		}
-
-		m_filepathToModelDataCache.erase(_filepath);
-
-		//For each texture, check if any other remaining model is using it
-		for (ImageData* img : texturesToRemove)
+		
+		std::ifstream fs(_filepath, std::ios::binary);
+		if (!fs)
 		{
-			bool isShared = false;
-			for (const auto& [path, otherModel] : m_filepathToModelDataCache)
-			{
-				for (const CPUMaterial& mat : otherModel.materials)
-				{
-					for (const ImageData* otherImg : mat.allTextures)
-					{
-						if (otherImg == img)
-						{
-							isShared = true;
-							goto checkDone; //forgive me bjarne stroustrup, im sorry, im so sorry, ill think of a better way later
-						}
-					}
-				}
-			}
-			checkDone:
+			throw std::invalid_argument("ModelLoader::GetMaterialHeader() - failed to open model at _filepath (" + _filepath + ")");
+		}
+		cereal::BinaryInputArchive archive(fs);
 
-			//If no other model uses this texture, free it from the ImageLoader's cache
-			if (!isShared)
-			{
-				ImageLoader::FreeImage(img);
-				TextureCompressor::FreeImage(img);
-			}
+		DiskMaterial header{};
+		archive(header);
+		if (header.magic != std::string("NKMATERIAL"))
+		{
+			throw std::runtime_error("ModelLoader::GetMaterialHeader() - deserialised material header's magic string was not the expected \"NKMATERIAL\" - header.magic = " + header.magic);
+		}
+		
+		if (header.isNTC)
+		{
+			CPUMaterialNTC cpuHeaderNTC;
+			cpuHeaderNTC.name = header.name;
+			cpuHeaderNTC.pipeline = header.pipeline;
+			cpuHeaderNTC.materialDataFilepath = header.ntcMaterialDataFilepath;
+			cpuHeaderNTC.numChannels = header.numChannels;
+			cpuHeaderNTC.materialPropertyChannelLookup = header.materialPropertyChannelLookup;
+			cpuHeaderNTC.shaderMaterialData = header.ntcShaderMaterialData;
+			return cpuHeaderNTC;
+		}
+		else
+		{
+			CPUMaterial cpuHeader;
+			cpuHeader.name = header.name;
+			cpuHeader.pipeline = header.pipeline;
+			cpuHeader.shaderMaterialData = header.shaderMaterialData;
+			cpuHeader.allTextures = header.allTextures;
+			return cpuHeader;
 		}
 	}
 
 
-
+	
 	VertexInputDesc ModelLoader::GetModelVertexInputDescription()
 	{
 		std::vector<VertexAttributeDesc> vertexAttributes;
@@ -102,7 +118,7 @@ namespace NK
 		posAttribute.attribute = SHADER_ATTRIBUTE::POSITION;
 		posAttribute.binding = 0;
 		posAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
-		posAttribute.offset = offsetof(ModelVertex, position);
+		posAttribute.offset = offsetof(Vertex, position);
 		vertexAttributes.push_back(posAttribute);
 
 		//Normal attribute
@@ -110,7 +126,7 @@ namespace NK
 		normAttribute.attribute = SHADER_ATTRIBUTE::NORMAL;
 		normAttribute.binding = 0;
 		normAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
-		normAttribute.offset = offsetof(ModelVertex, normal);
+		normAttribute.offset = offsetof(Vertex, normal);
 		vertexAttributes.push_back(normAttribute);
 
 		//Texcoord attribute
@@ -118,7 +134,7 @@ namespace NK
 		uvAttribute.attribute = SHADER_ATTRIBUTE::TEXCOORD_0;
 		uvAttribute.binding = 0;
 		uvAttribute.format = DATA_FORMAT::R32G32_SFLOAT;
-		uvAttribute.offset = offsetof(ModelVertex, texCoord);
+		uvAttribute.offset = offsetof(Vertex, texCoord);
 		vertexAttributes.push_back(uvAttribute);
 
 		//Tangent attribute
@@ -126,7 +142,7 @@ namespace NK
 		tanAttribute.attribute = SHADER_ATTRIBUTE::TANGENT;
 		tanAttribute.binding = 0;
 		tanAttribute.format = DATA_FORMAT::R32G32B32A32_SFLOAT;
-		tanAttribute.offset = offsetof(ModelVertex, tangent);
+		tanAttribute.offset = offsetof(Vertex, tangent);
 		vertexAttributes.push_back(tanAttribute);
 
 		//Vertex buffer binding
@@ -134,7 +150,7 @@ namespace NK
 		VertexBufferBindingDesc bufferBinding{};
 		bufferBinding.binding = 0;
 		bufferBinding.inputRate = VERTEX_INPUT_RATE::VERTEX;
-		bufferBinding.stride = sizeof(ModelVertex);
+		bufferBinding.stride = sizeof(Vertex);
 		bufferBindings.push_back(bufferBinding);
 
 		//Vertex input description
@@ -149,38 +165,123 @@ namespace NK
 	
 	void ModelLoader::ClearCache()
 	{
-		m_filepathToModelDataCache.clear();
+		m_filepathToMeshDataCache.clear();
 		ImageLoader::ClearCache();
 		TextureCompressor::ClearCache();
 	}
 
 
 	
-	void ModelLoader::SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures, NTCSerialisationInfo _ntc)
+	void ModelLoader::SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _outputTextureDirectory)
 	{
-		//Create output filepath if it doesn't exist
-		const std::filesystem::path outputPath{ _outputFilepath };
+		//Create output filepaths if it doesn't exist
+		std::filesystem::path outputPath{ _outputFilepath };
 		const std::filesystem::path outputDir{ outputPath.parent_path() };
 		if (!outputDir.empty())
 		{
 			std::filesystem::create_directories(outputDir);
 		}
-
-		//Load the serialised model into the archive
-		std::ofstream os(_outputFilepath, std::ios::binary);
-		if (!os)
+		std::filesystem::path outputTexturePath{ _outputTextureDirectory };
+		const std::filesystem::path outputTextureDir{ outputTexturePath.parent_path() };
+		if (!outputTextureDir.empty())
 		{
-			throw std::runtime_error("ModelLoader::SerialiseNKModel() - failed to open _outputFilepath for writing. _outputFilepath (" + _outputFilepath + ")");
+			std::filesystem::create_directories(outputTextureDir);
 		}
-		cereal::BinaryOutputArchive archive(os);
-		CPUModel_Serialised model{ std::get<CPUModel_Serialised>(LoadNonNKModel(_inputFilepath, _flipFaceWinding, _flipTextures, true, outputDir)) };
-		model.header.flipTextures = _flipTextures;
-		archive(model);
+		
+		DiskModel diskModel;
+		diskModel.magic = "NKMODEL";
+		diskModel.version = 0;
+		diskModel.cpuModel.meshDataFilepath = outputPath.replace_extension(".nkmeshdata");
+		
+		std::pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>> data{ LoadNonNKModelData(_inputFilepath, _flipFaceWinding, _flipTextures, _outputTextureDirectory) };
+		std::ofstream meshStream(diskModel.cpuModel.meshDataFilepath, std::ios::binary);
+		if (!meshStream)
+		{
+			throw std::runtime_error("ModelLoader::SerialiseNKModel() - failed to create mesh data file. Filepath = " + diskModel.cpuModel.meshDataFilepath);
+		}
+		{
+			cereal::BinaryOutputArchive meshArch(meshStream);
+			std::string magic{ "NKMESHDATA" };
+			meshArch(magic);
+			cereal::size_type numMeshes{ data.first.size() };
+			meshArch(numMeshes);
+			diskModel.cpuModel.meshDataLoadInfo.resize(numMeshes);
+			
+			//Calculate centre and halfExtents of model
+			glm::vec3 minAABBModel(std::numeric_limits<float>::max());
+			glm::vec3 maxAABBModel(std::numeric_limits<float>::lowest());
+			
+			for (std::size_t i{ 0 }; i < numMeshes; ++i)
+			{
+				//Calculate halfExtents of mesh
+				glm::vec3 minAABB(std::numeric_limits<float>::max());
+				glm::vec3 maxAABB(std::numeric_limits<float>::lowest());
+				for (const Vertex& vertex : data.first[i].vertices)
+				{
+					minAABB.x = std::min(minAABB.x, vertex.position.x);
+					minAABB.y = std::min(minAABB.y, vertex.position.y);
+					minAABB.z = std::min(minAABB.z, vertex.position.z);
+
+					maxAABB.x = std::max(maxAABB.x, vertex.position.x);
+					maxAABB.y = std::max(maxAABB.y, vertex.position.y);
+					maxAABB.z = std::max(maxAABB.z, vertex.position.z);
+					
+					//Also update model's half extents
+					minAABBModel.x = std::min(minAABBModel.x, vertex.position.x);
+					minAABBModel.y = std::min(minAABBModel.y, vertex.position.y);
+					minAABBModel.z = std::min(minAABBModel.z, vertex.position.z);
+
+					maxAABBModel.x = std::max(maxAABBModel.x, vertex.position.x);
+					maxAABBModel.y = std::max(maxAABBModel.y, vertex.position.y);
+					maxAABBModel.z = std::max(maxAABBModel.z, vertex.position.z);
+				}
+				diskModel.cpuModel.meshDataLoadInfo[i].centre = (minAABB + maxAABB) * 0.5f;
+				diskModel.cpuModel.meshDataLoadInfo[i].halfExtents = (maxAABB - minAABB) * 0.5f;
+				
+				diskModel.cpuModel.meshDataLoadInfo[i].meshOffset = meshStream.tellp();
+				meshArch(data.first[i]);
+			}
+			
+			diskModel.cpuModel.halfExtents = (maxAABBModel - minAABBModel) * 0.5f;
+		}
+		
+		std::ofstream modelStream(_outputFilepath, std::ios::binary);
+		if (!modelStream)
+		{
+			throw std::runtime_error("ModelLoader::SerialiseNKModel() - failed to failed to create model data file. Filepath = " + _outputFilepath);
+		}
+		{
+			cereal::BinaryOutputArchive modelArch(modelStream);
+			modelArch(diskModel);
+		}
+		
+		for (std::size_t i{ 0 }; i < data.second.size(); ++i)
+		{
+			DiskMaterial diskMaterial{};
+			diskMaterial.magic = "NKMATERIAL";
+			diskMaterial.version = 0;
+			diskMaterial.name = data.second[i].name;
+			diskMaterial.pipeline = data.second[i].pipeline;
+			diskMaterial.isNTC = false; //default
+			diskMaterial.shaderMaterialData = data.second[i].shaderMaterialData;
+			diskMaterial.allTextures = data.second[i].allTextures;
+			
+			std::string materialOutputPath{ outputDir.string() + "/" + diskMaterial.name + std::string(".nkmaterial") };
+			std::ofstream materialStream(materialOutputPath, std::ios::binary);
+			if (!materialStream)
+			{
+				throw std::runtime_error("ModelLoader::SerialiseNKModel() - failed to create material file. Filepath = " + materialOutputPath);
+			}
+			{
+				cereal::BinaryOutputArchive materialArch(materialStream);
+				materialArch(diskMaterial);
+			}
+		}
 	}
 
 
 
-	CPUModel_SerialisedHeader ModelLoader::GetNKModelHeader(const std::string& _filepath)
+	CPUModel ModelLoader::GetNKModelHeader(const std::string& _filepath)
 	{
 		std::ifstream fs(_filepath, std::ios::binary);
 		if (!fs)
@@ -189,51 +290,19 @@ namespace NK
 		}
 		cereal::BinaryInputArchive archive(fs);
 
-		CPUModel_SerialisedHeader header{};
+		DiskModel header{};
 		archive(header);
+		if (header.magic != std::string("NKMODEL"))
+		{
+			throw std::runtime_error("ModelLoader::GetNKModelHeader() - deserialised model header's magic string was not the expected \"NKMODEL\" - header.magic = " + header.magic);
+		}
 		
-		return header;
+		return header.cpuModel;
 	}
 
 
 
-	const CPUModel* ModelLoader::LoadNKModel(const std::string& _filepath)
-	{
-		std::ifstream fs(_filepath, std::ios::binary);
-		if (!fs)
-		{
-			throw std::invalid_argument("ModelLoader::LoadModel() - failed to open model at _filepath (" + _filepath + ")");
-		}
-		cereal::BinaryInputArchive archive(fs);
-
-		CPUModel_Serialised serialisedModel;
-		archive(serialisedModel);
-
-		CPUModel& model{ m_filepathToModelDataCache[_filepath] };
-		model.meshes = std::move(serialisedModel.meshes);
-		model.materials.resize(serialisedModel.materials.size());
-		for (std::size_t matIndex{ 0 }; matIndex < serialisedModel.materials.size(); ++matIndex)
-		{
-			model.materials[matIndex].lightingModel = serialisedModel.materials[matIndex].lightingModel;
-			model.materials[matIndex].shaderMaterialData = serialisedModel.materials[matIndex].shaderMaterialData;
-
-			for (std::size_t texIndex{ 0 }; texIndex < serialisedModel.materials[matIndex].allTextures.size(); ++texIndex)
-			{
-				const std::pair<std::string, bool> texLoadData{ serialisedModel.materials[matIndex].allTextures[texIndex] };
-				if (!texLoadData.first.empty())
-				{
-					model.materials[matIndex].allTextures[texIndex] = TextureCompressor::LoadImage(std::filesystem::path(_filepath).parent_path().string() + "/" + texLoadData.first, serialisedModel.header.flipTextures, texLoadData.second);
-					model.materials[matIndex].allTextures[texIndex]->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
-				}
-			}
-		}
-
-		return &(m_filepathToModelDataCache[_filepath]);
-	}
-
-
-
-	std::variant<CPUModel*, CPUModel_Serialised> ModelLoader::LoadNonNKModel(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, bool _serialisedModelOutput, const std::filesystem::path& _serialisedModelTextureOutputDirectory)
+	std::pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>> ModelLoader::LoadNonNKModelData(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _serialisedTextureOutputDirectory)
 	{
 		Assimp::Importer importer{};
 		const aiScene* scene{ importer.ReadFile(_filepath,
@@ -252,83 +321,64 @@ namespace NK
 			throw std::runtime_error("ModelLoader::LoadModel() - Failed to load model (" + _filepath + ") - " + std::string(importer.GetErrorString()));
 		}
 
-		CPUModel_Serialised cpuModelSerialised{};
-		CPUModel cpuModel{};
-		std::string modelDirectory{ _filepath.substr(0, _filepath.find_last_of('/')) };
-		if (_serialisedModelOutput) { ProcessNode(scene->mRootNode, scene, &cpuModelSerialised, modelDirectory); }
-		else { ProcessNode(scene->mRootNode, scene, &cpuModel, modelDirectory); }
+		
+		//Load mesh data
+		std::vector<CPUMeshData> cpuMeshData;
+		std::string materialDirectory{ std::filesystem::path(_serialisedTextureOutputDirectory).parent_path().string() };
+		ProcessNode(scene->mRootNode, scene, &cpuMeshData, materialDirectory);
+		
 		
 		//Calculate model extents
 		glm::vec3 minAABB(std::numeric_limits<float>::max());
 		glm::vec3 maxAABB(std::numeric_limits<float>::lowest());
-		auto calculateExtentsAndCenterModel{ [&](auto* _model)
+		for (const CPUMeshData& mesh : cpuMeshData)
 		{
-			//Calculate extents
-			for (const CPUMesh& mesh : _model->meshes)
+			for (const Vertex& vertex : mesh.vertices)
 			{
-				for (const ModelVertex& vertex : mesh.vertices)
-				{
-					minAABB.x = std::min(minAABB.x, vertex.position.x);
-					minAABB.y = std::min(minAABB.y, vertex.position.y);
-					minAABB.z = std::min(minAABB.z, vertex.position.z);
+				minAABB.x = std::min(minAABB.x, vertex.position.x);
+				minAABB.y = std::min(minAABB.y, vertex.position.y);
+				minAABB.z = std::min(minAABB.z, vertex.position.z);
 
-					maxAABB.x = std::max(maxAABB.x, vertex.position.x);
-					maxAABB.y = std::max(maxAABB.y, vertex.position.y);
-					maxAABB.z = std::max(maxAABB.z, vertex.position.z);
-				}
+				maxAABB.x = std::max(maxAABB.x, vertex.position.x);
+				maxAABB.y = std::max(maxAABB.y, vertex.position.y);
+				maxAABB.z = std::max(maxAABB.z, vertex.position.z);
 			}
-
-			const glm::vec3 extentsCentre{ (minAABB + maxAABB) * 0.5f };
-
-			//Center the model so its local origin (0,0,0) is at centre of extents
-			for (CPUMesh& mesh : _model->meshes)
-			{
-				for (ModelVertex& vertex : mesh.vertices)
-				{
-					vertex.position -= extentsCentre;
-				}
-			}
-		} };
-
-		if (_serialisedModelOutput)
-		{
-			calculateExtentsAndCenterModel(&cpuModelSerialised);
-			cpuModelSerialised.header.halfExtents = (maxAABB - minAABB) * 0.5f;
 		}
-		else
+		const glm::vec3 extentsCentre{ (minAABB + maxAABB) * 0.5f };
+
+		//Center the model so its local origin (0,0,0) is at centre of extents
+		for (CPUMeshData& mesh : cpuMeshData)
 		{
-			calculateExtentsAndCenterModel(&cpuModel);
-			cpuModel.halfExtents = (maxAABB - minAABB) * 0.5f;
+			for (Vertex& vertex : mesh.vertices)
+			{
+				vertex.position -= extentsCentre;
+			}
 		}
 		
-
-		//Load scene materials
-		if (_serialisedModelOutput) { cpuModelSerialised.materials.resize(scene->mNumMaterials); }
-		else { cpuModel.materials.resize(scene->mNumMaterials); }
+		
+		//Load materials
+		std::vector<CPUMaterial> materials;
+		materials.resize(scene->mNumMaterials);
 		for (std::size_t i{ 0 }; i < scene->mNumMaterials; ++i)
 		{
 			aiMaterial* assimpMaterial{ scene->mMaterials[i] };
-			CPUMaterial_Serialised nekiMaterialSerialised{};
-			CPUMaterial nekiMaterial{};
-
+			
+			std::string matName{ assimpMaterial->GetName().C_Str() };
+			if (matName.empty()) { matName = "Material"; }
+			matName += "_" + std::to_string(i);
+			std::ranges::replace_if(matName,[](const char c) { return c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|'; }, '_');
+			materials[i].name = matName;
+			
 			auto load{ [&](const MODEL_TEXTURE_TYPE _dst, const aiTextureType _src)
 			{
-				if (_serialisedModelOutput)
+				materials[i].allTextures[std::to_underlying(_dst)] = GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, std::filesystem::path(_filepath).parent_path().string());
+				if (!materials[i].allTextures.at(std::to_underlying(_dst)).first.empty())
 				{
-					nekiMaterialSerialised.allTextures[std::to_underlying(_dst)] = GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory);
-
-					if (!nekiMaterialSerialised.allTextures.at(std::to_underlying(_dst)).first.empty())
-					{
-						//Compress to .ktx2
-						std::string& filepath{ nekiMaterialSerialised.allTextures.at(std::to_underlying(_dst)).first };
-						const std::string newFilepath{ (_serialisedModelTextureOutputDirectory / std::filesystem::path(filepath).filename()).replace_extension(".ktx2").string() };
-						TextureCompressor::KTXCompress(filepath, nekiMaterialSerialised.allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
-						filepath = std::filesystem::path(newFilepath).filename().string(); //filepath is reference so this is modifying the lookup entry to point to the new ktx2 texture - just store the path relative to the model (so just the filename)
-					}
-				}
-				else
-				{
-					nekiMaterial.allTextures[std::to_underlying(_dst)] = LoadMaterialTexture(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, modelDirectory, _flipTextures);
+					//Texture was added, compress to ktx2
+					std::string& filepath{ materials[i].allTextures.at(std::to_underlying(_dst)).first };
+					const std::string newFilepath{ (_serialisedTextureOutputDirectory / std::filesystem::path(filepath).filename()).replace_extension(".ktx2").string() };
+					TextureCompressor::KTXCompress(filepath, materials[i].allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
+					filepath = std::filesystem::path(newFilepath).string(); //filepath is a reference so this is modifying the lookup entry to point to the new ktx2 texture
 				}
 			}};
 			
@@ -348,34 +398,29 @@ namespace NK
 			load(MODEL_TEXTURE_TYPE::ROUGHNESS        , aiTextureType_DIFFUSE_ROUGHNESS);
 			load(MODEL_TEXTURE_TYPE::EMISSION_COLOUR  , aiTextureType_EMISSION_COLOR);
 			load(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION);
-
+			
 			//If NORMAL_CAMERA wasn't available, fall back to NORMAL
-			if ((nekiMaterial.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)] == nullptr) && (nekiMaterialSerialised.allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)].first.empty()))
+			if (materials[i].allTextures[std::to_underlying(MODEL_TEXTURE_TYPE::NORMAL)].first.empty())
 			{
 				load(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMALS);
 			}
-
-
+			
 			//Determine lighting model
-			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return (nekiMaterial.allTextures[std::to_underlying(_tex)] != nullptr) || (!nekiMaterialSerialised.allTextures[std::to_underlying(_tex)].first.empty()); } };
+			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return !materials[i].allTextures[std::to_underlying(_tex)].first.empty(); } };
 			const bool isPBR{	hasTex(MODEL_TEXTURE_TYPE::METALNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::ROUGHNESS)			||
 								hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR)			||
 								hasTex(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION)	||
 								hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) };
-
-			if (_serialisedModelOutput) { nekiMaterialSerialised.lightingModel = isPBR ? LIGHTING_MODEL::PHYSICALLY_BASED : LIGHTING_MODEL::BLINN_PHONG; }
-			else { nekiMaterial.lightingModel = isPBR ? LIGHTING_MODEL::PHYSICALLY_BASED : LIGHTING_MODEL::BLINN_PHONG; }
-
-
+			materials[i].pipeline = (isPBR ? LIGHTING_MODEL::PHYSICALLY_BASED : LIGHTING_MODEL::BLINN_PHONG);
+			
 			//Populate shader material data
-			switch (_serialisedModelOutput ? nekiMaterialSerialised.lightingModel : nekiMaterial.lightingModel)
+			switch (materials[i].pipeline)
 			{
 			case LIGHTING_MODEL::BLINN_PHONG:
 			{
-				if (_serialisedModelOutput) { nekiMaterialSerialised.shaderMaterialData = BlinnPhongMaterial{}; }
-				else { nekiMaterial.shaderMaterialData = BlinnPhongMaterial{}; }
-				BlinnPhongMaterial& material{ std::get<BlinnPhongMaterial>(_serialisedModelOutput ? nekiMaterialSerialised.shaderMaterialData : nekiMaterial.shaderMaterialData) };
+				materials[i].shaderMaterialData = BlinnPhongMaterial{};
+				BlinnPhongMaterial& material{ std::get<BlinnPhongMaterial>(materials[i].shaderMaterialData) };
 				
 				//Convenient workaround - see explanation in CPUMaterial declaration (ModelLoader.h)
 				material.diffuseIdx			= static_cast<int>(MODEL_TEXTURE_TYPE::DIFFUSE);
@@ -407,9 +452,8 @@ namespace NK
 
 			case LIGHTING_MODEL::PHYSICALLY_BASED:
 			{
-				if (_serialisedModelOutput) { nekiMaterialSerialised.shaderMaterialData = PBRMaterial{}; }
-				else { nekiMaterial.shaderMaterialData = PBRMaterial{}; }
-				PBRMaterial& material{ std::get<PBRMaterial>(_serialisedModelOutput ? nekiMaterialSerialised.shaderMaterialData : nekiMaterial.shaderMaterialData) };
+				materials[i].shaderMaterialData = PBRMaterial{};
+				PBRMaterial& material{ std::get<PBRMaterial>(materials[i].shaderMaterialData) };
 
 				//Convenient workaround - see explanation in CPUMaterial declaration (ModelLoader.h)
 				material.baseColourIdx		= hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR) ? static_cast<int>(MODEL_TEXTURE_TYPE::BASE_COLOUR) : static_cast<int>(MODEL_TEXTURE_TYPE::DIFFUSE);
@@ -441,58 +485,39 @@ namespace NK
 				break;
 			}
 			}
-
-			
-			if (_serialisedModelOutput) { cpuModelSerialised.materials[i] = nekiMaterialSerialised; }
-			else { cpuModel.materials[i] = nekiMaterial; }
 		}
-
-
-		if (_serialisedModelOutput)
-		{
-			return std::move(cpuModelSerialised);
-		}
-		else
-		{
-			//Add to cache
-			m_filepathToModelDataCache[_filepath] = cpuModel;
-			return &(m_filepathToModelDataCache[_filepath]);
-		}
+		
+		return std::make_pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>>(std::move(cpuMeshData), std::move(materials));
 	}
 
 
 
-	void ModelLoader::ProcessNode(aiNode* _node, const aiScene* _scene, std::variant<CPUModel*, CPUModel_Serialised*> _outModel, const std::string& _modelDirectory)
+	void ModelLoader::ProcessNode(const aiNode* _node, const aiScene* _scene, std::vector<CPUMeshData>* _outMeshData, const std::string& _outputMaterialDirectory)
 	{
 		//Process all the node's meshes (if any)
 		for (std::size_t i{ 0 }; i < _node->mNumMeshes; ++i)
 		{
 			aiMesh* mesh{ _scene->mMeshes[_node->mMeshes[i]] };
-
-			std::visit([&](auto* _model)
-			{
-				_model->meshes.push_back(ProcessMesh(mesh, _scene, _modelDirectory));
-			}, _outModel);
+			_outMeshData->push_back(ProcessMesh(mesh, _scene, _outputMaterialDirectory));
 		}
 
 		//Recursively process each child node
 		for (std::size_t i{ 0 }; i < _node->mNumChildren; ++i)
 		{
-			ProcessNode(_node->mChildren[i], _scene, _outModel, _modelDirectory);
+			ProcessNode(_node->mChildren[i], _scene, _outMeshData, _outputMaterialDirectory);
 		}
 	}
 
 
 
-	CPUMesh ModelLoader::ProcessMesh(aiMesh* _mesh, const aiScene* _scene, const std::string& _directory)
+	CPUMeshData ModelLoader::ProcessMesh(aiMesh* _mesh, const aiScene* _scene, const std::string& _outputMaterialDirectory)
 	{
-		CPUMesh nekiMesh;
-
+		CPUMeshData cpuMesh;
 		
 		//Process vertices
 		for (std::size_t i{ 0 }; i < _mesh->mNumVertices; ++i)
 		{
-			ModelVertex vertex{};
+			Vertex vertex{};
 
 			//Position
 			vertex.position = { _mesh->mVertices[i].x, _mesh->mVertices[i].y, _mesh->mVertices[i].z };
@@ -521,7 +546,7 @@ namespace NK
 				vertex.tangent   = { t.x, t.y, t.z, sign };
 			}
 
-			nekiMesh.vertices.push_back(vertex);
+			cpuMesh.vertices.push_back(vertex);
 		}
 
 
@@ -532,58 +557,24 @@ namespace NK
 			aiFace face{ _mesh->mFaces[i] };
 			for (std::size_t j{ 0 }; j < face.mNumIndices; ++j)
 			{
-				nekiMesh.indices.push_back(face.mIndices[j]);
+				cpuMesh.indices.push_back(face.mIndices[j]);
 			}
 		}
-
-
-		nekiMesh.materialIndex = _mesh->mMaterialIndex;
-
-
-		return nekiMesh;
-	}
-
-
-
-	ImageData* ModelLoader::LoadMaterialTexture(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory, bool _flipTexture)
-	{
-		const aiTextureType assimpType{ static_cast<aiTextureType>(_assimpType) };
 		
-		if (_material->GetTextureCount(assimpType) == 0)
-		{
-			return {};
-		}
+		std::string matName{ _scene->mMaterials[_mesh->mMaterialIndex]->GetName().C_Str() };
+		if (matName.empty()) { matName = "Material"; }
+		matName += "_" + std::to_string(_mesh->mMaterialIndex);
+		std::ranges::replace_if(matName,[](const char c) { return c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|'; }, '_');
 
-		//Load first texture of type (multiple textures of same type for same material is not currently supported by Neki)
-		aiString filename;
-		_material->GetTexture(assimpType, 0, &filename);
-		const std::string filepath{ _directory + "/" + filename.C_Str() };
-		auto isColour = [&]()
-		{
-			switch (_nekiType) {
-			case MODEL_TEXTURE_TYPE::DIFFUSE:
-			case MODEL_TEXTURE_TYPE::SPECULAR:
-			case MODEL_TEXTURE_TYPE::AMBIENT:
-			case MODEL_TEXTURE_TYPE::EMISSIVE:
-			case MODEL_TEXTURE_TYPE::EMISSION_COLOUR:
-			case MODEL_TEXTURE_TYPE::BASE_COLOUR:
-			case MODEL_TEXTURE_TYPE::REFLECTION:
-				return true;
-			default: return false;
-			}
-		};
+		cpuMesh.materialFilepath = _outputMaterialDirectory + std::string("/") + matName + std::string(".nkmaterial");
 
-		ImageData* const imageData{ ImageLoader::LoadImage(filepath, _flipTexture, isColour()) };
-		imageData->desc.usage |= TEXTURE_USAGE_FLAGS::READ_ONLY;
-		return imageData;
+		return cpuMesh;
 	}
 
 
 
 	std::pair<std::string, bool> ModelLoader::GetMaterialTextureDataForSerialisation(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory)
 	{
-		//todo: this should be refactored, too much overlap with LoadMaterialTexture()
-		
 		const aiTextureType assimpType{ static_cast<aiTextureType>(_assimpType) };
 		
 		if (_material->GetTextureCount(assimpType) == 0)

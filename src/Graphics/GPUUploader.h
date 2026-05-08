@@ -34,15 +34,12 @@ namespace NK
 		IQueue* graphicsQueue;
 	};
 
-	
-	struct GPUMesh
+	struct GPUTexture
 	{
-		UniquePtr<IBuffer> vertexBuffer;
-		UniquePtr<IBuffer> indexBuffer;
-		std::uint32_t indexCount;
-		std::size_t materialIndex; //Index into parent GPUModel's materials vector
+		UniquePtr<ITexture> texture;
+		UniquePtr<ITextureView> view;
 	};
-
+	
 	struct GPUMaterial
 	{
 		LIGHTING_MODEL lightingModel;
@@ -51,8 +48,13 @@ namespace NK
 		//This material will hence be valid for as long as its in scope
 		UniquePtr<IBuffer> materialBuffer;
 		UniquePtr<IBufferView> materialBufferView;
-		std::vector<UniquePtr<ITexture>> textures;
-		std::vector<UniquePtr<ITextureView>> textureViews;
+	};
+	
+	struct GPUMesh
+	{
+		UniquePtr<IBuffer> vertexBuffer;
+		UniquePtr<IBuffer> indexBuffer;
+		std::uint32_t indexCount;
 	};
 	
 	struct GPUModel
@@ -85,9 +87,10 @@ namespace NK
 		//The number of bytes in _data is expected to exactly match the size of the destination texture
 		void EnqueueTextureDataUpload(const void* _data, ITexture* _dstTexture, RESOURCE_STATE _dstTextureInitialState);
 
-		//_cpuModel should be populated from ModelLoader::LoadModel()
-		[[nodiscard]] UniquePtr<GPUModel> EnqueueModelDataUpload(const CPUModel* _cpuModel);
-
+		[[nodiscard]] UniquePtr<GPUMesh> EnqueueMeshDataUpload(const CPUMeshData* _cpuMesh);
+		[[nodiscard]] UniquePtr<GPUMaterial> EnqueueMaterialDataUpload(const CPUMaterial* _cpuMaterial);
+		[[nodiscard]] UniquePtr<GPUTexture> EnqueueTextureDataUpload(const ImageData* _imgData);
+		
 		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and the provided fence and semaphore will already be signalled
 		//
 		//If _waitIdle = false, the calling thread will not be blocked, instead the provided fence and semaphore will be signalled when the flush is complete
@@ -112,10 +115,6 @@ namespace NK
 		//Subregions are tightly packed so m_stagingBufferSubregions.back().offset + m_stagingBufferSubregions.back().size will be the offset for new resources
 		//Gets cleared when Reset() is called
 		std::vector<BufferSubregion> m_stagingBufferSubregions;
-
-		//Stores all the ImageData pointers whose ImageData::data is in m_stagingBufferSubregions waiting to be flushed
-		//Once it has been flushed, we can free the texture data - todo: this is just a bit for debugging, there should be a better system in place for knowing when to load/unload resources
-		std::queue<ImageData*> m_imageDataPointers;
 		
 		UniquePtr<ICommandPool> m_commandPool;
 		UniquePtr<ICommandBuffer> m_commandBuffer;

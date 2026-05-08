@@ -208,12 +208,13 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
 [shader("pixel")]
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
+	
     NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
     SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 	StructuredBuffer<LightData> lightBuffer = g_lightData[NonUniformResourceIndex(PC(lightDataBufferIndex))];
 
     float4 albedoSample = g_textures[NonUniformResourceIndex(material.baseColourIdx)].Sample(linearSampler, vertexOutput.texCoord);
-    float4 normalSample = g_textures[NonUniformResourceIndex(material.normalIdx)].Sample(linearSampler, vertexOutput.texCoord);
+	float4 normalSample = g_textures[NonUniformResourceIndex(material.normalIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 metallicSample = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 roughnessSample = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 emissiveSample = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(linearSampler, vertexOutput.texCoord);
@@ -223,7 +224,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
     float metallic = metallicSample.g;
     float roughness = roughnessSample.b;
     float3 emissive = pow(emissiveSample.rgb, 2.2); //srgb -> linear
-
+	
 
     float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); //frag pos to camera
 

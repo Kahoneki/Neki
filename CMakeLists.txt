@@ -228,15 +228,18 @@ endif()
 
 
 #ImGuizmo
-FetchContent_Declare(imguizmo GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git GIT_TAG master)
-FetchContent_MakeAvailable(imguizmo)
-list(APPEND IMGUI_SOURCES ${imguizmo_SOURCE_DIR}/ImGuizmo.cpp)
+FetchContent_Declare(imguizmo GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git GIT_TAG 1.9)
+FetchContent_GetProperties(imguizmo)
+if(NOT imguizmo_POPULATED)
+    FetchContent_Populate(imguizmo)
+endif()
+list(APPEND IMGUI_SOURCES ${imguizmo_SOURCE_DIR}/src/ImGuizmo.cpp)
 
 
 #ImGui library
 add_library(ImGui STATIC ${IMGUI_SOURCES})
 target_include_directories(ImGui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
-target_include_directories(ImGui PUBLIC ${imguizmo_SOURCE_DIR})
+target_include_directories(ImGui PUBLIC ${imguizmo_SOURCE_DIR}/src)
 target_link_libraries(ImGui PUBLIC glfw)
 
 if(NEKI_BUILD_VULKAN)
@@ -460,7 +463,12 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 
 
     #Copy all resource files to the output directory, maintaining subdirectory structure
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Samples/Resource-Files/" DESTINATION "${CMAKE_BINARY_DIR}/Samples/Resource-Files/")
+    add_custom_target(CopyNekiResources ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/Samples/Resource-Files"
+            "${CMAKE_BINARY_DIR}/Samples/Resource-Files"
+            COMMENT "Copying engine resource files..."
+    )
 
 
 

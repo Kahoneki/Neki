@@ -21,8 +21,8 @@ namespace NK
 		CModelRenderer() = default;
 		
 		CModelRenderer(const CModelRenderer& _other)
-		: modelPath(_other.modelPath), localSpaceOrigin(_other.localSpaceOrigin), localSpaceHalfExtents(_other.localSpaceHalfExtents),
-		  visible(_other.visible), model(nullptr), modelPathDirty(true), visibilityIndex(0xFFFFFFFF)
+		: localSpaceOrigin(_other.localSpaceOrigin), localSpaceHalfExtents(_other.localSpaceHalfExtents), modelPath(_other.modelPath),
+		  modelPathDirty(true), meshVisible(_other.meshVisible)
 		{
 		}
 		
@@ -31,15 +31,12 @@ namespace NK
 			if (this == &_other) return *this;
 
 			modelPath = _other.modelPath;
-			modelPathDirty = true;
+			modelPathDirty = false;
 
 			localSpaceOrigin = _other.localSpaceOrigin;
 			localSpaceHalfExtents = _other.localSpaceHalfExtents;
-			visible = _other.visible;
-
-			model = nullptr;
-			visibilityIndex = 0xFFFFFFFF; 
-
+			meshVisible = _other.meshVisible;
+			
 			return *this;
 		}
 
@@ -67,16 +64,12 @@ namespace NK
 		
 		[[nodiscard]] inline static std::string GetStaticName() { return "Model Renderer"; }
 		
-		SERIALISE_MEMBER_FUNC(modelPath, localSpaceOrigin, localSpaceHalfExtents, visible);
+		SERIALISE_MEMBER_FUNC(modelPath, localSpaceOrigin, localSpaceHalfExtents, meshVisible);
 		
 		
 		//Volume in local space
 		glm::vec3 localSpaceOrigin{ 0,0,0 };
 		glm::vec3 localSpaceHalfExtents{ 0,0,0 };
-		
-		
-		//VERY temp
-		Neural::NTCModel* ntcModel;
 		
 		
 	private:
@@ -107,16 +100,20 @@ namespace NK
 		}
 		
 		
-		std::string modelPath{ "Samples/Resource-Files/nkmodels/Prefabs/Cube.nkmodel" };
+		std::string modelPath{ "Samples/Resource-Files/nkmodels/Prefabs/Cube/model.nkmodel" };
 		bool modelPathDirty{ true };
 		bool filePathNotFoundError{ false };
 		bool nonNkModelError{ false };
+		std::string meshDataPath{ "Samples/Resource-Files/nkmodels/Prefabs/Cube/mesh.nkmeshdata" };
 		
-		//Non-owning pointer. The RenderLayer owns and manages the GPUModel
-		GPUModel* model{ nullptr };
+		//Non-owning pointers. The RenderLayer owns and manages the GPUMeshes
+		std::vector<GPUMesh*> meshes;
+		std::vector<GPUMaterial*> materials; //parallel to `meshes`
 		
-		bool visible{ true };
-		std::uint32_t visibilityIndex{ 0xFFFFFFFF };
+		std::vector<bool> meshVisible;
+		std::vector<std::uint32_t> meshVisibilityIndices;
+		
+		std::vector<MeshDataLoadInfo> meshDataLoadInfos;
 		
 		//UI
 		std::string lastAccessedFilepath{ NEKI_SOURCE_DIR };

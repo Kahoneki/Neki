@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Materials.h"
 #include "ShaderAttributeLocations.h"
 
 #include <Core/Utils/enum_enable_bitmask_operators.h>
@@ -13,6 +14,7 @@
 #include <variant>
 #include <vector>
 #include <glm/glm.hpp>
+
 #ifdef AddJob
 	#undef AddJob
 #endif
@@ -927,4 +929,205 @@ namespace NK
 		CAMERA,
 		PLAYER_CAMERA,
 	};
+	
+	
+	namespace Neural
+	{
+		struct NTCHeader
+		{
+			std::uint32_t version;
+			std::uint32_t baseImageRes;
+			std::uint32_t numMips;
+			std::uint32_t qualityValue;
+			std::uint32_t hiddenNeurons;
+			std::uint32_t g0Channels;
+			std::uint32_t g1Channels;
+			std::uint32_t g0QuantLevels;
+			std::uint32_t g1QuantLevels;
+			std::uint32_t numLinearLayers;
+			std::uint32_t numOctaves;
+			std::uint32_t tileSize;
+		};
+	
+		struct NTCLatentTexture
+		{
+			std::uint32_t res;
+			std::uint32_t numElements; //Number of elements before packing
+			std::uint32_t numElementsPacked; //Number of elements after packing
+			unsigned char* data;
+		};
+	
+		struct NTCFeatureLevel
+		{
+			NTCLatentTexture g0;
+			NTCLatentTexture g1;
+		};
+	
+		struct NTCLinearLayer
+		{
+			std::uint32_t inFeatures;
+			std::uint32_t outFeatures;
+		
+			//Weights and biases were saved as a contiguous fp16 block
+			std::vector<std::uint16_t> weights; //Size: inFeatures * outFeatures (flattened for contiguity)
+			std::vector<std::uint16_t> biases; //Size: outFeatures
+		};
+	
+		struct NTCModel
+		{
+			NTCHeader header;
+			std::array<NTCFeatureLevel, 4> featureLevels; //4 feature levels
+			std::vector<NTCLinearLayer> mlp; //Size: header.numLinearLayers
+		};
+	}
+	
+	
+	struct MeshDataLoadInfo
+	{
+		glm::vec3 centre;
+		glm::vec3 halfExtents;
+		std::uint64_t meshOffset; //offset into .nkmeshdata file (std::streampos isn't cereal-serialisable)
+	};
+	SERIALISE(MeshDataLoadInfo, v.centre, v.halfExtents, v.meshOffset)
+	
+	struct CPUModel
+	{
+		glm::vec3 halfExtents; //Centred at 0,0,0
+		std::string meshDataFilepath; //relative
+		std::vector<MeshDataLoadInfo> meshDataLoadInfo;
+	};
+	SERIALISE(CPUModel, v.halfExtents, v.meshDataFilepath, v.meshDataLoadInfo)
+	
+	struct DiskModel
+	{
+		std::string magic; //NKMODEL
+		std::uint32_t version;
+		CPUModel cpuModel;
+	};
+	SERIALISE(DiskModel, v.magic, v.version, v.cpuModel)
+	
+	
+	struct Vertex
+	{
+		glm::vec3 position;
+		glm::vec3 normal;
+		glm::vec2 texCoord;
+		glm::vec4 tangent;
+	};
+	SERIALISE(Vertex, v.position, v.normal, v.texCoord, v.tangent)
+	
+	struct CPUMeshData
+	{
+		std::string materialFilepath;
+		std::vector<Vertex> vertices;
+		std::vector<std::uint32_t> indices;
+	};
+	SERIALISE(CPUMeshData, v.materialFilepath, v.vertices, v.indices)
+	
+	struct DiskMeshData
+	{
+		std::string magic; //NKMESHDATA
+		std::vector<CPUMeshData> meshData;
+	};
+	SERIALISE(DiskMeshData, v.magic, v.meshData)
+	
+	
+	enum class LIGHTING_MODEL
+	{
+		BLINN_PHONG = 0,
+		PHYSICALLY_BASED = 1,
+	};
+	
+	enum class MODEL_TEXTURE_TYPE : std::size_t
+	{
+		//Key:
+		//Y = yes - accepted as a native part of the lighting model
+		//S = sometimes
+		//N = no - ignored in the lighting model
+		
+		//Name						┌─ Blinn-Phong ──────┐  ┌─ PBR Spec-Gloss ───────────┐  ┌─ PBR Metal-Rough ───────┐
+		DIFFUSE				= 0,	//Y						//S (fallback)					//S (fallback)
+		SPECULAR			= 1,	//Y						//Y								//N
+		AMBIENT				= 2,	//S (AO tint)			//S (AO)						//S (AO)
+		EMISSIVE			= 3,	//Y						//Y								//Y
+		HEIGHT				= 4,	//S (non-lighting)		//S (non-lighting)				//S (non-lighting)
+		NORMAL				= 5,	//Y						//Y								//Y
+		SHININESS			= 6,	//Y						//Y								//S (convert -> roughness)
+		OPACITY				= 7,	//Y						//Y								//Y
+		DISPLACEMENT		= 8,	//S						//S								//S
+		LIGHTMAP			= 9,	//S						//Y (AO)						//Y (AO)
+		REFLECTION			= 10,	//S (static env-map)	//S (optional env-map)			//S (optional env-map)
+		BASE_COLOUR			= 11,	//N						//S (preferred over DIFFUSE)	//Y
+		METALNESS			= 12,	//N						//N								//Y
+		ROUGHNESS			= 13,	//N						//N								//Y
+		EMISSION_COLOUR		= 14,	//Y						//Y								//Y
+		AMBIENT_OCCLUSION	= 15,	//S						//Y								//Y
+
+		NUM_MODEL_TEXTURE_TYPES = 16,
+	};
+	
+	struct DiskMaterial
+	{
+		std::string magic; //NKMATERIAL
+		std::uint32_t version;
+		std::string name;
+		
+		LIGHTING_MODEL pipeline;
+		bool isNTC;
+		
+		//if isNTC
+		std::string ntcMaterialDataFilepath; //relative
+		std::uint32_t numChannels;
+		std::vector<std::pair<std::size_t, bool>> materialPropertyChannelLookup; //index with channel index to get MODEL_TEXTURE_TYPE (representing the property this channel holds (repeating for e.g.: RGB)) + srgb-flag pair
+		std::variant<BlinnPhongMaterialNTC, PBRMaterialNTC> ntcShaderMaterialData;
+		
+		//if !isNTC
+		//There's a bit of translation going on here to communicate to the GPUUploader
+		//The bool flags in the material type will be populated by ModelLoader with the actual correct values that will end up going to the GPU
+		//The index members in the material type will be populated with MODEL_TEXTURE_TYPE values, representing the texture type the GPUUploader class should populate the texture slot with
+		//
+		//This is a convenient workaround for the fact that there isn't a 1-to-1 mapping between the MODEL_TEXTURE_TYPE enum and the texture types represented in the material types
+		//For example, BlinnPhongMaterial has `hasEmissive` and `emissiveIdx` members, but if the material provides both an EMISSIVE and EMISSION_COLOUR type, which one should these fields refer to?
+		//In the specific case above, it will favour EMISSION_COLOUR - this decision will be specific to each texture type that has this problem
+		//This choice is decided by the ModelLoader which then passes on this information the GPUUploader by populating the emissiveIdx field with MODEL_TEXTURE_TYPE::EMISSIVE or EMISSION_COLOUR so the GPU knows which texture to pull.
+		//The GPUUploader will update these values with the indices it allocates when creating the GPUMaterial
+		std::variant<BlinnPhongMaterial, PBRMaterial> shaderMaterialData;
+		std::array<std::pair<std::string, bool>, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //index with MODEL_TEXTURE_TYPE to get relative filepath + srgb-flag pair
+	};
+	SERIALISE(DiskMaterial, v.magic, v.version, v.pipeline, v.isNTC, v.ntcMaterialDataFilepath, v.numChannels, v.materialPropertyChannelLookup, v.shaderMaterialData, v.allTextures)
+	
+	struct DiskMaterialDataNTC
+	{
+		std::string magic; //NKMATERIALDATANTC
+		Neural::NTCModel ntcModel;
+	};
+	
+	struct CPUMaterialNTC
+	{
+		std::string name;
+		LIGHTING_MODEL pipeline;
+		std::string materialDataFilepath; //relative
+		std::uint32_t numChannels;
+		std::vector<std::pair<std::size_t, bool>> materialPropertyChannelLookup; //index with channel index to get MODEL_TEXTURE_TYPE (representing the property this channel holds (repeating for e.g.: RGB)) + srgb-flag pair
+		std::variant<BlinnPhongMaterialNTC, PBRMaterialNTC> shaderMaterialData;
+	};
+	
+	struct CPUMaterial
+	{
+		std::string name;
+		LIGHTING_MODEL pipeline;
+		
+		//There's a bit of translation going on here to communicate to the GPUUploader
+		//The bool flags in the material type will be populated by ModelLoader with the actual correct values that will end up going to the GPU
+		//The index members in the material type will be populated with MODEL_TEXTURE_TYPE values, representing the texture type the GPUUploader class should populate the texture slot with
+		//
+		//This is a convenient workaround for the fact that there isn't a 1-to-1 mapping between the MODEL_TEXTURE_TYPE enum and the texture types represented in the material types
+		//For example, BlinnPhongMaterial has `hasEmissive` and `emissiveIdx` members, but if the material provides both an EMISSIVE and EMISSION_COLOUR type, which one should these fields refer to?
+		//In the specific case above, it will favour EMISSION_COLOUR - this decision will be specific to each texture type that has this problem
+		//This choice is decided by the ModelLoader which then passes on this information the GPUUploader by populating the emissiveIdx field with MODEL_TEXTURE_TYPE::EMISSIVE or EMISSION_COLOUR so the GPU knows which texture to pull.
+		//The GPUUploader will update these values with the indices it allocates when creating the GPUMaterial
+		std::variant<BlinnPhongMaterial, PBRMaterial> shaderMaterialData;
+		std::array<std::pair<std::string, bool>, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //index with MODEL_TEXTURE_TYPE to get relative filepath + srgb-flag pair
+	};
+	
 }

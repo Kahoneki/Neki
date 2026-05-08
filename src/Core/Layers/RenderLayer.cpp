@@ -8,19 +8,18 @@
 #include <Components/CSelected.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
+#include <Core/Utils/ModelLoader.h>
 #include <Core/Utils/NTCMatrixLayerConverter.h>
 #include <Core/Utils/TextureCompressor.h>
 #include <Graphics/Lights/DirectionalLight.h>
 #include <Graphics/Lights/PointLight.h>
 #include <Graphics/Lights/SpotLight.h>
 #include <Managers/InputManager.h>
-#include <Managers/TimeManager.h>
 #include <RHI/IBuffer.h>
 #include <RHI/IBufferView.h>
 #include <RHI/IQueue.h>
 #include <RHI/ISampler.h>
 #include <RHI/ISemaphore.h>
-#include <RHI/ISurface.h>
 #include <RHI/ISwapchain.h>
 
 
@@ -28,7 +27,6 @@
 	#include <RHI-Vulkan/VulkanCommandBuffer.h>
 	#include <RHI-Vulkan/VulkanDevice.h>
 	#include <RHI-Vulkan/VulkanQueue.h>
-	#include <RHI-Vulkan/VulkanUtils.h>
 #endif
 #ifdef NEKI_D3D12_SUPPORTED
 	#include <RHI-D3D12/D3D12CommandBuffer.h>
@@ -53,7 +51,7 @@ namespace NK
 {
 
 	RenderLayer::RenderLayer(Registry& _reg, const RenderLayerDesc& _desc)
-	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_globalFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.renderResolution), m_visibilityIndexAllocator(NK_NEW(FreeListAllocator, _desc.maxModels)), m_firstFrame(true)
+	: ILayer(_reg), m_allocator(*Context::GetAllocator()), m_desc(_desc), m_currentFrame(0), m_globalFrame(0), m_supersampleResolution(glm::ivec2(m_desc.ssaaMultiplier) * m_desc.renderResolution), m_visibilityIndexAllocator(NK_NEW(FreeListAllocator, _desc.maxModels * _desc.maxMeshesPerModel)), m_firstFrame(true)
 	{
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::HEADING, LOGGER_LAYER::RENDER_LAYER, "Initialising Render Layer\n");
@@ -68,7 +66,7 @@ namespace NK
 		InitCameraBuffers();
 		InitLightDataBuffer();
 		InitModelMatricesBuffer();
-		InitModelVisibilityBuffers();
+		InitMeshVisibilityBuffers();
 		InitCube();
 		InitScreenQuad();
 		InitShadersAndPipelines();
@@ -149,7 +147,7 @@ namespace NK
 	{
 		ILayer::SetRegistry(_reg);
 		m_activeCamera = nullptr;
-		for (auto& lookup : m_modelMatricesEntitiesLookups)
+		for (std::vector<Entity>& lookup : m_modelMatricesEntitiesLookups)
 		{
 			lookup.clear();
 		}
@@ -434,38 +432,38 @@ namespace NK
 
 
 
-	void RenderLayer::InitModelVisibilityBuffers()
+	void RenderLayer::InitMeshVisibilityBuffers()
 	{
-		m_modelVisibilityDeviceBuffers.resize(m_desc.framesInFlight);
-		m_modelVisibilityReadbackBuffers.resize(m_desc.framesInFlight);
-		m_modelVisibilityDeviceBufferViews.resize(m_desc.framesInFlight);
-		m_modelVisibilityReadbackBufferMaps.resize(m_desc.framesInFlight);
+		m_meshVisibilityDeviceBuffers.resize(m_desc.framesInFlight);
+		m_meshVisibilityReadbackBuffers.resize(m_desc.framesInFlight);
+		m_meshVisibilityDeviceBufferViews.resize(m_desc.framesInFlight);
+		m_meshVisibilityReadbackBufferMaps.resize(m_desc.framesInFlight);
 
 		for (std::uint32_t i = 0; i < m_desc.framesInFlight; ++i)
 		{
 			//Need to create a host-visible readback buffer and a device-local buffer for the uav
 			//Todo^: look into device-local host-accessible memory type (uma, resizeable bar, etc. etc.)
-			BufferDesc modelVisibilityBufferDesc{};
-			modelVisibilityBufferDesc.size = m_desc.maxModels * sizeof(std::uint32_t);
-			modelVisibilityBufferDesc.type = MEMORY_TYPE::READBACK;
-			modelVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT;
-			m_modelVisibilityReadbackBuffers[i] = m_device->CreateBuffer(modelVisibilityBufferDesc);
-			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityReadbackBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
+			BufferDesc meshVisibilityBufferDesc{};
+			meshVisibilityBufferDesc.size = m_desc.maxModels * m_desc.maxMeshesPerModel * sizeof(std::uint32_t);
+			meshVisibilityBufferDesc.type = MEMORY_TYPE::READBACK;
+			meshVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT;
+			m_meshVisibilityReadbackBuffers[i] = m_device->CreateBuffer(meshVisibilityBufferDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_meshVisibilityReadbackBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
 
-			modelVisibilityBufferDesc.type = MEMORY_TYPE::DEVICE;
-			modelVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT | BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_WRITE_BIT;
-			m_modelVisibilityDeviceBuffers[i] = m_device->CreateBuffer(modelVisibilityBufferDesc);
-			m_graphicsCommandBuffers[0]->TransitionBarrier(m_modelVisibilityDeviceBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
+			meshVisibilityBufferDesc.type = MEMORY_TYPE::DEVICE;
+			meshVisibilityBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_SRC_BIT | BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_WRITE_BIT;
+			m_meshVisibilityDeviceBuffers[i] = m_device->CreateBuffer(meshVisibilityBufferDesc);
+			m_graphicsCommandBuffers[0]->TransitionBarrier(m_meshVisibilityDeviceBuffers[i].get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::COPY_DEST);
 
-			BufferViewDesc modelVisibilityBufferViewDesc{};
-			modelVisibilityBufferViewDesc.size = m_desc.maxModels * sizeof(std::uint32_t);
-			modelVisibilityBufferViewDesc.offset = 0;
-			modelVisibilityBufferViewDesc.stride = 0; //byte address buffer
-			modelVisibilityBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_WRITE;
-			m_modelVisibilityDeviceBufferViews[i] = m_device->CreateBufferView(m_modelVisibilityDeviceBuffers[i].get(), modelVisibilityBufferViewDesc);
+			BufferViewDesc meshVisibilityBufferViewDesc{};
+			meshVisibilityBufferViewDesc.size = m_desc.maxModels * m_desc.maxMeshesPerModel * sizeof(std::uint32_t);
+			meshVisibilityBufferViewDesc.offset = 0;
+			meshVisibilityBufferViewDesc.stride = 0; //byte address buffer
+			meshVisibilityBufferViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_WRITE;
+			m_meshVisibilityDeviceBufferViews[i] = m_device->CreateBufferView(m_meshVisibilityDeviceBuffers[i].get(), meshVisibilityBufferViewDesc);
 
-			m_modelVisibilityReadbackBufferMaps[i] = m_modelVisibilityReadbackBuffers[i]->GetMap();
-			std::fill_n(static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[i]), m_desc.maxModels, 1u);
+			m_meshVisibilityReadbackBufferMaps[i] = m_meshVisibilityReadbackBuffers[i]->GetMap();
+			std::fill_n(static_cast<std::uint32_t*>(m_meshVisibilityReadbackBufferMaps[i]), m_desc.maxModels * m_desc.maxMeshesPerModel, 1u);
 		}
 	}
 
@@ -577,8 +575,8 @@ namespace NK
 		//Vertex Shaders
 		ShaderDesc vertShaderDesc{};
 		vertShaderDesc.type = SHADER_TYPE::VERTEX;
-		vertShaderDesc.filepath = "Shaders/ModelVisibility_vs";
-		m_modelVisibilityVertShader = m_device->CreateShader(vertShaderDesc);
+		vertShaderDesc.filepath = "Shaders/MeshVisibility_vs";
+		m_meshVisibilityVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/Shadow_vs";
 		m_shadowVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/Model_vs";
@@ -591,17 +589,15 @@ namespace NK
 		//Fragment Shaders
 		ShaderDesc fragShaderDesc{};
 		fragShaderDesc.type = SHADER_TYPE::FRAGMENT;
-		fragShaderDesc.filepath = "Shaders/ModelVisibility_fs";
-		m_modelVisibilityFragShader = m_device->CreateShader(fragShaderDesc);
+		fragShaderDesc.filepath = "Shaders/MeshVisibility_fs";
+		m_meshVisibilityFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Shadow_fs";
 		m_shadowFragShader = m_device->CreateShader(fragShaderDesc);
 
-		// fragShaderDesc.filepath = "Shaders/ModelBlinnPhong_fs";
-		//VERY temp
-		fragShaderDesc.filepath = "Shaders/NTCModel_fs";
-		m_blinnPhongFragShader = m_device->CreateShader(fragShaderDesc, true);
+		fragShaderDesc.filepath = "Shaders/MeshBlinnPhong_fs";
+		m_blinnPhongFragShader = m_device->CreateShader(fragShaderDesc);
 		
-		fragShaderDesc.filepath = "Shaders/ModelPBR_fs";
+		fragShaderDesc.filepath = "Shaders/MeshPBR_fs";
 		m_pbrFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Skybox_fs";
 		m_skyboxFragShader = m_device->CreateShader(fragShaderDesc);
@@ -618,8 +614,8 @@ namespace NK
 		//Root Signatures
 		RootSignatureDesc rootSigDesc{};
 		rootSigDesc.bindPoint = PIPELINE_BIND_POINT::GRAPHICS;
-		rootSigDesc.num32BitPushConstantValues = sizeof(ModelVisibilityPassPushConstantData) / 4;
-		m_modelVisibilityPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
+		rootSigDesc.num32BitPushConstantValues = sizeof(MeshVisibilityPassPushConstantData) / 4;
+		m_meshVisibilityPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.num32BitPushConstantValues = sizeof(ShadowPassPushConstantData) / 4;
 		m_shadowPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.num32BitPushConstantValues = sizeof(MeshPassPushConstantData) / 4;
@@ -633,7 +629,7 @@ namespace NK
 		m_prefixSumPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		
 
-		InitModelVisibilityPipeline();
+		InitMeshVisibilityPipeline();
 		InitShadowPipeline();
 		InitSkyboxPipeline();
 		InitGraphicsPipelines();
@@ -643,7 +639,7 @@ namespace NK
 
 
 
-	void RenderLayer::InitModelVisibilityPipeline()
+	void RenderLayer::InitMeshVisibilityPipeline()
 	{
 		std::vector<VertexAttributeDesc> vertexAttributes;
 		VertexAttributeDesc posAttribute{};
@@ -688,9 +684,9 @@ namespace NK
 
 		PipelineDesc pipelineDesc{};
 		pipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
-		pipelineDesc.vertexShader = m_modelVisibilityVertShader.get();
-		pipelineDesc.fragmentShader = m_modelVisibilityFragShader.get();
-		pipelineDesc.rootSignature = m_modelVisibilityPassRootSignature.get();
+		pipelineDesc.vertexShader = m_meshVisibilityVertShader.get();
+		pipelineDesc.fragmentShader = m_meshVisibilityFragShader.get();
+		pipelineDesc.rootSignature = m_meshVisibilityPassRootSignature.get();
 		pipelineDesc.vertexInputDesc = vertexInputDesc;
 		pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
 		pipelineDesc.rasteriserDesc = rasteriserDesc;
@@ -700,7 +696,7 @@ namespace NK
 		pipelineDesc.colourAttachmentFormats = {};
 		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
 
-		m_modelVisibilityPipeline = m_device->CreatePipeline(pipelineDesc);
+		m_meshVisibilityPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
 
 
@@ -955,16 +951,16 @@ namespace NK
 
 
 		meshDesc.AddNode(
-			"MODEL_VISIBILITY_PASS",
+			"MESH_VISIBILITY_PASS",
 			{ { "CAMERA_BUFFER_PREVIOUS_FRAME", RESOURCE_STATE::CONSTANT_BUFFER },
 			{ "MODEL_MATRICES_BUFFER", RESOURCE_STATE::SHADER_RESOURCE },
-			{ "MODEL_VISIBILITY_DEVICE_BUFFER", RESOURCE_STATE::COPY_DEST },
+			{ "MESH_VISIBILITY_DEVICE_BUFFER", RESOURCE_STATE::COPY_DEST },
 			{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
 			{ "SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE },
 			{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE } },
 			[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 			{
-				_cmdBuf->ClearReadWriteBufferView(_bufViews.Get("MODEL_VISIBILITY_DEVICE_BUFFER_VIEW"), 0u);
+				_cmdBuf->ClearReadWriteBufferView(_bufViews.Get("MESH_VISIBILITY_DEVICE_BUFFER_VIEW"), 0u);
 
 				if (m_desc.enableMSAA)
 				{
@@ -979,20 +975,20 @@ namespace NK
 					_cmdBuf->BeginRendering(0, nullptr, nullptr, nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr, true, m_firstFrame);
 				}
 
-				_cmdBuf->BindRootSignature(m_modelVisibilityPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+				_cmdBuf->BindRootSignature(m_meshVisibilityPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
 				_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
 				_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
 
-				ModelVisibilityPassPushConstantData pushConstantData{};
+				MeshVisibilityPassPushConstantData pushConstantData{};
 				pushConstantData.camDataBufferIndex = _bufViews.Get("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW")->GetIndex();
 				pushConstantData.modelMatricesBufferIndex = _bufViews.Get("MODEL_MATRICES_BUFFER_VIEW")->GetIndex();
-				pushConstantData.modelVisibilityBufferIndex = _bufViews.Get("MODEL_VISIBILITY_DEVICE_BUFFER_VIEW")->GetIndex();
+				pushConstantData.meshVisibilityBufferIndex = _bufViews.Get("MESH_VISIBILITY_DEVICE_BUFFER_VIEW")->GetIndex();
 
 				//Models
 				std::size_t cubeVertexBufferStride{ sizeof(glm::vec3) };
-				_cmdBuf->PushConstants(m_modelVisibilityPassRootSignature.get(), &pushConstantData);
-				_cmdBuf->BindPipeline(m_modelVisibilityPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+				_cmdBuf->PushConstants(m_meshVisibilityPassRootSignature.get(), &pushConstantData);
+				_cmdBuf->BindPipeline(m_meshVisibilityPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
 				_cmdBuf->BindVertexBuffers(0, 1, m_cubeVertBuffer.get(), &cubeVertexBufferStride);
 				_cmdBuf->BindIndexBuffer(m_cubeIndexBuffer.get(), DATA_FORMAT::R32_UINT);
 				_cmdBuf->DrawIndexed(36, m_modelMatrices.size(), 0, 0);
@@ -1001,12 +997,12 @@ namespace NK
 
 
 		meshDesc.AddNode(
-		"MODEL_VISIBILITY_BUFFER_COPY_PASS",
-		{{ "MODEL_VISIBILITY_DEVICE_BUFFER", RESOURCE_STATE::COPY_SOURCE },
-		{ "MODEL_VISIBILITY_READBACK_BUFFER", RESOURCE_STATE::COPY_DEST }},
+		"MESH_VISIBILITY_BUFFER_COPY_PASS",
+		{{ "MESH_VISIBILITY_DEVICE_BUFFER", RESOURCE_STATE::COPY_SOURCE },
+		{ "MESH_VISIBILITY_READBACK_BUFFER", RESOURCE_STATE::COPY_DEST }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
-			_cmdBuf->CopyBufferToBuffer(_bufs.Get("MODEL_VISIBILITY_DEVICE_BUFFER"), _bufs.Get("MODEL_VISIBILITY_READBACK_BUFFER"), 0, 0, m_desc.maxModels * sizeof(std::uint32_t));
+			_cmdBuf->CopyBufferToBuffer(_bufs.Get("MESH_VISIBILITY_DEVICE_BUFFER"), _bufs.Get("MESH_VISIBILITY_READBACK_BUFFER"), 0, 0, m_desc.maxMeshesPerModel * m_desc.maxModels * sizeof(std::uint32_t));
 		}, true);
 
 
@@ -1028,7 +1024,7 @@ namespace NK
 			_cmdBuf->BindPipeline(m_shadowPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
 			_cmdBuf->BindRootSignature(m_shadowPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
-			std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
+			std::size_t modelVertexBufferStride{ sizeof(Vertex) };
 			
 			ShadowPassPushConstantData pushConstantData{};
 
@@ -1037,17 +1033,13 @@ namespace NK
 			{
 				for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 				{
-					if (!modelRenderer.visible) { continue; }
-					const GPUModel* const model{ modelRenderer.model };
-					if (!model) { continue; }
+					if (modelRenderer.meshes.size() == 0) { continue; }
 					pushConstantData.modelMat = transform.GetModelMatrix();
 
-					for (std::size_t meshIndex{ 0 }; meshIndex < modelRenderer.model->meshes.size(); ++meshIndex)
+					for (std::size_t meshIndex{ 0 }; meshIndex < modelRenderer.meshes.size(); ++meshIndex)
 					{
-//						if (model->meshes[meshIndex] == nullptr) { continue; }
-//						if (model->meshes[meshIndex]->vertexBuffer == nullptr) { continue; }
-//						if (model->meshes[meshIndex]->indexBuffer == nullptr) { continue; }
-						const GPUMesh* mesh{ model->meshes[meshIndex].get() };
+						const GPUMesh* mesh{ modelRenderer.meshes[meshIndex] };
+						if (!mesh) { continue; }
 						_cmdBuf->PushConstants(m_shadowPassRootSignature.get(), &pushConstantData);
 						_cmdBuf->BindVertexBuffers(0, 1, mesh->vertexBuffer.get(), &modelVertexBufferStride);
 						_cmdBuf->BindIndexBuffer(mesh->indexBuffer.get(), DATA_FORMAT::R32_UINT);
@@ -1150,26 +1142,26 @@ namespace NK
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 			
 			//VERY temp
-			pushConstantData.g0BufferIndex = m_latentTexBufferView->GetIndex();
-			pushConstantData.g1BufferIndex = m_latentTexBufferView2->GetIndex();
-			pushConstantData.mlpBufferIndex = m_mlpBufferView->GetIndex();
-			pushConstantData.layer0_W_offset = m_layer0_W_offset;
-			pushConstantData.layer0_B_offset = m_layer0_B_offset;
-			pushConstantData.layer1_W_offset = m_layer1_W_offset;
-			pushConstantData.layer1_B_offset = m_layer1_B_offset;
-			pushConstantData.layer2_W_offset = m_layer2_W_offset;
-			pushConstantData.layer2_B_offset = m_layer2_B_offset;
-			pushConstantData.g0Channels = m_g0Channels;
-			pushConstantData.g1Channels = m_g1Channels;
-			pushConstantData.g0QuantLevels = m_g0QuantLevels;
-			pushConstantData.g1QuantLevels = m_g1QuantLevels;
-			pushConstantData.g0Resolution = m_g0Resolution;
-			pushConstantData.imageResolution = m_imageResolution;
-			pushConstantData.numOctaves = m_numOctaves;
-			pushConstantData.tileSize = m_tileSize;
-			pushConstantData.numLayers = m_numLayers;
-			pushConstantData.hiddenNeurons = m_numHiddenNeurons;
-			pushConstantData.frameIndex = m_globalFrame;
+			// pushConstantData.g0BufferIndex = m_latentTexBufferView->GetIndex();
+			// pushConstantData.g1BufferIndex = m_latentTexBufferView2->GetIndex();
+			// pushConstantData.mlpBufferIndex = m_mlpBufferView->GetIndex();
+			// pushConstantData.layer0_W_offset = m_layer0_W_offset;
+			// pushConstantData.layer0_B_offset = m_layer0_B_offset;
+			// pushConstantData.layer1_W_offset = m_layer1_W_offset;
+			// pushConstantData.layer1_B_offset = m_layer1_B_offset;
+			// pushConstantData.layer2_W_offset = m_layer2_W_offset;
+			// pushConstantData.layer2_B_offset = m_layer2_B_offset;
+			// pushConstantData.g0Channels = m_g0Channels;
+			// pushConstantData.g1Channels = m_g1Channels;
+			// pushConstantData.g0QuantLevels = m_g0QuantLevels;
+			// pushConstantData.g1QuantLevels = m_g1QuantLevels;
+			// pushConstantData.g0Resolution = m_g0Resolution;
+			// pushConstantData.imageResolution = m_imageResolution;
+			// pushConstantData.numOctaves = m_numOctaves;
+			// pushConstantData.tileSize = m_tileSize;
+			// pushConstantData.numLayers = m_numLayers;
+			// pushConstantData.hiddenNeurons = m_numHiddenNeurons;
+			// pushConstantData.frameIndex = m_globalFrame;
 			
 			if (m_activeCamera)
 			{
@@ -1188,24 +1180,23 @@ namespace NK
 			}
 
 			//Models
-			std::size_t modelVertexBufferStride{ sizeof(ModelVertex) };
+			std::size_t modelVertexBufferStride{ sizeof(Vertex) };
 			for (auto&& [modelRenderer, transform] : m_reg.get().View<CModelRenderer, CTransform>())
 			{
-				if (!modelRenderer.visible) { continue; }
-				const GPUModel* const model{ modelRenderer.model };
-				if (!model) { continue; }
+				if (modelRenderer.meshes.size() == 0) { continue; }
 				pushConstantData.modelMat = transform.GetModelMatrix();
 
-				for (std::size_t i{ 0 }; i < modelRenderer.model->meshes.size(); ++i)
+				for (std::size_t i{ 0 }; i < modelRenderer.meshes.size(); ++i)
 				{
-					const GPUMesh* mesh{ model->meshes[i].get() };
-					// pushConstantData.materialBufferIndex = model->materials[mesh->materialIndex]->bufferIndex;
+					const GPUMesh* mesh{ modelRenderer.meshes[i] };
+					const GPUMaterial* mat{ modelRenderer.materials[i] };
 					
-					//VERY temp
-					pushConstantData.materialBufferIndex = m_latentTexBufferView->GetIndex();
+					if (!mesh || !mat) { continue; }
+					
+					pushConstantData.materialBufferIndex = mat->bufferIndex;
 					
 					_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
-					IPipeline* pipeline{ model->materials[mesh->materialIndex]->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get() };
+					IPipeline* pipeline{ (mat->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get()) };
 					_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
 					_cmdBuf->BindVertexBuffers(0, 1, mesh->vertexBuffer.get(), &modelVertexBufferStride);
 					_cmdBuf->BindIndexBuffer(mesh->indexBuffer.get(), DATA_FORMAT::R32_UINT);
@@ -2302,18 +2293,54 @@ namespace NK
 		m_graphicsCommandBuffers[m_currentFrame]->Begin();
 		
 		UpdateLightDataBuffer();
-		UpdateModelMatricesBuffer();
 
 
-		//Fence has been signalled, unload models that have been marked for unloading this frame
-		while (!m_modelUnloadQueue[m_globalFrame].empty())
+		//Fence has been signalled, unload meshes, materials, and textures that have been marked for unloading this frame
+		while (!m_meshUnloadQueue[m_globalFrame].empty())
 		{
-			if (m_gpuModelReferenceCounter[m_modelUnloadQueue[m_globalFrame].back()] == 0)
+			if (m_gpuMeshReferenceCounter[m_meshUnloadQueue[m_globalFrame].back()] == 0)
 			{
-				if (m_fullDiskStreaming) { ModelLoader::UnloadModel(m_modelUnloadQueue[m_globalFrame].back()); }
-				m_gpuModelCache.erase(m_modelUnloadQueue[m_globalFrame].back());
+				if (m_fullDiskStreaming) { ModelLoader::UnloadMesh(m_meshUnloadQueue[m_globalFrame].back().first, m_meshUnloadQueue[m_globalFrame].back().second); }
+				m_gpuMeshCache.erase(m_meshUnloadQueue[m_globalFrame].back());
 			}
-			m_modelUnloadQueue[m_globalFrame].pop_back();
+			m_meshUnloadQueue[m_globalFrame].pop_back();
+		}
+		
+		while (!m_materialUnloadQueue[m_globalFrame].empty())
+		{
+			std::string matPath{ m_materialUnloadQueue[m_globalFrame].back() };
+			if (m_gpuMaterialReferenceCounter[matPath] == 0)
+			{
+				//Material isn't being used, decrement its textures
+				std::variant<CPUMaterial, CPUMaterialNTC> matHeaderVar{ ModelLoader::GetMaterialHeader(matPath) };
+				if (std::holds_alternative<CPUMaterial>(matHeaderVar)) 
+				{
+					CPUMaterial cpuMaterial{ std::get<CPUMaterial>(matHeaderVar) };
+					for (const std::pair<std::string, bool>& texPair : cpuMaterial.allTextures) 
+					{
+						if (!texPair.first.empty()) 
+						{
+							--m_gpuTextureReferenceCounter[texPair.first];
+							if (m_gpuTextureReferenceCounter[texPair.first] == 0) 
+							{
+								m_textureUnloadQueue[m_globalFrame].push_back(texPair.first);
+							}
+						}
+					}
+				}
+				m_gpuMaterialCache.erase(matPath);
+			}
+			m_materialUnloadQueue[m_globalFrame].pop_back();
+		}
+		
+		while (!m_textureUnloadQueue[m_globalFrame].empty())
+		{
+			std::string texPath{ m_textureUnloadQueue[m_globalFrame].back() };
+			if (m_gpuTextureReferenceCounter[texPath] == 0)
+			{
+				m_gpuTextureCache.erase(texPath);
+			}
+			m_textureUnloadQueue[m_globalFrame].pop_back();
 		}
 		
 		
@@ -2405,249 +2432,286 @@ namespace NK
 		}
 
 		
-		//Model Loading Phase
-		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_modelVisibilityReadbackBufferMaps[m_currentFrame]) };
-		for (std::size_t i{ 0 }; i < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++i)
+		
+		
+		
+		
+		
+		
+		for (auto&& [model] : m_reg.get().View<CModelRenderer>())
 		{
-			//In case entity has been destroyed
-			if (!m_reg.get().EntityInRegistry(m_modelMatricesEntitiesLookups[m_currentFrame][i]))
+			if (model.modelPathDirty)
 			{
-				//O(1) swap and pop removal
-				m_modelMatricesEntitiesLookups[m_currentFrame][i] = m_modelMatricesEntitiesLookups[m_currentFrame].back();
-				m_modelMatricesEntitiesLookups[m_currentFrame].pop_back();
-				--i; //recheck index now that a new element is here
-				continue;
-			}
-			
-			CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
-			CTransform& transform{ m_reg.get().GetComponent<CTransform>(m_modelMatricesEntitiesLookups[m_currentFrame][i]) };
-			
-			//Update visibility if not frozen
-			if (!m_freezeVisibility)
-			{
-				bool isVisible{ (visibilityMap[modelRenderer.visibilityIndex] == 1) }; //GPU visibility result
-				if (!isVisible && m_activeCamera)
-				{
-					//If camera is within model's bounds, the depth buffer may contain residual data from the model, and since the AABB lies outside this extent, it may not be rendered and so the gpu visibility check will fail
-					//Check if camera is within model bounds, and if so, override gpu's result and set visible to true
-				
-					//Transform camera position from world space -> model's local space
-					const glm::vec3 modelLocalCamPos{ glm::vec3(glm::inverse(transform.GetModelMatrix()) * glm::vec4(m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)).GetWorldPosition(), 1.0f)) };
-				
-					float bufferRegion{ 1.05f };
-					const glm::vec3 bufferedExtents{ modelRenderer.localSpaceHalfExtents * 1.05f };
-					const glm::vec3 minBound{ modelRenderer.localSpaceOrigin - bufferedExtents };
-					const glm::vec3 maxBound{ modelRenderer.localSpaceOrigin + bufferedExtents };
-					if (modelLocalCamPos.x >= minBound.x && modelLocalCamPos.x <= maxBound.x &&
-						modelLocalCamPos.y >= minBound.y && modelLocalCamPos.y <= maxBound.y &&
-						modelLocalCamPos.z >= minBound.z && modelLocalCamPos.z <= maxBound.z)
-					{
-						//Inside model, so override visibility flag
-						isVisible = true;
-					}
-				}
-				if (modelRenderer.visibilityIndex != 0xFFFFFFFF)
-				{
-					modelRenderer.visible = isVisible;
-				}
-			}
-			
-			
-			if (modelRenderer.modelPathDirty)
-			{
-				if (modelRenderer.filePathNotFoundError || modelRenderer.nonNkModelError)
+				if (model.filePathNotFoundError || model.nonNkModelError)
 				{
 					continue;
 				}
 				
-				
-				//If there's a model currently assigned, we need to remove it before loading the new one
-				if (modelRenderer.model)
+				//For every mesh currently loaded, we need to remove it before loading the new ones
+				for (std::size_t meshIdx = 0; meshIdx < model.meshes.size(); ++meshIdx)
 				{
-					std::string oldPath;
-					for (const auto& [path, gpuModel] : m_gpuModelCache)
+					if (model.meshes[meshIdx])
 					{
-						if (gpuModel.get() == modelRenderer.model)
+						auto meshKey = std::make_pair(model.meshDataPath, model.meshDataLoadInfos[meshIdx].meshOffset);
+						--m_gpuMeshReferenceCounter[meshKey];
+						if (m_gpuMeshReferenceCounter[meshKey] == 0)
 						{
-							oldPath = path;
+							m_meshUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(meshKey);
+						}
+            
+						if (model.materials[meshIdx])
+						{
+							const CPUMeshData* cpuMesh = ModelLoader::LoadMesh(meshKey.first, meshKey.second);
+							std::string matPath = cpuMesh->materialFilepath;
+							--m_gpuMaterialReferenceCounter[matPath];
+							if (m_gpuMaterialReferenceCounter[matPath] == 0)
+							{
+								m_materialUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(matPath);
+							}
+						}
+					}
+        
+					if (model.meshVisibilityIndices[meshIdx] != 0xFFFFFFFF)
+					{
+						m_visibilityIndexAllocator->Free(model.meshVisibilityIndices[meshIdx]);
+					}
+				}
+
+				//Load the new model header
+				CPUModel header = ModelLoader::GetNKModelHeader(model.modelPath);
+				model.localSpaceHalfExtents = header.halfExtents;
+				std::filesystem::path modelDir = std::filesystem::path(model.modelPath).parent_path();
+				model.meshDataPath = (modelDir / header.meshDataFilepath).string();
+				model.meshDataLoadInfos = header.meshDataLoadInfo;
+    
+				std::size_t numMeshes{ model.meshDataLoadInfos.size() };
+				model.meshes.assign(numMeshes, nullptr);
+				model.materials.assign(numMeshes, nullptr);
+				model.meshVisible.assign(numMeshes, false);
+				model.meshVisibilityIndices.assign(numMeshes, 0xFFFFFFFF);
+
+				model.modelPathDirty = false;
+			}
+			
+			UpdateModelMatricesBuffer();
+			
+			
+			
+			std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_meshVisibilityReadbackBufferMaps[m_currentFrame]) };
+			for (std::size_t meshIdx{ 0 }; meshIdx < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++meshIdx)
+			{
+				//In case entity has been destroyed
+				if (!m_reg.get().EntityInRegistry(m_modelMatricesEntitiesLookups[m_currentFrame][meshIdx]))
+				{
+					//O(1) swap and pop removal
+					m_modelMatricesEntitiesLookups[m_currentFrame][meshIdx] = m_modelMatricesEntitiesLookups[m_currentFrame].back();
+					m_modelMatricesEntitiesLookups[m_currentFrame].pop_back();
+					--meshIdx; //recheck index now that a new element is here
+					continue;
+				}
+				
+				
+				CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][meshIdx]) };
+				CTransform& transform{ m_reg.get().GetComponent<CTransform>(m_modelMatricesEntitiesLookups[m_currentFrame][meshIdx]) };
+				
+				
+				//Update visibility if not frozen
+				if (!m_freezeVisibility)
+				{
+					bool isVisible{ (visibilityMap[modelRenderer.meshVisibilityIndices[meshIdx]] == 1) }; //GPU visibility result
+					if (!isVisible && m_activeCamera)
+					{
+						//If camera is within mesh's bounds, the depth buffer may contain residual data from the mesh, and since the AABB lies outside this extent, it may not be rendered and so the gpu visibility check will fail
+						//Check if camera is within mesh bounds, and if so, override gpu's result and set visible to true
+			
+						//Transform camera position from world space -> mesh's local space
+						const glm::vec3 meshLocalCamPos{ glm::vec3(glm::inverse(transform.GetModelMatrix()) * glm::vec4(m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)).GetWorldPosition(), 1.0f)) };
+			
+						constexpr float bufferRegion{ 1.05f };
+						const glm::vec3 bufferedExtents{ modelRenderer.meshDataLoadInfos[meshIdx].halfExtents * bufferRegion };
+						const glm::vec3 minBound{ modelRenderer.meshDataLoadInfos[meshIdx].centre - bufferedExtents };
+						const glm::vec3 maxBound{ modelRenderer.meshDataLoadInfos[meshIdx].centre + bufferedExtents };
+						if (meshLocalCamPos.x >= minBound.x && meshLocalCamPos.x <= maxBound.x &&
+							meshLocalCamPos.y >= minBound.y && meshLocalCamPos.y <= maxBound.y &&
+							meshLocalCamPos.z >= minBound.z && meshLocalCamPos.z <= maxBound.z)
+						{
+							//Inside model, so override visibility flag
+							isVisible = true;
+						}
+					}
+					if (modelRenderer.meshVisibilityIndices[meshIdx] != 0xFFFFFFFF)
+					{
+						modelRenderer.meshVisible[meshIdx] = isVisible;
+					}
+				}
+				
+				
+				std::pair<std::string, std::uint64_t> meshKey{ std::make_pair(modelRenderer.meshDataPath, modelRenderer.meshDataLoadInfos[meshIdx].meshOffset) };
+				if (modelRenderer.meshVisible[meshIdx] && !modelRenderer.meshes[meshIdx])
+				{
+					//Mesh is visible but is not set, set it by either:
+					//- recovering from the unload queue if present
+					//- pulling it from the cache if present
+					//- loading it otherwise
+					
+					//Check if mesh is in unload queue - if it is, just take it out the queue
+					bool meshInUnloadQueue{ false };
+					for (std::unordered_map<std::uint64_t, std::vector<std::pair<std::string, std::uint64_t>>>::iterator it{ m_meshUnloadQueue.begin() }; it != m_meshUnloadQueue.end(); ++it)
+					{
+						std::vector<std::pair<std::string, std::uint64_t>>::iterator vecIt{ std::ranges::find(it->second, meshKey) };
+						if (vecIt != it->second.end())
+						{
+							//This mesh is in the unload queue, recover it
+							modelRenderer.meshes[meshIdx] = m_gpuMeshCache[meshKey].get();
+							meshInUnloadQueue = true;
+							it->second.erase(vecIt);
 							break;
 						}
 					}
-
-					//Decrement reference count for the old model
-					if (!oldPath.empty() && m_gpuModelReferenceCounter.contains(oldPath))
+					
+					const CPUMeshData* cpuMesh{ ModelLoader::LoadMesh(meshKey.first, meshKey.second) };
+					if (!meshInUnloadQueue)
 					{
-						--m_gpuModelReferenceCounter[oldPath];
-
-						if (m_gpuModelReferenceCounter[oldPath] == 0)
+						//Mesh wasn't in the unload queue to be recovered, so we need to set it
+						if (!m_gpuMeshCache.contains(meshKey))
 						{
-							//No entities using this model, queue for unload
-							m_modelUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(oldPath);
+							//Mesh isn't present in the cache either, so we need to load it
+							m_gpuMeshCache[meshKey] = m_gpuUploader->EnqueueMeshDataUpload(cpuMesh);
+							m_newGPUUploaderUpload = true;
+							m_gpuMeshReferenceCounter[meshKey] = 0;
+						}
+						modelRenderer.meshes[meshIdx] = m_gpuMeshCache[meshKey].get();
+					}
+					++m_gpuMeshReferenceCounter[meshKey];
+					
+					
+					//Do the same for the material and its textures
+					std::string matPath{ cpuMesh->materialFilepath };
+					bool matInUnloadQueue{ false };
+					for (std::unordered_map<std::uint64_t, std::vector<std::string>>::iterator it{ m_materialUnloadQueue.begin() }; it != m_materialUnloadQueue.end(); ++it)
+					{
+						std::vector<std::string>::iterator vecIt{ std::ranges::find(it->second, matPath) };
+						if (vecIt != it->second.end())
+						{
+							modelRenderer.materials[meshIdx] = m_gpuMaterialCache[matPath].get();
+							matInUnloadQueue = true;
+							it->second.erase(vecIt);
+							break;
 						}
 					}
-
-					//Trigger the model load
-					modelRenderer.model = nullptr;
 					
-					//Reset extents so the update knows to recalculate them from the new model header
-					modelRenderer.localSpaceHalfExtents = glm::vec3(0.0f);
-				}
+					if (!matInUnloadQueue)
+					{
+						if (!m_gpuMaterialCache.contains(matPath))
+						{
+							std::variant<CPUMaterial, CPUMaterialNTC> matHeaderVar{ ModelLoader::GetMaterialHeader(matPath) };
+							if (std::holds_alternative<CPUMaterial>(matHeaderVar))
+							{
+								CPUMaterial cpuMaterial{ std::get<CPUMaterial>(matHeaderVar) };
+								
+								auto processTextureIdx{ [&](int& shaderIdx)
+								{
+									if (shaderIdx < 0) { return; } 
+								
+									const std::string& texPath{ cpuMaterial.allTextures[shaderIdx].first };
+									const bool isSrgb{ cpuMaterial.allTextures[shaderIdx].second };
+									if (texPath.empty()) { return; }
 
-				modelRenderer.modelPathDirty = false;
+									bool texInUnloadQueue{ false };
+									for (std::unordered_map<std::uint64_t, std::vector<std::string>>::iterator texIt{ m_textureUnloadQueue.begin() }; texIt != m_textureUnloadQueue.end(); ++texIt)
+									{
+										std::vector<std::string>::iterator texVecIt{ std::ranges::find(texIt->second, texPath) };
+										if (texVecIt != texIt->second.end())
+										{
+											texInUnloadQueue = true;
+											texIt->second.erase(texVecIt);
+											break;
+										}
+									}
+
+									if (!texInUnloadQueue && !m_gpuTextureCache.contains(texPath))
+									{
+										ImageData* imgData{ TextureCompressor::LoadImage(texPath, false, isSrgb) };
+										m_gpuTextureCache[texPath] = m_gpuUploader->EnqueueTextureDataUpload(imgData);
+										m_newGPUUploaderUpload = true;
+										m_gpuTextureReferenceCounter[texPath] = 0;
+										TextureCompressor::FreeImage(imgData);
+									}
+								
+									++m_gpuTextureReferenceCounter[texPath];
+								
+									shaderIdx = m_gpuTextureCache[texPath]->view->GetIndex();
+								} };
+								
+								if (cpuMaterial.pipeline == LIGHTING_MODEL::PHYSICALLY_BASED)
+								{
+									PBRMaterial& pbr = std::get<PBRMaterial>(cpuMaterial.shaderMaterialData);
+									if (pbr.hasBaseColour) { processTextureIdx(pbr.baseColourIdx); }
+									if (pbr.hasMetalness)  { processTextureIdx(pbr.metalnessIdx); }
+									if (pbr.hasRoughness)  { processTextureIdx(pbr.roughnessIdx); }
+									if (pbr.hasSpecular)   { processTextureIdx(pbr.specularIdx); }
+									if (pbr.hasShininess)  { processTextureIdx(pbr.shininessIdx); }
+									if (pbr.hasNormal)     { processTextureIdx(pbr.normalIdx); }
+									if (pbr.hasAO)         { processTextureIdx(pbr.aoIdx); }
+									if (pbr.hasEmissive)   { processTextureIdx(pbr.emissiveIdx); }
+									if (pbr.hasOpacity)    { processTextureIdx(pbr.opacityIdx); }
+									if (pbr.hasHeight)     { processTextureIdx(pbr.heightIdx); }
+									if (pbr.hasDisplacement) { processTextureIdx(pbr.displacementIdx); }
+									if (pbr.hasReflection) { processTextureIdx(pbr.reflectionIdx); }
+								}
+								else
+								{
+									BlinnPhongMaterial& bp = std::get<BlinnPhongMaterial>(cpuMaterial.shaderMaterialData);
+									if (bp.hasDiffuse)  { processTextureIdx(bp.diffuseIdx); }
+									if (bp.hasSpecular) { processTextureIdx(bp.specularIdx); }
+									if (bp.hasAmbient)  { processTextureIdx(bp.ambientIdx); }
+									if (bp.hasEmissive) { processTextureIdx(bp.emissiveIdx); }
+									if (bp.hasNormal)   { processTextureIdx(bp.normalIdx); }
+									if (bp.hasShininess) { processTextureIdx(bp.shininessIdx); }
+									if (bp.hasOpacity)  { processTextureIdx(bp.opacityIdx); }
+									if (bp.hasHeight)   { processTextureIdx(bp.heightIdx); }
+									if (bp.hasDisplacement) { processTextureIdx(bp.displacementIdx); }
+									if (bp.hasLightmap) { processTextureIdx(bp.lightmapIdx); }
+									if (bp.hasReflection) { processTextureIdx(bp.reflectionIdx); }
+								}
+
+								m_gpuMaterialCache[matPath] = m_gpuUploader->EnqueueMaterialDataUpload(&cpuMaterial);
+								m_gpuMaterialReferenceCounter[matPath] = 0;
+								m_newGPUUploaderUpload = true;
+							}
+						}
+						modelRenderer.materials[meshIdx] = m_gpuMaterialCache[matPath].get();
+					}
+					++m_gpuMaterialReferenceCounter[matPath];
+				}
+				else if (!modelRenderer.meshVisible[meshIdx] && modelRenderer.meshes[meshIdx])
+				{
+					--m_gpuMeshReferenceCounter[meshKey];
+					modelRenderer.meshes[meshIdx] = nullptr;
+
+					if (m_gpuMeshReferenceCounter[meshKey] == 0)
+					{
+						m_meshUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(meshKey);
+					}
+					if (modelRenderer.materials[meshIdx])
+					{
+						const CPUMeshData* cpuMesh = ModelLoader::LoadMesh(meshKey.first, meshKey.second);
+						std::string matPath = cpuMesh->materialFilepath;
+						
+						--m_gpuMaterialReferenceCounter[matPath];
+						modelRenderer.materials[meshIdx] = nullptr;
+
+						if (m_gpuMaterialReferenceCounter[matPath] == 0)
+						{
+							m_materialUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(matPath);
+						}
+					}
+				}
 			}
 			
-
-			if (modelRenderer.visible && !modelRenderer.model)
-			{
-				//If model is only queued for unload (and so hasn't yet been unloaded), we can just remove it from the unload queue
-				bool modelInUnloadQueue{ false };
-				for (std::unordered_map<std::uint64_t, std::vector<std::string>>::iterator it{ m_modelUnloadQueue.begin() }; it != m_modelUnloadQueue.end(); ++it)
-				{
-					std::vector<std::string>::iterator vecIt{ std::ranges::find(it->second, modelRenderer.modelPath) };
-					if (vecIt != it->second.end())
-					{
-						modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
-						modelInUnloadQueue = true;
-						it->second.erase(vecIt);
-					}
-				}
-				if (modelInUnloadQueue)
-				{
-					++m_gpuModelReferenceCounter[modelRenderer.modelPath];
-					continue;
-				}
-
-				//Model is visible but isn't assigned, assign it
-				if (!m_gpuModelCache.contains(modelRenderer.modelPath))
-				{
-					//Model isn't loaded, load it
-					const CPUModel* const cpuModel{ ModelLoader::LoadModel(modelRenderer.modelPath, true, true) };
-					m_gpuModelCache[modelRenderer.modelPath] = m_gpuUploader->EnqueueModelDataUpload(cpuModel);
-					m_newGPUUploaderUpload = true;
-					m_gpuModelReferenceCounter[modelRenderer.modelPath] = 0;
-					
-					
-					//VERY temp
-					if (!m_latentTexBuffer)
-					{
-						m_ntcModel = modelRenderer.ntcModel;
-						BufferDesc desc{};
-						desc.size = (m_ntcModel->featureLevels[0].g0.numElementsPacked + 3) & ~3; //round up to the nearest multiple of 4
-						desc.type = MEMORY_TYPE::HOST;
-						desc.usage = BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
-						m_latentTexBuffer = m_device->CreateBuffer(desc);
-						m_latentTexBufferMap = m_latentTexBuffer->GetMap();
-						memcpy(m_latentTexBufferMap, m_ntcModel->featureLevels[0].g0.data, m_ntcModel->featureLevels[0].g0.numElementsPacked);
-						BufferViewDesc viewDesc{};
-						viewDesc.size = desc.size;
-						viewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
-						viewDesc.offset = 0;
-						viewDesc.stride = 0;
-						m_latentTexBufferView = m_device->CreateBufferView(m_latentTexBuffer.get(), viewDesc);
-						
-						desc.size = (m_ntcModel->featureLevels[0].g1.numElementsPacked + 3) & ~3; //round up to the nearest multiple of 4
-						desc.type = MEMORY_TYPE::HOST;
-						desc.usage = BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
-						m_latentTexBuffer2 = m_device->CreateBuffer(desc);
-						m_latentTexBufferMap2 = m_latentTexBuffer2->GetMap();
-						memcpy(m_latentTexBufferMap2, m_ntcModel->featureLevels[0].g1.data, m_ntcModel->featureLevels[0].g1.numElementsPacked);
-						viewDesc.size = desc.size;
-						viewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
-						viewDesc.offset = 0;
-						viewDesc.stride = 0;
-						m_latentTexBufferView2 = m_device->CreateBufferView(m_latentTexBuffer2.get(), viewDesc);
-						
-						std::vector<std::uint8_t> packedMLP;
-						const auto align16{ [](const std::size_t _x) -> std::size_t { return (_x+15) & ~15; } };
-						const auto appendAligned{ [&](const void* _data, std::size_t _size) -> std::uint32_t
-						{
-							const std::size_t offset{ align16(packedMLP.size()) };
-							packedMLP.resize(offset + _size);
-							memcpy(packedMLP.data() + offset, _data, _size);
-							return static_cast<std::uint32_t>(offset);
-						}};
-						struct LayerOffsets
-						{
-							std::uint32_t W;
-							std::uint32_t B;
-						};
-						
-						std::vector<LayerOffsets> layerOffsets;
-						for (const Neural::NTCLinearLayer& layer : m_ntcModel->mlp)
-						{
-							//Convert weights from row-major fp16 to InferencingOptimal
-							Neural::ConvertedLayer convertedLayer{ Neural::NTCMatrixLayerConverter::ConvertLayer(
-								dynamic_cast<VulkanDevice*>(m_device.get())->GetDevice(),
-								layer.weights.data(),
-								layer.weights.size() * sizeof(std::uint16_t),
-								layer.biases.data(),
-								layer.biases.size() * sizeof(std::uint16_t),
-								layer.outFeatures,
-								layer.inFeatures
-								) };
-							
-							LayerOffsets offsets;
-							offsets.W = appendAligned(convertedLayer.weightData.data(), convertedLayer.weightData.size());
-							offsets.B = appendAligned(convertedLayer.biasData.data(), convertedLayer.biasData.size());
-							layerOffsets.push_back(offsets);
-						}
-						
-						desc.size = packedMLP.size();
-						desc.type = MEMORY_TYPE::DEVICE;
-						desc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
-						m_mlpBuffer = m_device->CreateBuffer(desc);
-						m_gpuUploader->EnqueueBufferDataUpload(packedMLP.data(), m_mlpBuffer.get(), RESOURCE_STATE::UNDEFINED);
-						m_newGPUUploaderUpload = true;
-						m_graphicsCommandBuffers[m_currentFrame]->TransitionBarrier(m_mlpBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::SHADER_RESOURCE);
-						viewDesc.size = desc.size;
-						viewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
-						viewDesc.offset = 0;
-						viewDesc.stride = 0;
-						m_mlpBufferView = m_device->CreateBufferView(m_mlpBuffer.get(), viewDesc);
-						
-						m_g0Channels = m_ntcModel->header.g0Channels;
-						m_g1Channels = m_ntcModel->header.g1Channels;
-						m_g0QuantLevels = m_ntcModel->header.g0QuantLevels;
-						m_g1QuantLevels = m_ntcModel->header.g1QuantLevels;
-						m_imageResolution = m_ntcModel->header.baseImageRes;
-						m_g0Resolution = (m_ntcModel->header.qualityValue < 2) ? (m_imageResolution * 0.25f) : (m_imageResolution * 0.5f);
-						m_numOctaves = m_ntcModel->header.numOctaves;
-						m_tileSize = m_ntcModel->header.tileSize;
-						m_numLayers = m_ntcModel->header.numLinearLayers;
-						m_numHiddenNeurons = m_ntcModel->header.hiddenNeurons;
-						
-						m_layer0_W_offset = layerOffsets[0].W;
-						m_layer0_B_offset = layerOffsets[0].B;
-						if (m_numLayers >= 2)
-						{
-							m_layer1_W_offset = layerOffsets[1].W;
-							m_layer1_B_offset = layerOffsets[1].B;
-						}
-						if (m_numLayers >= 3)
-						{
-							m_layer2_W_offset = layerOffsets[2].W;
-							m_layer2_B_offset = layerOffsets[2].B;
-						}
-					}
-				}
-				modelRenderer.model = m_gpuModelCache[modelRenderer.modelPath].get();
-				++m_gpuModelReferenceCounter[modelRenderer.modelPath];
-			}
-			
-			else if (!modelRenderer.visible && modelRenderer.model)
-			{
-				//Model isn't visible but is loaded, decrement reference counter and unassign
-				--m_gpuModelReferenceCounter[modelRenderer.modelPath];
-				modelRenderer.model = nullptr;
-
-				if (m_gpuModelReferenceCounter[modelRenderer.modelPath] == 0)
-				{
-					//No CModelRenderers are currently visible that use this model, add it to the unload queue
-					m_modelUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(modelRenderer.modelPath);
-				}
-			}
+			//Reset visibility map for writing into during this frame
+			std::memset(visibilityMap, 0, m_desc.maxMeshesPerModel * m_desc.maxModels * sizeof(std::uint32_t));
 		}
-		std::memset(visibilityMap, 0, m_desc.maxModels * sizeof(std::uint32_t));
 		
 		
 		if (m_textureDeletionQueue.contains(m_globalFrame))
@@ -2667,8 +2731,8 @@ namespace NK
 
 		
 		RenderGraphExecutionDesc execDesc{};
-		execDesc.commandBuffers["MODEL_VISIBILITY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
-		execDesc.commandBuffers["MODEL_VISIBILITY_BUFFER_COPY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["MESH_VISIBILITY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
+		execDesc.commandBuffers["MESH_VISIBILITY_BUFFER_COPY_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SHADOW_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["DEPTH_BARRIER"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
@@ -2682,8 +2746,8 @@ namespace NK
 		execDesc.buffers.Set("CAMERA_BUFFER_PREVIOUS_FRAME", m_camDataBuffersPreviousFrame[m_currentFrame].get());
 		execDesc.buffers.Set("LIGHT_DATA_BUFFER", m_lightDataBuffer.get());
 		execDesc.buffers.Set("MODEL_MATRICES_BUFFER", m_modelMatricesBuffers[m_currentFrame].get());
-		execDesc.buffers.Set("MODEL_VISIBILITY_DEVICE_BUFFER", m_modelVisibilityDeviceBuffers[m_currentFrame].get());
-		execDesc.buffers.Set("MODEL_VISIBILITY_READBACK_BUFFER", m_modelVisibilityReadbackBuffers[m_currentFrame].get());
+		execDesc.buffers.Set("MESH_VISIBILITY_DEVICE_BUFFER", m_meshVisibilityDeviceBuffers[m_currentFrame].get());
+		execDesc.buffers.Set("MESH_VISIBILITY_READBACK_BUFFER", m_meshVisibilityReadbackBuffers[m_currentFrame].get());
 
 		execDesc.textures.Set("SCENE_COLOUR", m_sceneColour.get());
 		execDesc.textures.Set("SCENE_COLOUR_MSAA", m_sceneColourMSAA.get());
@@ -2706,7 +2770,7 @@ namespace NK
 		execDesc.bufferViews.Set("CAMERA_BUFFER_VIEW", m_camDataBufferViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("CAMERA_BUFFER_PREVIOUS_FRAME_VIEW", m_camDataBufferPreviousFrameViews[m_currentFrame].get());
 		execDesc.bufferViews.Set("MODEL_MATRICES_BUFFER_VIEW", m_modelMatricesBufferViews[m_currentFrame].get());
-		execDesc.bufferViews.Set("MODEL_VISIBILITY_DEVICE_BUFFER_VIEW", m_modelVisibilityDeviceBufferViews[m_currentFrame].get());
+		execDesc.bufferViews.Set("MESH_VISIBILITY_DEVICE_BUFFER_VIEW", m_meshVisibilityDeviceBufferViews[m_currentFrame].get());
 
 		execDesc.textureViews.Set("SCENE_COLOUR_RTV", m_sceneColourRTV.get());
 		execDesc.textureViews.Set("SCENE_COLOUR_SRV", m_sceneColourSRV.get());
@@ -2966,30 +3030,41 @@ namespace NK
 
 		for (auto&& [transform, model] : m_reg.get().View<CTransform, CModelRenderer>())
 		{
-			if (model.visibilityIndex == 0xFFFFFFFF)
+			if (model.modelPath.empty()) { continue; }
+
+			if (model.meshDataLoadInfos.empty())
 			{
-				model.visibilityIndex = m_visibilityIndexAllocator->Allocate();
-			}
-			
-			constexpr float epsilon{ 1e-3 };
-			if (model.localSpaceHalfExtents.x < epsilon && model.localSpaceHalfExtents.y < epsilon && model.localSpaceHalfExtents.z < epsilon)
-			{
-				//Model boundary hasn't been set yet
-				const CPUModel_SerialisedHeader header{ ModelLoader::GetNKModelHeader(model.modelPath) };
+				CPUModel header = ModelLoader::GetNKModelHeader(model.modelPath);
 				model.localSpaceHalfExtents = header.halfExtents;
 				model.localSpaceOrigin = glm::vec3(0);
+				model.meshDataLoadInfos = header.meshDataLoadInfo;
 			}
 
-			constexpr float scaleBuffer{ 1.05f }; //Used as a scalar multiplier to the AABB's scale so that it's a bit larger than the model (eliminates z-fighting issues)
-			const glm::mat4 aabbMatrix{ transform.GetModelMatrix() * glm::translate(glm::mat4(1.0f), model.localSpaceOrigin) * glm::scale(glm::mat4(1.0f), model.localSpaceHalfExtents * 2.0f * scaleBuffer) };
+			if (model.meshDataLoadInfos.empty()) { continue; }
 			
-			ModelMatrixShaderData data{};
-			data.modelMatrix = aabbMatrix;
-			data.visibilityIndex = model.visibilityIndex;
-			shaderData.push_back(data);
-        
-			m_modelMatricesEntitiesLookups[m_currentFrame].push_back(m_reg.get().GetEntity(transform));
-			m_modelMatrices.push_back(aabbMatrix);
+			if (model.meshVisibilityIndices.size() != model.meshDataLoadInfos.size())
+			{
+				model.meshVisibilityIndices.assign(model.meshDataLoadInfos.size(), 0xFFFFFFFF);
+			}
+
+			for (std::size_t meshIdx{ 0 }; meshIdx < model.meshDataLoadInfos.size(); ++meshIdx)
+			{
+				if (model.meshVisibilityIndices[meshIdx] == 0xFFFFFFFF)
+				{
+					model.meshVisibilityIndices[meshIdx] = m_visibilityIndexAllocator->Allocate();
+				}
+
+				constexpr float scaleBuffer{ 1.05f }; //Used as a scalar multiplier to the AABB's scale so that it's a bit larger than the model (eliminates z-fighting issues)
+				const glm::mat4 aabbMatrix{ transform.GetModelMatrix() * glm::translate(glm::mat4(1.0f), model.meshDataLoadInfos[meshIdx].centre) * glm::scale(glm::mat4(1.0f), model.meshDataLoadInfos[meshIdx].halfExtents * 2.0f * scaleBuffer) };
+				
+				ModelMatrixShaderData data{};
+				data.modelMatrix = aabbMatrix;
+				data.visibilityIndex = model.meshVisibilityIndices[meshIdx];
+				shaderData.push_back(data);
+	        
+				m_modelMatricesEntitiesLookups[m_currentFrame].push_back(m_reg.get().GetEntity(transform));
+				m_modelMatrices.push_back(aabbMatrix);
+			}
 		}
 		
 		memcpy(m_modelMatricesBufferMaps[m_currentFrame], shaderData.data(), shaderData.size() * sizeof(ModelMatrixShaderData));
@@ -3033,22 +3108,36 @@ namespace NK
 		{
 			CModelRenderer& modelRenderer{ _event.reg->GetComponent<CModelRenderer>(_event.entity) };
 
-			if (m_gpuModelReferenceCounter.contains(modelRenderer.modelPath))
+			for (std::size_t i{ 0 }; i < modelRenderer.meshes.size(); ++i)
 			{
-				--m_gpuModelReferenceCounter[modelRenderer.modelPath];
-				modelRenderer.model = nullptr;
-
-				if (m_gpuModelReferenceCounter[modelRenderer.modelPath] == 0)
+				if (modelRenderer.meshes[i])
 				{
-					//No CModelRenderers are currently visible that use this model, add it to the unload queue
-					m_modelUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(modelRenderer.modelPath);
-				}
-			}
+					std::pair<std::string, std::uint64_t> meshKey = std::make_pair(modelRenderer.meshDataPath, modelRenderer.meshDataLoadInfos[i].meshOffset);
+					--m_gpuMeshReferenceCounter[meshKey];
+					modelRenderer.meshes[i] = nullptr;
+					if (m_gpuMeshReferenceCounter[meshKey] == 0)
+					{
+						m_meshUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(meshKey);
+					}
 
-			if (modelRenderer.visibilityIndex != 0xFFFFFFFF)
-			{
-				m_visibilityIndexAllocator->Free(modelRenderer.visibilityIndex);
-				modelRenderer.visibilityIndex = 0xFFFFFFFF;
+					if (modelRenderer.materials[i])
+					{
+						const CPUMeshData* cpuMesh{ ModelLoader::LoadMesh(meshKey.first, meshKey.second) };
+						std::string matPath{ cpuMesh->materialFilepath };
+						--m_gpuMaterialReferenceCounter[matPath];
+						modelRenderer.materials[i] = nullptr;
+						if (m_gpuMaterialReferenceCounter[matPath] == 0)
+						{
+							m_materialUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(matPath);
+						}
+					}
+				}
+
+				if (modelRenderer.meshVisibilityIndices[i] != 0xFFFFFFFF)
+				{
+					m_visibilityIndexAllocator->Free(modelRenderer.meshVisibilityIndices[i]);
+					modelRenderer.meshVisibilityIndices[i] = 0xFFFFFFFF;
+				}
 			}
 		}
 		
@@ -3129,10 +3218,10 @@ namespace NK
 	void RenderLayer::OnSceneLoad(const SceneLoadEvent& _event)
 	{
 		m_graphicsQueue->WaitIdle();
-		m_gpuModelReferenceCounter.clear();
+		m_gpuMeshReferenceCounter.clear();
 		m_textureDeletionQueue.clear();
-		m_modelUnloadQueue.clear();
-		m_gpuModelCache.clear();
+		m_meshUnloadQueue.clear();
+		m_gpuMeshCache.clear();
 		ModelLoader::ClearCache();
 		for (std::vector<Entity>& lookup : m_modelMatricesEntitiesLookups)
 		{
@@ -3140,9 +3229,9 @@ namespace NK
 		}
 		for (std::uint32_t i{ 0 }; i < m_desc.framesInFlight; ++i)
 		{
-			std::memset(m_modelVisibilityReadbackBufferMaps[i], 0, m_desc.maxModels * sizeof(std::uint32_t));
+			std::memset(m_meshVisibilityReadbackBufferMaps[i], 0, m_desc.maxMeshesPerModel * m_desc.maxModels * sizeof(std::uint32_t));
 		}
-		m_visibilityIndexAllocator = UniquePtr<FreeListAllocator>(NK_NEW(FreeListAllocator, m_desc.maxModels));
+		m_visibilityIndexAllocator = UniquePtr<FreeListAllocator>(NK_NEW(FreeListAllocator, m_desc.maxMeshesPerModel * m_desc.maxModels));
 		m_gpuUploader->Flush(true, nullptr, nullptr);
 		m_gpuUploader->Reset();
 		m_activeCamera = nullptr;

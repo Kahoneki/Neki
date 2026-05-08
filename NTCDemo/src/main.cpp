@@ -36,14 +36,16 @@ public:
 	{
 		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Plane.nkmodel") };
 		// NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Plane.gltf", serialisedModelOutputPath.string(), true, true);
+		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/SponzaTest/Sponza.nkmodel") };
+		// NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath.string(), true, true, serialisedModelOutputPath.parent_path() / std::string("Textures"));
 		
-		m_floorEntity = m_reg.Create();
-		NK::CModelRenderer& floorModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_floorEntity) };
-		floorModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/Prefabs/Plane.nkmodel");
-		NK::CTransform& floorTransform{ m_reg.GetComponent<NK::CTransform>(m_floorEntity) };
-		floorTransform.name = "Floor";
-		floorTransform.SetLocalPosition({ 0, 0.0f, 0.0f });
-		floorTransform.SetLocalScale({ 5.0f, 0.2f, 5.0f });
+		m_helmetEntity = m_reg.Create();
+		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
+		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/SponzaTest/Sponza.nkmodel");
+		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
+		helmetTransform.name = "Helmet";
+		helmetTransform.SetLocalPosition({ 0, 0.0f, 0.0f });
+		helmetTransform.SetLocalScale({ 0.1, 0.1, 0.1 });
 		
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };
@@ -92,16 +94,16 @@ public:
 		input.AddActionToMap(NK::PLAYER_CAMERA_ACTIONS::YAW_PITCH);
 		
 		
-		//VERY temp
-		NK::Neural::NTCModel* model{ NK::Neural::NTCLoader::LoadMaterial("Resource-Files/model.pt") };
-		floorModelRenderer.ntcModel = model;
+		// //VERY temp
+		// NK::Neural::NTCModel* model{ NK::Neural::NTCLoader::LoadMaterial("Resource-Files/model.pt") };
+		// helmetModelRenderer.ntcModel = model;
 	}
 	
 	virtual void Update() override {}
 
 
 private:
-	NK::Entity m_floorEntity;
+	NK::Entity m_helmetEntity;
 	NK::Entity m_cameraEntity;
 	NK::Entity m_skyboxEntity;
 	NK::Entity m_lightEntity1;

@@ -76,6 +76,123 @@ namespace NK
 		SERIALISE(PBRMaterial, v.baseColourIdx, v.metalnessIdx, v.roughnessIdx, v.specularIdx, v.shininessIdx, v.normalIdx, v.aoIdx, v.emissiveIdx, v.opacityIdx, v.heightIdx, v.displacementIdx, v.reflectionIdx, v.hasBaseColour, v.hasMetalness, v.hasRoughness, v.hasSpecular, v.hasShininess, v.hasNormal, v.hasAO, v.hasEmissive, v.hasOpacity, v.hasHeight, v.hasDisplacement, v.hasReflection)
 	#endif
 	
+	
+	struct BlinnPhongMaterialNTC
+	{
+		int diffuseChannelR;
+		int diffuseChannelG;
+		int diffuseChannelB;
+		int diffuseChannelA;
+		int specularChannelR;
+		int specularChannelG;
+		int specularChannelB;
+		int ambientChannelR;
+		int ambientChannelG;
+		int ambientChannelB;
+		int emissiveChannelR;
+		int emissiveChannelG;
+		int emissiveChannelB;
+		int normalChannelX;
+		int normalChannelY;
+		int normalChannelZ;
+		int shininessChannel;
+		int opacityChannel;
+		int heightChannel;
+		int displacementChannel;
+		int lightmapChannelR;
+		int lightmapChannelG;
+		int lightmapChannelB;
+		int reflectionChannelR;
+		int reflectionChannelG;
+		int reflectionChannelB;
+			
+		//Presence flags (0 / 1)
+		int hasDiffuseChannelR;
+		int hasDiffuseChannelG;
+		int hasDiffuseChannelB;
+		int hasDiffuseChannelA;
+		int hasSpecularChannelR;
+		int hasSpecularChannelG;
+		int hasSpecularChannelB;
+		int hasAmbientChannelR;
+		int hasAmbientChannelG;
+		int hasAmbientChannelB;
+		int hasEmissiveChannelR;
+		int hasEmissiveChannelG;
+		int hasEmissiveChannelB;
+		int hasNormalChannelX;
+		int hasNormalChannelY;
+		int hasNormalChannelZ;
+		int hasShininessChannel;
+		int hasOpacityChannel;
+		int hasHeightChannel;
+		int hasDisplacementChannel;
+		int hasLightmapChannelR;
+		int hasLightmapChannelG;
+		int hasLightmapChannelB;
+		int hasReflectionChannelR;
+		int hasReflectionChannelG;
+		int hasReflectionChannelB;
+	};
+	#if defined(__cplusplus)
+		SERIALISE(BlinnPhongMaterialNTC, v.diffuseChannelR, v.diffuseChannelG, v.diffuseChannelB, v.diffuseChannelA, v.specularChannelR, v.specularChannelG, v.specularChannelB, v.ambientChannelR, v.ambientChannelG, v.ambientChannelB, v.emissiveChannelR, v.emissiveChannelG, v.emissiveChannelB, v.normalChannelX, v.normalChannelY, v.normalChannelZ, v.shininessChannel, v.opacityChannel, v.heightChannel, v.displacementChannel, v.lightmapChannelR, v.lightmapChannelG, v.lightmapChannelB, v.reflectionChannelR, v.reflectionChannelG, v.reflectionChannelB, v.hasDiffuseChannelR, v.hasDiffuseChannelG, v.hasDiffuseChannelB, v.hasDiffuseChannelA, v.hasSpecularChannelR, v.hasSpecularChannelG, v.hasSpecularChannelB, v.hasAmbientChannelR, v.hasAmbientChannelG, v.hasAmbientChannelB, v.hasEmissiveChannelR, v.hasEmissiveChannelG, v.hasEmissiveChannelB, v.hasNormalChannelX, v.hasNormalChannelY, v.hasNormalChannelZ, v.hasShininessChannel, v.hasOpacityChannel, v.hasHeightChannel, v.hasDisplacementChannel, v.hasLightmapChannelR, v.hasLightmapChannelG, v.hasLightmapChannelB, v.hasReflectionChannelR, v.hasReflectionChannelG, v.hasReflectionChannelB)
+	#endif
+
+	struct PBRMaterialNTC
+	{
+		int baseColourChannelR;
+		int baseColourChannelG;
+		int baseColourChannelB;
+		int baseColourChannelA;
+		int metalnessChannel;
+		int roughnessChannel;
+		int specularChannelR;
+		int specularChannelG;
+		int specularChannelB;
+		int shininessChannel;
+		int normalChannelX;
+		int normalChannelY;
+		int normalChannelZ;
+		int aoChannel;
+		int emissiveChannelR;
+		int emissiveChannelG;
+		int emissiveChannelB;
+		int opacityChannel;
+		int heightChannel;
+		int displacementChannel;
+		int reflectionChannelR;
+		int reflectionChannelG;
+		int reflectionChannelB;
+
+		//Presence flags (0 / 1)
+		int hasBaseColourChannelR;
+		int hasBaseColourChannelG;
+		int hasBaseColourChannelB;
+		int hasBaseColourChannelA;
+		int hasMetalnessChannel;
+		int hasRoughnessChannel;
+		int hasSpecularChannelR;
+		int hasSpecularChannelG;
+		int hasSpecularChannelB;
+		int hasShininessChannel;
+		int hasNormalChannelX;
+		int hasNormalChannelY;
+		int hasNormalChannelZ;
+		int hasAoChannel;
+		int hasEmissiveChannelR;
+		int hasEmissiveChannelG;
+		int hasEmissiveChannelB;
+		int hasOpacityChannel;
+		int hasHeightChannel;
+		int hasDisplacementChannel;
+		int hasReflectionChannelR;
+		int hasReflectionChannelG;
+		int hasReflectionChannelB;
+	};
+	#if defined(__cplusplus)
+		SERIALISE(PBRMaterialNTC, v.baseColourChannelR, v.baseColourChannelG, v.baseColourChannelB, v.baseColourChannelA, v.metalnessChannel, v.roughnessChannel, v.specularChannelR, v.specularChannelG, v.specularChannelB, v.shininessChannel, v.normalChannelX, v.normalChannelY, v.normalChannelZ, v.aoChannel, v.emissiveChannelR, v.emissiveChannelG, v.emissiveChannelB, v.opacityChannel, v.heightChannel, v.displacementChannel, v.reflectionChannelR, v.reflectionChannelG, v.reflectionChannelB, v.hasBaseColourChannelR, v.hasBaseColourChannelG, v.hasBaseColourChannelB, v.hasBaseColourChannelA, v.hasMetalnessChannel, v.hasRoughnessChannel, v.hasSpecularChannelR, v.hasSpecularChannelG, v.hasSpecularChannelB, v.hasShininessChannel, v.hasNormalChannelX, v.hasNormalChannelY, v.hasNormalChannelZ, v.hasAoChannel, v.hasEmissiveChannelR, v.hasEmissiveChannelG, v.hasEmissiveChannelB, v.hasOpacityChannel, v.hasHeightChannel, v.hasDisplacementChannel, v.hasReflectionChannelR, v.hasReflectionChannelG, v.hasReflectionChannelB)
+	#endif
+	
 }
 
 #endif

@@ -12,7 +12,6 @@ namespace NK
 		m_totalTime = glfwGetTime();
 		m_dt = m_totalTime - m_lastTime;
 		m_lastTime = m_totalTime;
-		std::cout << 1/m_dt << '\n';
 	}
 	
 }

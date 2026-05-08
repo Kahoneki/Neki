@@ -27,6 +27,11 @@ namespace NK
 	
 	void TextureCompressor::KTXCompress(const std::string& _inputFilepath, const bool _srgb, const bool _flipImage, const std::string& _outputFilepath)
 	{
+		if (!std::filesystem::path(_outputFilepath).parent_path().empty())
+		{
+			std::filesystem::create_directories(std::filesystem::path(_outputFilepath).parent_path());
+		}
+		
 		stbi_set_flip_vertically_on_load(_flipImage);
 		
 		int width, height, nrChannels;
@@ -234,7 +239,7 @@ namespace NK
 		imageData.desc.size.y = texture->baseHeight;
 		imageData.desc.mipLevels = texture->numLevels;
 		imageData.desc.dimension = TEXTURE_DIMENSION::DIM_2;
-		imageData.desc.usage = TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT;
+		imageData.desc.usage = TEXTURE_USAGE_FLAGS::TRANSFER_DST_BIT | TEXTURE_USAGE_FLAGS::READ_ONLY;
 		
 		//Handle cube/array dimensions
 		if (texture->isCubemap)
