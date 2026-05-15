@@ -48,6 +48,31 @@ namespace NK
 		//This material will hence be valid for as long as its in scope
 		UniquePtr<IBuffer> materialBuffer;
 		UniquePtr<IBufferView> materialBufferView;
+		
+		//NTC
+		bool isNTC{ false };
+		UniquePtr<IBuffer> g0Buffer;
+		UniquePtr<IBufferView> g0BufferView;
+		UniquePtr<IBuffer> g1Buffer;
+		UniquePtr<IBufferView> g1BufferView;
+		UniquePtr<IBuffer> mlpBuffer;
+		UniquePtr<IBufferView> mlpBufferView;
+		std::uint32_t layer0_W_offset{ 0 };
+		std::uint32_t layer0_B_offset{ 0 };
+		std::uint32_t layer1_W_offset{ 0 };
+		std::uint32_t layer1_B_offset{ 0 };
+		std::uint32_t layer2_W_offset{ 0 };
+		std::uint32_t layer2_B_offset{ 0 };
+		std::uint32_t g0Channels{ 0 };
+		std::uint32_t g1Channels{ 0 };
+		std::uint32_t g0QuantLevels{ 0 };
+		std::uint32_t g1QuantLevels{ 0 };
+		std::uint32_t g0Resolution{ 0 };
+		std::uint32_t imageResolution{ 0 };
+		std::uint32_t numOctaves{ 0 };
+		std::uint32_t tileSize{ 0 };
+		std::uint32_t numLayers{ 0 };
+		std::uint32_t hiddenNeurons{ 0 };
 	};
 	
 	struct GPUMesh
@@ -89,6 +114,7 @@ namespace NK
 
 		[[nodiscard]] UniquePtr<GPUMesh> EnqueueMeshDataUpload(const CPUMeshData* _cpuMesh);
 		[[nodiscard]] UniquePtr<GPUMaterial> EnqueueMaterialDataUpload(const CPUMaterial* _cpuMaterial);
+		[[nodiscard]] UniquePtr<GPUMaterial> EnqueueMaterialDataUploadNTC(const CPUMaterialNTC* _cpuMaterial);
 		[[nodiscard]] UniquePtr<GPUTexture> EnqueueTextureDataUpload(const ImageData* _imgData);
 		
 		//If _waitIdle = true, the calling thread will be blocked until the flush is complete and the provided fence and semaphore will already be signalled

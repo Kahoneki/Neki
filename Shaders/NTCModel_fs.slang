@@ -1,5 +1,3 @@
-//VERY temp
-
 static const float LIGHT_NEAR = 0.01f;
 static const float LIGHT_FAR = 1000.0f;
 
@@ -325,8 +323,8 @@ Material EvaluateMLP(float2 uv)
 	
 	
 	//MLP
-	static const uint HIDDEN_DIM = 32;
-	static const uint OUTPUT_DIM = 9;
+	static const uint HIDDEN_DIM = 16;
+	static const uint OUTPUT_DIM = 12;
     CoopVec<float16_t, HIDDEN_DIM> hidden0 = coopVecMatMulAdd<float16_t, HIDDEN_DIM, MAX_INPUTS, float16_t>(
         encodings,
         CoopVecComponentType.Float16,

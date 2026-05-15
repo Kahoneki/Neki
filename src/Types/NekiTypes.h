@@ -1094,7 +1094,36 @@ namespace NK
 		std::variant<BlinnPhongMaterial, PBRMaterial> shaderMaterialData;
 		std::array<std::pair<std::string, bool>, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //index with MODEL_TEXTURE_TYPE to get relative filepath + srgb-flag pair
 	};
-	SERIALISE(DiskMaterial, v.magic, v.version, v.pipeline, v.isNTC, v.ntcMaterialDataFilepath, v.numChannels, v.materialPropertyChannelLookup, v.shaderMaterialData, v.allTextures)
+	SERIALISE(DiskMaterial, v.magic, v.version, v.pipeline, v.isNTC, v.ntcMaterialDataFilepath, v.numChannels, v.materialPropertyChannelLookup, v.ntcShaderMaterialData, v.shaderMaterialData, v.allTextures)
+	
+	struct NeuralTrainingParameters
+	{
+		//Quality level of model
+		//(BPPC = bitc per pixel per channel)
+		//0 = 0.2BPPC
+		//1 = 0.5BPPC
+		//2 = 1.0BPPC
+		//3 = 2.5BPPC
+		//This presents a tradeoff between quality and compression ratio (higher value = higher quality but lower compression ratio)
+		int quality;
+		
+		//The number of hidden neurons per hidden layer in the NTC model
+		//This presents a tradeoff between quality and runtime inference (sampling) speed (higher value = higher quality but lower runtime performance)
+		//This also has a minor impact on compression ratio (higher value = lower compression ratio), however the impact the MLP has compared to the latent feature pyramid is generally deemed to be negligible
+		int hiddenNeurons;
+		
+		//The number of training iterations to run the model for
+		//This presents a tradeoff between quality and training time (higher value = higher quality but higher training time)
+		int epochs;
+	};
+	
+	struct TextureToTrain
+	{
+		MODEL_TEXTURE_TYPE type;
+		std::string path;
+		int channels; //1 or 3
+		float weight; //Importance in loss function
+	};
 	
 	struct DiskMaterialDataNTC
 	{

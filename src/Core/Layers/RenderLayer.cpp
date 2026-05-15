@@ -593,12 +593,12 @@ namespace NK
 		m_meshVisibilityFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Shadow_fs";
 		m_shadowFragShader = m_device->CreateShader(fragShaderDesc);
-
 		fragShaderDesc.filepath = "Shaders/MeshBlinnPhong_fs";
 		m_blinnPhongFragShader = m_device->CreateShader(fragShaderDesc);
-		
 		fragShaderDesc.filepath = "Shaders/MeshPBR_fs";
 		m_pbrFragShader = m_device->CreateShader(fragShaderDesc);
+		fragShaderDesc.filepath = "Shaders/NTCModel_fs";
+		m_ntcPBRFragShader = m_device->CreateShader(fragShaderDesc, true);
 		fragShaderDesc.filepath = "Shaders/Skybox_fs";
 		m_skyboxFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Postprocess_fs";
@@ -860,6 +860,9 @@ namespace NK
 
 		pipelineDesc.fragmentShader = m_pbrFragShader.get();
 		m_pbrPipeline = m_device->CreatePipeline(pipelineDesc);
+		
+		pipelineDesc.fragmentShader = m_ntcPBRFragShader.get();
+		m_ntcPBRPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
 
 
@@ -1125,7 +1128,6 @@ namespace NK
 				_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("SCENE_COLOUR_RTV"), nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr);
 			}
 			
-			_cmdBuf->BindRootSignature(m_meshPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
 			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
@@ -1141,34 +1143,13 @@ namespace NK
 			pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 			
-			//VERY temp
-			// pushConstantData.g0BufferIndex = m_latentTexBufferView->GetIndex();
-			// pushConstantData.g1BufferIndex = m_latentTexBufferView2->GetIndex();
-			// pushConstantData.mlpBufferIndex = m_mlpBufferView->GetIndex();
-			// pushConstantData.layer0_W_offset = m_layer0_W_offset;
-			// pushConstantData.layer0_B_offset = m_layer0_B_offset;
-			// pushConstantData.layer1_W_offset = m_layer1_W_offset;
-			// pushConstantData.layer1_B_offset = m_layer1_B_offset;
-			// pushConstantData.layer2_W_offset = m_layer2_W_offset;
-			// pushConstantData.layer2_B_offset = m_layer2_B_offset;
-			// pushConstantData.g0Channels = m_g0Channels;
-			// pushConstantData.g1Channels = m_g1Channels;
-			// pushConstantData.g0QuantLevels = m_g0QuantLevels;
-			// pushConstantData.g1QuantLevels = m_g1QuantLevels;
-			// pushConstantData.g0Resolution = m_g0Resolution;
-			// pushConstantData.imageResolution = m_imageResolution;
-			// pushConstantData.numOctaves = m_numOctaves;
-			// pushConstantData.tileSize = m_tileSize;
-			// pushConstantData.numLayers = m_numLayers;
-			// pushConstantData.hiddenNeurons = m_numHiddenNeurons;
-			// pushConstantData.frameIndex = m_globalFrame;
-			
 			if (m_activeCamera)
 			{
 				pushConstantData.maxIrradiance = m_activeCamera->GetMaxIrradiance();
 			}
 
 			//Skybox
+			_cmdBuf->BindRootSignature(m_meshPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 			if (_texs.Get("SKYBOX"))
 			{
 				std::size_t skyboxVertexBufferStride{ sizeof(glm::vec3) };
@@ -1195,11 +1176,44 @@ namespace NK
 					
 					pushConstantData.materialBufferIndex = mat->bufferIndex;
 					
-					_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
-					IPipeline* pipeline{ (mat->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get()) };
-					_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
 					_cmdBuf->BindVertexBuffers(0, 1, mesh->vertexBuffer.get(), &modelVertexBufferStride);
 					_cmdBuf->BindIndexBuffer(mesh->indexBuffer.get(), DATA_FORMAT::R32_UINT);
+					
+					if (mat->isNTC)
+					{
+						_cmdBuf->BindRootSignature(m_NTCPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+						_cmdBuf->BindPipeline(m_ntcPBRPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+						NTCPassPushConstantData ntcData{};
+						static_cast<MeshPassPushConstantData&>(ntcData) = pushConstantData;
+						ntcData.g0BufferIndex   = mat->g0BufferView->GetIndex();
+						ntcData.g1BufferIndex   = mat->g1BufferView->GetIndex();
+						ntcData.mlpBufferIndex  = mat->mlpBufferView->GetIndex();
+						ntcData.layer0_W_offset = mat->layer0_W_offset;
+						ntcData.layer0_B_offset = mat->layer0_B_offset;
+						ntcData.layer1_W_offset = mat->layer1_W_offset;
+						ntcData.layer1_B_offset = mat->layer1_B_offset;
+						ntcData.layer2_W_offset = mat->layer2_W_offset;
+						ntcData.layer2_B_offset = mat->layer2_B_offset;
+						ntcData.g0Channels      = mat->g0Channels;
+						ntcData.g1Channels      = mat->g1Channels;
+						ntcData.g0QuantLevels   = mat->g0QuantLevels;
+						ntcData.g1QuantLevels   = mat->g1QuantLevels;
+						ntcData.g0Resolution    = mat->g0Resolution;
+						ntcData.imageResolution = mat->imageResolution;
+						ntcData.numOctaves      = mat->numOctaves;
+						ntcData.tileSize        = mat->tileSize;
+						ntcData.numLayers       = mat->numLayers;
+						ntcData.hiddenNeurons   = mat->hiddenNeurons;
+						ntcData.frameIndex      = m_globalFrame;
+						_cmdBuf->PushConstants(m_NTCPassRootSignature.get(), &ntcData);
+					}
+					else
+					{
+						IPipeline* pipeline{ (mat->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get()) };
+						_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
+						_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
+					}
+					
 					_cmdBuf->DrawIndexed(mesh->indexCount, 1, 0, 0);
 				}
 			}
@@ -2631,7 +2645,7 @@ namespace NK
 
 									if (!texInUnloadQueue && !m_gpuTextureCache.contains(texPath))
 									{
-										ImageData* imgData{ TextureCompressor::LoadImage(texPath, false, isSrgb) };
+										const ImageData* const imgData{ TextureCompressor::LoadImage(texPath, false, isSrgb) };
 										m_gpuTextureCache[texPath] = m_gpuUploader->EnqueueTextureDataUpload(imgData);
 										m_newGPUUploaderUpload = true;
 										m_gpuTextureReferenceCounter[texPath] = 0;
@@ -2676,6 +2690,13 @@ namespace NK
 								}
 
 								m_gpuMaterialCache[matPath] = m_gpuUploader->EnqueueMaterialDataUpload(&cpuMaterial);
+								m_gpuMaterialReferenceCounter[matPath] = 0;
+								m_newGPUUploaderUpload = true;
+							}
+							else if (std::holds_alternative<CPUMaterialNTC>(matHeaderVar))
+							{
+								CPUMaterialNTC cpuMaterialNTC{ std::get<CPUMaterialNTC>(matHeaderVar) };
+								m_gpuMaterialCache[matPath] = m_gpuUploader->EnqueueMaterialDataUploadNTC(&cpuMaterialNTC);
 								m_gpuMaterialReferenceCounter[matPath] = 0;
 								m_newGPUUploaderUpload = true;
 							}

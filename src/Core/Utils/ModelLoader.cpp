@@ -1,6 +1,5 @@
 #include "ModelLoader.h"
 
-#include "FileUtils.h"
 #include "ImageLoader.h"
 #include "TextureCompressor.h"
 
@@ -11,8 +10,17 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 #include <cereal/archives/binary.hpp>
+
+#include "imgui.h"
 #ifdef max
 	#undef max
+#endif
+#ifdef _WIN32
+	#define POPEN _popen
+	#define PCLOSE _pclose
+#else
+	#define POPEN popen
+	#define PCLOSE pclose
 #endif
 
 
@@ -66,7 +74,7 @@ namespace NK
 	
 	std::variant<CPUMaterial, CPUMaterialNTC> ModelLoader::GetMaterialHeader(const std::string& _filepath)
 	{
-		if (!std::filesystem::path(_filepath).has_extension() || std::filesystem::path(_filepath).extension() != ".nkmaterial")
+		if (!std::filesystem::path(_filepath).has_extension() || (std::filesystem::path(_filepath).extension() != ".nkmaterial" && std::filesystem::path(_filepath).extension() != ".nkmaterialntc"))
 		{
 			throw std::invalid_argument("ModelLoader::GetMaterialHeader() - _filepath does not end in .nkmaterial as required. _filepath = " + _filepath);
 		}
@@ -80,7 +88,7 @@ namespace NK
 
 		DiskMaterial header{};
 		archive(header);
-		if (header.magic != std::string("NKMATERIAL"))
+		if (header.magic != std::string("NKMATERIAL") && header.magic != std::string("NKMATERIALNTC"))
 		{
 			throw std::runtime_error("ModelLoader::GetMaterialHeader() - deserialised material header's magic string was not the expected \"NKMATERIAL\" - header.magic = " + header.magic);
 		}
@@ -172,7 +180,7 @@ namespace NK
 
 
 	
-	void ModelLoader::SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _outputTextureDirectory)
+	void ModelLoader::SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures)
 	{
 		//Create output filepaths if it doesn't exist
 		std::filesystem::path outputPath{ _outputFilepath };
@@ -181,8 +189,7 @@ namespace NK
 		{
 			std::filesystem::create_directories(outputDir);
 		}
-		std::filesystem::path outputTexturePath{ _outputTextureDirectory };
-		const std::filesystem::path outputTextureDir{ outputTexturePath.parent_path() };
+		const std::filesystem::path outputTextureDir{ outputDir / "Textures" };
 		if (!outputTextureDir.empty())
 		{
 			std::filesystem::create_directories(outputTextureDir);
@@ -193,7 +200,7 @@ namespace NK
 		diskModel.version = 0;
 		diskModel.cpuModel.meshDataFilepath = outputPath.replace_extension(".nkmeshdata");
 		
-		std::pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>> data{ LoadNonNKModelData(_inputFilepath, _flipFaceWinding, _flipTextures, _outputTextureDirectory) };
+		std::pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>> data{ LoadNonNKModelData(_inputFilepath, _flipFaceWinding, _flipTextures, outputDir) };
 		std::ofstream meshStream(diskModel.cpuModel.meshDataFilepath, std::ios::binary);
 		if (!meshStream)
 		{
@@ -279,6 +286,142 @@ namespace NK
 		}
 	}
 
+	
+	
+	void ModelLoader::SerialiseNKModelNTC(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures, const NeuralTrainingParameters& _neuralTrainingParameters)
+	{
+		//Validate neural training parameters
+		if (_neuralTrainingParameters.quality < 0 || _neuralTrainingParameters.quality > 3)
+		{
+			throw std::invalid_argument("SerialiseNKModelNTC() - provided _neuralTrainingParameters.quality is not in valid range [0,3] - quality = " + std::to_string(_neuralTrainingParameters.quality));
+		}
+		if (_neuralTrainingParameters.hiddenNeurons <= 0)
+		{
+			throw std::invalid_argument("SerialiseNKModelNTC() - provided _neuralTrainingParameters.hiddenNeurons must be > 0 - hiddenNeurons = " + std::to_string(_neuralTrainingParameters.hiddenNeurons));
+		}
+		if (_neuralTrainingParameters.epochs <= 0)
+		{
+			throw std::invalid_argument("SerialiseNKModelNTC() - provided _neuralTrainingParameters.epochs must be > 0 - epochs = " + std::to_string(_neuralTrainingParameters.epochs));
+		}
+		
+		
+		//Create output filepath if it doesn't exist
+		std::filesystem::path outputPath{ _outputFilepath };
+		const std::filesystem::path outputDir{ outputPath.parent_path() };
+		if (!outputDir.empty())
+		{
+			std::filesystem::create_directories(outputDir);
+		}
+		
+		DiskModel diskModel;
+		diskModel.magic = "NKMODEL";
+		diskModel.version = 0;
+		diskModel.cpuModel.meshDataFilepath = outputPath.replace_extension(".nkmeshdata");
+		
+		std::pair<std::vector<CPUMeshData>, std::vector<std::variant<CPUMaterial, CPUMaterialNTC>>> data{ LoadNonNKModelDataNTC(_inputFilepath, _flipFaceWinding, _flipTextures, outputDir, _neuralTrainingParameters) };
+		std::ofstream meshStream(diskModel.cpuModel.meshDataFilepath, std::ios::binary);
+		if (!meshStream)
+		{
+			throw std::runtime_error("ModelLoader::SerialiseNKModelNTC() - failed to create mesh data file. Filepath = " + diskModel.cpuModel.meshDataFilepath);
+		}
+		{
+			cereal::BinaryOutputArchive meshArch(meshStream);
+			std::string magic{ "NKMESHDATA" };
+			meshArch(magic);
+			cereal::size_type numMeshes{ data.first.size() };
+			meshArch(numMeshes);
+			diskModel.cpuModel.meshDataLoadInfo.resize(numMeshes);
+			
+			//Calculate centre and halfExtents of model
+			glm::vec3 minAABBModel(std::numeric_limits<float>::max());
+			glm::vec3 maxAABBModel(std::numeric_limits<float>::lowest());
+			
+			for (std::size_t i{ 0 }; i < numMeshes; ++i)
+			{
+				//Calculate halfExtents of mesh
+				glm::vec3 minAABB(std::numeric_limits<float>::max());
+				glm::vec3 maxAABB(std::numeric_limits<float>::lowest());
+				for (const Vertex& vertex : data.first[i].vertices)
+				{
+					minAABB.x = std::min(minAABB.x, vertex.position.x);
+					minAABB.y = std::min(minAABB.y, vertex.position.y);
+					minAABB.z = std::min(minAABB.z, vertex.position.z);
+
+					maxAABB.x = std::max(maxAABB.x, vertex.position.x);
+					maxAABB.y = std::max(maxAABB.y, vertex.position.y);
+					maxAABB.z = std::max(maxAABB.z, vertex.position.z);
+					
+					//Also update model's half extents
+					minAABBModel.x = std::min(minAABBModel.x, vertex.position.x);
+					minAABBModel.y = std::min(minAABBModel.y, vertex.position.y);
+					minAABBModel.z = std::min(minAABBModel.z, vertex.position.z);
+
+					maxAABBModel.x = std::max(maxAABBModel.x, vertex.position.x);
+					maxAABBModel.y = std::max(maxAABBModel.y, vertex.position.y);
+					maxAABBModel.z = std::max(maxAABBModel.z, vertex.position.z);
+				}
+				diskModel.cpuModel.meshDataLoadInfo[i].centre = (minAABB + maxAABB) * 0.5f;
+				diskModel.cpuModel.meshDataLoadInfo[i].halfExtents = (maxAABB - minAABB) * 0.5f;
+				
+				diskModel.cpuModel.meshDataLoadInfo[i].meshOffset = meshStream.tellp();
+				meshArch(data.first[i]);
+			}
+			
+			diskModel.cpuModel.halfExtents = (maxAABBModel - minAABBModel) * 0.5f;
+		}
+		
+		std::ofstream modelStream(_outputFilepath, std::ios::binary);
+		if (!modelStream)
+		{
+			throw std::runtime_error("ModelLoader::SerialiseNKModelNTC() - failed to failed to create model data file. Filepath = " + _outputFilepath);
+		}
+		{
+			cereal::BinaryOutputArchive modelArch(modelStream);
+			modelArch(diskModel);
+		}
+		
+		for (std::size_t i{ 0 }; i < data.second.size(); ++i)
+		{
+			DiskMaterial diskMaterial{};
+			diskMaterial.version = 0;
+			
+			//Check which variant was returned by the loader
+			if (std::holds_alternative<CPUMaterialNTC>(data.second[i]))
+			{
+				const CPUMaterialNTC& ntcMat{ std::get<CPUMaterialNTC>(data.second[i]) };
+				diskMaterial.magic = "NKMATERIALNTC";
+				diskMaterial.name = ntcMat.name;
+				diskMaterial.pipeline = ntcMat.pipeline;
+				diskMaterial.isNTC = true;
+				diskMaterial.ntcMaterialDataFilepath = ntcMat.materialDataFilepath;
+				diskMaterial.numChannels = ntcMat.numChannels;
+				diskMaterial.materialPropertyChannelLookup = ntcMat.materialPropertyChannelLookup;
+				diskMaterial.ntcShaderMaterialData = ntcMat.shaderMaterialData;
+			}
+			else
+			{
+				const CPUMaterial& stdMat{ std::get<CPUMaterial>(data.second[i]) };
+				diskMaterial.magic = "NKMATERIAL";
+				diskMaterial.name = stdMat.name;
+				diskMaterial.pipeline = stdMat.pipeline;
+				diskMaterial.isNTC = false;
+				diskMaterial.shaderMaterialData = stdMat.shaderMaterialData;
+				diskMaterial.allTextures = stdMat.allTextures;
+			}
+			
+			const std::string ext{ (diskMaterial.isNTC ? ".nkmaterialntc" : ".nkmaterial") };
+			std::string materialOutputPath{ outputDir.string() + "/" + diskMaterial.name + ext };
+			std::ofstream materialStream(materialOutputPath, std::ios::binary);
+			if (!materialStream)
+			{
+				throw std::runtime_error("ModelLoader::SerialiseNKModelNTC() - failed to create material file. Filepath = " + materialOutputPath);
+			}
+			{
+				cereal::BinaryOutputArchive materialArch(materialStream);
+				materialArch(diskMaterial);
+			}
+		}
+	}
 
 
 	CPUModel ModelLoader::GetNKModelHeader(const std::string& _filepath)
@@ -302,7 +445,7 @@ namespace NK
 
 
 
-	std::pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>> ModelLoader::LoadNonNKModelData(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _serialisedTextureOutputDirectory)
+	std::pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>> ModelLoader::LoadNonNKModelData(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _serialisedModelOutputDirectory)
 	{
 		Assimp::Importer importer{};
 		const aiScene* scene{ importer.ReadFile(_filepath,
@@ -324,7 +467,7 @@ namespace NK
 		
 		//Load mesh data
 		std::vector<CPUMeshData> cpuMeshData;
-		std::string materialDirectory{ std::filesystem::path(_serialisedTextureOutputDirectory).parent_path().string() };
+		const std::string& materialDirectory{ _serialisedModelOutputDirectory };
 		ProcessNode(scene->mRootNode, scene, &cpuMeshData, materialDirectory);
 		
 		
@@ -359,10 +502,10 @@ namespace NK
 		//Load materials
 		std::vector<CPUMaterial> materials;
 		materials.resize(scene->mNumMaterials);
+		const std::string textureDirectory{ _serialisedModelOutputDirectory + "/Textures" };
 		for (std::size_t i{ 0 }; i < scene->mNumMaterials; ++i)
 		{
 			aiMaterial* assimpMaterial{ scene->mMaterials[i] };
-			
 			std::string matName{ assimpMaterial->GetName().C_Str() };
 			if (matName.empty()) { matName = "Material"; }
 			matName += "_" + std::to_string(i);
@@ -376,7 +519,7 @@ namespace NK
 				{
 					//Texture was added, compress to ktx2
 					std::string& filepath{ materials[i].allTextures.at(std::to_underlying(_dst)).first };
-					const std::string newFilepath{ (_serialisedTextureOutputDirectory / std::filesystem::path(filepath).filename()).replace_extension(".ktx2").string() };
+					const std::string newFilepath{ (textureDirectory / std::filesystem::path(filepath).filename()).replace_extension(".ktx2").string() };
 					TextureCompressor::KTXCompress(filepath, materials[i].allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
 					filepath = std::filesystem::path(newFilepath).string(); //filepath is a reference so this is modifying the lookup entry to point to the new ktx2 texture
 				}
@@ -490,7 +633,249 @@ namespace NK
 		return std::make_pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>>(std::move(cpuMeshData), std::move(materials));
 	}
 
+	
+	
+	std::pair<std::vector<CPUMeshData>, std::vector<std::variant<CPUMaterial, CPUMaterialNTC>>> ModelLoader::LoadNonNKModelDataNTC(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _serialisedModelOutputDirectory, const NeuralTrainingParameters& _neuralTrainingParameters)
+	{
+		Assimp::Importer importer{};
+		const aiScene* scene{ importer.ReadFile(_filepath,
+		                                        aiProcess_Triangulate |			//Ensure model is composed of triangles
+		                                        aiProcess_GenSmoothNormals |	//Generate smooth normals if they don't exist
+		                                        /*aiProcess_FlipUVs |*/			//Flip UVs to match Vulkan's top left texcoord system
+		                                        aiProcess_CalcTangentSpace |	//Calculate tangents and bitangents (required for TBN in normal mapping)
+		                                        aiProcess_MakeLeftHanded |
+		                                        aiProcess_JoinIdenticalVertices |
+		                                        (_flipFaceWinding ? aiProcess_FlipWindingOrder : 0)
+		                                       ) };
 
+		//Ensure scene was loaded correctly
+		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
+		{
+			throw std::runtime_error("ModelLoader::LoadModel() - Failed to load model (" + _filepath + ") - " + std::string(importer.GetErrorString()));
+		}
+
+		
+		//Load mesh data
+		std::vector<CPUMeshData> cpuMeshData;
+		const std::string& materialDirectory{ _serialisedModelOutputDirectory };
+		ProcessNode(scene->mRootNode, scene, &cpuMeshData, materialDirectory);
+		
+		
+		//Calculate model extents
+		glm::vec3 minAABB(std::numeric_limits<float>::max());
+		glm::vec3 maxAABB(std::numeric_limits<float>::lowest());
+		for (const CPUMeshData& mesh : cpuMeshData)
+		{
+			for (const Vertex& vertex : mesh.vertices)
+			{
+				minAABB.x = std::min(minAABB.x, vertex.position.x);
+				minAABB.y = std::min(minAABB.y, vertex.position.y);
+				minAABB.z = std::min(minAABB.z, vertex.position.z);
+
+				maxAABB.x = std::max(maxAABB.x, vertex.position.x);
+				maxAABB.y = std::max(maxAABB.y, vertex.position.y);
+				maxAABB.z = std::max(maxAABB.z, vertex.position.z);
+			}
+		}
+		const glm::vec3 extentsCentre{ (minAABB + maxAABB) * 0.5f };
+
+		//Center the model so its local origin (0,0,0) is at centre of extents
+		for (CPUMeshData& mesh : cpuMeshData)
+		{
+			for (Vertex& vertex : mesh.vertices)
+			{
+				vertex.position -= extentsCentre;
+			}
+		}
+		
+		
+		//Load materials
+		std::vector<std::variant<CPUMaterial, CPUMaterialNTC>> materials;
+		materials.resize(scene->mNumMaterials);
+		for (std::size_t i{ 0 }; i < scene->mNumMaterials; ++i)
+		{
+			aiMaterial* assimpMaterial{ scene->mMaterials[i] };
+			std::string matName{ assimpMaterial->GetName().C_Str() };
+			if (matName.empty()) { matName = "Material"; }
+			matName += "_" + std::to_string(i);
+			std::ranges::replace_if(matName,[](const char c) { return c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|'; }, '_');
+			
+			std::vector<TextureToTrain> texturesToTrain;
+			auto TryAddTexture{[&](MODEL_TEXTURE_TYPE _nekiType, aiTextureType _aiType, int _channels, float _weight)
+			{
+				const std::string path{ GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_aiType), _nekiType, std::filesystem::path(_filepath).parent_path().string()).first };
+				if (!path.empty())
+				{
+					const std::string absPath{ std::filesystem::absolute(path).string() };
+					texturesToTrain.push_back({ _nekiType, absPath, _channels, _weight });
+				}
+				return !path.empty();
+			}};
+			
+			if (!TryAddTexture(MODEL_TEXTURE_TYPE::BASE_COLOUR, aiTextureType_BASE_COLOR, 3, 1.0f))
+			{
+				TryAddTexture(MODEL_TEXTURE_TYPE::DIFFUSE, aiTextureType_DIFFUSE, 3, 1.0f);
+			}
+			if (!TryAddTexture(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMAL_CAMERA, 3, 3.0f))
+			{
+				TryAddTexture(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMALS, 3, 3.0f);
+			}
+			if (!TryAddTexture(MODEL_TEXTURE_TYPE::EMISSIVE, aiTextureType_EMISSIVE, 3, 1.0f))
+			{
+				TryAddTexture(MODEL_TEXTURE_TYPE::EMISSION_COLOUR, aiTextureType_EMISSION_COLOR, 3, 1.0f);
+			}
+			TryAddTexture(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION, 1, 1.0f);
+			TryAddTexture(MODEL_TEXTURE_TYPE::DISPLACEMENT, aiTextureType_DISPLACEMENT, 1, 1.0f);
+			TryAddTexture(MODEL_TEXTURE_TYPE::ROUGHNESS, aiTextureType_DIFFUSE_ROUGHNESS, 1, 1.0f);
+			TryAddTexture(MODEL_TEXTURE_TYPE::METALNESS, aiTextureType_METALNESS, 1, 1.0f);
+			
+			if (texturesToTrain.empty())
+			{
+				//Fallback: This material has no textures. Return it as a standard CPUMaterial.
+				std::cout << "[NTC] Material '" << matName << "' has no textures suitable for NTC. Falling back to standard PBR material.\n";
+				CPUMaterial standardMat;
+				standardMat.name = matName;
+				standardMat.pipeline = LIGHTING_MODEL::PHYSICALLY_BASED;
+				PBRMaterial pbr{};
+				std::memset(&pbr, 0, sizeof(PBRMaterial));
+				standardMat.shaderMaterialData = pbr;
+				materials[i] = standardMat;
+				continue;
+			}
+			
+			
+			//Create the CLI command
+			const std::string ptFilename{ matName + ".pt" };
+			const std::string outPtPath{ _serialisedModelOutputDirectory + "/" + ptFilename };
+			std::string scriptPath = std::string(NEKI_SOURCE_DIR) + "/util/ntc/train.py";
+			std::string cmd{ "" };
+			cmd += "\"" + std::string(NEKI_PYTHON_EXECUTABLE) + "\" -u \"" + scriptPath + "\"";
+			cmd += " --out \"" + outPtPath + "\"";
+			cmd += " --quality " + std::to_string(_neuralTrainingParameters.quality);
+			cmd += " --hidden_neurons " + std::to_string(_neuralTrainingParameters.hiddenNeurons);
+			cmd += " --epochs " + std::to_string(_neuralTrainingParameters.epochs);
+			if (_flipTextures) { cmd += " --flip"; }
+			
+			std::string texArgs{ " --textures" };
+			std::string chanArgs{ " --channels" };
+			std::string weightArgs{ " --weights" };
+			
+			PBRMaterialNTC pbrNTC{};
+			std::memset(&pbrNTC, 0, sizeof(PBRMaterialNTC));
+			std::size_t currentChannel{ 0 };
+			for (const TextureToTrain& t : texturesToTrain)
+			{
+				texArgs += " \"" + t.path + "\"";
+				chanArgs += " " + std::to_string(t.channels);
+				for (std::size_t c{ 0 }; c < t.channels; ++c)
+				{
+					weightArgs += " " + std::to_string(t.weight);
+				}
+
+				switch (t.type)
+				{
+				case MODEL_TEXTURE_TYPE::BASE_COLOUR:
+				case MODEL_TEXTURE_TYPE::DIFFUSE:
+					pbrNTC.baseColourChannelR = currentChannel;
+					pbrNTC.baseColourChannelG = currentChannel + 1;
+					pbrNTC.baseColourChannelB = currentChannel + 2;
+					pbrNTC.hasBaseColourChannelR = 1;
+					pbrNTC.hasBaseColourChannelG = 1;
+					pbrNTC.hasBaseColourChannelB = 1;
+					break;
+				case MODEL_TEXTURE_TYPE::NORMAL:
+					pbrNTC.normalChannelX = currentChannel;
+					pbrNTC.normalChannelY = currentChannel + 1;
+					pbrNTC.normalChannelZ = currentChannel + 2;
+					pbrNTC.hasNormalChannelX = 1;
+					pbrNTC.hasNormalChannelY = 1;
+					pbrNTC.hasNormalChannelZ = 1;
+					break;
+				case MODEL_TEXTURE_TYPE::EMISSIVE:
+				case MODEL_TEXTURE_TYPE::EMISSION_COLOUR:
+					pbrNTC.emissiveChannelR = currentChannel;
+					pbrNTC.emissiveChannelG = currentChannel + 1;
+					pbrNTC.emissiveChannelB = currentChannel + 2;
+					pbrNTC.hasEmissiveChannelR = 1;
+					pbrNTC.hasEmissiveChannelG = 1;
+					pbrNTC.hasEmissiveChannelB = 1;
+					break;
+				case MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION:
+					pbrNTC.aoChannel = currentChannel;
+					pbrNTC.hasAoChannel = 1;
+					break;
+				case MODEL_TEXTURE_TYPE::DISPLACEMENT:
+					pbrNTC.displacementChannel = currentChannel;
+					pbrNTC.hasDisplacementChannel = 1;
+					break;
+				case MODEL_TEXTURE_TYPE::ROUGHNESS:
+					pbrNTC.roughnessChannel = currentChannel;
+					pbrNTC.hasRoughnessChannel = 1;
+					break;
+				case MODEL_TEXTURE_TYPE::METALNESS:
+					pbrNTC.metalnessChannel = currentChannel;
+					pbrNTC.hasMetalnessChannel = 1;
+					break;
+				default:
+					break;
+				}
+				currentChannel += t.channels;
+			}
+			cmd += texArgs + chanArgs + weightArgs;
+			cmd += " 2>&1";
+			
+			std::cout << "[NTC] Training neural material: " << matName << "...\n";
+			std::cout << "[NTC] Generated command: " << cmd << '\n';
+			FILE* const pipe{ POPEN(cmd.c_str(), "r") };
+			if (!pipe)
+			{
+				throw std::runtime_error("Failed to open pipe for NTC training subprocess.");
+			}
+			char buffer[512];
+			while (fgets(buffer, sizeof(buffer), pipe) != nullptr)
+			{
+				std::cout << "[Python] " << buffer;
+			}
+			const int err{ PCLOSE(pipe) };
+			if (err != 0)
+			{
+				throw std::runtime_error("NTC training failed with exit code: " + std::to_string(err));
+			}
+			
+			CPUMaterialNTC ntcMat;
+			ntcMat.name = matName;
+			ntcMat.pipeline = LIGHTING_MODEL::PHYSICALLY_BASED;
+			ntcMat.materialDataFilepath = outPtPath;
+			ntcMat.numChannels = currentChannel;
+			ntcMat.shaderMaterialData = pbrNTC;
+			materials[i] = ntcMat;
+		}
+		
+		//ProcessMesh hardcodes the .nkmaterial extension into the materialFilepath field even if it should be .nkmaterialntc, so it needs to be fixed
+		//todo: find a better way of doing this - it's tricky though as it cannot be assumed that all meshes in the LoadNonNKModelDataNTC function will have an NTC material (as some materials may be deemed unsuitable for NTC)
+		for (CPUMeshData& mesh : cpuMeshData)
+		{
+			const std::filesystem::path meshMatPath{ mesh.materialFilepath };
+			const std::string stemName{ meshMatPath.stem().string() };
+
+			for (const std::variant<CPUMaterial, CPUMaterialNTC>& matVariant : materials)
+			{
+				if (std::holds_alternative<CPUMaterialNTC>(matVariant))
+				{
+					const CPUMaterialNTC& ntcMat{ std::get<CPUMaterialNTC>(matVariant) };
+					if (ntcMat.name == stemName)
+					{
+						mesh.materialFilepath = _serialisedModelOutputDirectory + "/" + stemName + ".nkmaterialntc";
+						break;
+					}
+				}
+			}
+		}
+		
+		return std::make_pair<std::vector<CPUMeshData>, std::vector<std::variant<CPUMaterial, CPUMaterialNTC>>>(std::move(cpuMeshData), std::move(materials));
+	}
+
+	
 
 	void ModelLoader::ProcessNode(const aiNode* _node, const aiScene* _scene, std::vector<CPUMeshData>* _outMeshData, const std::string& _outputMaterialDirectory)
 	{

@@ -259,6 +259,50 @@ target_link_libraries(Neki PUBLIC ImGui)
 
 
 
+# ==========================================
+# NTC Python Virtual Environment Setup
+# ==========================================
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+# Define the venv directory inside the build folder
+set(NTC_VENV_DIR "${CMAKE_BINARY_DIR}/ntc_venv")
+
+# Determine the correct Python executable path based on the OS
+if(WIN32)
+    set(NTC_PYTHON_EXE "${NTC_VENV_DIR}/Scripts/python.exe")
+else()
+    set(NTC_PYTHON_EXE "${NTC_VENV_DIR}/bin/python")
+endif()
+
+# Convert to forward slashes so it doesn't break C++ string escaping
+file(TO_CMAKE_PATH "${NTC_PYTHON_EXE}" NTC_PYTHON_EXE_FWD)
+
+# Define the custom command to create the venv and install requirements.
+# This uses a marker file so it only runs once, unless requirements.txt changes.
+set(NTC_REQUIREMENTS "${CMAKE_CURRENT_SOURCE_DIR}/util/ntc/requirements.txt")
+set(NTC_VENV_MARKER "${NTC_VENV_DIR}/venv.marker")
+
+add_custom_command(
+        OUTPUT "${NTC_VENV_MARKER}"
+        COMMAND ${Python3_EXECUTABLE} -m venv "${NTC_VENV_DIR}"
+        COMMAND "${NTC_PYTHON_EXE}" -m pip install --upgrade pip
+        COMMAND "${NTC_PYTHON_EXE}" -m pip install -r "${NTC_REQUIREMENTS}"
+        COMMAND ${CMAKE_COMMAND} -E touch "${NTC_VENV_MARKER}"
+        DEPENDS "${NTC_REQUIREMENTS}"
+        COMMENT "Setting up Python venv for NTC and installing dependencies (PyTorch is large, this may take a few minutes)..."
+)
+
+# Create a target for the venv setup
+add_custom_target(NTCVenvSetup ALL DEPENDS "${NTC_VENV_MARKER}")
+
+# Make the Neki library depend on this setup, so the venv is built before the engine runs
+add_dependencies(Neki NTCVenvSetup)
+
+# Pass the venv Python executable path to C++
+target_compile_definitions(Neki PUBLIC NEKI_PYTHON_EXECUTABLE=\"${NTC_PYTHON_EXE_FWD}\")
+
+
+
 #Compiles a given HLSL shader source file to SPIR-V and/or DXIL
 #Usage:
 #- SOURCE_FILE: Path to the HLSL shader file
@@ -588,7 +632,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     
     
     
-    #Demos
     add_subdirectory(NTCDemo)
+#    add_subdirectory(AssetCompiler)
 
 endif()

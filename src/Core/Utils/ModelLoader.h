@@ -40,7 +40,10 @@ namespace NK
 		[[nodiscard]] static std::variant<CPUMaterial, CPUMaterialNTC> GetMaterialHeader(const std::string& _filepath);
 		
 		//Serialise a model of any type (.gltf, .fbx, .obj, etc.) from _inputFilepath into a .nkmodel file at _outputFilepath
-		static void SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _outputTextureDirectory);
+		static void SerialiseNKModel(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures);
+		
+		//Serialise a model of any type (.gltf, .fbx, .obj, etc.) from _inputFilepath into a .nkmodel file at _outputFilepath with neural materials
+		static void SerialiseNKModelNTC(const std::string& _inputFilepath, const std::string& _outputFilepath, bool _flipFaceWinding, bool _flipTextures, const NeuralTrainingParameters& _neuralTrainingParameters);
 
 		//Get the header of a .nkmodel
 		static CPUModel GetNKModelHeader(const std::string& _filepath);
@@ -51,7 +54,8 @@ namespace NK
 		
 
 	private:
-		[[nodiscard]] static std::pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>> LoadNonNKModelData(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _serialisedTextureOutputDirectory);
+		[[nodiscard]] static std::pair<std::vector<CPUMeshData>, std::vector<CPUMaterial>> LoadNonNKModelData(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _serialisedModelOutputDirectory);
+		[[nodiscard]] static std::pair<std::vector<CPUMeshData>, std::vector<std::variant<CPUMaterial, CPUMaterialNTC>>> LoadNonNKModelDataNTC(const std::string& _filepath, bool _flipFaceWinding, bool _flipTextures, const std::string& _serialisedModelOutputDirectory, const NeuralTrainingParameters& _neuralTrainingParameters);
 		
 		//Recursively process nodes in the Assimp scene graph
 		static void ProcessNode(const aiNode* _node, const aiScene* _scene, std::vector<CPUMeshData>* _outMeshData, const std::string& _outputMaterialDirectory);

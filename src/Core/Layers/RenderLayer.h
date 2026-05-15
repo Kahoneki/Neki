@@ -100,34 +100,7 @@ namespace NK
 		void OnEntityDestroy(const EntityDestroyEvent& _event);
 		void OnComponentRemove(const ComponentRemoveEvent& _event);
 		void OnSceneLoad(const SceneLoadEvent& _event);
-
-
-		//VERY temp
-		Neural::NTCModel* m_ntcModel;
-		UniquePtr<IBuffer> m_latentTexBuffer;
-		void* m_latentTexBufferMap;
-		UniquePtr<IBufferView> m_latentTexBufferView;
-		UniquePtr<IBuffer> m_latentTexBuffer2;
-		void* m_latentTexBufferMap2;
-		UniquePtr<IBufferView> m_latentTexBufferView2;
-		UniquePtr<IBuffer> m_mlpBuffer;
-		UniquePtr<IBufferView> m_mlpBufferView;
-		std::uint32_t m_layer0_W_offset;
-		std::uint32_t m_layer0_B_offset;
-		std::uint32_t m_layer1_W_offset;
-		std::uint32_t m_layer1_B_offset;
-		std::uint32_t m_layer2_W_offset;
-		std::uint32_t m_layer2_B_offset;
-		std::uint32_t m_g0Channels;
-		std::uint32_t m_g1Channels;
-		std::uint32_t m_g0QuantLevels;
-		std::uint32_t m_g1QuantLevels;
-		std::uint32_t m_g0Resolution;
-		std::uint32_t m_imageResolution;
-		std::uint32_t m_numOctaves;
-		std::uint32_t m_tileSize;
-		std::uint32_t m_numLayers;
-		std::uint32_t m_numHiddenNeurons;
+		
 		
 		//Dependency injections
 		IAllocator& m_allocator;
@@ -246,6 +219,7 @@ namespace NK
 		UniquePtr<IShader> m_skyboxFragShader;
 		UniquePtr<IShader> m_blinnPhongFragShader;
 		UniquePtr<IShader> m_pbrFragShader;
+		UniquePtr<IShader> m_ntcPBRFragShader;
 		UniquePtr<IShader> m_postprocessFragShader;
 		UniquePtr<IShader> m_meshVisibilityFragShader;
 		UniquePtr<IShader> m_prefixSumCompShader;
@@ -282,32 +256,10 @@ namespace NK
 			SamplerIndex samplerIndex;
 	
 			float maxIrradiance;
-			
-			//todo: VERY temp
-			// std::uint32_t g0BufferIndex;
-			// std::uint32_t g1BufferIndex;
-			// std::uint32_t mlpBufferIndex;
-			// std::uint32_t layer0_W_offset;
-			// std::uint32_t layer0_B_offset;
-			// std::uint32_t layer1_W_offset;
-			// std::uint32_t layer1_B_offset;
-			// std::uint32_t layer2_W_offset;
-			// std::uint32_t layer2_B_offset;
-			// std::uint32_t g0Channels;
-			// std::uint32_t g1Channels;
-			// std::uint32_t g0QuantLevels;
-			// std::uint32_t g1QuantLevels;
-			// std::uint32_t g0Resolution;
-			// std::uint32_t imageResolution;
-			// std::uint32_t numOctaves;
-			// std::uint32_t tileSize;
-			// std::uint32_t numLayers;
-			// std::uint32_t hiddenNeurons;
-			// std::uint32_t frameIndex;
 		};
 		UniquePtr<IRootSignature> m_meshPassRootSignature;
 		
-		struct NTCPassPushConstantData
+		struct NTCPassPushConstantData : public MeshPassPushConstantData
 		{
 			std::uint32_t g0BufferIndex;
 			std::uint32_t g1BufferIndex;
@@ -318,6 +270,17 @@ namespace NK
 			std::uint32_t layer1_B_offset;
 			std::uint32_t layer2_W_offset;
 			std::uint32_t layer2_B_offset;
+			std::uint32_t g0Channels;
+			std::uint32_t g1Channels;
+			std::uint32_t g0QuantLevels;
+			std::uint32_t g1QuantLevels;
+			std::uint32_t g0Resolution;
+			std::uint32_t imageResolution;
+			std::uint32_t numOctaves;
+			std::uint32_t tileSize;
+			std::uint32_t numLayers;
+			std::uint32_t hiddenNeurons;
+			std::uint32_t frameIndex;
 		};
 		UniquePtr<IRootSignature> m_NTCPassRootSignature;
 
@@ -356,6 +319,7 @@ namespace NK
 		UniquePtr<IPipeline> m_skyboxPipeline;
 		UniquePtr<IPipeline> m_blinnPhongPipeline;
 		UniquePtr<IPipeline> m_pbrPipeline;
+		UniquePtr<IPipeline> m_ntcPBRPipeline;
 		UniquePtr<IPipeline> m_prefixSumPipeline;
 		UniquePtr<IPipeline> m_postprocessPipeline;
 

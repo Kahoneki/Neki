@@ -1,6 +1,8 @@
 #include "GPUUploader.h"
 
 #include <Core/Utils/ImageLoader.h>
+#include <Core/Utils/NTCLoader.h>
+#include <Core/Utils/NTCMatrixLayerConverter.h>
 #include <RHI/IBuffer.h>
 #include <RHI/IBufferView.h>
 #include <RHI/ICommandBuffer.h>
@@ -14,6 +16,9 @@
 #include <ranges>
 #include <stdexcept>
 
+#ifdef NEKI_VULKAN_SUPPORTED
+	#include <RHI-Vulkan/VulkanDevice.h>
+#endif
 
 
 namespace NK
@@ -381,6 +386,175 @@ namespace NK
 	}
 
 	
+	
+	UniquePtr<GPUMaterial> GPUUploader::EnqueueMaterialDataUploadNTC(const CPUMaterialNTC* _cpuMaterial)
+	{
+	    UniquePtr<GPUMaterial> gpuMaterial{ NK_NEW(GPUMaterial) };
+	    gpuMaterial->lightingModel = _cpuMaterial->pipeline;
+	    gpuMaterial->isNTC = true;
+
+	    Neural::NTCModel* ntcModel{ Neural::NTCLoader::LoadMaterial(_cpuMaterial->materialDataFilepath) };
+
+	    BufferDesc materialBufferDesc{};
+	    materialBufferDesc.type = MEMORY_TYPE::DEVICE;
+	    materialBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
+	    
+	    if (gpuMaterial->lightingModel == LIGHTING_MODEL::PHYSICALLY_BASED)
+	    {
+	        materialBufferDesc.size = sizeof(PBRMaterialNTC);
+	        gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
+	        PBRMaterialNTC pbrMat{ std::get<PBRMaterialNTC>(_cpuMaterial->shaderMaterialData) };
+	        EnqueueBufferDataUpload(&pbrMat, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
+	    }
+	    else
+	    {
+	        materialBufferDesc.size = sizeof(BlinnPhongMaterialNTC);
+	        gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
+	        BlinnPhongMaterialNTC bpMat{ std::get<BlinnPhongMaterialNTC>(_cpuMaterial->shaderMaterialData) };
+	        EnqueueBufferDataUpload(&bpMat, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
+	    }
+
+	    m_commandBuffer->TransitionBarrier(gpuMaterial->materialBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::CONSTANT_BUFFER);
+
+	    BufferViewDesc materialBufferViewDesc{};
+	    materialBufferViewDesc.size = materialBufferDesc.size;
+	    materialBufferViewDesc.type = BUFFER_VIEW_TYPE::UNIFORM;
+	    materialBufferViewDesc.offset = 0;
+	    gpuMaterial->materialBufferView = m_device.CreateBufferView(gpuMaterial->materialBuffer.get(), materialBufferViewDesc);
+	    gpuMaterial->bufferIndex = gpuMaterial->materialBufferView->GetIndex();
+
+	    //Populate NTC metadata
+	    gpuMaterial->g0Channels = ntcModel->header.g0Channels;
+	    gpuMaterial->g1Channels = ntcModel->header.g1Channels;
+	    gpuMaterial->g0QuantLevels = ntcModel->header.g0QuantLevels;
+	    gpuMaterial->g1QuantLevels = ntcModel->header.g1QuantLevels;
+	    gpuMaterial->g0Resolution = ntcModel->header.baseImageRes;
+	    gpuMaterial->imageResolution = ntcModel->header.baseImageRes;
+	    gpuMaterial->numOctaves = ntcModel->header.numOctaves;
+	    gpuMaterial->tileSize = ntcModel->header.tileSize;
+	    gpuMaterial->numLayers = ntcModel->header.numLinearLayers;
+	    gpuMaterial->hiddenNeurons = ntcModel->header.hiddenNeurons;
+
+		//Upload G0 buffer (combining all 4 feature levels into a single buffer)
+	    std::size_t g0TotalSize{ 0 };
+	    for(std::size_t i{ 0 }; i < 4; ++i)
+	    {
+		    g0TotalSize += ntcModel->featureLevels[i].g0.numElementsPacked;
+	    }
+	    BufferDesc g0Desc{};
+	    g0Desc.size = g0TotalSize;
+	    g0Desc.type = MEMORY_TYPE::DEVICE;
+	    g0Desc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
+	    gpuMaterial->g0Buffer = m_device.CreateBuffer(g0Desc);
+	    std::vector<unsigned char> g0Data(g0TotalSize);
+	    std::size_t g0Offset{ 0 };
+	    for(std::size_t i{ 0 }; i < 4; ++i)
+	    {
+	        std::memcpy(g0Data.data() + g0Offset, ntcModel->featureLevels[i].g0.data, ntcModel->featureLevels[i].g0.numElementsPacked);
+	        g0Offset += ntcModel->featureLevels[i].g0.numElementsPacked;
+	    }
+	    EnqueueBufferDataUpload(g0Data.data(), gpuMaterial->g0Buffer.get(), RESOURCE_STATE::UNDEFINED);
+	    m_commandBuffer->TransitionBarrier(gpuMaterial->g0Buffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::SHADER_RESOURCE);
+	    BufferViewDesc g0ViewDesc{};
+	    g0ViewDesc.size = g0TotalSize;
+	    g0ViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
+	    g0ViewDesc.offset = 0;
+	    g0ViewDesc.stride = 0; //ByteAddressBuffer
+	    gpuMaterial->g0BufferView = m_device.CreateBufferView(gpuMaterial->g0Buffer.get(), g0ViewDesc);
+
+	    //Upload G1 buffer (combining all 4 feature levels into a single buffer)
+	    std::size_t g1TotalSize{ 0 };
+	    for(std::size_t i{ 0 }; i < 4; ++i)
+	    {
+		    g1TotalSize += ntcModel->featureLevels[i].g1.numElementsPacked;
+	    }
+	    BufferDesc g1Desc{};
+	    g1Desc.size = g1TotalSize;
+	    g1Desc.type = MEMORY_TYPE::DEVICE;
+	    g1Desc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
+	    gpuMaterial->g1Buffer = m_device.CreateBuffer(g1Desc);
+	    std::vector<unsigned char> g1Data(g1TotalSize);
+	    std::size_t g1Offset{ 0 };
+	    for(std::size_t i = 0; i < 4; ++i)
+	    {
+	        std::memcpy(g1Data.data() + g1Offset, ntcModel->featureLevels[i].g1.data, ntcModel->featureLevels[i].g1.numElementsPacked);
+	        g1Offset += ntcModel->featureLevels[i].g1.numElementsPacked;
+	    }
+	    EnqueueBufferDataUpload(g1Data.data(), gpuMaterial->g1Buffer.get(), RESOURCE_STATE::UNDEFINED);
+	    m_commandBuffer->TransitionBarrier(gpuMaterial->g1Buffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::SHADER_RESOURCE);
+	    BufferViewDesc g1ViewDesc{};
+	    g1ViewDesc.size = g1TotalSize;
+	    g1ViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
+	    g1ViewDesc.offset = 0;
+	    g1ViewDesc.stride = 0;
+	    gpuMaterial->g1BufferView = m_device.CreateBufferView(gpuMaterial->g1Buffer.get(), g1ViewDesc);
+
+	    //Upload MLP Buffer (converting for cooperative matrix)
+	    std::vector<Neural::ConvertedLayer> convertedLayers;
+	    std::size_t mlpTotalSize{ 0 };
+	    if (VkDevice vkDevice{ dynamic_cast<VulkanDevice&>(m_device).GetDevice() })
+	    {
+		    for (const Neural::NTCLinearLayer& layer : ntcModel->mlp)
+		    {
+		    	Neural::ConvertedLayer convertedLayer{ Neural::NTCMatrixLayerConverter::ConvertLayer(vkDevice, layer.weights.data(), layer.weights.size() * sizeof(std::uint16_t), layer.biases.data(), layer.biases.size() * sizeof(std::uint16_t), layer.outFeatures, layer.inFeatures) };
+		    	convertedLayers.push_back(convertedLayer);
+		    	mlpTotalSize = (mlpTotalSize + 15) & ~15;
+		    	mlpTotalSize += convertedLayer.weightData.size();
+		    	mlpTotalSize = (mlpTotalSize + 15) & ~15;
+		    	mlpTotalSize += convertedLayer.biasData.size();
+		    }
+	    }
+	    else
+	    {
+		    throw std::runtime_error("Neural materials currently require Vulkan for cooperative matrix support.");
+	    }
+	    BufferDesc mlpDesc{};
+	    mlpDesc.size = mlpTotalSize;
+	    mlpDesc.type = MEMORY_TYPE::DEVICE;
+	    mlpDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::STORAGE_BUFFER_READ_ONLY_BIT;
+	    gpuMaterial->mlpBuffer = m_device.CreateBuffer(mlpDesc);
+	    std::vector<unsigned char> mlpData(mlpTotalSize, 0);
+	    std::size_t currentMlpOffset{ 0 };
+	    auto appendData{ [&](const std::vector<std::uint8_t>& data, std::uint32_t& outOffset)
+		{
+	        currentMlpOffset = (currentMlpOffset + 15) & ~15; //16-byte align
+	        outOffset = currentMlpOffset;
+	        std::memcpy(mlpData.data() + currentMlpOffset, data.data(), data.size());
+	        currentMlpOffset += data.size();
+	    } };
+	    if (convertedLayers.size() > 0)
+	    {
+	        appendData(convertedLayers[0].weightData, gpuMaterial->layer0_W_offset);
+	        appendData(convertedLayers[0].biasData, gpuMaterial->layer0_B_offset);
+	    }
+	    if (convertedLayers.size() > 1)
+	    {
+	        appendData(convertedLayers[1].weightData, gpuMaterial->layer1_W_offset);
+	        appendData(convertedLayers[1].biasData, gpuMaterial->layer1_B_offset);
+	    }
+	    if (convertedLayers.size() > 2)
+	    {
+	        appendData(convertedLayers[2].weightData, gpuMaterial->layer2_W_offset);
+	        appendData(convertedLayers[2].biasData, gpuMaterial->layer2_B_offset);
+	    }
+
+	    EnqueueBufferDataUpload(mlpData.data(), gpuMaterial->mlpBuffer.get(), RESOURCE_STATE::UNDEFINED);
+	    m_commandBuffer->TransitionBarrier(gpuMaterial->mlpBuffer.get(), RESOURCE_STATE::COPY_DEST, RESOURCE_STATE::SHADER_RESOURCE);
+
+	    BufferViewDesc mlpViewDesc{};
+	    mlpViewDesc.size = mlpTotalSize;
+	    mlpViewDesc.type = BUFFER_VIEW_TYPE::STORAGE_READ_ONLY;
+	    mlpViewDesc.offset = 0;
+	    mlpViewDesc.stride = 0;
+	    gpuMaterial->mlpBufferView = m_device.CreateBufferView(gpuMaterial->mlpBuffer.get(), mlpViewDesc);
+
+	    //Free cpu-side ntc model (todo: do we actually want to do this? (streaming purposes?))
+	    Neural::NTCLoader::FreeMaterial(ntcModel);
+
+	    return gpuMaterial;
+	}
+
+
 	
 	UniquePtr<GPUTexture> GPUUploader::EnqueueTextureDataUpload(const ImageData* _imgData)
 	{
