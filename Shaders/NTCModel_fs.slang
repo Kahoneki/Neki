@@ -17,8 +17,9 @@ struct VertexOutput
 	float3 fragPos : FRAG_POS;
 	float3 worldNormal : WORLD_NORMAL;
 	float3 camPos : CAM_POS;
-	float3x3 TBN : TBN;
-	float3 bitangent : BITANGENT;
+    float3 TBN_T : TBN_T;
+    float3 TBN_B : TBN_B;
+    float3 TBN_N : TBN_N;
 };
 
 struct LightData
@@ -37,7 +38,6 @@ struct LightData
     uint shadowMapIndex;
     float3 padding;
 };
-
 
 [[vk::binding(0,0)]] ByteAddressBuffer g0Buffer[] : register(t0, space0);
 [[vk::binding(0,0)]] ByteAddressBuffer g1Buffer[] : register(t0, space0);
@@ -86,6 +86,12 @@ struct PushConstants
     uint imageResolution;
     uint numOctaves;
     uint tileSize;
+    
+    uint g0_offsets[4];
+    uint g1_offsets[4];
+
+    float lod;
+    uint featureLevel;
 
     uint numLayers;
     uint hiddenNeurons;
@@ -94,25 +100,32 @@ struct PushConstants
 [[vk::push_constant]] PushConstants pc;
 
 
+float CalculateLevelOfDetail(float2 uv, float2 textureRes)
+{
+    float2 dx = ddx(uv * textureRes);
+    float2 dy = ddy(uv * textureRes);
+    float dxx = dot(dx, dx);
+    float dyy = dot(dy, dy);
+    float rho = max(dxx, dyy);
+    float lod = 0.5 * log2(rho);
+    return max(0.0, lod);
+}
+
+
 float2 RandomFloat2(float2 p)
 {
     float3 p3 = frac(float3(p.xyx) * float3(0.1031f, 0.1030f, 0.0973f));
     p3 += dot(p3, p3.yzx + 33.33f);
-    return frac((p3.xx + p3.yz) * p3.zy); //[0,1]
+    return frac((p3.xx + p3.yz) * p3.zy);
 }
 
 float2 RandomGaussianFloat2(float2 p)
 {
     float2 u = RandomFloat2(p);
-
-    // Prevent log(0)
     u.x = max(u.x, 1e-6f);
-
-    // Box-Muller transform
     const float TWO_PI = 6.28318530718f;
     float r = sqrt(-2.0f * log(u.x));
     float theta = TWO_PI * u.y;
-
     return float2(r * cos(theta), r * sin(theta));
 }
 
@@ -124,40 +137,34 @@ half HardGELU(half x)
 
 
 static const uint MAX_G0_CHANNELS = 16;
-struct G0Features
-{
-	float channels[MAX_G0_CHANNELS];
-};
+struct G0Features { float channels[MAX_G0_CHANNELS]; };
 
 static const uint MAX_G1_CHANNELS = 20;
-struct G1Features
-{
-	float channels[MAX_G1_CHANNELS];
-};
+struct G1Features { float channels[MAX_G1_CHANNELS]; };
 
-G0Features SampleG0(int2 p)
+
+G0Features SampleG0(int2 p, uint fl)
 {
 	G0Features output;
-	uint pixelIdx = p.y * pc.g0Resolution + p.x;
 
-    // Calculate bytes per pixel based on channels and quant levels
-    uint bitsPerChannel = (pc.g0QuantLevels <= 4) ? 2 : 4; // uniform across material - no warp divergence
+    uint g0ResAtLevel = pc.g0Resolution >> fl;
+	uint pixelIdx = p.y * g0ResAtLevel + p.x;
+
+    uint bitsPerChannel = (pc.g0QuantLevels <= 4) ? 2 : 4;
     uint bitsPerPixel = pc.g0Channels * bitsPerChannel;
-    uint bytesPerPixel = (bitsPerPixel + 7) / 8; //Round up to nearest byte
+    uint bytesPerPixel = (bitsPerPixel + 7) / 8;
 
-	uint byteOffset = pixelIdx * bytesPerPixel;
+	uint byteOffset = pc.g0_offsets[fl] + (pixelIdx * bytesPerPixel);
 	uint alignedOffset = byteOffset & ~3;
 	uint byteShift = (byteOffset & 3) * 8;
 
-    // Load enough words to cover all channels
     uint numWords = (bytesPerPixel + 3) / 4 + 1;
-    uint words[4]; //4 = max needed
+    uint words[4];
     for (uint w = 0; w < min(numWords, 4); ++w)
     {
         words[w] = g0Buffer[pc.g0BufferIndex].Load(alignedOffset + (w * 4));
     }
 
-    // Unpack channels
     float scale = 1.0 / float(pc.g0QuantLevels - 1);
     uint bitPos = byteShift;
     for (uint c = 0; c < pc.g0Channels; ++c)
@@ -166,51 +173,42 @@ G0Features SampleG0(int2 p)
         uint bitOffsetInByte = (bitsPerChannel == 4) ? (4 - (bitPos % 8)) : (6 - (bitPos % 8));
         uint bitOffset = (bitPos / 8 % 4) * 8 + bitOffsetInByte;
         uint raw;
-        if (bitsPerChannel == 2)
-        {
-            raw = (words[wordIndex] >> bitOffset) & 0x3;
-        }
-        else
-        {
-            raw = (words[wordIndex] >> bitOffset) & 0xF;
-        }
+        if (bitsPerChannel == 2) { raw = (words[wordIndex] >> bitOffset) & 0x3; }
+        else { raw = (words[wordIndex] >> bitOffset) & 0xF; }
 
         output.channels[c] = float(raw) * scale;
         bitPos += bitsPerChannel;
     }
 
-    // Zero out unused channels
     for (uint c = pc.g0Channels; c < MAX_G0_CHANNELS; ++c)
-    {
         output.channels[c] = 0.0f;
-    }
 
     return output;
 }
 
-G1Features SampleG1(int2 p)
+
+G1Features SampleG1(int2 p, uint fl)
 {
     G1Features output;
-    uint pixelIdx = p.y * (pc.g0Resolution / 2) + p.x;
 
-    // Calculate bytes per pixel based on channels and quant levels
-    uint bitsPerChannel = (pc.g1QuantLevels <= 4) ? 2 : 4; // uniform across material - no warp divergence
+    uint g0ResAtLevel = pc.g0Resolution >> fl;
+    uint pixelIdx = p.y * (g0ResAtLevel / 2) + p.x; 
+
+    uint bitsPerChannel = (pc.g1QuantLevels <= 4) ? 2 : 4;
     uint bitsPerPixel = pc.g1Channels * bitsPerChannel;
-    uint bytesPerPixel = (bitsPerPixel + 7) / 8; // Round up to nearest byte
+    uint bytesPerPixel = (bitsPerPixel + 7) / 8; 
 
-    uint byteOffset = pixelIdx * bytesPerPixel;
+    uint byteOffset = pc.g1_offsets[fl] + (pixelIdx * bytesPerPixel);
     uint alignedOffset = byteOffset & ~3;
     uint byteShift = (byteOffset & 3) * 8;
 
-    // Load enough words to cover all channels
     uint numWords = (bytesPerPixel + 3) / 4 + 1;
-    uint words[4]; // 4 = max needed
+    uint words[4]; 
     for (uint w = 0; w < min(numWords, 4); ++w)
     {
         words[w] = g1Buffer[pc.g1BufferIndex].Load(alignedOffset + (w * 4));
     }
 
-    // Unpack channels
     float scale = 1.0 / float(pc.g1QuantLevels - 1);
     uint bitPos = byteShift;
     for (uint c = 0; c < pc.g1Channels; ++c)
@@ -219,40 +217,27 @@ G1Features SampleG1(int2 p)
         uint bitOffsetInByte = (bitsPerChannel == 4) ? (4 - (bitPos % 8)) : (6 - (bitPos % 8));
         uint bitOffset = (bitPos / 8 % 4) * 8 + bitOffsetInByte;
         uint raw;
-        if (bitsPerChannel == 2)
-        {
-            raw = (words[wordIndex] >> bitOffset) & 0x3;
-        }
-        else
-        {
-            raw = (words[wordIndex] >> bitOffset) & 0xF;
-        }
+        if (bitsPerChannel == 2) { raw = (words[wordIndex] >> bitOffset) & 0x3; }
+        else { raw = (words[wordIndex] >> bitOffset) & 0xF; }
 
         output.channels[c] = float(raw) * scale;
         bitPos += bitsPerChannel;
     }
 
-    // Zero out unused channels
     for (uint c = pc.g1Channels; c < MAX_G1_CHANNELS; ++c)
-    {
         output.channels[c] = 0.0f;
-    }
 
     return output;
 }
 
 
 
-CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
+CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
 {
     uv = frac(uv);
-    
+    uint featureLevel = clamp(pc.featureLevel, 0, 3);
+
 	float2 p = uv * float(pc.imageResolution);
-    
-    //Stochastic filtering
-    // float2 filterOffset = RandomGaussianFloat2(uv + pc.frameIndex) * 0.1f;
-    // p += filterOffset;
-    
     p = clamp(p, float2(0.0f, 0.0f), float2(pc.imageResolution - 1, pc.imageResolution - 1));
 	float2 local = fmod(p, pc.tileSize) / pc.tileSize;
     local = local * 2.0f - 1.0f;
@@ -271,7 +256,7 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
         encodings[i*4+3] = half(cos(scale * local.y));
         offset += 4;
 	}
-    encodings[offset++] = half(0.0f); // normalised lod
+    encodings[offset++] = half(clamp(pc.lod, 0.0f, 1.0f)); // normalised lod
 
     // G0
 	int w = pc.g0Resolution;
@@ -282,13 +267,13 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
 	int y0 = clamp(int(floor(p.y)), 0, h-1);
 	int y1 = clamp(y0+1, 0, h-1);
 	{
-		G0Features s00 = SampleG0(int2(x0, y0));
+		G0Features s00 = SampleG0(int2(x0, y0), featureLevel);
 		for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+c] = half(s00.channels[c]); }
-        G0Features s01 = SampleG0(int2(x0, y1));
+        G0Features s01 = SampleG0(int2(x0, y1), featureLevel);
         for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(1*pc.g0Channels)+c] = half(s01.channels[c]); }
-        G0Features s10 = SampleG0(int2(x1, y0));
+        G0Features s10 = SampleG0(int2(x1, y0), featureLevel);
         for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(2*pc.g0Channels)+c] = half(s10.channels[c]); }
-        G0Features s11 = SampleG0(int2(x1, y1));
+        G0Features s11 = SampleG0(int2(x1, y1), featureLevel);
         for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(3*pc.g0Channels)+c] = half(s11.channels[c]); }
     }
     offset += pc.g0Channels*4;
@@ -304,10 +289,10 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
 	y1 = clamp(y0+1, 0, h-1);
 	float2 weight = float2(fx-x0, fy-y0);
 	{
-		G1Features s00 = SampleG1(int2(x0, y0));
-		G1Features s01 = SampleG1(int2(x0, y1));
-		G1Features s10 = SampleG1(int2(x1, y0));
-		G1Features s11 = SampleG1(int2(x1, y1));
+		G1Features s00 = SampleG1(int2(x0, y0), featureLevel);
+		G1Features s01 = SampleG1(int2(x0, y1), featureLevel);
+		G1Features s10 = SampleG1(int2(x1, y0), featureLevel);
+		G1Features s11 = SampleG1(int2(x1, y1), featureLevel);
 		for (uint c=0; c<pc.g1Channels; ++c)
 		{
 			float latent = (1-weight.x) * (1-weight.y) * s00.channels[c];
@@ -323,7 +308,6 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
     {
         encodings[c] = half(0.0);
     }
-	
 	
 	//MLP
     CoopVec<float16_t, HIDDEN_DIM> hidden0 = coopVecMatMulAdd<float16_t, HIDDEN_DIM, MAX_INPUTS, float16_t>(
@@ -397,9 +381,7 @@ bool PointInPointLightShadow(float3 _fragPos, float3 _lightPos, uint _shadowInde
     float3 absVec = abs(lightToFrag);
     float localZ = max(absVec.x, max(absVec.y, absVec.z));
 
-    // Convert linear distance to non-linear depth (0..1) based on Perspective Projection
     float normDepth = (LIGHT_FAR / (LIGHT_FAR - LIGHT_NEAR)) - ((LIGHT_FAR * LIGHT_NEAR) / (LIGHT_FAR - LIGHT_NEAR)) / localZ;
-
     float closestDepth = g_cubemaps[NonUniformResourceIndex(_shadowIndex)].Sample(_samplerState, lightToFrag).r;
 
     float bias = 0.00002f;
@@ -447,38 +429,29 @@ float3 FresnelSchlick(float _cosTheta, float3 _F0)
 
 float3 CalculateDirectLight(float3 _albedo, float _metallic, float _roughness, float3 _F0, float3 _N, float3 _V, float3 _L, float3 _radiance)
 {
-    // Intermediate vectors
     float3 H = normalize(_V + _L);
     float NDotL = max(dot(_N, _L), 0.0);
     float NDotV = max(dot(_N, _V), 0.0);
     float HDotV = max(dot(H, _V), 0.0);
 
-    //----SPECULAR----//
-    // DGF
     float D = DistributionGGX(_N, H, _roughness);
     float G = GeometrySmith(_N, _V, _L, _roughness);
     float3 F = FresnelSchlick(HDotV, _F0);
 
-    // Cook-Torrance Specular BRDF
     float3 numerator = D * G * F;
-    float denominator = max(4.0 * NDotV * NDotL, 0.0001); // Prevent divide by zero
+    float denominator = max(4.0 * NDotV * NDotL, 0.0001); 
     float3 specular = numerator / denominator;
 
-    //----DIFFUSE----//
-    float3 kS = F;                                  // specular power determined by fresnel
-    float3 kD = 1.0 - kS;                           // gotta conserve that energy
-    kD *= (1.0 - _metallic);                        // metals absorb all refracted light and convert to heat
-    float3 diffuse = kD * _albedo / 3.141592653589; // todo: read this https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
+    float3 kS = F;                                  
+    float3 kD = 1.0 - kS;                           
+    kD *= (1.0 - _metallic);                        
+    float3 diffuse = kD * _albedo / 3.141592653589; 
 
-    float angleAttenuation = NDotL;
     return (diffuse + specular) * _radiance * NDotL;
 }
 
 float3 FresnelSchlickRoughness(float _cosTheta, float3 _F0, float _roughness)
 {
-    // For smooth surfaces, reflectivity at 90 degrees is 1.0 (pure white)
-    // For rough surfaces, dampen the 1.0 based on roughness
-    // I.e.: reflectivity increases as angle increases and decreases as roughness increases
     return _F0 + (max(1.0 - _roughness, _F0) - _F0) * pow(clamp(1.0 - _cosTheta, 0.0, 1.0), 5.0);
 }
 
@@ -487,18 +460,15 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
     float NDotV = max(dot(_N, _V), 0.0);
     float3 R = reflect(-_V, _N);
 
-    // Specular IBL (prefiltered environment map + brdf lut)
-    const float MAX_REFLECTION_LOD = 4.0; // todo: use the actual number of mip levels
+    const float MAX_REFLECTION_LOD = 4.0; 
     float3 prefilteredColour = g_cubemaps[pc.prefilterCubemapIndex].SampleLevel(g_samplers[pc.samplerIndex], R, _roughness * MAX_REFLECTION_LOD).rgb;
     float2 brdfLUT = g_textures[pc.brdfLUTIndex].Sample(g_samplers[pc.brdfLUTSamplerIndex], float2(NDotV, _roughness)).rg;
     float3 specularIBL = prefilteredColour * (_F0 * brdfLUT.x + brdfLUT.y);
 
-    // Energy conservation
     float3 kS = FresnelSchlickRoughness(max(dot(_N, _V), 0.0), _F0, _roughness);
     float3 kD = 1.0 - kS;
     kD *= (1.0 - _metallic);
 
-    // Diffuse IBL (irradiance)
     float3 irradiance = g_cubemaps[pc.irradianceCubemapIndex].Sample(g_samplers[pc.samplerIndex], _N).rgb;
     if (!all(isfinite(irradiance)))
     {
@@ -510,31 +480,12 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
     return diffuseIBL + specularIBL;
 }
 
-
-
-float CalculateLevelOfDetail(float2 uv, float2 textureRes)
-{
-    //Get the derivatives of the UVs
-    float2 dx = ddx(uv * textureRes);
-    float2 dy = ddy(uv * textureRes);
-    
-    //Calculate the squared lengths of those derivatives
-    float dxx = dot(dx, dx);
-    float dyy = dot(dy, dy);
-    
-    //Get the max of the squared lengths, and take log2(sqrt(x)) (equivalent to 0.5*log2(x), shoutout log rules)
-    float rho = max(dxx, dyy);
-    float lod = 0.5 * log2(rho);
-    
-    return max(0.0, lod);
-}
-
-
-
 [shader("pixel")]
 float4 main(VertexOutput vertexOutput) : SV_TARGET
 {
-    CoopVec<float16_t, MAX_OUTPUTS> mlpOutput = EvaluateMLP(vertexOutput.texCoord);
+    float distanceToCamera = length(vertexOutput.camPos - vertexOutput.worldPos);
+    float lod = log2(max(1.0, distanceToCamera * 5.0));
+    CoopVec<float16_t, MAX_OUTPUTS> mlpOutput = EvaluateMLP(vertexOutput.texCoord, lod);
     
     PBRMaterialNTC ntcMat = g_materials[pc.materialBufferIndex];
     SamplerState linearSampler = g_samplers[pc.samplerIndex];
@@ -566,35 +517,31 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
     if (bool(ntcMat.hasAoChannel)) { aoSample = mlpOutput[ntcMat.aoChannel]; }
 
 
+    float3x3 TBN = transpose(float3x3(vertexOutput.TBN_T, vertexOutput.TBN_B, vertexOutput.TBN_N));
+
+
     float3 albedo = pow(saturate(albedoSample.rgb), 2.2);
-    float3 normal = normalize(mul(saturate(normalSample.rgb) * 2.0 - 1.0, vertexOutput.TBN));
+    float3 normal = normalize(mul(saturate(normalSample.rgb) * 2.0 - 1.0, TBN));
     float3 emissive = pow(saturate(emissiveSample.rgb), 2.2);
     float metallic = saturate(metallicSample);
     float roughness = saturate(roughnessSample);
     float ao = saturate(aoSample);
     
+    float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); 
 
-    float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); //frag pos to camera
-
-	//Base reflectance
 	float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 
-
-	//Direct lighting
 	float3 totalDirectLighting = float3(0.0f, 0.0f, 0.0f);
 	for (uint i = 0; i < pc.numLights; ++i)
 	{
 		LightData light = lightBuffer[i];
 
-		//Shadows - if point is in shadow from this light, just skip this light
-		if (light.type == 2) //Point Light
+		if (light.type == 2) 
 		{
 			if (PointInPointLightShadow(vertexOutput.worldPos, light.position, light.shadowMapIndex, linearSampler))
-			{
 				continue;
-			}
 		}
-		else //Directional / Spot
+		else 
 		{
 			float4 posInLightClipSpace = mul(light.viewProjMat, float4(vertexOutput.worldPos, 1.0));
 			float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
@@ -607,24 +554,18 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
 				
 				float bias = 0.0005f; 
 				if ((currentPixelDepth - bias) > shadowDepth)
-				{
 					continue;
-				}
 			}
 		}
-
-
-		//Point is not in shadow from this light source - add up its contribution
 
 		float3 lightDirToFragPos;
 		float attenuation = 1.0;
 
-		//todo: replace with enums that match c++ side
-		if (light.type == 1) //Directional
+		if (light.type == 1) 
 		{
 			lightDirToFragPos = normalize(-light.direction);
 		}
-		else //Point / Spot
+		else 
 		{
 			float3 fragPosToLightPos = light.position - vertexOutput.worldPos;
 			float dist = length(fragPosToLightPos);
@@ -632,7 +573,7 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
 
 			attenuation = 1.0 / (light.constantAttenuation + light.linearAttenuation * dist + light.quadraticAttenuation * dist * dist);
 
-			if (light.type == 3) //Spot
+			if (light.type == 3) 
 			{
 				float theta = dot(lightDirToFragPos, normalize(-light.direction));
 				float innerCos = cos(light.innerAngle);
@@ -655,15 +596,9 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
 		}
 	}
 
-
 	float3 ambientLighting = CalculateIBL(albedo, roughness, metallic, F0, normal, V);
     ambientLighting *= ao;
 	
-	
-	float3 irradiance = g_cubemaps[pc.irradianceCubemapIndex].Sample(g_samplers[pc.samplerIndex], normal).rgb;
-	//if (irradiance.r > 2.0f || irradiance.g > 2.0f || irradiance.b > 2.0f) { return float4(1.0f, 0.0f, 1.0f, 1.0f); }
-
-
     float3 colour = totalDirectLighting + ambientLighting + emissive;
 
     return float4(colour, 1.0);

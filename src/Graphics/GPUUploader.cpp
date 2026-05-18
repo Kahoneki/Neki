@@ -450,6 +450,7 @@ namespace NK
 	    std::size_t g0Offset{ 0 };
 	    for(std::size_t i{ 0 }; i < 4; ++i)
 	    {
+	    	gpuMaterial->g0_offsets[i] = static_cast<std::uint32_t>(g0Offset);
 	        std::memcpy(g0Data.data() + g0Offset, ntcModel->featureLevels[i].g0.data, ntcModel->featureLevels[i].g0.numElementsPacked);
 	        g0Offset += ntcModel->featureLevels[i].g0.numElementsPacked;
 	    }
@@ -477,6 +478,7 @@ namespace NK
 	    std::size_t g1Offset{ 0 };
 	    for(std::size_t i = 0; i < 4; ++i)
 	    {
+	    	gpuMaterial->g1_offsets[i] = static_cast<std::uint32_t>(g1Offset);
 	        std::memcpy(g1Data.data() + g1Offset, ntcModel->featureLevels[i].g1.data, ntcModel->featureLevels[i].g1.numElementsPacked);
 	        g1Offset += ntcModel->featureLevels[i].g1.numElementsPacked;
 	    }

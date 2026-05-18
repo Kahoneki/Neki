@@ -23,7 +23,6 @@ struct VertexOutput
     float3 TBN_N : TBN_N;
 };
 
-
 struct CamData
 {
 	float4x4 viewMat;
@@ -32,7 +31,6 @@ struct CamData
 };
 
 [[vk::binding(0,0)]] ConstantBuffer<CamData> g_camData[] : register(b0, space0);
-
 
 PUSH_CONSTANTS_BLOCK(
 	float4x4 modelMat;
@@ -52,8 +50,7 @@ PUSH_CONSTANTS_BLOCK(
 	
 	float maxIrradiance;
 	
-	
-		uint g0BufferIndex;
+	uint g0BufferIndex;
 	uint g1BufferIndex;
 	uint mlpBufferIndex;
 	uint layer0_W_offset;
@@ -73,14 +70,16 @@ PUSH_CONSTANTS_BLOCK(
     uint numOctaves;
     uint tileSize;
     
+    uint g0_offsets[4];
+    uint g1_offsets[4];
 
+	float lod;
+	uint featureLevel;
 
     uint numLayers;
     uint hiddenNeurons;
-    
     uint frameIndex; //for stochastic filtering
 );
-
 
 VertexOutput VSMain(VertexInput input, uint vertexID : SV_VertexID)
 {
@@ -95,7 +94,6 @@ VertexOutput VSMain(VertexInput input, uint vertexID : SV_VertexID)
 	output.fragPos = float3(worldPos.xyz);
 	output.pos = mul(camData.projMat, mul(camData.viewMat, worldPos));
 
-	
 	//TBN
     float sign = input.tangent.w;
 	float3 T_os = input.tangent.xyz;
@@ -110,7 +108,6 @@ VertexOutput VSMain(VertexInput input, uint vertexID : SV_VertexID)
 	output.TBN_B = B_world;
 	output.TBN_N = N_world;
 	output.worldNormal = N_world;
-
 	
     return output;
 }

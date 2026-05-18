@@ -581,6 +581,8 @@ namespace NK
 		m_shadowVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/Model_vs";
 		m_meshVertShader = m_device->CreateShader(vertShaderDesc);
+		vertShaderDesc.filepath = "Shaders/NTCModel_vs";
+		m_ntcVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/Skybox_vs";
 		m_skyboxVertShader = m_device->CreateShader(vertShaderDesc);
 		vertShaderDesc.filepath = "Shaders/ScreenQuad_vs";
@@ -861,7 +863,9 @@ namespace NK
 		pipelineDesc.fragmentShader = m_pbrFragShader.get();
 		m_pbrPipeline = m_device->CreatePipeline(pipelineDesc);
 		
+		pipelineDesc.vertexShader = m_ntcVertShader.get();
 		pipelineDesc.fragmentShader = m_ntcPBRFragShader.get();
+		pipelineDesc.rootSignature = m_NTCPassRootSignature.get();
 		m_ntcPBRPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
 
@@ -1202,9 +1206,40 @@ namespace NK
 						ntcData.imageResolution = mat->imageResolution;
 						ntcData.numOctaves      = mat->numOctaves;
 						ntcData.tileSize        = mat->tileSize;
+						for (std::uint32_t offsetIdx{ 0 }; offsetIdx < 4; ++offsetIdx)
+						{
+							ntcData.g0_offsets[offsetIdx] = mat->g0_offsets[offsetIdx];
+							ntcData.g1_offsets[offsetIdx] = mat->g1_offsets[offsetIdx];
+						}
 						ntcData.numLayers       = mat->numLayers;
 						ntcData.hiddenNeurons   = mat->hiddenNeurons;
 						ntcData.frameIndex      = m_globalFrame;
+						
+						//Calculate feature level
+						std::uint32_t featureLevel{ 0 };
+						if (m_activeCamera && i < modelRenderer.meshDataLoadInfos.size())
+						{
+							//Get camera world position
+							CTransform& cameraTransform{ m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)) };
+							const glm::vec3 cameraPos{ cameraTransform.GetWorldPosition() };
+            
+							//Get this specific mesh's world center position (todo: profile)
+							const glm::vec4 meshLocalCenter{ glm::vec4(modelRenderer.meshDataLoadInfos[i].centre, 1.0f) };
+							const glm::vec3 meshWorldCenter{ glm::vec3(transform.GetModelMatrix() * meshLocalCenter) };
+            
+							//Calculate distance-based LOD
+							const float distanceToCamera{ glm::length(cameraPos - meshWorldCenter) };
+							const float lod{ std::log2f(std::max(1.0f, distanceToCamera * m_lodScale)) };
+							std::uint32_t num_mips{ static_cast<std::uint32_t>(std::log2(ntcData.imageResolution) - 1) };
+							const std::uint32_t mipIndex{ (std::clamp(static_cast<std::uint32_t>(std::floor(lod)), 0u, num_mips)) };
+							ntcData.lod = mipIndex / 10.0f;
+            
+							//Calculate feature level
+							static const uint32_t FeatureLevelLookup[11] = { 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 3 };
+							featureLevel = FeatureLevelLookup[mipIndex];
+						}
+						ntcData.featureLevel = featureLevel;
+						
 						_cmdBuf->PushConstants(m_NTCPassRootSignature.get(), &ntcData);
 					}
 					else
@@ -2054,6 +2089,15 @@ namespace NK
 			if (ImGui::IsItemHovered())
 			{
 				ImGui::SetTooltip("Pause the visibility state of all models (used for demonstration to see the culling in action)");
+			}
+			
+			ImGui::Separator();
+			
+			//LOD
+			ImGui::DragFloat("LOD Scale", &m_lodScale, 0.01f);
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Adjust the scale at which LODs are swapped out for neural materials (note: quite buggy at this time)");
 			}
 		}
 		if (m_showEditor && m_showEditorSettings) { ImGui::End(); }

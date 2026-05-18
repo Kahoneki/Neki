@@ -115,7 +115,7 @@ namespace NK
 		VkDescriptorSetLayout m_globalDescriptorSetLayout{ VK_NULL_HANDLE };
 		VkDescriptorSet m_globalDescriptorSet{ VK_NULL_HANDLE };
 		
-		bool m_enableInstanceValidationLayers = false;
+		bool m_enableInstanceValidationLayers = true;
 		const std::array<const char*, 1> m_instanceValidationLayers{ "VK_LAYER_KHRONOS_validation" };
 		const std::array<const char*, 1> m_requiredInstanceExtensions{ VK_KHR_SURFACE_EXTENSION_NAME };
 		const std::array<const char*, 6> requiredDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_EXT_mesh_shader", "VK_EXT_mutable_descriptor_type", "VK_KHR_shader_non_semantic_info", VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME, VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME };

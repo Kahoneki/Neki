@@ -71,6 +71,8 @@ namespace NK
 		std::uint32_t imageResolution{ 0 };
 		std::uint32_t numOctaves{ 0 };
 		std::uint32_t tileSize{ 0 };
+		std::uint32_t g0_offsets[4];
+		std::uint32_t g1_offsets[4];
 		std::uint32_t numLayers{ 0 };
 		std::uint32_t hiddenNeurons{ 0 };
 	};

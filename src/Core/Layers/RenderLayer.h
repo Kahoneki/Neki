@@ -211,6 +211,7 @@ namespace NK
 
 		UniquePtr<IShader> m_shadowVertShader;
 		UniquePtr<IShader> m_meshVertShader;
+		UniquePtr<IShader> m_ntcVertShader;
 		UniquePtr<IShader> m_skyboxVertShader;
 		UniquePtr<IShader> m_screenQuadVertShader;
 		UniquePtr<IShader> m_meshVisibilityVertShader;
@@ -278,6 +279,10 @@ namespace NK
 			std::uint32_t imageResolution;
 			std::uint32_t numOctaves;
 			std::uint32_t tileSize;
+			std::uint32_t g0_offsets[4];
+			std::uint32_t g1_offsets[4];
+			float lod;
+			uint featureLevel;
 			std::uint32_t numLayers;
 			std::uint32_t hiddenNeurons;
 			std::uint32_t frameIndex;
@@ -443,6 +448,8 @@ namespace NK
 		
 		//Pause the visibility state of all models (used for demonstration to see the culling in action)
 		bool m_freezeVisibility{ false };
+		
+		float m_lodScale{ 0.0f };
 		
 		//For shortcuts (required so that, e.g., ctrl+c will copy but c+ctrl won't)
 		bool m_cPressedLastFrame{ false }; //Ctrl+C = copy
