@@ -63,7 +63,7 @@ namespace NK
 		//Translate an Assimp mesh to an NK::CPUMeshData
 		static CPUMeshData ProcessMesh(aiMesh* _mesh, const aiScene* _scene, const std::string& _outputMaterialDirectory);
 
-		static std::pair<std::string, bool> GetMaterialTextureDataForSerialisation(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _materialDirectory); //std::pair of filepath and srgb-flag
+		static std::pair<std::string, bool> GetMaterialTextureDataForSerialisation(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType); //std::pair of filepath and srgb-flag
 		
 		
 		//To avoid unnecessary duplicate loads

@@ -231,7 +231,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
     float metallic = metallicSample.b;
     float roughness = roughnessSample.g;
     float3 emissive = emissiveSample.rgb;
-	
+	return float4(albedo,1);
 
     float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); //frag pos to camera
 

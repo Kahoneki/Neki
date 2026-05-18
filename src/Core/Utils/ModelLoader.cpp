@@ -502,7 +502,6 @@ namespace NK
 		//Load materials
 		std::vector<CPUMaterial> materials;
 		materials.resize(scene->mNumMaterials);
-		const std::string textureDirectory{ _serialisedModelOutputDirectory + "/Textures" };
 		for (std::size_t i{ 0 }; i < scene->mNumMaterials; ++i)
 		{
 			aiMaterial* assimpMaterial{ scene->mMaterials[i] };
@@ -514,13 +513,13 @@ namespace NK
 			
 			auto load{ [&](const MODEL_TEXTURE_TYPE _dst, const aiTextureType _src)
 			{
-				materials[i].allTextures[std::to_underlying(_dst)] = GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst, std::filesystem::path(_filepath).parent_path().string());
+				materials[i].allTextures[std::to_underlying(_dst)] = GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_src), _dst);
 				if (!materials[i].allTextures.at(std::to_underlying(_dst)).first.empty())
 				{
 					//Texture was added, compress to ktx2
 					std::string& filepath{ materials[i].allTextures.at(std::to_underlying(_dst)).first };
-					const std::string newFilepath{ (textureDirectory / std::filesystem::path(filepath).filename()).replace_extension(".ktx2").string() };
-					// TextureCompressor::KTXCompress(filepath, materials[i].allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
+					const std::string newFilepath{ (_serialisedModelOutputDirectory / std::filesystem::path(filepath)).replace_extension(".ktx2").string() };
+					TextureCompressor::KTXCompress(std::filesystem::path(_filepath).parent_path() / filepath, materials[i].allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
 					filepath = std::filesystem::path(newFilepath).string(); //filepath is a reference so this is modifying the lookup entry to point to the new ktx2 texture
 				}
 			}};
@@ -703,7 +702,7 @@ namespace NK
 			std::vector<TextureToTrain> texturesToTrain;
 			auto TryAddTexture{[&](MODEL_TEXTURE_TYPE _nekiType, aiTextureType _aiType, int _channels, float _weight, const std::string& _extract)
 			{
-				const std::pair<std::string, bool> texData{ GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_aiType), _nekiType, std::filesystem::path(_filepath).parent_path().string()) };
+				const std::pair<std::string, bool> texData{ GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_aiType), _nekiType) };
 				const std::string& path{ texData.first };
 				const bool isSRGB{ texData.second };
 				if (!path.empty())
@@ -972,7 +971,7 @@ namespace NK
 
 
 
-	std::pair<std::string, bool> ModelLoader::GetMaterialTextureDataForSerialisation(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType, const std::string& _directory)
+	std::pair<std::string, bool> ModelLoader::GetMaterialTextureDataForSerialisation(aiMaterial* _material, aiTextureTypeOverload _assimpType, MODEL_TEXTURE_TYPE _nekiType)
 	{
 		const aiTextureType assimpType{ static_cast<aiTextureType>(_assimpType) };
 		
@@ -982,9 +981,13 @@ namespace NK
 		}
 
 		//Load first texture of type (multiple textures of same type for same material is not currently supported by Neki)
-		aiString filename;
-		_material->GetTexture(assimpType, 0, &filename);
-		const std::string filepath{ _directory + "/" + filename.C_Str() };
+		aiString assimpFilepath;
+		_material->GetTexture(assimpType, 0, &assimpFilepath);
+		std::string filepath{ assimpFilepath.C_Str() };
+		
+		//Replace all \ with /
+		std::ranges::replace(filepath, '\\', '/');
+		
 		auto isColour = [&]()
 		{
 			switch (_nekiType) {

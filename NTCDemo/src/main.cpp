@@ -51,11 +51,12 @@ public:
 		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/Test/DamagedHelmet.nkmodel");
+		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/BistroTest/Bistro.nkmodel");
 		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		helmetTransform.name = "Sponza";
 		helmetTransform.SetLocalPosition({ -1.0f, 0.0f, 0.0f });
-		// helmetTransform.SetLocalScale({ 0.1, 0.1, 0.1 });
+		helmetTransform.SetLocalRotation({ glm::radians(-90.0f), 0.0f, glm::radians(180.0f) });
+		helmetTransform.SetLocalScale({ 0.01, 0.01, 0.01 });
 		
 		m_helmetEntity2 = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer2{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity2) };
