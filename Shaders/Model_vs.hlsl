@@ -18,8 +18,9 @@ struct VertexOutput
 	float3 fragPos : FRAG_POS;
 	float3 worldNormal : WORLD_NORMAL;
 	float3 camPos : CAM_POS;
-	float3x3 TBN : TBN;	
-	float3 bitangent : BITANGENT;
+	float3 TBN_T : TBN_T;
+    float3 TBN_B : TBN_B;
+    float3 TBN_N : TBN_N;
 };
 
 
@@ -77,8 +78,9 @@ VertexOutput VSMain(VertexInput input, uint vertexID : SV_VertexID)
 	float3 B_world = normalize( mul(PC(modelMat), float4(B_os, 0.0)).xyz );
 	float3 N_world = normalize( mul(PC(modelMat), float4(N_os, 0.0)).xyz );
 
-	output.TBN = transpose(float3x3(T_world, B_world, N_world));
-	output.bitangent = B_world;
+	output.TBN_T = T_world;
+	output.TBN_B = B_world;
+	output.TBN_N = N_world;
 	output.worldNormal = N_world;
 
 	

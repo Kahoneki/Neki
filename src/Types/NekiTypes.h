@@ -1123,6 +1123,8 @@ namespace NK
 		std::string path;
 		int channels; //1 or 3
 		float weight; //Importance in loss function
+		std::string extract; //e.g.: "rgb", "r", "g", "b"
+		bool convertToLinear; //True if SRGB
 	};
 	
 	struct DiskMaterialDataNTC

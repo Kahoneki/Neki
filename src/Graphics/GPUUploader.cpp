@@ -494,14 +494,42 @@ namespace NK
 	    std::size_t mlpTotalSize{ 0 };
 	    if (VkDevice vkDevice{ dynamic_cast<VulkanDevice&>(m_device).GetDevice() })
 	    {
-		    for (const Neural::NTCLinearLayer& layer : ntcModel->mlp)
-		    {
-		    	Neural::ConvertedLayer convertedLayer{ Neural::NTCMatrixLayerConverter::ConvertLayer(vkDevice, layer.weights.data(), layer.weights.size() * sizeof(std::uint16_t), layer.biases.data(), layer.biases.size() * sizeof(std::uint16_t), layer.outFeatures, layer.inFeatures) };
+	    	std::size_t layerIdx{ 0 };
+	    	const std::size_t numLayers{ ntcModel->mlp.size() };
+	    	for (const Neural::NTCLinearLayer& layer : ntcModel->mlp)
+	    	{
+	    		const void* weightPtr{ layer.weights.data() };
+	    		std::uint32_t inFeatures{ layer.inFeatures };
+	    		std::uint32_t outFeatures{ layer.outFeatures };
+	    		std::vector<uint16_t> paddingBuffer;
+	    		
+	    		//Pad input (first layer) to 96 to match shader's MAX_INPUTS
+	    		const std::uint32_t targetIn{ (layerIdx == 0) ? 96 : inFeatures };
+	    		
+	    		//Pad output (last layer) to 16 to match shader's MAX_OUTPUTS
+	    		const std::uint32_t targetOut{ (layerIdx == numLayers - 1) ? 16 : outFeatures };
+
+	    		if (inFeatures < targetIn || outFeatures < targetOut)
+	    		{
+	    			paddingBuffer.resize(targetOut * targetIn, 0);
+	    			for (std::uint32_t row{ 0 }; row < outFeatures; ++row)
+	    			{
+	    				std::memcpy(&paddingBuffer[row * targetIn], &layer.weights[row * inFeatures], inFeatures * sizeof(uint16_t));
+	    			}
+	    			weightPtr = paddingBuffer.data();
+	    			inFeatures = targetIn;
+	    			outFeatures = targetOut;
+	    		}
+
+	    		Neural::ConvertedLayer convertedLayer{ Neural::NTCMatrixLayerConverter::ConvertLayer(vkDevice, weightPtr, outFeatures * inFeatures * sizeof(std::uint16_t), layer.biases.data(), layer.biases.size() * sizeof(std::uint16_t), outFeatures, inFeatures) };
+
 		    	convertedLayers.push_back(convertedLayer);
 		    	mlpTotalSize = (mlpTotalSize + 15) & ~15;
 		    	mlpTotalSize += convertedLayer.weightData.size();
 		    	mlpTotalSize = (mlpTotalSize + 15) & ~15;
 		    	mlpTotalSize += convertedLayer.biasData.size();
+		    	
+		    	++layerIdx;
 		    }
 	    }
 	    else

@@ -701,33 +701,41 @@ namespace NK
 			std::ranges::replace_if(matName,[](const char c) { return c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|'; }, '_');
 			
 			std::vector<TextureToTrain> texturesToTrain;
-			auto TryAddTexture{[&](MODEL_TEXTURE_TYPE _nekiType, aiTextureType _aiType, int _channels, float _weight)
+			auto TryAddTexture{[&](MODEL_TEXTURE_TYPE _nekiType, aiTextureType _aiType, int _channels, float _weight, const std::string& _extract)
 			{
-				const std::string path{ GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_aiType), _nekiType, std::filesystem::path(_filepath).parent_path().string()).first };
+				const std::pair<std::string, bool> texData{ GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_aiType), _nekiType, std::filesystem::path(_filepath).parent_path().string()) };
+				const std::string& path{ texData.first };
+				const bool isSRGB{ texData.second };
 				if (!path.empty())
 				{
 					const std::string absPath{ std::filesystem::absolute(path).string() };
-					texturesToTrain.push_back({ _nekiType, absPath, _channels, _weight });
+					texturesToTrain.push_back({ _nekiType, absPath, _channels, _weight, _extract, isSRGB });
 				}
 				return !path.empty();
 			}};
 			
-			if (!TryAddTexture(MODEL_TEXTURE_TYPE::BASE_COLOUR, aiTextureType_BASE_COLOR, 3, 1.0f))
+			if (!TryAddTexture(MODEL_TEXTURE_TYPE::BASE_COLOUR, aiTextureType_BASE_COLOR, 3, 1.0f, "rgb"))
 			{
-				TryAddTexture(MODEL_TEXTURE_TYPE::DIFFUSE, aiTextureType_DIFFUSE, 3, 1.0f);
+				TryAddTexture(MODEL_TEXTURE_TYPE::DIFFUSE, aiTextureType_DIFFUSE, 3, 1.0f, "rgb");
 			}
-			if (!TryAddTexture(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMAL_CAMERA, 3, 3.0f))
+			if (!TryAddTexture(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMAL_CAMERA, 3, 3.0f, "rgb"))
 			{
-				TryAddTexture(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMALS, 3, 3.0f);
+				TryAddTexture(MODEL_TEXTURE_TYPE::NORMAL, aiTextureType_NORMALS, 3, 3.0f, "rgb");
 			}
-			if (!TryAddTexture(MODEL_TEXTURE_TYPE::EMISSIVE, aiTextureType_EMISSIVE, 3, 1.0f))
+			if (!TryAddTexture(MODEL_TEXTURE_TYPE::EMISSIVE, aiTextureType_EMISSIVE, 3, 1.0f, "rgb"))
 			{
-				TryAddTexture(MODEL_TEXTURE_TYPE::EMISSION_COLOUR, aiTextureType_EMISSION_COLOR, 3, 1.0f);
+				TryAddTexture(MODEL_TEXTURE_TYPE::EMISSION_COLOUR, aiTextureType_EMISSION_COLOR, 3, 1.0f, "rgb");
 			}
-			TryAddTexture(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION, 1, 1.0f);
-			TryAddTexture(MODEL_TEXTURE_TYPE::DISPLACEMENT, aiTextureType_DISPLACEMENT, 1, 1.0f);
-			TryAddTexture(MODEL_TEXTURE_TYPE::ROUGHNESS, aiTextureType_DIFFUSE_ROUGHNESS, 1, 1.0f);
-			TryAddTexture(MODEL_TEXTURE_TYPE::METALNESS, aiTextureType_METALNESS, 1, 1.0f);
+			if (!TryAddTexture(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION, aiTextureType_AMBIENT_OCCLUSION, 1, 1.0f, "r"))
+			{
+				if (!TryAddTexture(MODEL_TEXTURE_TYPE::LIGHTMAP, aiTextureType_LIGHTMAP, 1, 1.0f, "r"))
+				{
+					TryAddTexture(MODEL_TEXTURE_TYPE::AMBIENT, aiTextureType_AMBIENT, 1, 1.0f, "r");
+				}
+			}
+			TryAddTexture(MODEL_TEXTURE_TYPE::DISPLACEMENT, aiTextureType_DISPLACEMENT, 1, 1.0f, "r");
+			TryAddTexture(MODEL_TEXTURE_TYPE::ROUGHNESS, aiTextureType_DIFFUSE_ROUGHNESS, 1, 1.0f, "g");
+			TryAddTexture(MODEL_TEXTURE_TYPE::METALNESS, aiTextureType_METALNESS, 1, 1.0f, "b");
 			
 			if (texturesToTrain.empty())
 			{
@@ -759,6 +767,8 @@ namespace NK
 			std::string texArgs{ " --textures" };
 			std::string chanArgs{ " --channels" };
 			std::string weightArgs{ " --weights" };
+			std::string extractArgs{ " --extract" };
+			std::string convertToLinearArgs{ " --convert_to_linear" };
 			
 			PBRMaterialNTC pbrNTC{};
 			std::memset(&pbrNTC, 0, sizeof(PBRMaterialNTC));
@@ -767,6 +777,8 @@ namespace NK
 			{
 				texArgs += " \"" + t.path + "\"";
 				chanArgs += " " + std::to_string(t.channels);
+				extractArgs += " " + t.extract;
+				convertToLinearArgs += " " + std::to_string(t.convertToLinear ? 1 : 0);
 				for (std::size_t c{ 0 }; c < t.channels; ++c)
 				{
 					weightArgs += " " + std::to_string(t.weight);
@@ -801,6 +813,8 @@ namespace NK
 					pbrNTC.hasEmissiveChannelB = 1;
 					break;
 				case MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION:
+				case MODEL_TEXTURE_TYPE::LIGHTMAP:
+				case MODEL_TEXTURE_TYPE::AMBIENT:
 					pbrNTC.aoChannel = currentChannel;
 					pbrNTC.hasAoChannel = 1;
 					break;
@@ -821,10 +835,10 @@ namespace NK
 				}
 				currentChannel += t.channels;
 			}
-			cmd += texArgs + chanArgs + weightArgs;
+			cmd += texArgs + chanArgs + weightArgs + extractArgs;
 			cmd += " 2>&1";
 			
-			std::cout << "[NTC] Training neural material: " << matName << "...\n";
+			std::cout << "[NTC] Training neural material: " << matName << " (" << i+1 << "/" << scene->mNumMaterials << ")" << "...\n";
 			std::cout << "[NTC] Generated command: " << cmd << '\n';
 			FILE* const pipe{ POPEN(cmd.c_str(), "r") };
 			if (!pipe)

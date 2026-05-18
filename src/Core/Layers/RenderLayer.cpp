@@ -1198,7 +1198,7 @@ namespace NK
 						ntcData.g1Channels      = mat->g1Channels;
 						ntcData.g0QuantLevels   = mat->g0QuantLevels;
 						ntcData.g1QuantLevels   = mat->g1QuantLevels;
-						ntcData.g0Resolution    = mat->g0Resolution;
+						ntcData.g0Resolution    = mat->g0Resolution / 2;
 						ntcData.imageResolution = mat->imageResolution;
 						ntcData.numOctaves      = mat->numOctaves;
 						ntcData.tileSize        = mat->tileSize;
@@ -2506,33 +2506,34 @@ namespace NK
 
 				model.modelPathDirty = false;
 			}
+		}
 			
-			UpdateModelMatricesBuffer();
+		UpdateModelMatricesBuffer();
 			
+		std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_meshVisibilityReadbackBufferMaps[m_currentFrame]) };
+		
+		//Iterate over models and their local meshes
+		for (auto&& [transform, modelRenderer] : m_reg.get().View<CTransform, CModelRenderer>())
+		{
+			if (modelRenderer.meshDataLoadInfos.empty()) { continue; }
 			
-			
-			std::uint32_t* visibilityMap{ static_cast<std::uint32_t*>(m_meshVisibilityReadbackBufferMaps[m_currentFrame]) };
-			for (std::size_t meshIdx{ 0 }; meshIdx < m_modelMatricesEntitiesLookups[m_currentFrame].size(); ++meshIdx)
+			for (std::size_t localMeshIdx{ 0 }; localMeshIdx < modelRenderer.meshDataLoadInfos.size(); ++localMeshIdx)
 			{
 				//In case entity has been destroyed
-				if (!m_reg.get().EntityInRegistry(m_modelMatricesEntitiesLookups[m_currentFrame][meshIdx]))
+				if (!m_reg.get().EntityInRegistry(m_modelMatricesEntitiesLookups[m_currentFrame][localMeshIdx]))
 				{
 					//O(1) swap and pop removal
-					m_modelMatricesEntitiesLookups[m_currentFrame][meshIdx] = m_modelMatricesEntitiesLookups[m_currentFrame].back();
+					m_modelMatricesEntitiesLookups[m_currentFrame][localMeshIdx] = m_modelMatricesEntitiesLookups[m_currentFrame].back();
 					m_modelMatricesEntitiesLookups[m_currentFrame].pop_back();
-					--meshIdx; //recheck index now that a new element is here
+					--localMeshIdx; //recheck index now that a new element is here
 					continue;
 				}
-				
-				
-				CModelRenderer& modelRenderer{ m_reg.get().GetComponent<CModelRenderer>(m_modelMatricesEntitiesLookups[m_currentFrame][meshIdx]) };
-				CTransform& transform{ m_reg.get().GetComponent<CTransform>(m_modelMatricesEntitiesLookups[m_currentFrame][meshIdx]) };
 				
 				
 				//Update visibility if not frozen
 				if (!m_freezeVisibility)
 				{
-					bool isVisible{ (visibilityMap[modelRenderer.meshVisibilityIndices[meshIdx]] == 1) }; //GPU visibility result
+					bool isVisible{ (visibilityMap[modelRenderer.meshVisibilityIndices[localMeshIdx]] == 1) }; //GPU visibility result
 					if (!isVisible && m_activeCamera)
 					{
 						//If camera is within mesh's bounds, the depth buffer may contain residual data from the mesh, and since the AABB lies outside this extent, it may not be rendered and so the gpu visibility check will fail
@@ -2542,9 +2543,9 @@ namespace NK
 						const glm::vec3 meshLocalCamPos{ glm::vec3(glm::inverse(transform.GetModelMatrix()) * glm::vec4(m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)).GetWorldPosition(), 1.0f)) };
 			
 						constexpr float bufferRegion{ 1.05f };
-						const glm::vec3 bufferedExtents{ modelRenderer.meshDataLoadInfos[meshIdx].halfExtents * bufferRegion };
-						const glm::vec3 minBound{ modelRenderer.meshDataLoadInfos[meshIdx].centre - bufferedExtents };
-						const glm::vec3 maxBound{ modelRenderer.meshDataLoadInfos[meshIdx].centre + bufferedExtents };
+						const glm::vec3 bufferedExtents{ modelRenderer.meshDataLoadInfos[localMeshIdx].halfExtents * bufferRegion };
+						const glm::vec3 minBound{ modelRenderer.meshDataLoadInfos[localMeshIdx].centre - bufferedExtents };
+						const glm::vec3 maxBound{ modelRenderer.meshDataLoadInfos[localMeshIdx].centre + bufferedExtents };
 						if (meshLocalCamPos.x >= minBound.x && meshLocalCamPos.x <= maxBound.x &&
 							meshLocalCamPos.y >= minBound.y && meshLocalCamPos.y <= maxBound.y &&
 							meshLocalCamPos.z >= minBound.z && meshLocalCamPos.z <= maxBound.z)
@@ -2553,15 +2554,15 @@ namespace NK
 							isVisible = true;
 						}
 					}
-					if (modelRenderer.meshVisibilityIndices[meshIdx] != 0xFFFFFFFF)
+					if (modelRenderer.meshVisibilityIndices[localMeshIdx] != 0xFFFFFFFF)
 					{
-						modelRenderer.meshVisible[meshIdx] = isVisible;
+						modelRenderer.meshVisible[localMeshIdx] = isVisible;
 					}
 				}
 				
 				
-				std::pair<std::string, std::uint64_t> meshKey{ std::make_pair(modelRenderer.meshDataPath, modelRenderer.meshDataLoadInfos[meshIdx].meshOffset) };
-				if (modelRenderer.meshVisible[meshIdx] && !modelRenderer.meshes[meshIdx])
+				std::pair<std::string, std::uint64_t> meshKey{ std::make_pair(modelRenderer.meshDataPath, modelRenderer.meshDataLoadInfos[localMeshIdx].meshOffset) };
+				if (modelRenderer.meshVisible[localMeshIdx] && !modelRenderer.meshes[localMeshIdx])
 				{
 					//Mesh is visible but is not set, set it by either:
 					//- recovering from the unload queue if present
@@ -2576,7 +2577,7 @@ namespace NK
 						if (vecIt != it->second.end())
 						{
 							//This mesh is in the unload queue, recover it
-							modelRenderer.meshes[meshIdx] = m_gpuMeshCache[meshKey].get();
+							modelRenderer.meshes[localMeshIdx] = m_gpuMeshCache[meshKey].get();
 							meshInUnloadQueue = true;
 							it->second.erase(vecIt);
 							break;
@@ -2594,7 +2595,7 @@ namespace NK
 							m_newGPUUploaderUpload = true;
 							m_gpuMeshReferenceCounter[meshKey] = 0;
 						}
-						modelRenderer.meshes[meshIdx] = m_gpuMeshCache[meshKey].get();
+						modelRenderer.meshes[localMeshIdx] = m_gpuMeshCache[meshKey].get();
 					}
 					++m_gpuMeshReferenceCounter[meshKey];
 					
@@ -2607,7 +2608,7 @@ namespace NK
 						std::vector<std::string>::iterator vecIt{ std::ranges::find(it->second, matPath) };
 						if (vecIt != it->second.end())
 						{
-							modelRenderer.materials[meshIdx] = m_gpuMaterialCache[matPath].get();
+							modelRenderer.materials[localMeshIdx] = m_gpuMaterialCache[matPath].get();
 							matInUnloadQueue = true;
 							it->second.erase(vecIt);
 							break;
@@ -2701,26 +2702,26 @@ namespace NK
 								m_newGPUUploaderUpload = true;
 							}
 						}
-						modelRenderer.materials[meshIdx] = m_gpuMaterialCache[matPath].get();
+						modelRenderer.materials[localMeshIdx] = m_gpuMaterialCache[matPath].get();
 					}
 					++m_gpuMaterialReferenceCounter[matPath];
 				}
-				else if (!modelRenderer.meshVisible[meshIdx] && modelRenderer.meshes[meshIdx])
+				else if (!modelRenderer.meshVisible[localMeshIdx] && modelRenderer.meshes[localMeshIdx])
 				{
 					--m_gpuMeshReferenceCounter[meshKey];
-					modelRenderer.meshes[meshIdx] = nullptr;
+					modelRenderer.meshes[localMeshIdx] = nullptr;
 
 					if (m_gpuMeshReferenceCounter[meshKey] == 0)
 					{
 						m_meshUnloadQueue[m_globalFrame + m_desc.framesInFlight + 1].push_back(meshKey);
 					}
-					if (modelRenderer.materials[meshIdx])
+					if (modelRenderer.materials[localMeshIdx])
 					{
 						const CPUMeshData* cpuMesh = ModelLoader::LoadMesh(meshKey.first, meshKey.second);
 						std::string matPath = cpuMesh->materialFilepath;
 						
 						--m_gpuMaterialReferenceCounter[matPath];
-						modelRenderer.materials[meshIdx] = nullptr;
+						modelRenderer.materials[localMeshIdx] = nullptr;
 
 						if (m_gpuMaterialReferenceCounter[matPath] == 0)
 						{
@@ -2729,10 +2730,9 @@ namespace NK
 					}
 				}
 			}
-			
-			//Reset visibility map for writing into during this frame
-			std::memset(visibilityMap, 0, m_desc.maxMeshesPerModel * m_desc.maxModels * sizeof(std::uint32_t));
 		}
+		//Reset visibility map for writing into during this frame
+		std::memset(visibilityMap, 0, m_desc.maxMeshesPerModel * m_desc.maxModels * sizeof(std::uint32_t));
 		
 		
 		if (m_textureDeletionQueue.contains(m_globalFrame))

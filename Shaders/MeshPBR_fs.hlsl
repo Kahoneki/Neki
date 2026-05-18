@@ -16,8 +16,9 @@ struct VertexOutput
 	float3 fragPos : FRAG_POS;
 	float3 worldNormal : WORLD_NORMAL;
 	float3 camPos : CAM_POS;
-	float3x3 TBN : TBN;
-	float3 bitangent : BITANGENT;
+    float3 TBN_T : TBN_T;
+    float3 TBN_B : TBN_B;
+    float3 TBN_N : TBN_N;
 };
 
 
@@ -218,12 +219,18 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
     float4 metallicSample = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 roughnessSample = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
     float4 emissiveSample = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(linearSampler, vertexOutput.texCoord);
-	
-    float3 albedo = pow(albedoSample.rgb, 2.2); //srgb -> linear
-    float3 normal = normalize(mul(vertexOutput.TBN, normalSample.rgb * 2.0 - 1.0));
-    float metallic = metallicSample.g;
-    float roughness = roughnessSample.b;
-    float3 emissive = pow(emissiveSample.rgb, 2.2); //srgb -> linear
+
+	float3x3 TBN = transpose(float3x3(
+    	vertexOutput.TBN_T,
+    	vertexOutput.TBN_B,
+    	vertexOutput.TBN_N
+	));
+
+    float3 albedo = albedoSample.rgb;
+    float3 normal = normalize(mul(TBN, normalSample.rgb * 2.0 - 1.0));
+    float metallic = metallicSample.b;
+    float roughness = roughnessSample.g;
+    float3 emissive = emissiveSample.rgb;
 	
 
     float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); //frag pos to camera

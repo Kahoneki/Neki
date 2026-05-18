@@ -501,7 +501,6 @@ namespace NK
 		m_computeQueueIndexAllocator = UniquePtr<FreeListAllocator>(NK_NEW(FreeListAllocator, numComputeQueues));
 		m_transferQueueIndexAllocator = UniquePtr<FreeListAllocator>(NK_NEW(FreeListAllocator, numTransferQueues));
 		
-		
 		m_logger.Unindent();
 	}
 

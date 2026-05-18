@@ -1,15 +1,24 @@
+#include "Types/Materials.slang"
+
 static const float LIGHT_NEAR = 0.01f;
 static const float LIGHT_FAR = 1000.0f;
+
+static const uint MAX_INPUTS = 96;
+static const uint HIDDEN_DIM = 16;
+static const uint MAX_OUTPUTS = 16;
+
+static const uint FeatureLevelLookup[11] = { 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 3 };
 
 struct VertexOutput
 {
 	float4 pos : SV_POSITION;
-	float3 worldPos : WORLD_POS;
+    float3 worldPos : WORLD_POS;
 	float2 texCoord : TEXCOORD0;
 	float3 fragPos : FRAG_POS;
 	float3 worldNormal : WORLD_NORMAL;
 	float3 camPos : CAM_POS;
 	float3x3 TBN : TBN;
+	float3 bitangent : BITANGENT;
 };
 
 struct LightData
@@ -37,6 +46,7 @@ struct LightData
 [[vk::binding(1, 0)]] SamplerState g_samplers[] : register(s0, space0);
 [[vk::binding(0, 0)]] StructuredBuffer<LightData> g_lightData[] : register(t0, space0);
 [[vk::binding(0, 0)]] Texture2D g_textures[] : register(t0, space1);
+[[vk::binding(0,0)]] ConstantBuffer<PBRMaterialNTC> g_materials[] : register(b0, space0);
 
 struct PushConstants
 {
@@ -112,15 +122,6 @@ half HardGELU(half x)
     return x * clamp(x / half(3.0) + half(0.5), half(0.0), half(1.0));
 }
 
-
-struct Material
-{
-    float3 colour;
-    float3 normal;
-    float ao;
-    float displacement;
-    float roughness;
-};
 
 static const uint MAX_G0_CHANNELS = 16;
 struct G0Features
@@ -242,20 +243,22 @@ G1Features SampleG1(int2 p)
 
 
 
-Material EvaluateMLP(float2 uv)
+CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
 {
-    // Stochastic filtering
-	float2 p = uv * pc.imageResolution;
+    uv = frac(uv);
+    
+	float2 p = uv * float(pc.imageResolution);
+    
+    //Stochastic filtering
     // float2 filterOffset = RandomGaussianFloat2(uv + pc.frameIndex) * 0.1f;
     // p += filterOffset;
-    p = floor(p); // nearest neighbour
+    
     p = clamp(p, float2(0.0f, 0.0f), float2(pc.imageResolution - 1, pc.imageResolution - 1));
 	float2 local = fmod(p, pc.tileSize) / pc.tileSize;
     local = local * 2.0f - 1.0f;
-    uv = p / pc.imageResolution;
+    uv = p / float(pc.imageResolution);
 
     uint numInputs = (pc.numOctaves * 2 * 2) + (1) + (pc.g0Channels * 4) + (pc.g1Channels);
-    static const uint MAX_INPUTS = 91;
     CoopVec<float16_t, MAX_INPUTS> encodings;
 
     uint offset = 0;
@@ -323,8 +326,6 @@ Material EvaluateMLP(float2 uv)
 	
 	
 	//MLP
-	static const uint HIDDEN_DIM = 16;
-	static const uint OUTPUT_DIM = 12;
     CoopVec<float16_t, HIDDEN_DIM> hidden0 = coopVecMatMulAdd<float16_t, HIDDEN_DIM, MAX_INPUTS, float16_t>(
         encodings,
         CoopVecComponentType.Float16,
@@ -373,7 +374,7 @@ Material EvaluateMLP(float2 uv)
 
     uint out_W_offset = (pc.numLayers >= 3) ? pc.layer2_W_offset : pc.layer1_W_offset;
     uint out_B_offset = (pc.numLayers >= 3) ? pc.layer2_B_offset : pc.layer1_B_offset;
-    CoopVec<float16_t, OUTPUT_DIM> output = coopVecMatMulAdd<float16_t, OUTPUT_DIM, HIDDEN_DIM, float16_t>(
+    CoopVec<float16_t, MAX_OUTPUTS> output = coopVecMatMulAdd<float16_t, MAX_OUTPUTS, HIDDEN_DIM, float16_t>(
         hidden1,
         CoopVecComponentType.Float16,
         mlpBuffer[pc.mlpBufferIndex],
@@ -387,13 +388,7 @@ Material EvaluateMLP(float2 uv)
         0
 	);
 
-    Material material;
-    material.colour = float3(output[0], output[1], output[2]);
-    material.normal = float3(output[3], output[4], output[5]);
-    material.ao = output[6];
-    material.displacement = output[7];
-    material.roughness = output[8];
-    return material;
+    return output;
 }
 
 bool PointInPointLightShadow(float3 _fragPos, float3 _lightPos, uint _shadowIndex, SamplerState _samplerState)
@@ -517,108 +512,159 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
 
 
 
+float CalculateLevelOfDetail(float2 uv, float2 textureRes)
+{
+    //Get the derivatives of the UVs
+    float2 dx = ddx(uv * textureRes);
+    float2 dy = ddy(uv * textureRes);
+    
+    //Calculate the squared lengths of those derivatives
+    float dxx = dot(dx, dx);
+    float dyy = dot(dy, dy);
+    
+    //Get the max of the squared lengths, and take log2(sqrt(x)) (equivalent to 0.5*log2(x), shoutout log rules)
+    float rho = max(dxx, dyy);
+    float lod = 0.5 * log2(rho);
+    
+    return max(0.0, lod);
+}
+
+
+
 [shader("pixel")]
 float4 main(VertexOutput vertexOutput) : SV_TARGET
 {
-	Material material = EvaluateMLP(vertexOutput.texCoord);
-
+    CoopVec<float16_t, MAX_OUTPUTS> mlpOutput = EvaluateMLP(vertexOutput.texCoord);
+    
+    PBRMaterialNTC ntcMat = g_materials[pc.materialBufferIndex];
     SamplerState linearSampler = g_samplers[pc.samplerIndex];
-    StructuredBuffer<LightData> lightBuffer = g_lightData[pc.lightDataBufferIndex];
+	StructuredBuffer<LightData> lightBuffer = g_lightData[pc.lightDataBufferIndex];
 
-    float3 albedo = pow(material.colour, 2.2); // srgb -> linear
-    float3 normal = normalize(mul(vertexOutput.TBN, material.normal * 2.0 - 1.0));
-    float metallic = 1 - material.roughness;
-    float roughness = material.roughness;
-    float3 emissive = pow(float3(0,0,0), 2.2); // srgb -> linear
 
-    float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); // frag pos to camera
+    float3 albedoSample = float3(0);
+    if (bool(ntcMat.hasBaseColourChannelR)) { albedoSample.x = mlpOutput[ntcMat.baseColourChannelR]; }
+    if (bool(ntcMat.hasBaseColourChannelG)) { albedoSample.y = mlpOutput[ntcMat.baseColourChannelG]; }
+    if (bool(ntcMat.hasBaseColourChannelB)) { albedoSample.z = mlpOutput[ntcMat.baseColourChannelB]; }
 
-    // Base reflectance
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+    float3 normalSample = float3(0);
+    if (bool(ntcMat.hasNormalChannelX)) { normalSample.x = mlpOutput[ntcMat.normalChannelX]; }
+    if (bool(ntcMat.hasNormalChannelY)) { normalSample.y = mlpOutput[ntcMat.normalChannelY]; }
+    if (bool(ntcMat.hasNormalChannelZ)) { normalSample.z = mlpOutput[ntcMat.normalChannelZ]; }
+    
+    float3 emissiveSample = float3(0);
+    if (bool(ntcMat.hasEmissiveChannelR)) { emissiveSample.x = mlpOutput[ntcMat.emissiveChannelR]; }
+    if (bool(ntcMat.hasEmissiveChannelG)) { emissiveSample.y = mlpOutput[ntcMat.emissiveChannelG]; }
+    if (bool(ntcMat.hasEmissiveChannelB)) { emissiveSample.z = mlpOutput[ntcMat.emissiveChannelB]; }
 
-    // Direct lighting
-    float3 totalDirectLighting = float3(0.0f, 0.0f, 0.0f);
-    for (uint i = 0; i < pc.numLights; ++i)
-    {
-        LightData light = lightBuffer[i];
+    float metallicSample = 0.0f;
+    if (bool(ntcMat.hasMetalnessChannel)) { metallicSample = mlpOutput[ntcMat.metalnessChannel]; }
 
-        // Shadows - if point is in shadow from this light, just skip this light
-        if (light.type == 2) // Point Light
-        {
-            if (PointInPointLightShadow(vertexOutput.worldPos, light.position, light.shadowMapIndex, linearSampler))
-            {
-                continue;
-            }
-        }
-        else // Directional / Spot
-        {
-            float4 posInLightClipSpace = mul(light.viewProjMat, float4(vertexOutput.worldPos, 1.0));
-            float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
-            float2 shadowMapUV = float2(posInLightNDC.x * 0.5f + 0.5f, posInLightNDC.y * -0.5f + 0.5f);
+    float roughnessSample = 0.0f;
+    if (bool(ntcMat.hasRoughnessChannel)) { roughnessSample = mlpOutput[ntcMat.roughnessChannel]; }
 
-            if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f && posInLightNDC.z <= 1.0f)
-            {
-                float shadowDepth = g_textures[NonUniformResourceIndex(light.shadowMapIndex)].Sample(linearSampler, shadowMapUV).r;
-                float currentPixelDepth = posInLightNDC.z;
+    float aoSample = 1.0f;
+    if (bool(ntcMat.hasAoChannel)) { aoSample = mlpOutput[ntcMat.aoChannel]; }
 
-                float bias = 0.0005f;
-                if ((currentPixelDepth - bias) > shadowDepth)
-                {
-                    continue;
-                }
-            }
-        }
 
-        // Point is not in shadow from this light source - add up its contribution
+    float3 albedo = pow(saturate(albedoSample.rgb), 2.2);
+    float3 normal = normalize(mul(saturate(normalSample.rgb) * 2.0 - 1.0, vertexOutput.TBN));
+    float3 emissive = pow(saturate(emissiveSample.rgb), 2.2);
+    float metallic = saturate(metallicSample);
+    float roughness = saturate(roughnessSample);
+    float ao = saturate(aoSample);
+    
 
-        float3 lightDirToFragPos;
-        float attenuation = 1.0;
+    float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); //frag pos to camera
 
-        // todo: replace with enums that match c++ side
-        if (light.type == 1) // Directional
-        {
-            lightDirToFragPos = normalize(-light.direction);
-        }
-        else // Point / Spot
-        {
-            float3 fragPosToLightPos = light.position - vertexOutput.worldPos;
-            float dist = length(fragPosToLightPos);
-            lightDirToFragPos = normalize(fragPosToLightPos);
+	//Base reflectance
+	float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 
-            attenuation = 1.0 / (light.constantAttenuation + light.linearAttenuation * dist + light.quadraticAttenuation * dist * dist);
 
-            if (light.type == 3) // Spot
-            {
-                float theta = dot(lightDirToFragPos, normalize(-light.direction));
-                float innerCos = cos(light.innerAngle);
-                float outerCos = cos(light.outerAngle);
-                float epsilon = innerCos - outerCos;
-                float intensity = clamp((theta - outerCos) / epsilon, 0.0f, 1.0f);
-                attenuation *= intensity;
-            }
-        }
+	//Direct lighting
+	float3 totalDirectLighting = float3(0.0f, 0.0f, 0.0f);
+	for (uint i = 0; i < pc.numLights; ++i)
+	{
+		LightData light = lightBuffer[i];
 
-        if (attenuation > 0.0001)
-        {
-            float NdotL = dot(normal, lightDirToFragPos);
-            if (NdotL > 0.0f)
-            {
-                float3 radiance = light.colour * light.intensity;
-                float3 directLighting = CalculateDirectLight(albedo, metallic, roughness, F0, normal, V, lightDirToFragPos, radiance);
-                totalDirectLighting += directLighting * attenuation;
-            }
-        }
-    }
+		//Shadows - if point is in shadow from this light, just skip this light
+		if (light.type == 2) //Point Light
+		{
+			if (PointInPointLightShadow(vertexOutput.worldPos, light.position, light.shadowMapIndex, linearSampler))
+			{
+				continue;
+			}
+		}
+		else //Directional / Spot
+		{
+			float4 posInLightClipSpace = mul(light.viewProjMat, float4(vertexOutput.worldPos, 1.0));
+			float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
+			float2 shadowMapUV = float2(posInLightNDC.x * 0.5f + 0.5f, posInLightNDC.y * -0.5f + 0.5f);
 
-    float3 ambientLighting = CalculateIBL(albedo, roughness, metallic, F0, normal, V);
-    // if (material.hasAO)
-    {
-        ambientLighting *= material.ao;
-    }
+			if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f && posInLightNDC.z <= 1.0f)
+			{
+				float shadowDepth = g_textures[NonUniformResourceIndex(light.shadowMapIndex)].Sample(linearSampler, shadowMapUV).r;
+				float currentPixelDepth = posInLightNDC.z;
+				
+				float bias = 0.0005f; 
+				if ((currentPixelDepth - bias) > shadowDepth)
+				{
+					continue;
+				}
+			}
+		}
 
-    float3 irradiance = g_cubemaps[pc.irradianceCubemapIndex].Sample(g_samplers[pc.samplerIndex], normal).rgb;
-    // if (irradiance.r > 2.0f || irradiance.g > 2.0f || irradiance.b > 2.0f) { return float4(1.0f, 0.0f, 1.0f, 1.0f); }
+
+		//Point is not in shadow from this light source - add up its contribution
+
+		float3 lightDirToFragPos;
+		float attenuation = 1.0;
+
+		//todo: replace with enums that match c++ side
+		if (light.type == 1) //Directional
+		{
+			lightDirToFragPos = normalize(-light.direction);
+		}
+		else //Point / Spot
+		{
+			float3 fragPosToLightPos = light.position - vertexOutput.worldPos;
+			float dist = length(fragPosToLightPos);
+			lightDirToFragPos = normalize(fragPosToLightPos);
+
+			attenuation = 1.0 / (light.constantAttenuation + light.linearAttenuation * dist + light.quadraticAttenuation * dist * dist);
+
+			if (light.type == 3) //Spot
+			{
+				float theta = dot(lightDirToFragPos, normalize(-light.direction));
+				float innerCos = cos(light.innerAngle);
+				float outerCos = cos(light.outerAngle);
+				float epsilon = innerCos - outerCos;
+				float intensity = clamp((theta - outerCos) / epsilon, 0.0f, 1.0f);
+				attenuation *= intensity;
+			}
+		}
+
+		if (attenuation > 0.0001)
+		{
+			float NdotL = dot(normal, lightDirToFragPos);
+			if (NdotL > 0.0f)
+			{
+				float3 radiance = light.colour * light.intensity;
+				float3 directLighting = CalculateDirectLight(albedo, metallic, roughness, F0, normal, V, lightDirToFragPos, radiance);
+				totalDirectLighting += directLighting * attenuation;
+			}
+		}
+	}
+
+
+	float3 ambientLighting = CalculateIBL(albedo, roughness, metallic, F0, normal, V);
+    ambientLighting *= ao;
+	
+	
+	float3 irradiance = g_cubemaps[pc.irradianceCubemapIndex].Sample(g_samplers[pc.samplerIndex], normal).rgb;
+	//if (irradiance.r > 2.0f || irradiance.g > 2.0f || irradiance.b > 2.0f) { return float4(1.0f, 0.0f, 1.0f, 1.0f); }
+
 
     float3 colour = totalDirectLighting + ambientLighting + emissive;
+
     return float4(colour, 1.0);
 }
