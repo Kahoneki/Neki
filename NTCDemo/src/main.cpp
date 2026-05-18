@@ -40,6 +40,8 @@ public:
 		// NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath.string(), true, true);
 		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Test/DamagedHelmet.nkmodel") };
 		// NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath.string(), true, true);
+		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/BistroTest/Bistro.nkmodel") };
+		// NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Bistro_v5_2/BistroExterior.fbx", serialisedModelOutputPath.string(), true, true);
 		
 		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/NTCTest/DamagedHelmet.nkmodel") };
 		// NK::ModelLoader::SerialiseNKModelNTC("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath.string(), true, true, {2, 16, 3000});
@@ -49,11 +51,11 @@ public:
 		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/NTCSponzaTest/Sponza.nkmodel");
+		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/Test/DamagedHelmet.nkmodel");
 		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		helmetTransform.name = "Sponza";
 		helmetTransform.SetLocalPosition({ -1.0f, 0.0f, 0.0f });
-		helmetTransform.SetLocalScale({ 0.1, 0.1, 0.1 });
+		// helmetTransform.SetLocalScale({ 0.1, 0.1, 0.1 });
 		
 		m_helmetEntity2 = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer2{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity2) };
@@ -152,7 +154,7 @@ public:
 		renderLayerDesc.backend = NK::GRAPHICS_BACKEND::VULKAN;
 		renderLayerDesc.enableMSAA = false;
 		renderLayerDesc.msaaSampleCount = NK::SAMPLE_COUNT::BIT_8;
-		renderLayerDesc.enableSSAA = false;
+		renderLayerDesc.enableSSAA = true;
 		renderLayerDesc.ssaaMultiplier = 2;
 		renderLayerDesc.window = m_window.get();
 		renderLayerDesc.renderResolution = glm::ivec2(1920, 1080);

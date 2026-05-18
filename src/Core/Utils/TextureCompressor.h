@@ -306,7 +306,7 @@ namespace NK
 		~TextureCompressor();
 		
 		//Takes the file at _inputFilepath and compresses it to a .ktx2, saving the result to _outputFilepath
-		static void KTXCompress(const std::string& _inputFilepath, const bool _srgb, const bool _flipImage, const std::string& _outputFilepath);
+		static void KTXCompress(std::string _inputFilepath, const bool _srgb, const bool _flipImage, std::string _outputFilepath);
 		[[nodiscard]] static ImageData* LoadImage(const std::string& _filepath, bool _flipImage, bool _srgb);
 		
 		static void FreeImage(const ImageData* _imageData);

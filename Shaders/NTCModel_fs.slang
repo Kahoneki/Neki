@@ -232,7 +232,7 @@ G1Features SampleG1(int2 p, uint fl)
 
 
 
-CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
+CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
 {
     uv = frac(uv);
     uint featureLevel = clamp(pc.featureLevel, 0, 3);
@@ -483,9 +483,7 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
 [shader("pixel")]
 float4 main(VertexOutput vertexOutput) : SV_TARGET
 {
-    float distanceToCamera = length(vertexOutput.camPos - vertexOutput.worldPos);
-    float lod = log2(max(1.0, distanceToCamera * 5.0));
-    CoopVec<float16_t, MAX_OUTPUTS> mlpOutput = EvaluateMLP(vertexOutput.texCoord, lod);
+    CoopVec<float16_t, MAX_OUTPUTS> mlpOutput = EvaluateMLP(vertexOutput.texCoord);
     
     PBRMaterialNTC ntcMat = g_materials[pc.materialBufferIndex];
     SamplerState linearSampler = g_samplers[pc.samplerIndex];
@@ -521,7 +519,7 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
 
 
     float3 albedo = pow(saturate(albedoSample.rgb), 2.2);
-    float3 normal = normalize(mul(saturate(normalSample.rgb) * 2.0 - 1.0, TBN));
+    float3 normal = normalize(mul(TBN, saturate(normalSample.rgb) * 2.0 - 1.0));
     float3 emissive = pow(saturate(emissiveSample.rgb), 2.2);
     float metallic = saturate(metallicSample);
     float roughness = saturate(roughnessSample);

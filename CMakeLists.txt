@@ -169,6 +169,11 @@ FetchContent_Declare(stb_image GIT_REPOSITORY https://github.com/nothings/stb.gi
 FetchContent_MakeAvailable(stb_image)
 target_include_directories(Neki PUBLIC ${stb_image_SOURCE_DIR})
 
+#bcdec
+FetchContent_Declare(bcdec GIT_REPOSITORY https://github.com/iOrange/bcdec.git GIT_TAG main)
+FetchContent_MakeAvailable(bcdec)
+target_include_directories(Neki PUBLIC ${bcdec_SOURCE_DIR})
+
 #KTX
 FetchContent_Declare(ktx GIT_REPOSITORY https://github.com/KhronosGroup/KTX-Software.git GIT_TAG v4.4.2)
 set(KTX_FEATURE_TOOLS OFF CACHE BOOL "" FORCE)

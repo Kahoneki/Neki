@@ -2,11 +2,14 @@
 
 #include <RHI/RHIUtils.h>
 
+#include <algorithm>
 #include <cmath>
 #include <ktx.h>
 #include <stb_image.h>
 #include <stb_image_resize2.h>
 #include <thread>
+
+#include "DDSLoader.h"
 #ifdef max
 	#undef max
 #endif
@@ -25,31 +28,71 @@ namespace NK
 
 	
 	
-	void TextureCompressor::KTXCompress(const std::string& _inputFilepath, const bool _srgb, const bool _flipImage, const std::string& _outputFilepath)
+	void TextureCompressor::KTXCompress(std::string _inputFilepath, const bool _srgb, const bool _flipImage, std::string _outputFilepath)
 	{
+		//Replace all \ with /
+		std::ranges::replace(_inputFilepath, '\\', '/');
+		std::ranges::replace(_outputFilepath, '\\', '/');
+		
 		if (!std::filesystem::path(_outputFilepath).parent_path().empty())
 		{
 			std::filesystem::create_directories(std::filesystem::path(_outputFilepath).parent_path());
 		}
-		
-		stbi_set_flip_vertically_on_load(_flipImage);
-		
+
 		int width, height, nrChannels;
-		const int result{ stbi_info(_inputFilepath.c_str(), &width, &height, &nrChannels) };
-		if (!result)
+		unsigned char* pixels;
+		const bool isDDS = _inputFilepath.ends_with(".dds") || _inputFilepath.ends_with(".DDS");
+
+		if (isDDS)
 		{
-			throw std::runtime_error("TextureCompressor::KTXCompress() - failed to read image info for " + _inputFilepath + " - result: " + std::to_string(result));
+			DDSLoadResult dds{ LoadDDS(_inputFilepath) };
+			width = dds.width;
+			height = dds.height;
+			nrChannels = dds.channels;
+
+			//Promote RGB to RGBA to make the gpu happy (same as stb path)
+			if (nrChannels == 3)
+			{
+				constexpr int desiredChannels{ 4 };
+				const std::size_t newSize{ static_cast<size_t>(width) * height * desiredChannels };
+				unsigned char* promoted{ new unsigned char[newSize] };
+				for (int i = 0; i < width * height; ++i)
+				{
+					promoted[i * 4 + 0] = dds.pixels[i * 3 + 0];
+					promoted[i * 4 + 1] = dds.pixels[i * 3 + 1];
+					promoted[i * 4 + 2] = dds.pixels[i * 3 + 2];
+					promoted[i * 4 + 3] = 255;
+				}
+				pixels = promoted;
+				nrChannels = desiredChannels;
+			}
+			else
+			{
+				pixels = new unsigned char[dds.pixels.size()];
+				memcpy(pixels, dds.pixels.data(), dds.pixels.size());
+			}
 		}
-
-		//Determine loading strategy
-		//If rgb, promote to rgba to make the gpu happy
-		//otherwise (1, 2, or 4) just keep it as is
-		const int desiredChannels{ (nrChannels == 3) ? 4 : nrChannels };
-
-		unsigned char* pixels{ stbi_load(_inputFilepath.c_str(), &width, &height, &nrChannels, desiredChannels) };
-		if (!pixels)
+		else
 		{
-			throw std::runtime_error("TextureCompressor::KTXCompress() - failed to load image at " + _inputFilepath);
+			stbi_set_flip_vertically_on_load(_flipImage);
+			
+			int result{ stbi_info(_inputFilepath.c_str(), &width, &height, &nrChannels) };
+			if (!result)
+			{
+				throw std::runtime_error("TextureCompressor::KTXCompress() - failed to read image info for " + _inputFilepath + " - result: " + std::to_string(result));
+			}
+
+			//Determine loading strategy
+			//If rgb, promote to rgba to make the gpu happy
+			//otherwise (1, 2, or 4) just keep it as is
+			const int desiredChannels{ (nrChannels == 3) ? 4 : nrChannels };
+
+			pixels = stbi_load(_inputFilepath.c_str(), &width, &height, &nrChannels, desiredChannels);
+			if (!pixels)
+			{
+				throw std::runtime_error("TextureCompressor::KTXCompress() - failed to load image at " + _inputFilepath);
+			}
+			nrChannels = desiredChannels;
 		}
 
 		//Determine num mip levels (down to 1x1)
@@ -58,7 +101,7 @@ namespace NK
 		//Determine input format and resize layout
 		VkFormat vkFormat{ VK_FORMAT_UNDEFINED };
 		stbir_pixel_layout resizeLayout;
-		switch (desiredChannels)
+		switch (nrChannels)
 		{
 		case 1: 
 			vkFormat = _srgb ? VK_FORMAT_R8_SRGB : VK_FORMAT_R8_UNORM; 
@@ -73,8 +116,8 @@ namespace NK
 			resizeLayout = STBIR_RGBA;
 			break;
 		default:
-			stbi_image_free(pixels);
-			throw std::runtime_error("TextureCompressor::KTXCompress() - unsupported channel count: " + std::to_string(desiredChannels));
+			if (isDDS) { delete[] pixels; } else { stbi_image_free(pixels); }
+			throw std::runtime_error("TextureCompressor::KTXCompress() - unsupported channel count: " + std::to_string(nrChannels));
 		}
 
 		//create the ktx texture
@@ -94,22 +137,22 @@ namespace NK
 		KTX_error_code ktxResult{ ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &texture) };
 		if (ktxResult != KTX_SUCCESS)
 		{
-			stbi_image_free(pixels);
+			if (isDDS) { delete[] pixels; } else { stbi_image_free(pixels); }
 			throw std::runtime_error("TextureCompressor::KTXCompress() - ktxTexture2_Create failed: " + std::string(ktxErrorString(ktxResult)));
 		}
 
 		//Set level 0 (base image)
-		ktxResult = ktxTexture_SetImageFromMemory(ktxTexture(texture), 0, 0, 0, pixels, width * height * desiredChannels); //todo: add array support, cube support, 3d texture support, yada yada - also why is this a macro
+		ktxResult = ktxTexture_SetImageFromMemory(ktxTexture(texture), 0, 0, 0, pixels, width * height * nrChannels); //todo: add array support, cube support, 3d texture support, yada yada - also why is this a macro
 		if (ktxResult != KTX_SUCCESS)
 		{
-			stbi_image_free(pixels);
+			if (isDDS) { delete[] pixels; } else { stbi_image_free(pixels); }
 			ktxTexture2_Destroy(texture);
 			throw std::runtime_error("TextureCompressor::KTXCompress() - ktxTexture_SetImageFromMemory (level 0) failed: " + std::string(ktxErrorString(ktxResult)));
 		}
 
 		//Generate and set mipmaps (levels 1 to numLevels)
-		std::vector<unsigned char> srcBuffer(pixels, pixels + (width * height * desiredChannels));
-		stbi_image_free(pixels); //Free original STBI memory (it's been stored in the vector)
+		std::vector<unsigned char> srcBuffer(pixels, pixels + (width * height * nrChannels));
+		if (isDDS) { delete[] pixels; } else { stbi_image_free(pixels); } //Free original memory (it's been stored in the vector)
 
 		std::int32_t currentW{ width };
 		std::int32_t currentH{ height };
@@ -119,7 +162,7 @@ namespace NK
 		{
 			const std::int32_t nextW{ std::max(1, currentW / 2) };
 			const std::int32_t nextH{ std::max(1, currentH / 2) };
-			const std::int32_t nextSize{ nextW * nextH * desiredChannels };
+			const std::int32_t nextSize{ nextW * nextH * nrChannels };
 			std::vector<unsigned char> dstBuffer(nextSize);
 
 			//Generate the mip with stbir resize
@@ -159,29 +202,29 @@ namespace NK
 		}
 
 		//todo: try with and without this
-//		//pre-transcode to bcn for fast loads
-//		ktx_transcode_fmt_e targetFormat{ KTX_TTF_NOSELECTION };
-//		switch (desiredChannels)
-//		{
-//		case 1:
-//			targetFormat = KTX_TTF_BC4_R; 
-//			break;
-//		case 2: 
-//			targetFormat = KTX_TTF_BC5_RG; 
-//			break;
-//		case 4: 
-//			targetFormat = KTX_TTF_BC7_RGBA; 
-//			break;
-//		default:
-//			throw std::runtime_error("TextureCompressor::BlockCompress() pre-transcode switch default case reached - desiredChannels = " + std::to_string(desiredChannels));
-//		}
-//
-//		ktxResult = ktxTexture2_TranscodeBasis(texture, targetFormat, 0);
-//		if (ktxResult != KTX_SUCCESS)
-//		{
-//			ktxTexture2_Destroy(texture);
-//			throw std::runtime_error("TextureCompressor::BlockCompress() - ktxTexture2_TranscodeBasis failed: " + std::string(ktxErrorString(ktxResult)));
-//		}
+	//	//pre-transcode to bcn for fast loads
+	//	ktx_transcode_fmt_e targetFormat{ KTX_TTF_NOSELECTION };
+	//	switch (nrChannels)
+	//	{
+	//	case 1:
+	//		targetFormat = KTX_TTF_BC4_R; 
+	//		break;
+	//	case 2: 
+	//		targetFormat = KTX_TTF_BC5_RG; 
+	//		break;
+	//	case 4: 
+	//		targetFormat = KTX_TTF_BC7_RGBA; 
+	//		break;
+	//	default:
+	//		throw std::runtime_error("TextureCompressor::BlockCompress() pre-transcode switch default case reached - nrChannels = " + std::to_string(nrChannels));
+	//	}
+	//
+	//	ktxResult = ktxTexture2_TranscodeBasis(texture, targetFormat, 0);
+	//	if (ktxResult != KTX_SUCCESS)
+	//	{
+	//		ktxTexture2_Destroy(texture);
+	//		throw std::runtime_error("TextureCompressor::BlockCompress() - ktxTexture2_TranscodeBasis failed: " + std::string(ktxErrorString(ktxResult)));
+	//	}
 
 		ktxResult = ktxTexture_WriteToNamedFile(ktxTexture(texture), _outputFilepath.c_str());
 		if (ktxResult != KTX_SUCCESS)
@@ -189,6 +232,8 @@ namespace NK
 			ktxTexture2_Destroy(texture);
 			throw std::runtime_error("TextureCompressor::KTXCompress() - ktxTexture_WriteToNamedFile for filepath " + _outputFilepath + " failed: " + std::string(ktxErrorString(ktxResult)));
 		}
+
+		ktxTexture2_Destroy(texture);
 	}
 
 

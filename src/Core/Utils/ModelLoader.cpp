@@ -520,7 +520,7 @@ namespace NK
 					//Texture was added, compress to ktx2
 					std::string& filepath{ materials[i].allTextures.at(std::to_underlying(_dst)).first };
 					const std::string newFilepath{ (textureDirectory / std::filesystem::path(filepath).filename()).replace_extension(".ktx2").string() };
-					TextureCompressor::KTXCompress(filepath, materials[i].allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
+					// TextureCompressor::KTXCompress(filepath, materials[i].allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
 					filepath = std::filesystem::path(newFilepath).string(); //filepath is a reference so this is modifying the lookup entry to point to the new ktx2 texture
 				}
 			}};
