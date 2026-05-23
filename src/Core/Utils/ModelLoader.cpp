@@ -189,11 +189,6 @@ namespace NK
 		{
 			std::filesystem::create_directories(outputDir);
 		}
-		const std::filesystem::path outputTextureDir{ outputDir / "Textures" };
-		if (!outputTextureDir.empty())
-		{
-			std::filesystem::create_directories(outputTextureDir);
-		}
 		
 		DiskModel diskModel;
 		diskModel.magic = "NKMODEL";
@@ -455,6 +450,7 @@ namespace NK
 		                                        aiProcess_CalcTangentSpace |	//Calculate tangents and bitangents (required for TBN in normal mapping)
 		                                        aiProcess_MakeLeftHanded |
 		                                        aiProcess_JoinIdenticalVertices |
+		                                        aiProcess_PreTransformVertices |
 		                                        (_flipFaceWinding ? aiProcess_FlipWindingOrder : 0)
 		                                       ) };
 
@@ -518,7 +514,7 @@ namespace NK
 				{
 					//Texture was added, compress to ktx2
 					std::string& filepath{ materials[i].allTextures.at(std::to_underlying(_dst)).first };
-					const std::string newFilepath{ (_serialisedModelOutputDirectory / std::filesystem::path(filepath)).replace_extension(".ktx2").string() };
+					const std::string newFilepath{ (_serialisedModelOutputDirectory / std::filesystem::path(filepath)).lexically_normal().replace_extension(".ktx2").string() };
 					TextureCompressor::KTXCompress(std::filesystem::path(_filepath).parent_path() / filepath, materials[i].allTextures.at(std::to_underlying(_dst)).second, _flipTextures, newFilepath);
 					filepath = std::filesystem::path(newFilepath).string(); //filepath is a reference so this is modifying the lookup entry to point to the new ktx2 texture
 				}
@@ -987,6 +983,7 @@ namespace NK
 		
 		//Replace all \ with /
 		std::ranges::replace(filepath, '\\', '/');
+		filepath = std::filesystem::path(filepath).replace_extension(".png").string();
 		
 		auto isColour = [&]()
 		{

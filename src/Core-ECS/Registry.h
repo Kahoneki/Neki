@@ -303,8 +303,19 @@ namespace NK
 				throw std::invalid_argument("Registry::CopyEntity() - provided _entity (" + std::to_string(_entity) + ") is not in registry.");
 			}
 
+			const CTransform& srcTransform{ GetComponent<CTransform>(_entity) };
+			const glm::vec3 localPos{ srcTransform.GetLocalPosition() };
+			const glm::quat localRot{ srcTransform.GetLocalRotationQuat() };
+			const glm::vec3 localScale{ srcTransform.GetLocalScale() };
+			const std::string name{ srcTransform.name };
+			std::vector<Entity> childEntities{};
+			for (CTransform* child : srcTransform.children)
+			{
+				childEntities.push_back(GetEntity(*child));
+			}
+			const std::vector<std::type_index> componentTypes{ m_entityComponents.at(_entity) };
 			const Entity newEntity{ Create() };
-			for (const std::type_index& typeIndex : m_entityComponents.at(_entity))
+			for (const std::type_index& typeIndex : componentTypes)
 			{
 				if (typeIndex == std::type_index(typeid(CTransform)))
 				{
@@ -313,18 +324,15 @@ namespace NK
 				m_componentPools.at(typeIndex)->CopyComponentToEntity(*this, _entity, newEntity);
 			}
 
-			const CTransform& srcTransform{ GetComponent<CTransform>(_entity) };
-			CTransform& dstTransform{ GetComponent<CTransform>(newEntity) };
+			GetComponent<CTransform>(newEntity).SetLocalPosition(localPos);
+			GetComponent<CTransform>(newEntity).SetLocalRotation(localRot);
+			GetComponent<CTransform>(newEntity).SetLocalScale(localScale);
+			GetComponent<CTransform>(newEntity).name = name;
 
-			dstTransform.SetLocalPosition(srcTransform.GetLocalPosition());
-			dstTransform.SetLocalRotation(srcTransform.GetLocalRotationQuat());
-			dstTransform.SetLocalScale(srcTransform.GetLocalScale());
-			dstTransform.name = srcTransform.name;
-
-			for (CTransform* child : srcTransform.children)
+			for (const Entity childEntity : childEntities)
 			{
-				const Entity childCopy{ CopyEntity(GetEntity(*child)) };
-				GetComponent<CTransform>(childCopy).SetParent(*this, &dstTransform);
+				const Entity childCopy{ CopyEntity(childEntity) };
+				GetComponent<CTransform>(childCopy).SetParent(*this, &GetComponent<CTransform>(newEntity));
 			}
 
 			return newEntity;

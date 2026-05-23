@@ -182,7 +182,7 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
 	float3 R = reflect(-_V, _N);
 	
 	//Specular IBL (prefiltered environment map + brdf lut)
-	const float MAX_REFLECTION_LOD = 4.0; //todo: use the actual number of mip levels
+	const float MAX_REFLECTION_LOD = 10.0; //todo: use the actual number of mip levels
 	float3 prefilteredColour = g_cubemaps[NonUniformResourceIndex(PC(prefilterCubemapIndex))].SampleLevel(g_samplers[NonUniformResourceIndex(PC(samplerIndex))], R, _roughness * MAX_REFLECTION_LOD).rgb;
 	float2 brdfLUT = g_textures[NonUniformResourceIndex(PC(brdfLUTIndex))].Sample(g_samplers[NonUniformResourceIndex(PC(brdfLUTSamplerIndex))], float2(NDotV, _roughness)).rg;
 	float3 specularIBL = prefilteredColour * (_F0 * brdfLUT.x + brdfLUT.y);
@@ -209,16 +209,10 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
 [shader("pixel")]
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
-	
     NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
     SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 	StructuredBuffer<LightData> lightBuffer = g_lightData[NonUniformResourceIndex(PC(lightDataBufferIndex))];
 
-    float4 albedoSample = g_textures[NonUniformResourceIndex(material.baseColourIdx)].Sample(linearSampler, vertexOutput.texCoord);
-	float4 normalSample = g_textures[NonUniformResourceIndex(material.normalIdx)].Sample(linearSampler, vertexOutput.texCoord);
-    float4 metallicSample = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
-    float4 roughnessSample = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(linearSampler, vertexOutput.texCoord);
-    float4 emissiveSample = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(linearSampler, vertexOutput.texCoord);
 
 	float3x3 TBN = transpose(float3x3(
     	vertexOutput.TBN_T,
@@ -226,12 +220,35 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
     	vertexOutput.TBN_N
 	));
 
-    float3 albedo = albedoSample.rgb;
-    float3 normal = normalize(mul(TBN, normalSample.rgb * 2.0 - 1.0));
-    float metallic = metallicSample.b;
-    float roughness = roughnessSample.g;
-    float3 emissive = emissiveSample.rgb;
-	return float4(albedo,1);
+
+	float3 albedo = float3(0,0,0);
+	if (material.hasBaseColour) { albedo = g_textures[NonUniformResourceIndex(material.baseColourIdx)].Sample(linearSampler, vertexOutput.texCoord).rgb; }
+	else { return float4(1,0,1,1); } //Magenta
+
+	float3 normal = float3(0,0,0);
+	if (material.hasNormal) { normal = normalize(mul(TBN, g_textures[NonUniformResourceIndex(material.normalIdx)].Sample(linearSampler, vertexOutput.texCoord).rgb * 2.0 - 1.0)); }
+	else { discard; }
+
+	float metallic = 0.0f;
+	if (material.hasMetalness) { metallic = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(linearSampler, vertexOutput.texCoord).b; }
+
+	float roughness = 1.0f;
+	if (material.hasRoughness) { roughness = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(linearSampler, vertexOutput.texCoord).g; }
+
+	float3 emissive = float3(0,0,0);
+	if (material.hasEmissive) { emissive = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(linearSampler, vertexOutput.texCoord).rgb; }
+
+	
+	//Anti-aliasing (specular speckle) fix
+	// Find how rapidly the normal is changing across screen pixels
+	float3 dndx = ddx(normal);
+	float3 dndy = ddy(normal);
+	float variance = max(dot(dndx, dndx), dot(dndy, dndy));
+
+	// Add the variance to the roughness. The further away/steeper the angle, the rougher it gets.
+	float minRoughness = 0.04f; // Never let roughness hit absolute zero to prevent math blowups
+	roughness = clamp(roughness + variance, minRoughness, 1.0f);
+
 
     float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); //frag pos to camera
 
@@ -323,8 +340,6 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	
 	
 	float3 irradiance = g_cubemaps[NonUniformResourceIndex(PC(irradianceCubemapIndex))].Sample(g_samplers[NonUniformResourceIndex(PC(samplerIndex))], normal).rgb;
-	//if (irradiance.r > 2.0f || irradiance.g > 2.0f || irradiance.b > 2.0f) { return float4(1.0f, 0.0f, 1.0f, 1.0f); }
-
 
     float3 colour = totalDirectLighting + ambientLighting + emissive;
 

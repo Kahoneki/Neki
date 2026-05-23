@@ -1856,10 +1856,14 @@ namespace NK
 				if (ImGui::BeginPopupContextItem())
 				{
 					//Unselect selected entity if exists
+					std::vector<Entity> toDeselect{};
 					for (auto&& [selected] : m_reg.get().View<CSelected>())
 					{
-						m_reg.get().RemoveComponent<CSelected>(m_reg.get().GetEntity(selected));
-						break; //todo: if i decide to make it so you can select multiple entities, this will need to be removed and the loop will need to be changed to get all entities with CSelected then delete them after (to avoid iterator invalidation in ComponentView)
+						toDeselect.push_back(m_reg.get().GetEntity(selected));
+					}
+					for (const Entity e : toDeselect)
+					{
+						m_reg.get().RemoveComponent<CSelected>(e);
 					}
 					
 					if (ImGui::MenuItem("Paste", nullptr, false, m_copiedEntity != UINT32_MAX))
@@ -2236,11 +2240,15 @@ namespace NK
 		if (ImGui::Selectable(label, isSelected))
 		{
 			//Clear previous selection (only one selection is allowed at a time)
+			std::vector<Entity> toDeselect{};
 			for (auto&& [selected] : m_reg.get().View<CSelected>())
 			{
-				m_reg.get().RemoveComponent<CSelected>(m_reg.get().GetEntity(selected));
+				toDeselect.push_back(m_reg.get().GetEntity(selected));
 			}
-					
+			for (const Entity e : toDeselect)
+			{
+				m_reg.get().RemoveComponent<CSelected>(e);
+			}
 			if (!isSelected)
 			{
 				m_reg.get().AddComponent<CSelected>(entity);
@@ -2285,15 +2293,15 @@ namespace NK
 			if (ImGui::MenuItem("Paste"))
 			{
 				Entity newEntity{ m_reg.get().CopyEntity(m_copiedEntity) };
+				CTransform* pasteParent{ nullptr };
 				
 				//If an entity is currently selected, the copied entity should be pasted to the same tree-level as the selected entity (i.e.: the pasted entity's parent should be set to the selected entity's parent)
 				for (auto&& [selected] : m_reg.get().View<CSelected>())
 				{
-					CTransform& newEntityTransform{ m_reg.get().GetComponent<CTransform>(newEntity) };
-					const CTransform& selectedEntityTransform{ m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(selected)) };
-					newEntityTransform.SetParent(m_reg.get(), selectedEntityTransform.GetParent());
+					pasteParent = m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(selected)).GetParent();
 					break; //It's currently not possible to select more than one entity, if i ever add this functionality though, then todo: figure out what to do about pasting when multiple entities are selected
 				}
+				m_reg.get().GetComponent<CTransform>(newEntity).SetParent(m_reg.get(), pasteParent);
 			}
 
 			ImGui::EndPopup();
@@ -2563,6 +2571,8 @@ namespace NK
 			
 			for (std::size_t localMeshIdx{ 0 }; localMeshIdx < modelRenderer.meshDataLoadInfos.size(); ++localMeshIdx)
 			{
+				// if (localMeshIdx < 57 || localMeshIdx > 65) { continue; }
+				
 				//In case entity has been destroyed
 				if (!m_reg.get().EntityInRegistry(m_modelMatricesEntitiesLookups[m_currentFrame][localMeshIdx]))
 				{
@@ -2597,6 +2607,7 @@ namespace NK
 							//Inside model, so override visibility flag
 							isVisible = true;
 						}
+						isVisible = true;
 					}
 					if (modelRenderer.meshVisibilityIndices[localMeshIdx] != 0xFFFFFFFF)
 					{
