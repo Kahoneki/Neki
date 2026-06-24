@@ -219,7 +219,8 @@ namespace NK
 		UniquePtr<IShader> m_shadowFragShader;
 		UniquePtr<IShader> m_skyboxFragShader;
 		UniquePtr<IShader> m_blinnPhongFragShader;
-		UniquePtr<IShader> m_pbrFragShader;
+		UniquePtr<IShader> m_pbrMetallicRoughnessFragShader;
+		UniquePtr<IShader> m_pbrSpecularGlossinessFragShader;
 		UniquePtr<IShader> m_ntcPBRFragShader;
 		UniquePtr<IShader> m_postprocessFragShader;
 		UniquePtr<IShader> m_meshVisibilityFragShader;
@@ -323,7 +324,8 @@ namespace NK
 		UniquePtr<IPipeline> m_shadowPipeline;
 		UniquePtr<IPipeline> m_skyboxPipeline;
 		UniquePtr<IPipeline> m_blinnPhongPipeline;
-		UniquePtr<IPipeline> m_pbrPipeline;
+		UniquePtr<IPipeline> m_pbrMetallicRoughnessPipeline;
+		UniquePtr<IPipeline> m_pbrSpecularGlossinessPipeline;
 		UniquePtr<IPipeline> m_ntcPBRPipeline;
 		UniquePtr<IPipeline> m_prefixSumPipeline;
 		UniquePtr<IPipeline> m_postprocessPipeline;

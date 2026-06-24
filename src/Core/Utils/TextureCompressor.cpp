@@ -104,15 +104,15 @@ namespace NK
 		switch (nrChannels)
 		{
 		case 1: 
-			vkFormat = _srgb ? VK_FORMAT_R8_SRGB : VK_FORMAT_R8_UNORM; 
+			vkFormat = _srgb ? VK_FORMAT_R8_SRGB : VK_FORMAT_R8_UNORM;
 			resizeLayout = STBIR_1CHANNEL;
 			break;
 		case 2: 
-			vkFormat = _srgb ? VK_FORMAT_R8G8_SRGB : VK_FORMAT_R8G8_UNORM; 
+			vkFormat = _srgb ? VK_FORMAT_R8G8_SRGB : VK_FORMAT_R8G8_UNORM;
 			resizeLayout = STBIR_RA;
 			break;
 		case 4: 
-			vkFormat = _srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM; 
+			vkFormat = _srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
 			resizeLayout = STBIR_RGBA;
 			break;
 		default:

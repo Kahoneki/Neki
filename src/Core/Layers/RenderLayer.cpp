@@ -597,8 +597,10 @@ namespace NK
 		m_shadowFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/MeshBlinnPhong_fs";
 		m_blinnPhongFragShader = m_device->CreateShader(fragShaderDesc);
-		fragShaderDesc.filepath = "Shaders/MeshPBR_fs";
-		m_pbrFragShader = m_device->CreateShader(fragShaderDesc);
+		fragShaderDesc.filepath = "Shaders/MeshPBRMetallicRoughness_fs";
+		m_pbrMetallicRoughnessFragShader = m_device->CreateShader(fragShaderDesc);
+		fragShaderDesc.filepath = "Shaders/MeshPBRSpecularGlossiness_fs";
+		m_pbrSpecularGlossinessFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/NTCModel_fs";
 		m_ntcPBRFragShader = m_device->CreateShader(fragShaderDesc, true);
 		fragShaderDesc.filepath = "Shaders/Skybox_fs";
@@ -860,8 +862,11 @@ namespace NK
 
 		m_blinnPhongPipeline = m_device->CreatePipeline(pipelineDesc);
 
-		pipelineDesc.fragmentShader = m_pbrFragShader.get();
-		m_pbrPipeline = m_device->CreatePipeline(pipelineDesc);
+		pipelineDesc.fragmentShader = m_pbrMetallicRoughnessFragShader.get();
+		m_pbrMetallicRoughnessPipeline = m_device->CreatePipeline(pipelineDesc);
+		
+		pipelineDesc.fragmentShader = m_pbrSpecularGlossinessFragShader.get();
+		m_pbrSpecularGlossinessPipeline = m_device->CreatePipeline(pipelineDesc);
 		
 		pipelineDesc.vertexShader = m_ntcVertShader.get();
 		pipelineDesc.fragmentShader = m_ntcPBRFragShader.get();
@@ -1244,7 +1249,10 @@ namespace NK
 					}
 					else
 					{
-						IPipeline* pipeline{ (mat->lightingModel == LIGHTING_MODEL::BLINN_PHONG ? m_blinnPhongPipeline.get() : m_pbrPipeline.get()) };
+						IPipeline* pipeline;
+						if (mat->lightingModel == LIGHTING_MODEL::BLINN_PHONG) { pipeline = m_blinnPhongPipeline.get(); }
+						else if (mat->lightingModel == LIGHTING_MODEL::PBR_METALLIC_ROUGHNESS) { pipeline = m_pbrMetallicRoughnessPipeline.get(); }
+						else if (mat->lightingModel == LIGHTING_MODEL::PBR_SPECULAR_GLOSSINESS) { pipeline = m_pbrSpecularGlossinessPipeline.get(); }
 						_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
 						_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
 					}
@@ -2571,8 +2579,6 @@ namespace NK
 			
 			for (std::size_t localMeshIdx{ 0 }; localMeshIdx < modelRenderer.meshDataLoadInfos.size(); ++localMeshIdx)
 			{
-				// if (localMeshIdx < 57 || localMeshIdx > 65) { continue; }
-				
 				//In case entity has been destroyed
 				if (!m_reg.get().EntityInRegistry(m_modelMatricesEntitiesLookups[m_currentFrame][localMeshIdx]))
 				{
@@ -2713,36 +2719,50 @@ namespace NK
 									shaderIdx = m_gpuTextureCache[texPath]->view->GetIndex();
 								} };
 								
-								if (cpuMaterial.pipeline == LIGHTING_MODEL::PHYSICALLY_BASED)
+								if (cpuMaterial.pipeline == LIGHTING_MODEL::PBR_METALLIC_ROUGHNESS)
 								{
-									PBRMaterial& pbr = std::get<PBRMaterial>(cpuMaterial.shaderMaterialData);
-									if (pbr.hasBaseColour) { processTextureIdx(pbr.baseColourIdx); }
-									if (pbr.hasMetalness)  { processTextureIdx(pbr.metalnessIdx); }
-									if (pbr.hasRoughness)  { processTextureIdx(pbr.roughnessIdx); }
-									if (pbr.hasSpecular)   { processTextureIdx(pbr.specularIdx); }
-									if (pbr.hasShininess)  { processTextureIdx(pbr.shininessIdx); }
-									if (pbr.hasNormal)     { processTextureIdx(pbr.normalIdx); }
-									if (pbr.hasAO)         { processTextureIdx(pbr.aoIdx); }
-									if (pbr.hasEmissive)   { processTextureIdx(pbr.emissiveIdx); }
-									if (pbr.hasOpacity)    { processTextureIdx(pbr.opacityIdx); }
-									if (pbr.hasHeight)     { processTextureIdx(pbr.heightIdx); }
+									PBRMetallicRoughnessMaterial& pbr{ std::get<PBRMetallicRoughnessMaterial>(cpuMaterial.shaderMaterialData) };
+									if (pbr.hasBaseColour)   { processTextureIdx(pbr.baseColourIdx); }
+									if (pbr.hasMetalness)    { processTextureIdx(pbr.metalnessIdx); }
+									if (pbr.hasRoughness)    { processTextureIdx(pbr.roughnessIdx); }
+									if (pbr.hasSpecular)     { processTextureIdx(pbr.specularIdx); }
+									if (pbr.hasShininess)    { processTextureIdx(pbr.shininessIdx); }
+									if (pbr.hasNormal)       { processTextureIdx(pbr.normalIdx); }
+									if (pbr.hasAO)           { processTextureIdx(pbr.aoIdx); }
+									if (pbr.hasEmissive)     { processTextureIdx(pbr.emissiveIdx); }
+									if (pbr.hasOpacity)      { processTextureIdx(pbr.opacityIdx); }
+									if (pbr.hasHeight)       { processTextureIdx(pbr.heightIdx); }
 									if (pbr.hasDisplacement) { processTextureIdx(pbr.displacementIdx); }
-									if (pbr.hasReflection) { processTextureIdx(pbr.reflectionIdx); }
+									if (pbr.hasReflection)   { processTextureIdx(pbr.reflectionIdx); }
 								}
-								else
+								else if (cpuMaterial.pipeline == LIGHTING_MODEL::PBR_SPECULAR_GLOSSINESS)
 								{
-									BlinnPhongMaterial& bp = std::get<BlinnPhongMaterial>(cpuMaterial.shaderMaterialData);
-									if (bp.hasDiffuse)  { processTextureIdx(bp.diffuseIdx); }
-									if (bp.hasSpecular) { processTextureIdx(bp.specularIdx); }
-									if (bp.hasAmbient)  { processTextureIdx(bp.ambientIdx); }
-									if (bp.hasEmissive) { processTextureIdx(bp.emissiveIdx); }
-									if (bp.hasNormal)   { processTextureIdx(bp.normalIdx); }
-									if (bp.hasShininess) { processTextureIdx(bp.shininessIdx); }
-									if (bp.hasOpacity)  { processTextureIdx(bp.opacityIdx); }
-									if (bp.hasHeight)   { processTextureIdx(bp.heightIdx); }
+									PBRSpecularGlossinessMaterial& pbr{ std::get<PBRSpecularGlossinessMaterial>(cpuMaterial.shaderMaterialData) };
+									if (pbr.hasDiffuse)      { processTextureIdx(pbr.diffuseIdx); }
+									if (pbr.hasSpecular)     { processTextureIdx(pbr.specularIdx); }
+									if (pbr.hasGlossiness)   { processTextureIdx(pbr.glossinessIdx); }
+									if (pbr.hasNormal)       { processTextureIdx(pbr.normalIdx); }
+									if (pbr.hasAO)           { processTextureIdx(pbr.aoIdx); }
+									if (pbr.hasEmissive)     { processTextureIdx(pbr.emissiveIdx); }
+									if (pbr.hasOpacity)      { processTextureIdx(pbr.opacityIdx); }
+									if (pbr.hasHeight)       { processTextureIdx(pbr.heightIdx); }
+									if (pbr.hasDisplacement) { processTextureIdx(pbr.displacementIdx); }
+									if (pbr.hasReflection)   { processTextureIdx(pbr.reflectionIdx); }
+								}
+								else if (cpuMaterial.pipeline == LIGHTING_MODEL::BLINN_PHONG)
+								{
+									BlinnPhongMaterial& bp{ std::get<BlinnPhongMaterial>(cpuMaterial.shaderMaterialData) };
+									if (bp.hasDiffuse)      { processTextureIdx(bp.diffuseIdx); }
+									if (bp.hasSpecular)     { processTextureIdx(bp.specularIdx); }
+									if (bp.hasAmbient)      { processTextureIdx(bp.ambientIdx); }
+									if (bp.hasEmissive)     { processTextureIdx(bp.emissiveIdx); }
+									if (bp.hasNormal)       { processTextureIdx(bp.normalIdx); }
+									if (bp.hasShininess)    { processTextureIdx(bp.shininessIdx); }
+									if (bp.hasOpacity)      { processTextureIdx(bp.opacityIdx); }
+									if (bp.hasHeight)       { processTextureIdx(bp.heightIdx); }
 									if (bp.hasDisplacement) { processTextureIdx(bp.displacementIdx); }
-									if (bp.hasLightmap) { processTextureIdx(bp.lightmapIdx); }
-									if (bp.hasReflection) { processTextureIdx(bp.reflectionIdx); }
+									if (bp.hasLightmap)     { processTextureIdx(bp.lightmapIdx); }
+									if (bp.hasReflection)   { processTextureIdx(bp.reflectionIdx); }
 								}
 
 								m_gpuMaterialCache[matPath] = m_gpuUploader->EnqueueMaterialDataUpload(&cpuMaterial);

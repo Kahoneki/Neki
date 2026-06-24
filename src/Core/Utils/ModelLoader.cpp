@@ -545,12 +545,13 @@ namespace NK
 			
 			//Determine lighting model
 			auto hasTex{ [&](const MODEL_TEXTURE_TYPE _tex) { return !materials[i].allTextures[std::to_underlying(_tex)].first.empty(); } };
-			const bool isPBR{	hasTex(MODEL_TEXTURE_TYPE::METALNESS)			||
-								hasTex(MODEL_TEXTURE_TYPE::ROUGHNESS)			||
-								hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR)			||
-								hasTex(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION)	||
-								hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) };
-			materials[i].pipeline = (isPBR ? LIGHTING_MODEL::PHYSICALLY_BASED : LIGHTING_MODEL::BLINN_PHONG);
+
+			const bool isMetalRough{ hasTex(MODEL_TEXTURE_TYPE::METALNESS) || hasTex(MODEL_TEXTURE_TYPE::ROUGHNESS) || hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR) };
+			const bool isSpecGloss{ hasTex(MODEL_TEXTURE_TYPE::SPECULAR) && (hasTex(MODEL_TEXTURE_TYPE::DIFFUSE) || hasTex(MODEL_TEXTURE_TYPE::SHININESS)) };
+
+			if (isMetalRough) { materials[i].pipeline = LIGHTING_MODEL::PBR_METALLIC_ROUGHNESS; }
+			else if (isSpecGloss) { materials[i].pipeline = LIGHTING_MODEL::PBR_SPECULAR_GLOSSINESS; }
+			else { materials[i].pipeline = LIGHTING_MODEL::BLINN_PHONG; }
 			
 			//Populate shader material data
 			switch (materials[i].pipeline)
@@ -588,10 +589,10 @@ namespace NK
 				break;
 			}
 
-			case LIGHTING_MODEL::PHYSICALLY_BASED:
+			case LIGHTING_MODEL::PBR_METALLIC_ROUGHNESS:
 			{
-				materials[i].shaderMaterialData = PBRMaterial{};
-				PBRMaterial& material{ std::get<PBRMaterial>(materials[i].shaderMaterialData) };
+				materials[i].shaderMaterialData = PBRMetallicRoughnessMaterial{};
+				PBRMetallicRoughnessMaterial& material{ std::get<PBRMetallicRoughnessMaterial>(materials[i].shaderMaterialData) };
 
 				//Convenient workaround - see explanation in CPUMaterial declaration (ModelLoader.h)
 				material.baseColourIdx		= hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR) ? static_cast<int>(MODEL_TEXTURE_TYPE::BASE_COLOUR) : static_cast<int>(MODEL_TEXTURE_TYPE::DIFFUSE);
@@ -619,7 +620,40 @@ namespace NK
 				material.hasHeight			= hasTex(MODEL_TEXTURE_TYPE::HEIGHT) ? 1 : 0;
 				material.hasDisplacement	= hasTex(MODEL_TEXTURE_TYPE::DISPLACEMENT) ? 1 : 0;
 				material.hasReflection		= hasTex(MODEL_TEXTURE_TYPE::REFLECTION) ? 1 : 0;
-				
+    
+				material.hasMetalness = 1;
+				material.hasRoughness = 1;
+				// material.hasAO        = 1;
+					
+				break;
+			}
+			case LIGHTING_MODEL::PBR_SPECULAR_GLOSSINESS:
+			{
+				materials[i].shaderMaterialData = PBRSpecularGlossinessMaterial{};
+				PBRSpecularGlossinessMaterial& material{ std::get<PBRSpecularGlossinessMaterial>(materials[i].shaderMaterialData) };
+
+				material.diffuseIdx         = hasTex(MODEL_TEXTURE_TYPE::DIFFUSE) ? static_cast<int>(MODEL_TEXTURE_TYPE::DIFFUSE) : static_cast<int>(MODEL_TEXTURE_TYPE::BASE_COLOUR);
+				material.specularIdx        = static_cast<int>(MODEL_TEXTURE_TYPE::SPECULAR);
+				material.glossinessIdx      = static_cast<int>(MODEL_TEXTURE_TYPE::SHININESS);
+				material.normalIdx          = static_cast<int>(MODEL_TEXTURE_TYPE::NORMAL);
+				material.aoIdx              = hasTex(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION) ? static_cast<int>(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION) : hasTex(MODEL_TEXTURE_TYPE::LIGHTMAP) ? static_cast<int>(MODEL_TEXTURE_TYPE::LIGHTMAP) : static_cast<int>(MODEL_TEXTURE_TYPE::AMBIENT);
+				material.emissiveIdx        = hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) ? static_cast<int>(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) : static_cast<int>(MODEL_TEXTURE_TYPE::EMISSIVE);
+				material.opacityIdx         = static_cast<int>(MODEL_TEXTURE_TYPE::OPACITY);
+				material.heightIdx          = static_cast<int>(MODEL_TEXTURE_TYPE::HEIGHT);
+				material.displacementIdx    = static_cast<int>(MODEL_TEXTURE_TYPE::DISPLACEMENT);
+				material.reflectionIdx      = static_cast<int>(MODEL_TEXTURE_TYPE::REFLECTION);
+
+				material.hasDiffuse         = hasTex(MODEL_TEXTURE_TYPE::DIFFUSE) || hasTex(MODEL_TEXTURE_TYPE::BASE_COLOUR) ? 1 : 0;
+				material.hasSpecular        = hasTex(MODEL_TEXTURE_TYPE::SPECULAR) ? 1 : 0;
+				material.hasGlossiness      = hasTex(MODEL_TEXTURE_TYPE::SHININESS) ? 1 : 0;
+				material.hasNormal          = hasTex(MODEL_TEXTURE_TYPE::NORMAL) ? 1 : 0;
+				material.hasAO              = hasTex(MODEL_TEXTURE_TYPE::AMBIENT_OCCLUSION) || hasTex(MODEL_TEXTURE_TYPE::LIGHTMAP) || hasTex(MODEL_TEXTURE_TYPE::AMBIENT) ? 1 : 0;
+				material.hasEmissive        = hasTex(MODEL_TEXTURE_TYPE::EMISSION_COLOUR) || hasTex(MODEL_TEXTURE_TYPE::EMISSIVE) ? 1 : 0;
+				material.hasOpacity         = hasTex(MODEL_TEXTURE_TYPE::OPACITY) ? 1 : 0;
+				material.hasHeight          = hasTex(MODEL_TEXTURE_TYPE::HEIGHT) ? 1 : 0;
+				material.hasDisplacement    = hasTex(MODEL_TEXTURE_TYPE::DISPLACEMENT) ? 1 : 0;
+				material.hasReflection      = hasTex(MODEL_TEXTURE_TYPE::REFLECTION) ? 1 : 0;
+
 				break;
 			}
 			}
@@ -699,11 +733,11 @@ namespace NK
 			auto TryAddTexture{[&](MODEL_TEXTURE_TYPE _nekiType, aiTextureType _aiType, int _channels, float _weight, const std::string& _extract)
 			{
 				const std::pair<std::string, bool> texData{ GetMaterialTextureDataForSerialisation(assimpMaterial, static_cast<aiTextureTypeOverload>(_aiType), _nekiType) };
-				const std::string& path{ texData.first };
+				const std::string& path{ texData.first }; //Path relative to the .gltf
 				const bool isSRGB{ texData.second };
 				if (!path.empty())
 				{
-					const std::string absPath{ std::filesystem::absolute(path).string() };
+					const std::string absPath{ std::filesystem::path(_filepath).parent_path() / path };
 					texturesToTrain.push_back({ _nekiType, absPath, _channels, _weight, _extract, isSRGB });
 				}
 				return !path.empty();
@@ -738,9 +772,9 @@ namespace NK
 				std::cout << "[NTC] Material '" << matName << "' has no textures suitable for NTC. Falling back to standard PBR material.\n";
 				CPUMaterial standardMat;
 				standardMat.name = matName;
-				standardMat.pipeline = LIGHTING_MODEL::PHYSICALLY_BASED;
-				PBRMaterial pbr{};
-				std::memset(&pbr, 0, sizeof(PBRMaterial));
+				standardMat.pipeline = LIGHTING_MODEL::PBR_METALLIC_ROUGHNESS;
+				PBRMetallicRoughnessMaterial pbr{};
+				std::memset(&pbr, 0, sizeof(PBRMetallicRoughnessMaterial));
 				standardMat.shaderMaterialData = pbr;
 				materials[i] = standardMat;
 				continue;
@@ -765,8 +799,8 @@ namespace NK
 			std::string extractArgs{ " --extract" };
 			std::string convertToLinearArgs{ " --convert_to_linear" };
 			
-			PBRMaterialNTC pbrNTC{};
-			std::memset(&pbrNTC, 0, sizeof(PBRMaterialNTC));
+			PBRMetallicRoughnessMaterialNTC pbrNTC{};
+			std::memset(&pbrNTC, 0, sizeof(PBRMetallicRoughnessMaterialNTC));
 			std::size_t currentChannel{ 0 };
 			for (const TextureToTrain& t : texturesToTrain)
 			{
@@ -853,7 +887,7 @@ namespace NK
 			
 			CPUMaterialNTC ntcMat;
 			ntcMat.name = matName;
-			ntcMat.pipeline = LIGHTING_MODEL::PHYSICALLY_BASED;
+			ntcMat.pipeline = LIGHTING_MODEL::PBR_METALLIC_ROUGHNESS;
 			ntcMat.materialDataFilepath = outPtPath;
 			ntcMat.numChannels = currentChannel;
 			ntcMat.shaderMaterialData = pbrNTC;
@@ -983,13 +1017,11 @@ namespace NK
 		
 		//Replace all \ with /
 		std::ranges::replace(filepath, '\\', '/');
-		filepath = std::filesystem::path(filepath).replace_extension(".png").string();
 		
 		auto isColour = [&]()
 		{
 			switch (_nekiType) {
 			case MODEL_TEXTURE_TYPE::DIFFUSE:
-			case MODEL_TEXTURE_TYPE::SPECULAR:
 			case MODEL_TEXTURE_TYPE::AMBIENT:
 			case MODEL_TEXTURE_TYPE::EMISSIVE:
 			case MODEL_TEXTURE_TYPE::EMISSION_COLOUR:

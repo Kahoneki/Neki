@@ -44,7 +44,7 @@ struct LightData
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space1);
 [[vk::binding(0,0)]] TextureCube g_cubemaps[] : register(t0, space2);
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
-[[vk::binding(0,0)]] ConstantBuffer<NK::PBRMaterial> g_materials[] : register(b0, space0);
+[[vk::binding(0,0)]] ConstantBuffer<NK::PBRMetallicRoughnessMaterial> g_materials[] : register(b0, space0);
 
 
 PUSH_CONSTANTS_BLOCK(
@@ -209,10 +209,9 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
 [shader("pixel")]
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
-    NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
+    NK::PBRMetallicRoughnessMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
     SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 	StructuredBuffer<LightData> lightBuffer = g_lightData[NonUniformResourceIndex(PC(lightDataBufferIndex))];
-
 
 	float3x3 TBN = transpose(float3x3(
     	vertexOutput.TBN_T,
@@ -224,30 +223,32 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	float3 albedo = float3(0,0,0);
 	if (material.hasBaseColour) { albedo = g_textures[NonUniformResourceIndex(material.baseColourIdx)].Sample(linearSampler, vertexOutput.texCoord).rgb; }
 	else { return float4(1,0,1,1); } //Magenta
-
+	
 	float3 normal = float3(0,0,0);
 	if (material.hasNormal) { normal = normalize(mul(TBN, g_textures[NonUniformResourceIndex(material.normalIdx)].Sample(linearSampler, vertexOutput.texCoord).rgb * 2.0 - 1.0)); }
 	else { discard; }
 
 	float metallic = 0.0f;
 	if (material.hasMetalness) { metallic = g_textures[NonUniformResourceIndex(material.metalnessIdx)].Sample(linearSampler, vertexOutput.texCoord).b; }
-
+	
 	float roughness = 1.0f;
 	if (material.hasRoughness) { roughness = g_textures[NonUniformResourceIndex(material.roughnessIdx)].Sample(linearSampler, vertexOutput.texCoord).g; }
 
 	float3 emissive = float3(0,0,0);
 	if (material.hasEmissive) { emissive = g_textures[NonUniformResourceIndex(material.emissiveIdx)].Sample(linearSampler, vertexOutput.texCoord).rgb; }
-
+	
 	
 	//Anti-aliasing (specular speckle) fix
-	// Find how rapidly the normal is changing across screen pixels
 	float3 dndx = ddx(normal);
 	float3 dndy = ddy(normal);
-	float variance = max(dot(dndx, dndx), dot(dndy, dndy));
-
-	// Add the variance to the roughness. The further away/steeper the angle, the rougher it gets.
-	float minRoughness = 0.04f; // Never let roughness hit absolute zero to prevent math blowups
-	roughness = clamp(roughness + variance, minRoughness, 1.0f);
+	
+	//Calculate the average variance of the normal derivatives
+	float variance = 0.5f * (dot(dndx, dndx) + dot(dndy, dndy));
+	
+	//Convert normal variance into an equivalent roughness increase (scale the variance to dampen the sparkles by distance)
+	float roughnessAA = sqrt(roughness * roughness + variance * 3.0f); 
+	float minRoughness = 0.04f;
+	roughness = clamp(roughnessAA, minRoughness, 1.0f);
 
 
     float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); //frag pos to camera
@@ -333,6 +334,7 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
 	float3 ambientLighting = CalculateIBL(albedo, roughness, metallic, F0, normal, V);
+	ambientLighting = max(ambientLighting, float3(0.2f, 0.2f, 0.2f) * albedo);
 	if (material.hasAO)
 	{
 		ambientLighting *= g_textures[NonUniformResourceIndex(material.aoIdx)].Sample(linearSampler, vertexOutput.texCoord).r;

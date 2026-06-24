@@ -128,7 +128,10 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	float3 sceneColour = g_textures[NonUniformResourceIndex(PC(sceneColourIndex))].Sample(linearSampler, vertexOutput.texCoord).rgb;
 	float sceneDepth = g_textures[NonUniformResourceIndex(PC(sceneDepthIndex))].Sample(linearSampler, vertexOutput.texCoord).r;
 
-	sceneColour = DepthOfField(sceneColour, sceneDepth, vertexOutput.pos);
+	uint satWidth, satHeight;
+	g_textures[NonUniformResourceIndex(PC(satTextureIndex))].GetDimensions(satWidth, satHeight);
+	int2 satTexelCoords = int2(vertexOutput.texCoord * float2(satWidth, satHeight));
+	sceneColour = DepthOfField(sceneColour, sceneDepth, satTexelCoords);
 	sceneColour *= PC(acesExposure);
 	sceneColour = ACESFilm(sceneColour);
 

@@ -358,17 +358,24 @@ namespace NK
 		materialBufferDesc.type = MEMORY_TYPE::DEVICE;
 		materialBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
 
-		if (gpuMaterial->lightingModel == LIGHTING_MODEL::BLINN_PHONG)
+		if (gpuMaterial->lightingModel == LIGHTING_MODEL::PBR_METALLIC_ROUGHNESS)
 		{
-			const BlinnPhongMaterial material{ std::get<BlinnPhongMaterial>(_cpuMaterial->shaderMaterialData) };
-			materialBufferDesc.size = sizeof(BlinnPhongMaterial);
+			const PBRMetallicRoughnessMaterial material{ std::get<PBRMetallicRoughnessMaterial>(_cpuMaterial->shaderMaterialData) };
+			materialBufferDesc.size = sizeof(PBRMetallicRoughnessMaterial);
 			gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
 			EnqueueBufferDataUpload(&material, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
 		}
+		else if (gpuMaterial->lightingModel == LIGHTING_MODEL::PBR_SPECULAR_GLOSSINESS)
+		{
+			materialBufferDesc.size = sizeof(PBRSpecularGlossinessMaterial);
+			gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
+			PBRSpecularGlossinessMaterial pbrMat{ std::get<PBRSpecularGlossinessMaterial>(_cpuMaterial->shaderMaterialData) };
+			EnqueueBufferDataUpload(&pbrMat, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
+		}
 		else
 		{
-			const PBRMaterial material{ std::get<PBRMaterial>(_cpuMaterial->shaderMaterialData) };
-			materialBufferDesc.size = sizeof(PBRMaterial);
+			const BlinnPhongMaterial material{ std::get<BlinnPhongMaterial>(_cpuMaterial->shaderMaterialData) };
+			materialBufferDesc.size = sizeof(BlinnPhongMaterial);
 			gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
 			EnqueueBufferDataUpload(&material, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
 		}
@@ -399,13 +406,20 @@ namespace NK
 	    materialBufferDesc.type = MEMORY_TYPE::DEVICE;
 	    materialBufferDesc.usage = BUFFER_USAGE_FLAGS::TRANSFER_DST_BIT | BUFFER_USAGE_FLAGS::UNIFORM_BUFFER_BIT;
 	    
-	    if (gpuMaterial->lightingModel == LIGHTING_MODEL::PHYSICALLY_BASED)
+	    if (gpuMaterial->lightingModel == LIGHTING_MODEL::PBR_METALLIC_ROUGHNESS)
 	    {
-	        materialBufferDesc.size = sizeof(PBRMaterialNTC);
+	        materialBufferDesc.size = sizeof(PBRMetallicRoughnessMaterialNTC);
 	        gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
-	        PBRMaterialNTC pbrMat{ std::get<PBRMaterialNTC>(_cpuMaterial->shaderMaterialData) };
+	        PBRMetallicRoughnessMaterialNTC pbrMat{ std::get<PBRMetallicRoughnessMaterialNTC>(_cpuMaterial->shaderMaterialData) };
 	        EnqueueBufferDataUpload(&pbrMat, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
 	    }
+		else if (gpuMaterial->lightingModel == LIGHTING_MODEL::PBR_SPECULAR_GLOSSINESS)
+		{
+			materialBufferDesc.size = sizeof(PBRSpecularGlossinessMaterialNTC);
+			gpuMaterial->materialBuffer = m_device.CreateBuffer(materialBufferDesc);
+			PBRSpecularGlossinessMaterialNTC pbrMat{ std::get<PBRSpecularGlossinessMaterialNTC>(_cpuMaterial->shaderMaterialData) };
+			EnqueueBufferDataUpload(&pbrMat, gpuMaterial->materialBuffer.get(), RESOURCE_STATE::UNDEFINED);
+		}
 	    else
 	    {
 	        materialBufferDesc.size = sizeof(BlinnPhongMaterialNTC);

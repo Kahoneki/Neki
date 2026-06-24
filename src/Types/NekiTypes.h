@@ -1035,7 +1035,8 @@ namespace NK
 	enum class LIGHTING_MODEL
 	{
 		BLINN_PHONG = 0,
-		PHYSICALLY_BASED = 1,
+		PBR_METALLIC_ROUGHNESS = 1,
+		PBR_SPECULAR_GLOSSINESS = 2,
 	};
 	
 	enum class MODEL_TEXTURE_TYPE : std::size_t
@@ -1079,7 +1080,7 @@ namespace NK
 		std::string ntcMaterialDataFilepath; //relative
 		std::uint32_t numChannels;
 		std::vector<std::pair<std::size_t, bool>> materialPropertyChannelLookup; //index with channel index to get MODEL_TEXTURE_TYPE (representing the property this channel holds (repeating for e.g.: RGB)) + srgb-flag pair
-		std::variant<BlinnPhongMaterialNTC, PBRMaterialNTC> ntcShaderMaterialData;
+		std::variant<BlinnPhongMaterialNTC, PBRMetallicRoughnessMaterialNTC, PBRSpecularGlossinessMaterialNTC> ntcShaderMaterialData;
 		
 		//if !isNTC
 		//There's a bit of translation going on here to communicate to the GPUUploader
@@ -1091,7 +1092,7 @@ namespace NK
 		//In the specific case above, it will favour EMISSION_COLOUR - this decision will be specific to each texture type that has this problem
 		//This choice is decided by the ModelLoader which then passes on this information the GPUUploader by populating the emissiveIdx field with MODEL_TEXTURE_TYPE::EMISSIVE or EMISSION_COLOUR so the GPU knows which texture to pull.
 		//The GPUUploader will update these values with the indices it allocates when creating the GPUMaterial
-		std::variant<BlinnPhongMaterial, PBRMaterial> shaderMaterialData;
+		std::variant<BlinnPhongMaterial, PBRMetallicRoughnessMaterial, PBRSpecularGlossinessMaterial> shaderMaterialData;
 		std::array<std::pair<std::string, bool>, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //index with MODEL_TEXTURE_TYPE to get relative filepath + srgb-flag pair
 	};
 	SERIALISE(DiskMaterial, v.magic, v.version, v.pipeline, v.isNTC, v.ntcMaterialDataFilepath, v.numChannels, v.materialPropertyChannelLookup, v.ntcShaderMaterialData, v.shaderMaterialData, v.allTextures)
@@ -1140,7 +1141,7 @@ namespace NK
 		std::string materialDataFilepath; //relative
 		std::uint32_t numChannels;
 		std::vector<std::pair<std::size_t, bool>> materialPropertyChannelLookup; //index with channel index to get MODEL_TEXTURE_TYPE (representing the property this channel holds (repeating for e.g.: RGB)) + srgb-flag pair
-		std::variant<BlinnPhongMaterialNTC, PBRMaterialNTC> shaderMaterialData;
+		std::variant<BlinnPhongMaterialNTC, PBRMetallicRoughnessMaterialNTC, PBRSpecularGlossinessMaterialNTC> shaderMaterialData;
 	};
 	
 	struct CPUMaterial
@@ -1157,7 +1158,7 @@ namespace NK
 		//In the specific case above, it will favour EMISSION_COLOUR - this decision will be specific to each texture type that has this problem
 		//This choice is decided by the ModelLoader which then passes on this information the GPUUploader by populating the emissiveIdx field with MODEL_TEXTURE_TYPE::EMISSIVE or EMISSION_COLOUR so the GPU knows which texture to pull.
 		//The GPUUploader will update these values with the indices it allocates when creating the GPUMaterial
-		std::variant<BlinnPhongMaterial, PBRMaterial> shaderMaterialData;
+		std::variant<BlinnPhongMaterial, PBRMetallicRoughnessMaterial, PBRSpecularGlossinessMaterial> shaderMaterialData;
 		std::array<std::pair<std::string, bool>, std::to_underlying(MODEL_TEXTURE_TYPE::NUM_MODEL_TEXTURE_TYPES)> allTextures; //index with MODEL_TEXTURE_TYPE to get relative filepath + srgb-flag pair
 	};
 	
