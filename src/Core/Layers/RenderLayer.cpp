@@ -607,6 +607,8 @@ namespace NK
 		m_skyboxFragShader = m_device->CreateShader(fragShaderDesc);
 		fragShaderDesc.filepath = "Shaders/Postprocess_fs";
 		m_postprocessFragShader = m_device->CreateShader(fragShaderDesc);
+		fragShaderDesc.filepath = "Shaders/TAA_fs";
+		m_taaFragShader = m_device->CreateShader(fragShaderDesc);
 
 		//Compute Shaders
 		ShaderDesc compShaderDesc{};
@@ -628,6 +630,8 @@ namespace NK
 		m_NTCPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.num32BitPushConstantValues = sizeof(PostprocessPassPushConstantData) / 4;
 		m_postprocessPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
+		rootSigDesc.num32BitPushConstantValues = sizeof(TAAPassPushConstantData) / 4;
+		m_taaPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
 		rootSigDesc.bindPoint = PIPELINE_BIND_POINT::COMPUTE;
 		rootSigDesc.num32BitPushConstantValues = sizeof(PrefixSumPassPushConstantData) / 4;
 		m_prefixSumPassRootSignature = m_device->CreateRootSignature(rootSigDesc);
@@ -639,6 +643,7 @@ namespace NK
 		InitGraphicsPipelines();
 		InitPrefixSumPipeline();
 		InitPostprocessPipeline();
+		InitTAAPipeline();
 	}
 
 
@@ -953,6 +958,75 @@ namespace NK
 
 		m_postprocessPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
+	
+	
+	
+	void RenderLayer::InitTAAPipeline()
+	{
+		std::vector<VertexAttributeDesc> vertexAttributes;
+		VertexAttributeDesc posAttribute{};
+		posAttribute.attribute = SHADER_ATTRIBUTE::POSITION;
+		posAttribute.binding = 0;
+		posAttribute.format = DATA_FORMAT::R32G32B32_SFLOAT;
+		posAttribute.offset = 0;
+		vertexAttributes.push_back(posAttribute);
+		VertexAttributeDesc uvAttribute{};
+		uvAttribute.attribute = SHADER_ATTRIBUTE::TEXCOORD_0;
+		uvAttribute.binding = 0;
+		uvAttribute.format = DATA_FORMAT::R32G32_SFLOAT;
+		uvAttribute.offset = sizeof(glm::vec3);
+		vertexAttributes.push_back(uvAttribute);
+		std::vector<VertexBufferBindingDesc> bufferBindings;
+		VertexBufferBindingDesc bufferBinding{};
+		bufferBinding.binding = 0;
+		bufferBinding.inputRate = VERTEX_INPUT_RATE::VERTEX;
+		bufferBinding.stride = sizeof(ScreenQuadVertex);
+		bufferBindings.push_back(bufferBinding);
+		VertexInputDesc vertexInputDesc{};
+		vertexInputDesc.attributeDescriptions = vertexAttributes;
+		vertexInputDesc.bufferBindingDescriptions = bufferBindings;
+
+		InputAssemblyDesc inputAssemblyDesc{};
+		inputAssemblyDesc.topology = INPUT_TOPOLOGY::TRIANGLE_LIST;
+
+		RasteriserDesc rasteriserDesc{};
+		rasteriserDesc.cullMode = CULL_MODE::BACK;
+		rasteriserDesc.frontFace = WINDING_DIRECTION::CLOCKWISE;
+		rasteriserDesc.depthBiasEnable = false;
+
+		DepthStencilDesc depthStencilDesc{};
+		depthStencilDesc.depthTestEnable = false;
+		depthStencilDesc.depthWriteEnable = false;
+		depthStencilDesc.stencilTestEnable = false;
+
+		MultisamplingDesc multisamplingDesc{};
+		multisamplingDesc.sampleCount = SAMPLE_COUNT::BIT_1;
+		multisamplingDesc.sampleMask = UINT32_MAX;
+		multisamplingDesc.alphaToCoverageEnable = false;
+
+		std::vector<ColourBlendAttachmentDesc> colourBlendAttachments(1);
+		colourBlendAttachments[0].colourWriteMask = COLOUR_ASPECT_FLAGS::R_BIT | COLOUR_ASPECT_FLAGS::G_BIT | COLOUR_ASPECT_FLAGS::B_BIT | COLOUR_ASPECT_FLAGS::A_BIT;
+		colourBlendAttachments[0].blendEnable = false;
+		ColourBlendDesc colourBlendDesc{};
+		colourBlendDesc.logicOpEnable = false;
+		colourBlendDesc.attachments = colourBlendAttachments;
+
+		PipelineDesc pipelineDesc{};
+		pipelineDesc.type = PIPELINE_TYPE::GRAPHICS;
+		pipelineDesc.vertexShader = m_screenQuadVertShader.get();
+		pipelineDesc.fragmentShader = m_taaFragShader.get();
+		pipelineDesc.rootSignature = m_taaPassRootSignature.get();
+		pipelineDesc.vertexInputDesc = vertexInputDesc;
+		pipelineDesc.inputAssemblyDesc = inputAssemblyDesc;
+		pipelineDesc.rasteriserDesc = rasteriserDesc;
+		pipelineDesc.depthStencilDesc = depthStencilDesc;
+		pipelineDesc.multisamplingDesc = multisamplingDesc;
+		pipelineDesc.colourBlendDesc = colourBlendDesc;
+		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R16G16B16A16_SFLOAT };
+		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::UNDEFINED;
+
+		m_taaPipeline = m_device->CreatePipeline(pipelineDesc);
+	}
 
 
 
@@ -1237,13 +1311,17 @@ namespace NK
 							const float lod{ std::log2f(std::max(1.0f, distanceToCamera * m_lodScale)) };
 							std::uint32_t num_mips{ static_cast<std::uint32_t>(std::log2(ntcData.imageResolution) - 1) };
 							const std::uint32_t mipIndex{ (std::clamp(static_cast<std::uint32_t>(std::floor(lod)), 0u, num_mips)) };
-							ntcData.lod = mipIndex / 10.0f;
+							
+							for (int j = 0; j < 4; ++j)
+							{
+								ntcData.g0_resolutions[j] = mat->g0_resolutions[j];
+								ntcData.g1_resolutions[j] = mat->g1_resolutions[j];
+							}
             
 							//Calculate feature level
 							static const uint32_t FeatureLevelLookup[11] = { 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 3 };
 							featureLevel = FeatureLevelLookup[mipIndex];
 						}
-						ntcData.featureLevel = featureLevel;
 						
 						_cmdBuf->PushConstants(m_NTCPassRootSignature.get(), &ntcData);
 					}
@@ -1310,8 +1388,43 @@ namespace NK
 
 		
 		meshDesc.AddNode(
-		"SUMMED_AREA_TABLE_PASS",
+		"TAA_PASS",
 		{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
+		 { "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
+		 { "SCENE_COLOUR_HISTORY", RESOURCE_STATE::SHADER_RESOURCE },
+		 { "TAA_RESOLVED", RESOURCE_STATE::RENDER_TARGET }},
+		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+		{
+			_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("TAA_RESOLVED_RTV"), nullptr, nullptr, nullptr);
+			_cmdBuf->BindRootSignature(m_taaPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.renderResolution });
+			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.renderResolution });
+
+			TAAPassPushConstantData pushConstantData{};
+			pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
+			pushConstantData.sceneDepthIndex = _texViews.Get("SCENE_DEPTH_SRV")->GetIndex();
+			pushConstantData.historyColourIndex = _texViews.Get("SCENE_COLOUR_HISTORY_SRV")->GetIndex();
+			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+
+			if (m_activeCamera)
+			{
+				pushConstantData.inverseViewProj = glm::inverse(m_currentJitteredViewProj);
+				pushConstantData.prevViewProj = m_prevViewProj;
+			}
+
+			std::size_t screenQuadVertexBufferStride{ sizeof(ScreenQuadVertex) };
+			_cmdBuf->PushConstants(m_taaPassRootSignature.get(), &pushConstantData);
+			_cmdBuf->BindPipeline(m_taaPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+			_cmdBuf->BindVertexBuffers(0, 1, m_screenQuadVertBuffer.get(), &screenQuadVertexBufferStride);
+			_cmdBuf->BindIndexBuffer(m_screenQuadIndexBuffer.get(), DATA_FORMAT::R32_UINT);
+			_cmdBuf->DrawIndexed(6, 1, 0, 0);
+			_cmdBuf->EndRendering(1, nullptr, _texs.Get("TAA_RESOLVED"));
+		});
+		
+		
+		meshDesc.AddNode(
+		"SUMMED_AREA_TABLE_PASS",
+		{{ "TAA_RESOLVED", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SAT_INTERMEDIATE", RESOURCE_STATE::UNORDERED_ACCESS },
 		{ "SAT_FINAL", RESOURCE_STATE::UNORDERED_ACCESS }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
@@ -1330,7 +1443,7 @@ namespace NK
 
 			//Pass 1: horizontal accumulation (rows)
 			//Reads SCENE_COLOUR and writes sums to SAT_INTERMEDIATE (transposes output to prepare for subsequent columns pass)
-			pushConstantData.inputTextureIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
+			pushConstantData.inputTextureIndex = _texViews.Get("TAA_RESOLVED_SRV")->GetIndex();
 			pushConstantData.outputTextureIndex = _texViews.Get("SAT_INTERMEDIATE_UAV")->GetIndex();
 			pushConstantData.dimensions = { dimensions.x, dimensions.y };
 			_cmdBuf->PushConstants(m_prefixSumPassRootSignature.get(), &pushConstantData);
@@ -1354,7 +1467,7 @@ namespace NK
 		
 		meshDesc.AddNode(
 		"POSTPROCESS_PASS",
-		{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
+		{{ "TAA_RESOLVED", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
 		{ "SAT_FINAL", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "BACKBUFFER", RESOURCE_STATE::RENDER_TARGET }},
@@ -1367,7 +1480,7 @@ namespace NK
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.window->GetFramebufferSize() });
 
 			PostprocessPassPushConstantData pushConstantData{};
-			pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
+			pushConstantData.sceneColourIndex = _texViews.Get("TAA_RESOLVED_SRV")->GetIndex();
 			pushConstantData.sceneDepthIndex = _texViews.Get("SCENE_DEPTH_SRV")->GetIndex();
 			pushConstantData.satTextureIndex = _texViews.Get("SAT_FINAL_SRV")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
@@ -1466,6 +1579,20 @@ namespace NK
 		m_sceneColourSRV = m_device->CreateShaderResourceTextureView(m_sceneColour.get(), sceneColourViewDesc);
 		if (m_desc.enableMSAA) { m_sceneColourMSAASRV = m_device->CreateShaderResourceTextureView(m_sceneColourMSAA.get(), sceneColourViewDesc); }
 		if (m_desc.enableSSAA) { m_sceneColourSSAASRV = m_device->CreateShaderResourceTextureView(m_sceneColourSSAA.get(), sceneColourViewDesc); }
+		
+		//TAA
+		TextureDesc taaDesc = sceneColourDesc;
+		m_taaResolved = m_device->CreateTexture(taaDesc);
+		m_sceneColourHistory = m_device->CreateTexture(taaDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_taaResolved.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::SHADER_RESOURCE);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneColourHistory.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::SHADER_RESOURCE);
+		TextureViewDesc taaViewDesc = sceneColourViewDesc;
+		taaViewDesc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
+		m_taaResolvedRTV = m_device->CreateRenderTargetTextureView(m_taaResolved.get(), taaViewDesc);
+		m_sceneColourHistoryRTV = m_device->CreateRenderTargetTextureView(m_sceneColourHistory.get(), taaViewDesc);
+		taaViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+		m_taaResolvedSRV = m_device->CreateShaderResourceTextureView(m_taaResolved.get(), taaViewDesc);
+		m_sceneColourHistorySRV = m_device->CreateShaderResourceTextureView(m_sceneColourHistory.get(), taaViewDesc);
 		
 		//--------END OF SCENE COLOUR--------//
 		
@@ -2834,6 +2961,7 @@ namespace NK
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		if (m_desc.enableMSAA) { execDesc.commandBuffers["MSAA_RESOLVE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
 		if (m_desc.enableSSAA) { execDesc.commandBuffers["SSAA_DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
+		execDesc.commandBuffers["TAA_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SUMMED_AREA_TABLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["POSTPROCESS_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["PRESENT_TRANSITION_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
@@ -2875,13 +3003,20 @@ namespace NK
 		execDesc.textureViews.Set("SCENE_COLOUR_SSAA_RTV", m_sceneColourSSAARTV.get());
 		execDesc.textureViews.Set("SCENE_COLOUR_SSAA_SRV", m_sceneColourSSAASRV.get());
 
+		execDesc.textures.Set("TAA_RESOLVED", m_taaResolved.get());
+		execDesc.textures.Set("SCENE_COLOUR_HISTORY", m_sceneColourHistory.get());
+		execDesc.textureViews.Set("TAA_RESOLVED_RTV", m_taaResolvedRTV.get());
+		execDesc.textureViews.Set("TAA_RESOLVED_SRV", m_taaResolvedSRV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_HISTORY_RTV", m_sceneColourHistoryRTV.get());
+		execDesc.textureViews.Set("SCENE_COLOUR_HISTORY_SRV", m_sceneColourHistorySRV.get());
+		
 		execDesc.textureViews.Set("SCENE_DEPTH_DSV", m_sceneDepthDSV.get());
 		execDesc.textureViews.Set("SCENE_DEPTH_SRV", m_sceneDepthSRV.get());
 		execDesc.textureViews.Set("SCENE_DEPTH_MSAA_DSV", m_sceneDepthMSAADSV.get());
 		execDesc.textureViews.Set("SCENE_DEPTH_MSAA_SRV", m_sceneDepthMSAASRV.get());
 		execDesc.textureViews.Set("SCENE_DEPTH_SSAA_DSV", m_sceneDepthSSAADSV.get());
 		execDesc.textureViews.Set("SCENE_DEPTH_SSAA_SRV", m_sceneDepthSSAASRV.get());
-
+		
 		execDesc.textureViews.Set("SAT_INTERMEDIATE_UAV", m_satIntermediateUAV.get());
 		execDesc.textureViews.Set("SAT_FINAL_UAV", m_satFinalUAV.get());
 		execDesc.textureViews.Set("SAT_INTERMEDIATE_SRV", m_satIntermediateSRV.get());
@@ -2918,6 +3053,15 @@ namespace NK
 		m_currentFrame = (m_currentFrame + 1) % m_desc.framesInFlight;
 		++m_globalFrame;
 
+		m_taaResolved.swap(m_sceneColourHistory);
+		m_taaResolvedRTV.swap(m_sceneColourHistoryRTV);
+		m_taaResolvedSRV.swap(m_sceneColourHistorySRV);
+		if (m_activeCamera)
+		{
+			CameraShaderData currCam = m_activeCamera->camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)).GetModelMatrix());
+			m_prevViewProj = m_currentViewProj; //Save unjittered matrix for next frame reprojection
+		}
+		
 		m_firstFrame = false;
 	}
 
@@ -2985,7 +3129,33 @@ namespace NK
 
 
 		//Update m_camDataBufferMap with the camera data from this frame
-		const CameraShaderData camShaderData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(_camera)).GetModelMatrix()) };
+		CameraShaderData camShaderData{ _camera.camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(_camera)).GetModelMatrix()) };
+		
+		m_currentViewProj = camShaderData.projMat * camShaderData.viewMat;
+		
+		//Calculate Halton jitter for TAA
+		auto Halton{ [](std::uint32_t index, int base) -> float {
+			float f{ 1.0f };
+			float result{ 0.0f };
+			while (index > 0) {
+				f /= static_cast<float>(base);
+				result += f * static_cast<float>(index % base);
+				index /= base;
+			}
+			return result;
+		} };
+
+		//16x TAA Sequence
+		const std::uint32_t haltonIndex{ static_cast<std::uint32_t>(m_globalFrame % 16) + 1 };
+		const float jitterX{ (Halton(haltonIndex, 2) - 0.5f) * 2.0f / m_desc.renderResolution.x };
+		const float jitterY{ (Halton(haltonIndex, 3) - 0.5f) * 2.0f / m_desc.renderResolution.y };
+
+		//Apply sub-pixel jitter
+		camShaderData.projMat[2][0] += jitterX;
+		camShaderData.projMat[2][1] += jitterY;
+		
+		m_currentJitteredViewProj = camShaderData.projMat * camShaderData.viewMat;
+		
 		memcpy(m_camDataBufferMaps[m_currentFrame], &camShaderData, sizeof(CameraShaderData));
 		if (m_firstFrame)
 		{

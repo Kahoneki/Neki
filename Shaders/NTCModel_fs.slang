@@ -1,5 +1,8 @@
 #include "Types/Materials.slang"
 
+//shut up the compiler (slang gives explicit binding overlap warnings, neki uses bindless descriptors so overlapping is intentional)
+#pragma warning(disable: 39001)
+
 static const float LIGHT_NEAR = 0.01f;
 static const float LIGHT_FAR = 1000.0f;
 
@@ -46,7 +49,7 @@ struct LightData
 [[vk::binding(1, 0)]] SamplerState g_samplers[] : register(s0, space0);
 [[vk::binding(0, 0)]] StructuredBuffer<LightData> g_lightData[] : register(t0, space0);
 [[vk::binding(0, 0)]] Texture2D g_textures[] : register(t0, space1);
-[[vk::binding(0,0)]] ConstantBuffer<PBRMaterialNTC> g_materials[] : register(b0, space0);
+[[vk::binding(0,0)]] ConstantBuffer<PBRMetallicRoughnessMaterialNTC> g_materials[] : register(b0, space0);
 
 struct PushConstants
 {
@@ -89,9 +92,8 @@ struct PushConstants
     
     uint g0_offsets[4];
     uint g1_offsets[4];
-
-    float lod;
-    uint featureLevel;
+    uint g0_resolutions[4];
+    uint g1_resolutions[4];
 
     uint numLayers;
     uint hiddenNeurons;
@@ -99,6 +101,18 @@ struct PushConstants
 };
 [[vk::push_constant]] PushConstants pc;
 
+uint pcg_hash(uint seed) 
+{
+    uint state = seed * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float random(inout uint seed) 
+{
+    seed = pcg_hash(seed);
+    return float(seed) / 4294967296.0;
+}
 
 float CalculateLevelOfDetail(float2 uv, float2 textureRes)
 {
@@ -111,30 +125,10 @@ float CalculateLevelOfDetail(float2 uv, float2 textureRes)
     return max(0.0, lod);
 }
 
-
-float2 RandomFloat2(float2 p)
-{
-    float3 p3 = frac(float3(p.xyx) * float3(0.1031f, 0.1030f, 0.0973f));
-    p3 += dot(p3, p3.yzx + 33.33f);
-    return frac((p3.xx + p3.yz) * p3.zy);
-}
-
-float2 RandomGaussianFloat2(float2 p)
-{
-    float2 u = RandomFloat2(p);
-    u.x = max(u.x, 1e-6f);
-    const float TWO_PI = 6.28318530718f;
-    float r = sqrt(-2.0f * log(u.x));
-    float theta = TWO_PI * u.y;
-    return float2(r * cos(theta), r * sin(theta));
-}
-
-
 half HardGELU(half x)
 {
     return x * clamp(x / half(3.0) + half(0.5), half(0.0), half(1.0));
 }
-
 
 static const uint MAX_G0_CHANNELS = 16;
 struct G0Features { float channels[MAX_G0_CHANNELS]; };
@@ -142,12 +136,11 @@ struct G0Features { float channels[MAX_G0_CHANNELS]; };
 static const uint MAX_G1_CHANNELS = 20;
 struct G1Features { float channels[MAX_G1_CHANNELS]; };
 
-
 G0Features SampleG0(int2 p, uint fl)
 {
 	G0Features output;
 
-    uint g0ResAtLevel = pc.g0Resolution >> fl;
+    uint g0ResAtLevel = pc.g0_resolutions[fl];
 	uint pixelIdx = p.y * g0ResAtLevel + p.x;
 
     uint bitsPerChannel = (pc.g0QuantLevels <= 4) ? 2 : 4;
@@ -186,13 +179,12 @@ G0Features SampleG0(int2 p, uint fl)
     return output;
 }
 
-
 G1Features SampleG1(int2 p, uint fl)
 {
     G1Features output;
 
-    uint g0ResAtLevel = pc.g0Resolution >> fl;
-    uint pixelIdx = p.y * (g0ResAtLevel / 2) + p.x; 
+    uint g1ResAtLevel = pc.g1_resolutions[fl];
+    uint pixelIdx = p.y * g1ResAtLevel + p.x; 
 
     uint bitsPerChannel = (pc.g1QuantLevels <= 4) ? 2 : 4;
     uint bitsPerPixel = pc.g1Channels * bitsPerChannel;
@@ -230,86 +222,94 @@ G1Features SampleG1(int2 p, uint fl)
     return output;
 }
 
-
-
-CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
+CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
 {
     uv = frac(uv);
-    uint featureLevel = clamp(pc.featureLevel, 0, 3);
+    
+    uint numMips = uint(log2(float(pc.imageResolution))) - 1;
+    
+    // Nearest-neighbor mip selection fallback. (Use DLSS / TAA if you want stochastic filtering)
+    uint mip = min(uint(round(lod)), numMips - 1);
+    uint featureLevel = FeatureLevelLookup[min(mip, 10u)];
 
-	float2 p = uv * float(pc.imageResolution);
+    float normalizedLod = saturate(float(mip) / float(max(1u, numMips - 1)));
+
+    float2 p = uv * float(pc.imageResolution);
     p = clamp(p, float2(0.0f, 0.0f), float2(pc.imageResolution - 1, pc.imageResolution - 1));
-	float2 local = fmod(p, pc.tileSize) / pc.tileSize;
+    float2 local = fmod(p, float(pc.tileSize)) / float(pc.tileSize);
     local = local * 2.0f - 1.0f;
-    uv = p / float(pc.imageResolution);
 
     uint numInputs = (pc.numOctaves * 2 * 2) + (1) + (pc.g0Channels * 4) + (pc.g1Channels);
     CoopVec<float16_t, MAX_INPUTS> encodings;
 
     uint offset = 0;
-	for (uint i=0; i<pc.numOctaves; ++i)
-	{
-		float scale = exp2(float(i)) * 3.141592653589;
-		encodings[i*4] = half(sin(scale * local.x));
-		encodings[i*4+1] = half(sin(scale * local.y));
-		encodings[i*4+2] = half(cos(scale * local.x));
+    for (uint i=0; i<pc.numOctaves; ++i)
+    {
+        float scale = exp2(float(i)) * 3.141592653589;
+        encodings[i*4] = half(sin(scale * local.x));
+        encodings[i*4+1] = half(sin(scale * local.y));
+        encodings[i*4+2] = half(cos(scale * local.x));
         encodings[i*4+3] = half(cos(scale * local.y));
         offset += 4;
-	}
-    encodings[offset++] = half(clamp(pc.lod, 0.0f, 1.0f)); // normalised lod
+    }
+    encodings[offset++] = half(normalizedLod);
 
     // G0
-	int w = pc.g0Resolution;
-	int h = pc.g0Resolution;
-	p = int2(int(uv.x * (w-1)), int(uv.y * (h-1)));
-	int x0 = clamp(int(floor(p.x)), 0, w-1);
-	int x1 = clamp(x0+1, 0, w-1);
-	int y0 = clamp(int(floor(p.y)), 0, h-1);
-	int y1 = clamp(y0+1, 0, h-1);
-	{
-		G0Features s00 = SampleG0(int2(x0, y0), featureLevel);
-		for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+c] = half(s00.channels[c]); }
-        G0Features s01 = SampleG0(int2(x0, y1), featureLevel);
-        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(1*pc.g0Channels)+c] = half(s01.channels[c]); }
-        G0Features s10 = SampleG0(int2(x1, y0), featureLevel);
-        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(2*pc.g0Channels)+c] = half(s10.channels[c]); }
-        G0Features s11 = SampleG0(int2(x1, y1), featureLevel);
-        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(3*pc.g0Channels)+c] = half(s11.channels[c]); }
+    int w0 = pc.g0_resolutions[featureLevel];
+    int h0 = w0;
+    float2 p0 = float2(uv.x * (w0 - 1.0f), uv.y * (h0 - 1.0f));
+    int x0_0 = clamp(int(floor(p0.x)), 0, w0-1);
+    int x1_0 = clamp(x0_0+1, 0, w0-1);
+    int y0_0 = clamp(int(floor(p0.y)), 0, h0-1);
+    int y1_0 = clamp(y0_0+1, 0, h0-1);
+    {
+        G0Features s00_0 = SampleG0(int2(x0_0, y0_0), featureLevel);
+        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+c] = half(s00_0.channels[c]); }
+        
+        G0Features s01_0 = SampleG0(int2(x0_0, y1_0), featureLevel);
+        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(1*pc.g0Channels)+c] = half(s01_0.channels[c]); }
+        
+        G0Features s10_0 = SampleG0(int2(x1_0, y0_0), featureLevel);
+        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(2*pc.g0Channels)+c] = half(s10_0.channels[c]); }
+        
+        G0Features s11_0 = SampleG0(int2(x1_0, y1_0), featureLevel);
+        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(3*pc.g0Channels)+c] = half(s11_0.channels[c]); }
     }
-    offset += pc.g0Channels*4;
+    offset += pc.g0Channels * 4;
 
     // G1
-	w = pc.g0Resolution/2;
-	h = pc.g0Resolution/2;
-	float fx = uv.x * (w - 1);
-	float fy = uv.y * (h - 1);
-	x0 = clamp(int(floor(fx)), 0, w-1);
-	x1 = clamp(x0+1, 0, w-1);
-	y0 = clamp(int(floor(fy)), 0, h-1);
-	y1 = clamp(y0+1, 0, h-1);
-	float2 weight = float2(fx-x0, fy-y0);
-	{
-		G1Features s00 = SampleG1(int2(x0, y0), featureLevel);
-		G1Features s01 = SampleG1(int2(x0, y1), featureLevel);
-		G1Features s10 = SampleG1(int2(x1, y0), featureLevel);
-		G1Features s11 = SampleG1(int2(x1, y1), featureLevel);
-		for (uint c=0; c<pc.g1Channels; ++c)
-		{
-			float latent = (1-weight.x) * (1-weight.y) * s00.channels[c];
-			latent += (1-weight.x) * weight.y * s01.channels[c];
-			latent += weight.x * (1-weight.y) * s10.channels[c];
-			latent += weight.x * weight.y * s11.channels[c];
-			encodings[offset+c] = half(latent);
+    int w1 = pc.g1_resolutions[featureLevel];
+    int h1 = w1;
+    float fx = uv.x * (w1 - 1.0f);
+    float fy = uv.y * (h1 - 1.0f);
+    int x0_1 = clamp(int(floor(fx)), 0, w1-1);
+    int x1_1 = clamp(x0_1+1, 0, w1-1);
+    int y0_1 = clamp(int(floor(fy)), 0, h1-1);
+    int y1_1 = clamp(y0_1+1, 0, h1-1);
+    float2 weight = float2(fx-float(x0_1), fy-float(y0_1));
+    {
+        G1Features s00_1 = SampleG1(int2(x0_1, y0_1), featureLevel);
+        G1Features s01_1 = SampleG1(int2(x0_1, y1_1), featureLevel);
+        G1Features s10_1 = SampleG1(int2(x1_1, y0_1), featureLevel);
+        G1Features s11_1 = SampleG1(int2(x1_1, y1_1), featureLevel);
+        
+        for (uint c=0; c<pc.g1Channels; ++c)
+        {
+            float latent = (1.0f-weight.x) * (1.0f-weight.y) * s00_1.channels[c];
+            latent += (1.0f-weight.x) * weight.y * s01_1.channels[c];
+            latent += weight.x * (1.0f-weight.y) * s10_1.channels[c];
+            latent += weight.x * weight.y * s11_1.channels[c];
+            encodings[offset+c] = half(latent);
         }
-        offset += pc.g1Channels;
-	}
+    }
+    offset += pc.g1Channels;
 
     for (uint c = offset; c < MAX_INPUTS; ++c)
     {
         encodings[c] = half(0.0);
     }
-	
-	//MLP
+    
+    //MLP
     CoopVec<float16_t, HIDDEN_DIM> hidden0 = coopVecMatMulAdd<float16_t, HIDDEN_DIM, MAX_INPUTS, float16_t>(
         encodings,
         CoopVecComponentType.Float16,
@@ -344,7 +344,7 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
             CoopVecMatrixLayout.InferencingOptimal,
             false,
             0
-	    );
+        );
         [ForceUnroll]
         for (int i = 0; i < HIDDEN_DIM; i++)
         {
@@ -370,7 +370,7 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv)
         CoopVecMatrixLayout.InferencingOptimal,
         false,
         0
-	);
+    );
 
     return output;
 }
@@ -483,24 +483,37 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
 [shader("pixel")]
 float4 main(VertexOutput vertexOutput) : SV_TARGET
 {
-    CoopVec<float16_t, MAX_OUTPUTS> mlpOutput = EvaluateMLP(vertexOutput.texCoord);
+    //Stochastic filtering
+    uint seed = uint(vertexOutput.pos.x) + uint(vertexOutput.pos.y) * 8192 + pc.frameIndex * 16777216;
+    float baseLod = CalculateLevelOfDetail(vertexOutput.texCoord, float2(pc.imageResolution, pc.imageResolution));
+    float lodRandom = random(seed);
+    uint mip = uint(max(0.0f, floor(baseLod + lodRandom)));
+    uint numMips = uint(max(0, int(log2(float(pc.imageResolution))) - 1));
+    mip = min(mip, numMips - 1);
+    float mipRes = float(pc.imageResolution >> mip);
+    float2 uvTexels = vertexOutput.texCoord * mipRes - 0.5f;
+    float2 uvRandom = float2(random(seed), random(seed));
+    float2 chosenTexel = floor(uvTexels + uvRandom);
+
+    //Snap to nearest trained texel center
+    float2 snappedUV = (chosenTexel + 0.5f) / mipRes;
+    CoopVec<float16_t, MAX_OUTPUTS> mlpOutput = EvaluateMLP(snappedUV, float(mip));
     
-    PBRMaterialNTC ntcMat = g_materials[pc.materialBufferIndex];
+    PBRMetallicRoughnessMaterialNTC ntcMat = g_materials[pc.materialBufferIndex];
     SamplerState linearSampler = g_samplers[pc.samplerIndex];
-	StructuredBuffer<LightData> lightBuffer = g_lightData[pc.lightDataBufferIndex];
+    StructuredBuffer<LightData> lightBuffer = g_lightData[pc.lightDataBufferIndex];
 
-
-    float3 albedoSample = float3(0);
+    float3 albedoSample = float3(0,0,0);
     if (bool(ntcMat.hasBaseColourChannelR)) { albedoSample.x = mlpOutput[ntcMat.baseColourChannelR]; }
     if (bool(ntcMat.hasBaseColourChannelG)) { albedoSample.y = mlpOutput[ntcMat.baseColourChannelG]; }
     if (bool(ntcMat.hasBaseColourChannelB)) { albedoSample.z = mlpOutput[ntcMat.baseColourChannelB]; }
 
-    float3 normalSample = float3(0);
+    float3 normalSample = float3(0,0,0);
     if (bool(ntcMat.hasNormalChannelX)) { normalSample.x = mlpOutput[ntcMat.normalChannelX]; }
     if (bool(ntcMat.hasNormalChannelY)) { normalSample.y = mlpOutput[ntcMat.normalChannelY]; }
     if (bool(ntcMat.hasNormalChannelZ)) { normalSample.z = mlpOutput[ntcMat.normalChannelZ]; }
     
-    float3 emissiveSample = float3(0);
+    float3 emissiveSample = float3(0,0,0);
     if (bool(ntcMat.hasEmissiveChannelR)) { emissiveSample.x = mlpOutput[ntcMat.emissiveChannelR]; }
     if (bool(ntcMat.hasEmissiveChannelG)) { emissiveSample.y = mlpOutput[ntcMat.emissiveChannelG]; }
     if (bool(ntcMat.hasEmissiveChannelB)) { emissiveSample.z = mlpOutput[ntcMat.emissiveChannelB]; }
@@ -514,9 +527,7 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
     float aoSample = 1.0f;
     if (bool(ntcMat.hasAoChannel)) { aoSample = mlpOutput[ntcMat.aoChannel]; }
 
-
     float3x3 TBN = transpose(float3x3(vertexOutput.TBN_T, vertexOutput.TBN_B, vertexOutput.TBN_N));
-
 
     float3 albedo = pow(saturate(albedoSample.rgb), 2.2);
     float3 normal = normalize(mul(TBN, saturate(normalSample.rgb) * 2.0 - 1.0));
@@ -525,78 +536,85 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
     float roughness = saturate(roughnessSample);
     float ao = saturate(aoSample);
     
+    //Specular speckles fix
+    float3 dndx = ddx(normal);
+    float3 dndy = ddy(normal);
+    float variance = 0.5f * (dot(dndx, dndx) + dot(dndy, dndy));
+    float roughnessAA = sqrt(roughness * roughness + variance * 3.0f); 
+    roughness = clamp(roughnessAA, 0.04f, 1.0f);
+    
     float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); 
 
-	float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 
-	float3 totalDirectLighting = float3(0.0f, 0.0f, 0.0f);
-	for (uint i = 0; i < pc.numLights; ++i)
-	{
-		LightData light = lightBuffer[i];
+    float3 totalDirectLighting = float3(0.0f, 0.0f, 0.0f);
+    for (uint i = 0; i < pc.numLights; ++i)
+    {
+        LightData light = lightBuffer[i];
 
-		if (light.type == 2) 
-		{
-			if (PointInPointLightShadow(vertexOutput.worldPos, light.position, light.shadowMapIndex, linearSampler))
-				continue;
-		}
-		else 
-		{
-			float4 posInLightClipSpace = mul(light.viewProjMat, float4(vertexOutput.worldPos, 1.0));
-			float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
-			float2 shadowMapUV = float2(posInLightNDC.x * 0.5f + 0.5f, posInLightNDC.y * -0.5f + 0.5f);
+        if (light.type == 2) 
+        {
+            if (PointInPointLightShadow(vertexOutput.worldPos, light.position, light.shadowMapIndex, linearSampler))
+                continue;
+        }
+        else 
+        {
+            float4 posInLightClipSpace = mul(light.viewProjMat, float4(vertexOutput.worldPos, 1.0));
+            float3 posInLightNDC = posInLightClipSpace.xyz / posInLightClipSpace.w;
+            float2 shadowMapUV = float2(posInLightNDC.x * 0.5f + 0.5f, posInLightNDC.y * -0.5f + 0.5f);
 
-			if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f && posInLightNDC.z <= 1.0f)
-			{
-				float shadowDepth = g_textures[NonUniformResourceIndex(light.shadowMapIndex)].Sample(linearSampler, shadowMapUV).r;
-				float currentPixelDepth = posInLightNDC.z;
-				
-				float bias = 0.0005f; 
-				if ((currentPixelDepth - bias) > shadowDepth)
-					continue;
-			}
-		}
+            if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f && posInLightNDC.z <= 1.0f)
+            {
+                float shadowDepth = g_textures[NonUniformResourceIndex(light.shadowMapIndex)].Sample(linearSampler, shadowMapUV).r;
+                float currentPixelDepth = posInLightNDC.z;
+                
+                float bias = 0.0005f; 
+                if ((currentPixelDepth - bias) > shadowDepth)
+                    continue;
+            }
+        }
 
-		float3 lightDirToFragPos;
-		float attenuation = 1.0;
+        float3 lightDirToFragPos;
+        float attenuation = 1.0;
 
-		if (light.type == 1) 
-		{
-			lightDirToFragPos = normalize(-light.direction);
-		}
-		else 
-		{
-			float3 fragPosToLightPos = light.position - vertexOutput.worldPos;
-			float dist = length(fragPosToLightPos);
-			lightDirToFragPos = normalize(fragPosToLightPos);
+        if (light.type == 1) 
+        {
+            lightDirToFragPos = normalize(-light.direction);
+        }
+        else 
+        {
+            float3 fragPosToLightPos = light.position - vertexOutput.worldPos;
+            float dist = length(fragPosToLightPos);
+            lightDirToFragPos = normalize(fragPosToLightPos);
 
-			attenuation = 1.0 / (light.constantAttenuation + light.linearAttenuation * dist + light.quadraticAttenuation * dist * dist);
+            attenuation = 1.0 / (light.constantAttenuation + light.linearAttenuation * dist + light.quadraticAttenuation * dist * dist);
 
-			if (light.type == 3) 
-			{
-				float theta = dot(lightDirToFragPos, normalize(-light.direction));
-				float innerCos = cos(light.innerAngle);
-				float outerCos = cos(light.outerAngle);
-				float epsilon = innerCos - outerCos;
-				float intensity = clamp((theta - outerCos) / epsilon, 0.0f, 1.0f);
-				attenuation *= intensity;
-			}
-		}
+            if (light.type == 3) 
+            {
+                float theta = dot(lightDirToFragPos, normalize(-light.direction));
+                float innerCos = cos(light.innerAngle);
+                float outerCos = cos(light.outerAngle);
+                float epsilon = innerCos - outerCos;
+                float intensity = clamp((theta - outerCos) / epsilon, 0.0f, 1.0f);
+                attenuation *= intensity;
+            }
+        }
 
-		if (attenuation > 0.0001)
-		{
-			float NdotL = dot(normal, lightDirToFragPos);
-			if (NdotL > 0.0f)
-			{
-				float3 radiance = light.colour * light.intensity;
-				float3 directLighting = CalculateDirectLight(albedo, metallic, roughness, F0, normal, V, lightDirToFragPos, radiance);
-				totalDirectLighting += directLighting * attenuation;
-			}
-		}
-	}
+        if (attenuation > 0.0001)
+        {
+            float NdotL = dot(normal, lightDirToFragPos);
+            if (NdotL > 0.0f)
+            {
+                float3 radiance = light.colour * light.intensity;
+                float3 directLighting = CalculateDirectLight(albedo, metallic, roughness, F0, normal, V, lightDirToFragPos, radiance);
+                totalDirectLighting += directLighting * attenuation;
+            }
+        }
+    }
 
-	float3 ambientLighting = CalculateIBL(albedo, roughness, metallic, F0, normal, V);
+    float3 ambientLighting = CalculateIBL(albedo, roughness, metallic, F0, normal, V);
     ambientLighting *= ao;
-	
+    
     float3 colour = totalDirectLighting + ambientLighting + emissive;
 
     return float4(colour, 1.0);

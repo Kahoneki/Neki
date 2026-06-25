@@ -54,31 +54,30 @@ PUSH_CONSTANTS_BLOCK(
 	uint g1BufferIndex;
 	uint mlpBufferIndex;
 	uint layer0_W_offset;
-    uint layer0_B_offset;
-    uint layer1_W_offset;
-    uint layer1_B_offset;
-    uint layer2_W_offset;
-    uint layer2_B_offset;
+	uint layer0_B_offset;
+	uint layer1_W_offset;
+	uint layer1_B_offset;
+	uint layer2_W_offset;
+	uint layer2_B_offset;
 
-    uint g0Channels;
-    uint g1Channels;
-    uint g0QuantLevels;
-    uint g1QuantLevels;
+	uint g0Channels;
+	uint g1Channels;
+	uint g0QuantLevels;
+	uint g1QuantLevels;
 
-    uint g0Resolution;
-    uint imageResolution;
-    uint numOctaves;
-    uint tileSize;
+	uint g0Resolution;
+	uint imageResolution;
+	uint numOctaves;
+	uint tileSize;
     
-    uint g0_offsets[4];
-    uint g1_offsets[4];
+	uint g0_offsets[4];
+	uint g1_offsets[4];
+	uint g0_resolutions[4];
+	uint g1_resolutions[4];
 
-	float lod;
-	uint featureLevel;
-
-    uint numLayers;
-    uint hiddenNeurons;
-    uint frameIndex; //for stochastic filtering
+	uint numLayers;
+	uint hiddenNeurons;
+	uint frameIndex; //for stochastic filtering
 );
 
 VertexOutput VSMain(VertexInput input, uint vertexID : SV_VertexID)

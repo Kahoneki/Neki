@@ -23,7 +23,7 @@ struct PointLight
 [[vk::binding(0,0)]] Texture2D g_textures[] : register(t0, space0);
 [[vk::binding(0,0)]] TextureCube g_skyboxes[] : register(t0, space1);
 [[vk::binding(1,0)]] SamplerState g_samplers[] : register(s0, space0);
-[[vk::binding(0,0)]] ConstantBuffer<NK::PBRMaterial> g_materials[] : register(b0, space0);
+[[vk::binding(0,0)]] ConstantBuffer<NK::PBRMetallicRoughnessMaterial> g_materials[] : register(b0, space0);
 [[vk::binding(0,0)]] ConstantBuffer<PointLight> g_pointLights[] : register(b0, space0);
 
 PUSH_CONSTANTS_BLOCK(
@@ -87,7 +87,7 @@ float3 FresnelSchlick(float _cosTheta, float3 _F0)
 [shader("pixel")]
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 {
-	NK::PBRMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
+	NK::PBRMetallicRoughnessMaterial material = g_materials[NonUniformResourceIndex(PC(materialBufferIndex))];
     SamplerState linearSampler = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 
     float4 albedoSample = g_textures[NonUniformResourceIndex(material.baseColourIdx)].Sample(linearSampler, vertexOutput.texCoord);

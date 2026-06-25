@@ -449,7 +449,7 @@ namespace NK
 	    gpuMaterial->numLayers = ntcModel->header.numLinearLayers;
 	    gpuMaterial->hiddenNeurons = ntcModel->header.hiddenNeurons;
 
-		//Upload G0 buffer (combining all 4 feature levels into a single buffer)
+//Upload G0 buffer (combining all 4 feature levels into a single buffer)
 	    std::size_t g0TotalSize{ 0 };
 	    for(std::size_t i{ 0 }; i < 4; ++i)
 	    {
@@ -465,6 +465,7 @@ namespace NK
 	    for(std::size_t i{ 0 }; i < 4; ++i)
 	    {
 	    	gpuMaterial->g0_offsets[i] = static_cast<std::uint32_t>(g0Offset);
+	    	gpuMaterial->g0_resolutions[i] = ntcModel->featureLevels[i].g0.res;
 	        std::memcpy(g0Data.data() + g0Offset, ntcModel->featureLevels[i].g0.data, ntcModel->featureLevels[i].g0.numElementsPacked);
 	        g0Offset += ntcModel->featureLevels[i].g0.numElementsPacked;
 	    }
@@ -493,6 +494,7 @@ namespace NK
 	    for(std::size_t i = 0; i < 4; ++i)
 	    {
 	    	gpuMaterial->g1_offsets[i] = static_cast<std::uint32_t>(g1Offset);
+	    	gpuMaterial->g1_resolutions[i] = ntcModel->featureLevels[i].g1.res;
 	        std::memcpy(g1Data.data() + g1Offset, ntcModel->featureLevels[i].g1.data, ntcModel->featureLevels[i].g1.numElementsPacked);
 	        g1Offset += ntcModel->featureLevels[i].g1.numElementsPacked;
 	    }

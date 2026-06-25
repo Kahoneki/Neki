@@ -76,6 +76,7 @@ namespace NK
 		void InitGraphicsPipelines();
 		void InitPrefixSumPipeline();
 		void InitPostprocessPipeline();
+		void InitTAAPipeline();
 
 		void InitRenderGraphs();
 		void InitScreenResources();
@@ -140,6 +141,11 @@ namespace NK
 		std::vector<UniquePtr<IBuffer>> m_camDataBuffersPreviousFrame;
 		std::vector<UniquePtr<IBufferView>> m_camDataBufferPreviousFrameViews;
 		std::vector<void*> m_camDataBufferPreviousFrameMaps;
+		
+		//For TAA
+		mutable glm::mat4 m_prevViewProj{ 1.0f };
+		mutable glm::mat4 m_currentViewProj{ 1.0f };
+		mutable glm::mat4 m_currentJitteredViewProj{ 1.0f };
 
 
 		struct alignas(16) LightShaderData
@@ -224,6 +230,8 @@ namespace NK
 		UniquePtr<IShader> m_ntcPBRFragShader;
 		UniquePtr<IShader> m_postprocessFragShader;
 		UniquePtr<IShader> m_meshVisibilityFragShader;
+		UniquePtr<IShader> m_taaFragShader;
+		
 		UniquePtr<IShader> m_prefixSumCompShader;
 
 		struct MeshVisibilityPassPushConstantData
@@ -282,8 +290,8 @@ namespace NK
 			std::uint32_t tileSize;
 			std::uint32_t g0_offsets[4];
 			std::uint32_t g1_offsets[4];
-			float lod;
-			uint featureLevel;
+			std::uint32_t g0_resolutions[4];
+			std::uint32_t g1_resolutions[4];
 			std::uint32_t numLayers;
 			std::uint32_t hiddenNeurons;
 			std::uint32_t frameIndex;
@@ -319,6 +327,17 @@ namespace NK
 			float acesExposure;
 		};
 		UniquePtr<IRootSignature> m_postprocessPassRootSignature;
+		
+		struct TAAPassPushConstantData
+		{
+			ResourceIndex sceneColourIndex;
+			ResourceIndex sceneDepthIndex;
+			ResourceIndex historyColourIndex;
+			SamplerIndex samplerIndex;
+			glm::mat4 inverseViewProj;
+			glm::mat4 prevViewProj;
+		};
+		UniquePtr<IRootSignature> m_taaPassRootSignature;
 
 		UniquePtr<IPipeline> m_meshVisibilityPipeline;
 		UniquePtr<IPipeline> m_shadowPipeline;
@@ -329,6 +348,7 @@ namespace NK
 		UniquePtr<IPipeline> m_ntcPBRPipeline;
 		UniquePtr<IPipeline> m_prefixSumPipeline;
 		UniquePtr<IPipeline> m_postprocessPipeline;
+		UniquePtr<IPipeline> m_taaPipeline;
 
 		UniquePtr<RenderGraph> m_meshRenderGraph;
 		RenderGraph* m_activeRenderGraph;
@@ -375,6 +395,14 @@ namespace NK
 		UniquePtr<ITextureView> m_satFinalUAV;
 		UniquePtr<ITextureView> m_satIntermediateSRV;
 		UniquePtr<ITextureView> m_satFinalSRV;
+		
+		//For TAA
+		UniquePtr<ITexture> m_taaResolved;
+		UniquePtr<ITextureView> m_taaResolvedRTV;
+		UniquePtr<ITextureView> m_taaResolvedSRV;
+		UniquePtr<ITexture> m_sceneColourHistory;
+		UniquePtr<ITextureView> m_sceneColourHistoryRTV;
+		UniquePtr<ITextureView> m_sceneColourHistorySRV;
 
 
 		//Stores the model matrices for all models - regardless of whether the model is loaded or not
