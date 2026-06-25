@@ -23,6 +23,8 @@ struct VertexOutput
     float3 TBN_T : TBN_T;
     float3 TBN_B : TBN_B;
     float3 TBN_N : TBN_N;
+    float4 currClipPos : CURR_CLIP;
+    float4 prevClipPos : PREV_CLIP;
 };
 
 struct LightData
@@ -69,34 +71,10 @@ struct PushConstants
 	uint samplerIndex;
 	
 	float maxIrradiance;
-	
-	uint g0BufferIndex;
-	uint g1BufferIndex;
-	uint mlpBufferIndex;
-	uint layer0_W_offset;
-    uint layer0_B_offset;
-    uint layer1_W_offset;
-    uint layer1_B_offset;
-    uint layer2_W_offset;
-    uint layer2_B_offset;
 
-    uint g0Channels;
-    uint g1Channels;
-    uint g0QuantLevels;
-    uint g1QuantLevels;
+	float4x4 prevModelMat;
+	float4x4 prevViewProjMat;
 
-    uint g0Resolution;
-    uint imageResolution;
-    uint numOctaves;
-    uint tileSize;
-    
-    uint g0_offsets[4];
-    uint g1_offsets[4];
-    uint g0_resolutions[4];
-    uint g1_resolutions[4];
-
-    uint numLayers;
-    uint hiddenNeurons;
     uint frameIndex; //for stochastic filtering
 };
 [[vk::push_constant]] PushConstants pc;
@@ -136,18 +114,18 @@ struct G0Features { float channels[MAX_G0_CHANNELS]; };
 static const uint MAX_G1_CHANNELS = 20;
 struct G1Features { float channels[MAX_G1_CHANNELS]; };
 
-G0Features SampleG0(int2 p, uint fl)
+G0Features SampleG0(int2 p, uint fl, PBRMetallicRoughnessMaterialNTC ntcMat)
 {
 	G0Features output;
 
-    uint g0ResAtLevel = pc.g0_resolutions[fl];
+    uint g0ResAtLevel = ntcMat.g0_resolutions[fl];
 	uint pixelIdx = p.y * g0ResAtLevel + p.x;
 
-    uint bitsPerChannel = (pc.g0QuantLevels <= 4) ? 2 : 4;
-    uint bitsPerPixel = pc.g0Channels * bitsPerChannel;
+    uint bitsPerChannel = (ntcMat.g0QuantLevels <= 4) ? 2 : 4;
+    uint bitsPerPixel = ntcMat.g0Channels * bitsPerChannel;
     uint bytesPerPixel = (bitsPerPixel + 7) / 8;
 
-	uint byteOffset = pc.g0_offsets[fl] + (pixelIdx * bytesPerPixel);
+	uint byteOffset = ntcMat.g0_offsets[fl] + (pixelIdx * bytesPerPixel);
 	uint alignedOffset = byteOffset & ~3;
 	uint byteShift = (byteOffset & 3) * 8;
 
@@ -155,12 +133,12 @@ G0Features SampleG0(int2 p, uint fl)
     uint words[4];
     for (uint w = 0; w < min(numWords, 4); ++w)
     {
-        words[w] = g0Buffer[pc.g0BufferIndex].Load(alignedOffset + (w * 4));
+        words[w] = g0Buffer[ntcMat.g0BufferIndex].Load(alignedOffset + (w * 4));
     }
 
-    float scale = 1.0 / float(pc.g0QuantLevels - 1);
+    float scale = 1.0 / float(ntcMat.g0QuantLevels - 1);
     uint bitPos = byteShift;
-    for (uint c = 0; c < pc.g0Channels; ++c)
+    for (uint c = 0; c < ntcMat.g0Channels; ++c)
     {
         uint wordIndex = bitPos / 32;
         uint bitOffsetInByte = (bitsPerChannel == 4) ? (4 - (bitPos % 8)) : (6 - (bitPos % 8));
@@ -173,24 +151,24 @@ G0Features SampleG0(int2 p, uint fl)
         bitPos += bitsPerChannel;
     }
 
-    for (uint c = pc.g0Channels; c < MAX_G0_CHANNELS; ++c)
+    for (uint c = ntcMat.g0Channels; c < MAX_G0_CHANNELS; ++c)
         output.channels[c] = 0.0f;
 
     return output;
 }
 
-G1Features SampleG1(int2 p, uint fl)
+G1Features SampleG1(int2 p, uint fl, PBRMetallicRoughnessMaterialNTC ntcMat)
 {
     G1Features output;
 
-    uint g1ResAtLevel = pc.g1_resolutions[fl];
+    uint g1ResAtLevel = ntcMat.g1_resolutions[fl];
     uint pixelIdx = p.y * g1ResAtLevel + p.x; 
 
-    uint bitsPerChannel = (pc.g1QuantLevels <= 4) ? 2 : 4;
-    uint bitsPerPixel = pc.g1Channels * bitsPerChannel;
+    uint bitsPerChannel = (ntcMat.g1QuantLevels <= 4) ? 2 : 4;
+    uint bitsPerPixel = ntcMat.g1Channels * bitsPerChannel;
     uint bytesPerPixel = (bitsPerPixel + 7) / 8; 
 
-    uint byteOffset = pc.g1_offsets[fl] + (pixelIdx * bytesPerPixel);
+    uint byteOffset = ntcMat.g1_offsets[fl] + (pixelIdx * bytesPerPixel);
     uint alignedOffset = byteOffset & ~3;
     uint byteShift = (byteOffset & 3) * 8;
 
@@ -198,12 +176,12 @@ G1Features SampleG1(int2 p, uint fl)
     uint words[4]; 
     for (uint w = 0; w < min(numWords, 4); ++w)
     {
-        words[w] = g1Buffer[pc.g1BufferIndex].Load(alignedOffset + (w * 4));
+        words[w] = g1Buffer[ntcMat.g1BufferIndex].Load(alignedOffset + (w * 4));
     }
 
-    float scale = 1.0 / float(pc.g1QuantLevels - 1);
+    float scale = 1.0 / float(ntcMat.g1QuantLevels - 1);
     uint bitPos = byteShift;
-    for (uint c = 0; c < pc.g1Channels; ++c)
+    for (uint c = 0; c < ntcMat.g1Channels; ++c)
     {
         uint wordIndex = bitPos / 32;
         uint bitOffsetInByte = (bitsPerChannel == 4) ? (4 - (bitPos % 8)) : (6 - (bitPos % 8));
@@ -216,34 +194,33 @@ G1Features SampleG1(int2 p, uint fl)
         bitPos += bitsPerChannel;
     }
 
-    for (uint c = pc.g1Channels; c < MAX_G1_CHANNELS; ++c)
+    for (uint c = ntcMat.g1Channels; c < MAX_G1_CHANNELS; ++c)
         output.channels[c] = 0.0f;
 
     return output;
 }
 
-CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
+CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod, PBRMetallicRoughnessMaterialNTC ntcMat)
 {
     uv = frac(uv);
     
-    uint numMips = uint(log2(float(pc.imageResolution))) - 1;
+    uint numMips = uint(log2(float(ntcMat.imageResolution))) - 1;
     
-    // Nearest-neighbor mip selection fallback. (Use DLSS / TAA if you want stochastic filtering)
     uint mip = min(uint(round(lod)), numMips - 1);
     uint featureLevel = FeatureLevelLookup[min(mip, 10u)];
 
     float normalizedLod = saturate(float(mip) / float(max(1u, numMips - 1)));
 
-    float2 p = uv * float(pc.imageResolution);
-    p = clamp(p, float2(0.0f, 0.0f), float2(pc.imageResolution - 1, pc.imageResolution - 1));
-    float2 local = fmod(p, float(pc.tileSize)) / float(pc.tileSize);
+    float2 p = uv * float(ntcMat.imageResolution);
+    p = clamp(p, float2(0.0f, 0.0f), float2(ntcMat.imageResolution - 1, ntcMat.imageResolution - 1));
+    float2 local = fmod(p, float(ntcMat.tileSize)) / float(ntcMat.tileSize);
     local = local * 2.0f - 1.0f;
 
-    uint numInputs = (pc.numOctaves * 2 * 2) + (1) + (pc.g0Channels * 4) + (pc.g1Channels);
+    uint numInputs = (ntcMat.numOctaves * 2 * 2) + (1) + (ntcMat.g0Channels * 4) + (ntcMat.g1Channels);
     CoopVec<float16_t, MAX_INPUTS> encodings;
 
     uint offset = 0;
-    for (uint i=0; i<pc.numOctaves; ++i)
+    for (uint i=0; i<ntcMat.numOctaves; ++i)
     {
         float scale = exp2(float(i)) * 3.141592653589;
         encodings[i*4] = half(sin(scale * local.x));
@@ -255,7 +232,7 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
     encodings[offset++] = half(normalizedLod);
 
     // G0
-    int w0 = pc.g0_resolutions[featureLevel];
+    int w0 = ntcMat.g0_resolutions[featureLevel];
     int h0 = w0;
     float2 p0 = float2(uv.x * (w0 - 1.0f), uv.y * (h0 - 1.0f));
     int x0_0 = clamp(int(floor(p0.x)), 0, w0-1);
@@ -263,22 +240,22 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
     int y0_0 = clamp(int(floor(p0.y)), 0, h0-1);
     int y1_0 = clamp(y0_0+1, 0, h0-1);
     {
-        G0Features s00_0 = SampleG0(int2(x0_0, y0_0), featureLevel);
-        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+c] = half(s00_0.channels[c]); }
+        G0Features s00_0 = SampleG0(int2(x0_0, y0_0), featureLevel, ntcMat);
+        for (uint c=0; c<ntcMat.g0Channels; ++c) { encodings[offset+c] = half(s00_0.channels[c]); }
         
-        G0Features s01_0 = SampleG0(int2(x0_0, y1_0), featureLevel);
-        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(1*pc.g0Channels)+c] = half(s01_0.channels[c]); }
+        G0Features s01_0 = SampleG0(int2(x0_0, y1_0), featureLevel, ntcMat);
+        for (uint c=0; c<ntcMat.g0Channels; ++c) { encodings[offset+(1*ntcMat.g0Channels)+c] = half(s01_0.channels[c]); }
         
-        G0Features s10_0 = SampleG0(int2(x1_0, y0_0), featureLevel);
-        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(2*pc.g0Channels)+c] = half(s10_0.channels[c]); }
+        G0Features s10_0 = SampleG0(int2(x1_0, y0_0), featureLevel, ntcMat);
+        for (uint c=0; c<ntcMat.g0Channels; ++c) { encodings[offset+(2*ntcMat.g0Channels)+c] = half(s10_0.channels[c]); }
         
-        G0Features s11_0 = SampleG0(int2(x1_0, y1_0), featureLevel);
-        for (uint c=0; c<pc.g0Channels; ++c) { encodings[offset+(3*pc.g0Channels)+c] = half(s11_0.channels[c]); }
+        G0Features s11_0 = SampleG0(int2(x1_0, y1_0), featureLevel, ntcMat);
+        for (uint c=0; c<ntcMat.g0Channels; ++c) { encodings[offset+(3*ntcMat.g0Channels)+c] = half(s11_0.channels[c]); }
     }
-    offset += pc.g0Channels * 4;
+    offset += ntcMat.g0Channels * 4;
 
     // G1
-    int w1 = pc.g1_resolutions[featureLevel];
+    int w1 = ntcMat.g1_resolutions[featureLevel];
     int h1 = w1;
     float fx = uv.x * (w1 - 1.0f);
     float fy = uv.y * (h1 - 1.0f);
@@ -288,12 +265,12 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
     int y1_1 = clamp(y0_1+1, 0, h1-1);
     float2 weight = float2(fx-float(x0_1), fy-float(y0_1));
     {
-        G1Features s00_1 = SampleG1(int2(x0_1, y0_1), featureLevel);
-        G1Features s01_1 = SampleG1(int2(x0_1, y1_1), featureLevel);
-        G1Features s10_1 = SampleG1(int2(x1_1, y0_1), featureLevel);
-        G1Features s11_1 = SampleG1(int2(x1_1, y1_1), featureLevel);
+        G1Features s00_1 = SampleG1(int2(x0_1, y0_1), featureLevel, ntcMat);
+        G1Features s01_1 = SampleG1(int2(x0_1, y1_1), featureLevel, ntcMat);
+        G1Features s10_1 = SampleG1(int2(x1_1, y0_1), featureLevel, ntcMat);
+        G1Features s11_1 = SampleG1(int2(x1_1, y1_1), featureLevel, ntcMat);
         
-        for (uint c=0; c<pc.g1Channels; ++c)
+        for (uint c=0; c<ntcMat.g1Channels; ++c)
         {
             float latent = (1.0f-weight.x) * (1.0f-weight.y) * s00_1.channels[c];
             latent += (1.0f-weight.x) * weight.y * s01_1.channels[c];
@@ -302,7 +279,7 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
             encodings[offset+c] = half(latent);
         }
     }
-    offset += pc.g1Channels;
+    offset += ntcMat.g1Channels;
 
     for (uint c = offset; c < MAX_INPUTS; ++c)
     {
@@ -313,11 +290,11 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
     CoopVec<float16_t, HIDDEN_DIM> hidden0 = coopVecMatMulAdd<float16_t, HIDDEN_DIM, MAX_INPUTS, float16_t>(
         encodings,
         CoopVecComponentType.Float16,
-        mlpBuffer[pc.mlpBufferIndex],
-        pc.layer0_W_offset,
+        mlpBuffer[ntcMat.mlpBufferIndex],
+        ntcMat.layer0_W_offset,
         CoopVecComponentType.Float16,
-        mlpBuffer[pc.mlpBufferIndex],
-        pc.layer0_B_offset,
+        mlpBuffer[ntcMat.mlpBufferIndex],
+        ntcMat.layer0_B_offset,
         CoopVecComponentType.Float16,
         CoopVecMatrixLayout.InferencingOptimal,
         false,
@@ -330,16 +307,16 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
     }
 
     CoopVec<float16_t, HIDDEN_DIM> hidden1;
-    if (pc.numLayers >= 3)
+    if (ntcMat.numLayers >= 3)
     {
         hidden1 = coopVecMatMulAdd<float16_t, HIDDEN_DIM, HIDDEN_DIM, float16_t>(
             hidden0,
             CoopVecComponentType.Float16,
-            mlpBuffer[pc.mlpBufferIndex],
-            pc.layer1_W_offset,
+            mlpBuffer[ntcMat.mlpBufferIndex],
+            ntcMat.layer1_W_offset,
             CoopVecComponentType.Float16,
-            mlpBuffer[pc.mlpBufferIndex],
-            pc.layer1_B_offset,
+            mlpBuffer[ntcMat.mlpBufferIndex],
+            ntcMat.layer1_B_offset,
             CoopVecComponentType.Float16,
             CoopVecMatrixLayout.InferencingOptimal,
             false,
@@ -356,15 +333,15 @@ CoopVec<float16_t, MAX_OUTPUTS> EvaluateMLP(float2 uv, float lod)
         hidden1 = hidden0;
     }
 
-    uint out_W_offset = (pc.numLayers >= 3) ? pc.layer2_W_offset : pc.layer1_W_offset;
-    uint out_B_offset = (pc.numLayers >= 3) ? pc.layer2_B_offset : pc.layer1_B_offset;
+    uint out_W_offset = (ntcMat.numLayers >= 3) ? ntcMat.layer2_W_offset : ntcMat.layer1_W_offset;
+    uint out_B_offset = (ntcMat.numLayers >= 3) ? ntcMat.layer2_B_offset : ntcMat.layer1_B_offset;
     CoopVec<float16_t, MAX_OUTPUTS> output = coopVecMatMulAdd<float16_t, MAX_OUTPUTS, HIDDEN_DIM, float16_t>(
         hidden1,
         CoopVecComponentType.Float16,
-        mlpBuffer[pc.mlpBufferIndex],
+        mlpBuffer[ntcMat.mlpBufferIndex],
         out_W_offset,
         CoopVecComponentType.Float16,
-        mlpBuffer[pc.mlpBufferIndex],
+        mlpBuffer[ntcMat.mlpBufferIndex],
         out_B_offset,
         CoopVecComponentType.Float16,
         CoopVecMatrixLayout.InferencingOptimal,
@@ -480,26 +457,34 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
     return diffuseIBL + specularIBL;
 }
 
+struct PSOutput {
+    float4 color : SV_TARGET0;
+    float2 velocity : SV_TARGET1;
+};
+
 [shader("pixel")]
-float4 main(VertexOutput vertexOutput) : SV_TARGET
+PSOutput main(VertexOutput vertexOutput)
 {
+    PBRMetallicRoughnessMaterialNTC ntcMat = g_materials[pc.materialBufferIndex];
+
     //Stochastic filtering
     uint seed = uint(vertexOutput.pos.x) + uint(vertexOutput.pos.y) * 8192 + pc.frameIndex * 16777216;
-    float baseLod = CalculateLevelOfDetail(vertexOutput.texCoord, float2(pc.imageResolution, pc.imageResolution));
+    float baseLod = CalculateLevelOfDetail(vertexOutput.texCoord, float2(ntcMat.imageResolution, ntcMat.imageResolution));
     float lodRandom = random(seed);
     uint mip = uint(max(0.0f, floor(baseLod + lodRandom)));
-    uint numMips = uint(max(0, int(log2(float(pc.imageResolution))) - 1));
+    uint numMips = uint(max(0, int(log2(float(ntcMat.imageResolution))) - 1));
     mip = min(mip, numMips - 1);
-    float mipRes = float(pc.imageResolution >> mip);
+    float mipRes = float(ntcMat.imageResolution >> mip);
     float2 uvTexels = vertexOutput.texCoord * mipRes - 0.5f;
     float2 uvRandom = float2(random(seed), random(seed));
     float2 chosenTexel = floor(uvTexels + uvRandom);
 
     //Snap to nearest trained texel center
     float2 snappedUV = (chosenTexel + 0.5f) / mipRes;
-    CoopVec<float16_t, MAX_OUTPUTS> mlpOutput = EvaluateMLP(snappedUV, float(mip));
     
-    PBRMetallicRoughnessMaterialNTC ntcMat = g_materials[pc.materialBufferIndex];
+    // Evaluate MLP with the material metadata block passed down
+    CoopVec<float16_t, MAX_OUTPUTS> mlpOutput = EvaluateMLP(snappedUV, float(mip), ntcMat);
+    
     SamplerState linearSampler = g_samplers[pc.samplerIndex];
     StructuredBuffer<LightData> lightBuffer = g_lightData[pc.lightDataBufferIndex];
 
@@ -536,15 +521,14 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
     float roughness = saturate(roughnessSample);
     float ao = saturate(aoSample);
     
-    //Specular speckles fix
-    float3 dndx = ddx(normal);
-    float3 dndy = ddy(normal);
-    float variance = 0.5f * (dot(dndx, dndx) + dot(dndy, dndy));
-    float roughnessAA = sqrt(roughness * roughness + variance * 3.0f); 
-    roughness = clamp(roughnessAA, 0.04f, 1.0f);
+    //Specular speckle fix
+	float3 dndx = ddx(normal);
+	float3 dndy = ddy(normal);
+	float variance = 0.5f * (dot(dndx, dndx) + dot(dndy, dndy));
+	float roughnessAA = sqrt(roughness * roughness + variance * 3.0f); 
+	roughness = clamp(roughnessAA, 0.04f, 1.0f);
     
     float3 V = normalize(vertexOutput.camPos - vertexOutput.fragPos); 
-
     float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 
     float3 totalDirectLighting = float3(0.0f, 0.0f, 0.0f);
@@ -617,5 +601,12 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
     
     float3 colour = totalDirectLighting + ambientLighting + emissive;
 
-    return float4(colour, 1.0);
+    PSOutput outVals;
+    outVals.color = float4(colour, 1.0);
+    float2 currUV = vertexOutput.currClipPos.xy / vertexOutput.currClipPos.w * 0.5 + 0.5;
+    currUV.y = 1.0 - currUV.y; // Vulkan UV flip
+    float2 prevUV = vertexOutput.prevClipPos.xy / vertexOutput.prevClipPos.w * 0.5 + 0.5;
+    prevUV.y = 1.0 - prevUV.y;
+    outVals.velocity = currUV - prevUV;
+    return outVals;
 }

@@ -210,6 +210,32 @@ endif()
 target_link_libraries(Neki PUBLIC portable_file_dialogs)
 
 
+#DLSS SDK
+FetchContent_Declare(
+        dlss
+        URL "https://github.com/NVIDIA/DLSS/archive/refs/tags/v3.7.0.zip"
+)
+FetchContent_MakeAvailable(dlss)
+
+#The SDK provides pre-compiled Linux binaries in lib/Linux_x86_64
+set(DLSS_LIB_DIR "${dlss_SOURCE_DIR}/lib/Linux_x86_64")
+target_include_directories(Neki PUBLIC "${dlss_SOURCE_DIR}/include")
+
+#Explicitly find and link the Linux shared object
+find_library(NVSDK_NGX_LIB NAMES nvsdk_ngx PATHS "${DLSS_LIB_DIR}" NO_DEFAULT_PATH)
+target_link_libraries(Neki PUBLIC ${NVSDK_NGX_LIB})
+
+#Tell the Linux runtime linker to look for .so files in the same directory as the executable
+set_target_properties(Neki PROPERTIES BUILD_RPATH "$ORIGIN")
+
+#Copy all DLSS .so files (libnvsdk_ngx.so, nvngx_dlss.so) to the binary directory post-build
+add_custom_command(TARGET Neki POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${DLSS_LIB_DIR}/"
+        "${CMAKE_BINARY_DIR}/"
+)
+
+
 #ImGui
 FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG v1.92.5-docking)
 FetchContent_MakeAvailable(imgui)

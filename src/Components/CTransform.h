@@ -61,6 +61,8 @@ namespace NK
 			
 			return localMatrix;
 		}
+		
+		[[nodiscard]] inline glm::mat4 GetPrevModelMatrix() const { return prevModelMatrix; }
 
 		
 		//Returns true if successful
@@ -173,6 +175,7 @@ namespace NK
 		SERIALISE_MEMBER_FUNC(localPos, localRot, localEulerAngles, localScale, name, serialisedParentID);
 		void OnBeforeSerialise(Registry& _reg);
 		
+		inline void UpdatePrevModelMatrix() { prevModelMatrix = GetModelMatrix(); }
 		
 		std::string name{ "Unnamed" };
 		
@@ -307,6 +310,10 @@ namespace NK
 		
 		//UI
 		bool local{ true }; //Local if true, world if false
+		
+		
+		//For TAA
+		glm::mat4 prevModelMatrix{ glm::mat4(1.0f) };
 	};
 	
 }

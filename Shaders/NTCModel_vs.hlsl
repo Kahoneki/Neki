@@ -21,6 +21,8 @@ struct VertexOutput
 	float3 TBN_T : TBN_T;
     float3 TBN_B : TBN_B;
     float3 TBN_N : TBN_N;
+    float4 currClipPos : CURR_CLIP; // Added
+    float4 prevClipPos : PREV_CLIP; // Added
 };
 
 struct CamData
@@ -49,34 +51,10 @@ PUSH_CONSTANTS_BLOCK(
 	uint samplerIndex;
 	
 	float maxIrradiance;
+
+	float4x4 prevModelMat;
+	float4x4 prevViewProjMat;
 	
-	uint g0BufferIndex;
-	uint g1BufferIndex;
-	uint mlpBufferIndex;
-	uint layer0_W_offset;
-	uint layer0_B_offset;
-	uint layer1_W_offset;
-	uint layer1_B_offset;
-	uint layer2_W_offset;
-	uint layer2_B_offset;
-
-	uint g0Channels;
-	uint g1Channels;
-	uint g0QuantLevels;
-	uint g1QuantLevels;
-
-	uint g0Resolution;
-	uint imageResolution;
-	uint numOctaves;
-	uint tileSize;
-    
-	uint g0_offsets[4];
-	uint g1_offsets[4];
-	uint g0_resolutions[4];
-	uint g1_resolutions[4];
-
-	uint numLayers;
-	uint hiddenNeurons;
 	uint frameIndex; //for stochastic filtering
 );
 
@@ -93,6 +71,11 @@ VertexOutput VSMain(VertexInput input, uint vertexID : SV_VertexID)
 	output.fragPos = float3(worldPos.xyz);
 	output.pos = mul(camData.projMat, mul(camData.viewMat, worldPos));
 
+	//For velocity reprojection
+	output.currClipPos = output.pos;
+	float4 prevWorldPos = mul(PC(prevModelMat), float4(input.pos, 1.0));
+	output.prevClipPos = mul(PC(prevViewProjMat), prevWorldPos);
+	
 	//TBN
     float sign = input.tangent.w;
 	float3 T_os = input.tangent.xyz;

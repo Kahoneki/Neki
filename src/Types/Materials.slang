@@ -79,64 +79,6 @@ struct PBRSpecularGlossinessMaterial
     int hasReflection;
 };
 
-
-struct BlinnPhongMaterialNTC
-{
-    int diffuseChannelR;
-    int diffuseChannelG;
-    int diffuseChannelB;
-    int diffuseChannelA;
-    int specularChannelR;
-    int specularChannelG;
-    int specularChannelB;
-    int ambientChannelR;
-    int ambientChannelG;
-    int ambientChannelB;
-    int emissiveChannelR;
-    int emissiveChannelG;
-    int emissiveChannelB;
-    int normalChannelX;
-    int normalChannelY;
-    int normalChannelZ;
-    int shininessChannel;
-    int opacityChannel;
-    int heightChannel;
-    int displacementChannel;
-    int lightmapChannelR;
-    int lightmapChannelG;
-    int lightmapChannelB;
-    int reflectionChannelR;
-    int reflectionChannelG;
-    int reflectionChannelB;
-
-    int hasDiffuseChannelR;
-    int hasDiffuseChannelG;
-    int hasDiffuseChannelB;
-    int hasDiffuseChannelA;
-    int hasSpecularChannelR;
-    int hasSpecularChannelG;
-    int hasSpecularChannelB;
-    int hasAmbientChannelR;
-    int hasAmbientChannelG;
-    int hasAmbientChannelB;
-    int hasEmissiveChannelR;
-    int hasEmissiveChannelG;
-    int hasEmissiveChannelB;
-    int hasNormalChannelX;
-    int hasNormalChannelY;
-    int hasNormalChannelZ;
-    int hasShininessChannel;
-    int hasOpacityChannel;
-    int hasHeightChannel;
-    int hasDisplacementChannel;
-    int hasLightmapChannelR;
-    int hasLightmapChannelG;
-    int hasLightmapChannelB;
-    int hasReflectionChannelR;
-    int hasReflectionChannelG;
-    int hasReflectionChannelB;
-};
-
 struct PBRMetallicRoughnessMaterialNTC
 {
     int baseColourChannelR;
@@ -163,6 +105,7 @@ struct PBRMetallicRoughnessMaterialNTC
     int reflectionChannelG;
     int reflectionChannelB;
 
+    //Presence flags (0 / 1)
     int hasBaseColourChannelR;
     int hasBaseColourChannelG;
     int hasBaseColourChannelB;
@@ -186,51 +129,28 @@ struct PBRMetallicRoughnessMaterialNTC
     int hasReflectionChannelR;
     int hasReflectionChannelG;
     int hasReflectionChannelB;
-};
 
-struct PBRSpecularGlossinessMaterialNTC
-{
-    int diffuseChannelR;
-    int diffuseChannelG;
-    int diffuseChannelB;
-    int diffuseChannelA;
-    int specularChannelR;
-    int specularChannelG;
-    int specularChannelB;
-    int glossinessChannel;
-    int normalChannelX;
-    int normalChannelY;
-    int normalChannelZ;
-    int aoChannel;
-    int emissiveChannelR;
-    int emissiveChannelG;
-    int emissiveChannelB;
-    int opacityChannel;
-    int heightChannel;
-    int displacementChannel;
-    int reflectionChannelR;
-    int reflectionChannelG;
-    int reflectionChannelB;
-
-    int hasDiffuseChannelR;
-    int hasDiffuseChannelG;
-    int hasDiffuseChannelB;
-    int hasDiffuseChannelA;
-    int hasSpecularChannelR;
-    int hasSpecularChannelG;
-    int hasSpecularChannelB;
-    int hasGlossinessChannel;
-    int hasNormalChannelX;
-    int hasNormalChannelY;
-    int hasNormalChannelZ;
-    int hasAoChannel;
-    int hasEmissiveChannelR;
-    int hasEmissiveChannelG;
-    int hasEmissiveChannelB;
-    int hasOpacityChannel;
-    int hasHeightChannel;
-    int hasDisplacementChannel;
-    int hasReflectionChannelR;
-    int hasReflectionChannelG;
-    int hasReflectionChannelB;
+    uint g0Channels;
+    uint g1Channels;
+    uint g0QuantLevels;
+    uint g1QuantLevels;
+    uint g0Resolution;
+    uint imageResolution;
+    uint numOctaves;
+    uint tileSize;
+    uint4 g0_offsets;
+    uint4 g1_offsets;
+    uint4 g0_resolutions;
+    uint4 g1_resolutions;
+    uint numLayers;
+    uint hiddenNeurons;
+    uint layer0_W_offset;
+    uint layer0_B_offset;
+    uint layer1_W_offset;
+    uint layer1_B_offset;
+    uint layer2_W_offset;
+    uint layer2_B_offset;
+    uint g0BufferIndex;
+    uint g1BufferIndex;
+    uint mlpBufferIndex;
 };

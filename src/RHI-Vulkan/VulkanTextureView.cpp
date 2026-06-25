@@ -121,6 +121,7 @@ namespace NK
 			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::TEXTURE_VIEW, "This constructor is only to be used for non-shader-accessible view types. This requirement will maybe be lifted in a future version - if there is a valid reason for needing this constructor in this instance, please make a GitHub issue on the topic.\n");
 			throw std::runtime_error("");
 		}
+		//^edit: velocity vectors innit
 
 
 		VkImageViewCreateInfo viewInfo{};

@@ -1,4 +1,3 @@
-#include <vk_mem_alloc.h>
 
 #include "VulkanDevice.h"
 
@@ -26,9 +25,13 @@
 
 #include <algorithm>
 #include <cstring>
+#include <nvsdk_ngx.h>
+#include <nvsdk_ngx_helpers.h>
+#include <nvsdk_ngx_vk.h>
 #include <set>
 #include <stdexcept>
 #include <GLFW/glfw3.h>
+#include <vk_mem_alloc.h>
 
 
 namespace NK
@@ -577,7 +580,14 @@ namespace NK
 		compositeFeatures.shaderReplicatedComposites = VK_TRUE;
 		compositeFeatures.pNext = &coopVecFeatures;
 
-
+		//DLSS
+		uint32_t ngxExtCount{ 0 };
+		VkExtensionProperties* ngxExts{ nullptr };
+		NVSDK_NGX_VULKAN_RequiredExtensions(&ngxExtCount, &ngxExts, nullptr, nullptr);
+		for (uint32_t i = 0; i < ngxExtCount; i++) {
+			requiredDeviceExtensions.push_back(ngxExts[i].extensionName);
+		}
+		
 		//Create device
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

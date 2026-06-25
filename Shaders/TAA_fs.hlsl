@@ -14,10 +14,8 @@ PUSH_CONSTANTS_BLOCK(
 	uint sceneDepthIndex;
 	uint historyColourIndex;
 	uint samplerIndex;
-	float4x4 inverseViewProj;
-	float4x4 prevViewProj;
+	uint velocityTextureIndex;
 );
-
 
 [shader("pixel")]
 float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
@@ -25,22 +23,16 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	SamplerState s = g_samplers[NonUniformResourceIndex(PC(samplerIndex))];
 	float2 uv = vertexOutput.texCoord;
 	
-	//Get current frame and depth
 	uint w, h;
 	g_textures[NonUniformResourceIndex(PC(sceneColourIndex))].GetDimensions(w,h);
 	int3 texelCoord = int3(uv * float2(w, h), 0);
+	
 	float3 currentColour = g_textures[NonUniformResourceIndex(PC(sceneColourIndex))].Load(texelCoord).rgb;
-	float depth = g_textures[NonUniformResourceIndex(PC(sceneDepthIndex))].Load(texelCoord).r;
 	
-	//Reprojection (get last frame's uv)
-	float4 ndc = float4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
-	float4 worldPos = mul(PC(inverseViewProj), ndc);
-	worldPos /= worldPos.w;
+	float2 velocity = g_textures[NonUniformResourceIndex(PC(velocityTextureIndex))].Load(texelCoord).rg;
+	float2 prevUV = uv - velocity;
 	
-	float4 prevClip = mul(PC(prevViewProj), worldPos);
-	float2 prevNDC = prevClip.xy / prevClip.w;
-	float2 prevUV = float2(prevNDC.x * 0.5 + 0.5, 0.5 - prevNDC.y * 0.5);
-	
+	float2 texelSize = 1.0 / float2(w,h);
 	float3 minColour = currentColour;
 	float3 maxColour = currentColour;
 	
@@ -60,20 +52,14 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 		maxColour = max(maxColour, neighbor);
 	}
 	
-	//Read history and clamp
 	float3 historyColour = g_textures[NonUniformResourceIndex(PC(historyColourIndex))].SampleLevel(s, prevUV, 0).rgb;
 	historyColour = clamp(historyColour, minColour, maxColour);
 	
-	//10% current, 90% history
 	float blendWeight = 0.1;
-	
-	//Reset the history if UV goes off screen
 	if (prevUV.x < 0.0 || prevUV.x > 1.0 || prevUV.y < 0.0 || prevUV.y > 1.0)
 	{
-		blendWeight = 1.0; //100% current, 0% history
+		blendWeight = 1.0;
 	}
 	
-	float3 finalColour = lerp(historyColour, currentColour, blendWeight);
-	
-	return float4(finalColour, 1.0);
+	return float4(lerp(historyColour, currentColour, blendWeight), 1.0);
 }

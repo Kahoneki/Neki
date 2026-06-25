@@ -45,6 +45,7 @@
 #endif
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
+#include <nvsdk_ngx_vk.h>
 
 
 namespace NK
@@ -168,6 +169,39 @@ namespace NK
 		{
 			#ifdef NEKI_VULKAN_SUPPORTED
 				m_device = UniquePtr<IDevice>(NK_NEW(VulkanDevice, m_logger, m_allocator));
+				
+				//DLSS
+				NVSDK_NGX_FeatureCommonInfo commonInfo{};
+				commonInfo.PathListInfo.Path = L".";
+
+				NVSDK_NGX_Result result = NVSDK_NGX_VULKAN_Init_with_ProjectID(
+					"NekiAppID",
+					NVSDK_NGX_ENGINE_TYPE_CUSTOM, "1.0",
+					L".", 
+					vkDevice->GetInstance(), 
+					vkDevice->GetPhysicalDevice(), 
+					vkDevice->GetDevice(), 
+					nullptr, nullptr, &commonInfo);
+
+				if (NVSDK_NGX_FAILED(result)) {
+					m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "Failed to initialize NVIDIA DLSS NGX.\n");
+				}
+
+				NVSDK_NGX_VULKAN_GetCapabilityParameters(&m_ngxParameters);
+
+				NVSDK_NGX_DLSS_Create_Params dlssCreateParams{};
+				dlssCreateParams.Feature.InWidth = m_desc.renderResolution.x;
+				dlssCreateParams.Feature.InHeight = m_desc.renderResolution.y;
+				dlssCreateParams.Feature.InTargetWidth = m_desc.window->GetSize().x;
+				dlssCreateParams.Feature.InTargetHeight = m_desc.window->GetSize().y;
+				dlssCreateParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_Balanced;
+
+				NVSDK_NGX_VULKAN_CreateFeature(
+					dynamic_cast<VulkanCommandBuffer*>(m_graphicsCommandBuffers[0].get())->GetBuffer(),
+					NVSDK_NGX_Feature_SuperSampling, 
+					m_ngxParameters, 
+					&m_dlssFeature, 
+					&dlssCreateParams);
 			#else
 				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::VULKAN but compiler definition NEKI_VULKAN_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
 				throw std::invalid_argument("");
@@ -795,9 +829,11 @@ namespace NK
 		multisamplingDesc.sampleMask = UINT32_MAX;
 		multisamplingDesc.alphaToCoverageEnable = false;
 
-		std::vector<ColourBlendAttachmentDesc> colourBlendAttachments(1);
+		std::vector<ColourBlendAttachmentDesc> colourBlendAttachments(2);
 		colourBlendAttachments[0].colourWriteMask = COLOUR_ASPECT_FLAGS::R_BIT | COLOUR_ASPECT_FLAGS::G_BIT | COLOUR_ASPECT_FLAGS::B_BIT | COLOUR_ASPECT_FLAGS::A_BIT;
 		colourBlendAttachments[0].blendEnable = false;
+		colourBlendAttachments[1].colourWriteMask = COLOUR_ASPECT_FLAGS::R_BIT | COLOUR_ASPECT_FLAGS::G_BIT | COLOUR_ASPECT_FLAGS::B_BIT | COLOUR_ASPECT_FLAGS::A_BIT;
+		colourBlendAttachments[1].blendEnable = false;
 		ColourBlendDesc colourBlendDesc{};
 		colourBlendDesc.logicOpEnable = false;
 		colourBlendDesc.attachments = colourBlendAttachments;
@@ -813,7 +849,7 @@ namespace NK
 		pipelineDesc.depthStencilDesc = depthStencilDesc;
 		pipelineDesc.multisamplingDesc = multisamplingDesc;
 		pipelineDesc.colourBlendDesc = colourBlendDesc;
-		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R16G16B16A16_SFLOAT };
+		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R16G16B16A16_SFLOAT, DATA_FORMAT::R16G16_SFLOAT };
 		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
 
 		m_skyboxPipeline = m_device->CreatePipeline(pipelineDesc);
@@ -844,9 +880,11 @@ namespace NK
 		multisamplingDesc.sampleMask = UINT32_MAX;
 		multisamplingDesc.alphaToCoverageEnable = false;
 
-		std::vector<ColourBlendAttachmentDesc> colourBlendAttachments(1);
+		std::vector<ColourBlendAttachmentDesc> colourBlendAttachments(2);
 		colourBlendAttachments[0].colourWriteMask = COLOUR_ASPECT_FLAGS::R_BIT | COLOUR_ASPECT_FLAGS::G_BIT | COLOUR_ASPECT_FLAGS::B_BIT | COLOUR_ASPECT_FLAGS::A_BIT;
 		colourBlendAttachments[0].blendEnable = false;
+		colourBlendAttachments[1].colourWriteMask = COLOUR_ASPECT_FLAGS::R_BIT | COLOUR_ASPECT_FLAGS::G_BIT | COLOUR_ASPECT_FLAGS::B_BIT | COLOUR_ASPECT_FLAGS::A_BIT;
+		colourBlendAttachments[1].blendEnable = false;
 		ColourBlendDesc colourBlendDesc{};
 		colourBlendDesc.logicOpEnable = false;
 		colourBlendDesc.attachments = colourBlendAttachments;
@@ -862,7 +900,7 @@ namespace NK
 		pipelineDesc.depthStencilDesc = depthStencilDesc;
 		pipelineDesc.multisamplingDesc = multisamplingDesc;
 		pipelineDesc.colourBlendDesc = colourBlendDesc;
-		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R16G16B16A16_SFLOAT };
+		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R16G16B16A16_SFLOAT, DATA_FORMAT::R16G16_SFLOAT };
 		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::D32_SFLOAT;
 
 		m_blinnPhongPipeline = m_device->CreatePipeline(pipelineDesc);
@@ -1189,6 +1227,7 @@ namespace NK
 		{ "SCENE_COLOUR", RESOURCE_STATE::RENDER_TARGET },
 		{ "SCENE_COLOUR_MSAA", RESOURCE_STATE::RENDER_TARGET },
 		{ "SCENE_COLOUR_SSAA", RESOURCE_STATE::RENDER_TARGET },
+		{ "SCENE_VELOCITY", RESOURCE_STATE::RENDER_TARGET },
 		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_WRITE },
 		{ "SCENE_DEPTH_MSAA", RESOURCE_STATE::DEPTH_WRITE },
 		{ "SCENE_DEPTH_SSAA", RESOURCE_STATE::DEPTH_WRITE },
@@ -1198,19 +1237,22 @@ namespace NK
 		{ "BRDF_LUT", RESOURCE_STATE::SHADER_RESOURCE }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
+			ITextureView* rtvColour{ m_desc.enableMSAA ? _texViews.Get("SCENE_COLOUR_MSAA_RTV") : (m_desc.enableSSAA ? _texViews.Get("SCENE_COLOUR_SSAA_RTV") : _texViews.Get("SCENE_COLOUR_RTV")) };
+			ITextureView* rtvVelocity{ _texViews.Get("SCENE_VELOCITY_RTV") };
+			ITextureView* rtvArray[]{ rtvColour, rtvVelocity };
+
 			if (m_desc.enableMSAA)
 			{
-				_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("SCENE_COLOUR_MSAA_RTV"), _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr);
+				_cmdBuf->BeginRendering(2, nullptr, rtvArray, _texViews.Get("SCENE_DEPTH_MSAA_DSV"), _texViews.Get("SCENE_DEPTH_DSV"), nullptr);
 			}
 			else if (m_desc.enableSSAA)
 			{
-				_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("SCENE_COLOUR_SSAA_RTV"), nullptr, _texViews.Get("SCENE_DEPTH_SSAA_DSV"), nullptr);
+				_cmdBuf->BeginRendering(2, nullptr, rtvArray, nullptr, _texViews.Get("SCENE_DEPTH_SSAA_DSV"), nullptr);
 			}
 			else
 			{
-				_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("SCENE_COLOUR_RTV"), nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr);
+				_cmdBuf->BeginRendering(2, nullptr, rtvArray, nullptr, _texViews.Get("SCENE_DEPTH_DSV"), nullptr);
 			}
-			
 
 			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
 			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.enableSSAA ? m_supersampleResolution : m_desc.renderResolution });
@@ -1226,6 +1268,9 @@ namespace NK
 			pushConstantData.brdfLUTSamplerIndex = _samplers.Get("BRDF_LUT_SAMPLER")->GetIndex();
 			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
 			
+			//Set the unjittered prev matrix for reprojection
+			pushConstantData.prevViewProjMat = m_prevViewProj;
+
 			if (m_activeCamera)
 			{
 				pushConstantData.maxIrradiance = m_activeCamera->GetMaxIrradiance();
@@ -1235,6 +1280,7 @@ namespace NK
 			_cmdBuf->BindRootSignature(m_meshPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 			if (_texs.Get("SKYBOX"))
 			{
+				pushConstantData.prevModelMat = glm::mat4(1.0f);
 				std::size_t skyboxVertexBufferStride{ sizeof(glm::vec3) };
 				_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
 				_cmdBuf->BindPipeline(m_skyboxPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
@@ -1249,6 +1295,7 @@ namespace NK
 			{
 				if (modelRenderer.meshes.size() == 0) { continue; }
 				pushConstantData.modelMat = transform.GetModelMatrix();
+				pushConstantData.prevModelMat = transform.GetPrevModelMatrix();
 
 				for (std::size_t i{ 0 }; i < modelRenderer.meshes.size(); ++i)
 				{
@@ -1268,60 +1315,9 @@ namespace NK
 						_cmdBuf->BindPipeline(m_ntcPBRPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
 						NTCPassPushConstantData ntcData{};
 						static_cast<MeshPassPushConstantData&>(ntcData) = pushConstantData;
-						ntcData.g0BufferIndex   = mat->g0BufferView->GetIndex();
-						ntcData.g1BufferIndex   = mat->g1BufferView->GetIndex();
-						ntcData.mlpBufferIndex  = mat->mlpBufferView->GetIndex();
-						ntcData.layer0_W_offset = mat->layer0_W_offset;
-						ntcData.layer0_B_offset = mat->layer0_B_offset;
-						ntcData.layer1_W_offset = mat->layer1_W_offset;
-						ntcData.layer1_B_offset = mat->layer1_B_offset;
-						ntcData.layer2_W_offset = mat->layer2_W_offset;
-						ntcData.layer2_B_offset = mat->layer2_B_offset;
-						ntcData.g0Channels      = mat->g0Channels;
-						ntcData.g1Channels      = mat->g1Channels;
-						ntcData.g0QuantLevels   = mat->g0QuantLevels;
-						ntcData.g1QuantLevels   = mat->g1QuantLevels;
-						ntcData.g0Resolution    = mat->g0Resolution / 2;
-						ntcData.imageResolution = mat->imageResolution;
-						ntcData.numOctaves      = mat->numOctaves;
-						ntcData.tileSize        = mat->tileSize;
-						for (std::uint32_t offsetIdx{ 0 }; offsetIdx < 4; ++offsetIdx)
-						{
-							ntcData.g0_offsets[offsetIdx] = mat->g0_offsets[offsetIdx];
-							ntcData.g1_offsets[offsetIdx] = mat->g1_offsets[offsetIdx];
-						}
-						ntcData.numLayers       = mat->numLayers;
-						ntcData.hiddenNeurons   = mat->hiddenNeurons;
 						ntcData.frameIndex      = m_globalFrame;
-						
-						//Calculate feature level
-						std::uint32_t featureLevel{ 0 };
-						if (m_activeCamera && i < modelRenderer.meshDataLoadInfos.size())
-						{
-							//Get camera world position
-							CTransform& cameraTransform{ m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)) };
-							const glm::vec3 cameraPos{ cameraTransform.GetWorldPosition() };
-            
-							//Get this specific mesh's world center position (todo: profile)
-							const glm::vec4 meshLocalCenter{ glm::vec4(modelRenderer.meshDataLoadInfos[i].centre, 1.0f) };
-							const glm::vec3 meshWorldCenter{ glm::vec3(transform.GetModelMatrix() * meshLocalCenter) };
-            
-							//Calculate distance-based LOD
-							const float distanceToCamera{ glm::length(cameraPos - meshWorldCenter) };
-							const float lod{ std::log2f(std::max(1.0f, distanceToCamera * m_lodScale)) };
-							std::uint32_t num_mips{ static_cast<std::uint32_t>(std::log2(ntcData.imageResolution) - 1) };
-							const std::uint32_t mipIndex{ (std::clamp(static_cast<std::uint32_t>(std::floor(lod)), 0u, num_mips)) };
-							
-							for (int j = 0; j < 4; ++j)
-							{
-								ntcData.g0_resolutions[j] = mat->g0_resolutions[j];
-								ntcData.g1_resolutions[j] = mat->g1_resolutions[j];
-							}
-            
-							//Calculate feature level
-							static const uint32_t FeatureLevelLookup[11] = { 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 3 };
-							featureLevel = FeatureLevelLookup[mipIndex];
-						}
+						ntcData.prevModelMat    = transform.GetPrevModelMatrix();
+						ntcData.prevViewProjMat = m_prevViewProj;
 						
 						_cmdBuf->PushConstants(m_NTCPassRootSignature.get(), &ntcData);
 					}
@@ -1341,15 +1337,15 @@ namespace NK
 
 			if (m_desc.enableMSAA)
 			{
-				_cmdBuf->EndRendering(1, nullptr, _texs.Get("SCENE_COLOUR_MSAA"));
+				_cmdBuf->EndRendering(2, nullptr, _texs.Get("SCENE_COLOUR_MSAA"));
 			}
 			else if (m_desc.enableSSAA)
 			{
-				_cmdBuf->EndRendering(1, nullptr, _texs.Get("SCENE_COLOUR_SSAA"));
+				_cmdBuf->EndRendering(2, nullptr, _texs.Get("SCENE_COLOUR_SSAA"));
 			}
 			else
 			{
-				_cmdBuf->EndRendering(1, nullptr, _texs.Get("SCENE_COLOUR"));
+				_cmdBuf->EndRendering(2, nullptr, _texs.Get("SCENE_COLOUR"));
 			}
 		});
 		
@@ -1388,38 +1384,36 @@ namespace NK
 
 		
 		meshDesc.AddNode(
-		"TAA_PASS",
-		{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
-		 { "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
-		 { "SCENE_COLOUR_HISTORY", RESOURCE_STATE::SHADER_RESOURCE },
-		 { "TAA_RESOLVED", RESOURCE_STATE::RENDER_TARGET }},
-		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
-		{
-			_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("TAA_RESOLVED_RTV"), nullptr, nullptr, nullptr);
-			_cmdBuf->BindRootSignature(m_taaPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
-			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.renderResolution });
-			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.renderResolution });
+				"TAA_PASS",
+				{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
+				 { "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
+				 { "SCENE_COLOUR_HISTORY", RESOURCE_STATE::SHADER_RESOURCE },
+				 { "SCENE_VELOCITY", RESOURCE_STATE::SHADER_RESOURCE }, 
+				 { "TAA_RESOLVED", RESOURCE_STATE::RENDER_TARGET }},
+				[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+				{
+					ITextureView* rtv = _texViews.Get("TAA_RESOLVED_RTV"); // Get local pointer
+					_cmdBuf->BeginRendering(1, nullptr, &rtv, nullptr, nullptr, nullptr); // Pass address of pointer (&rtv)
+			
+					_cmdBuf->BindRootSignature(m_taaPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+					_cmdBuf->SetViewport({ 0, 0 }, { m_desc.renderResolution });
+					_cmdBuf->SetScissor({ 0, 0 }, { m_desc.renderResolution });
 
-			TAAPassPushConstantData pushConstantData{};
-			pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
-			pushConstantData.sceneDepthIndex = _texViews.Get("SCENE_DEPTH_SRV")->GetIndex();
-			pushConstantData.historyColourIndex = _texViews.Get("SCENE_COLOUR_HISTORY_SRV")->GetIndex();
-			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+					TAAPassPushConstantData pushConstantData{};
+					pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
+					pushConstantData.sceneDepthIndex = _texViews.Get("SCENE_DEPTH_SRV")->GetIndex();
+					pushConstantData.historyColourIndex = _texViews.Get("SCENE_COLOUR_HISTORY_SRV")->GetIndex();
+					pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+					pushConstantData.velocityTextureIndex = _texViews.Get("SCENE_VELOCITY_SRV")->GetIndex();
 
-			if (m_activeCamera)
-			{
-				pushConstantData.inverseViewProj = glm::inverse(m_currentJitteredViewProj);
-				pushConstantData.prevViewProj = m_prevViewProj;
-			}
-
-			std::size_t screenQuadVertexBufferStride{ sizeof(ScreenQuadVertex) };
-			_cmdBuf->PushConstants(m_taaPassRootSignature.get(), &pushConstantData);
-			_cmdBuf->BindPipeline(m_taaPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
-			_cmdBuf->BindVertexBuffers(0, 1, m_screenQuadVertBuffer.get(), &screenQuadVertexBufferStride);
-			_cmdBuf->BindIndexBuffer(m_screenQuadIndexBuffer.get(), DATA_FORMAT::R32_UINT);
-			_cmdBuf->DrawIndexed(6, 1, 0, 0);
-			_cmdBuf->EndRendering(1, nullptr, _texs.Get("TAA_RESOLVED"));
-		});
+					std::size_t screenQuadVertexBufferStride{ sizeof(ScreenQuadVertex) };
+					_cmdBuf->PushConstants(m_taaPassRootSignature.get(), &pushConstantData);
+					_cmdBuf->BindPipeline(m_taaPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+					_cmdBuf->BindVertexBuffers(0, 1, m_screenQuadVertBuffer.get(), &screenQuadVertexBufferStride);
+					_cmdBuf->BindIndexBuffer(m_screenQuadIndexBuffer.get(), DATA_FORMAT::R32_UINT);
+					_cmdBuf->DrawIndexed(6, 1, 0, 0);
+					_cmdBuf->EndRendering(1, nullptr, _texs.Get("TAA_RESOLVED"));
+				});
 		
 		
 		meshDesc.AddNode(
@@ -1465,7 +1459,7 @@ namespace NK
 		});
 
 		
-		meshDesc.AddNode(
+meshDesc.AddNode(
 		"POSTPROCESS_PASS",
 		{{ "TAA_RESOLVED", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
@@ -1473,7 +1467,9 @@ namespace NK
 		{ "BACKBUFFER", RESOURCE_STATE::RENDER_TARGET }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
-			_cmdBuf->BeginRendering(1, nullptr, _texViews.Get("BACKBUFFER_RTV"), nullptr, nullptr, nullptr);
+			ITextureView* rtv = _texViews.Get("BACKBUFFER_RTV"); // Get local pointer
+			_cmdBuf->BeginRendering(1, nullptr, &rtv, nullptr, nullptr, nullptr); // Pass address of pointer (&rtv)
+			
 			_cmdBuf->BindRootSignature(m_postprocessPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
 			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.window->GetFramebufferSize() });
@@ -1595,6 +1591,20 @@ namespace NK
 		m_sceneColourHistorySRV = m_device->CreateShaderResourceTextureView(m_sceneColourHistory.get(), taaViewDesc);
 		
 		//--------END OF SCENE COLOUR--------//
+		
+		
+		//DLSS/FSR
+		TextureDesc velocityDesc = sceneColourDesc;
+		velocityDesc.format = DATA_FORMAT::R16G16_SFLOAT;
+		m_sceneVelocity = m_device->CreateTexture(velocityDesc);
+		m_graphicsCommandBuffers[0]->TransitionBarrier(m_sceneVelocity.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::RENDER_TARGET);
+
+		TextureViewDesc velocityViewDesc = sceneColourViewDesc;
+		velocityViewDesc.type = TEXTURE_VIEW_TYPE::RENDER_TARGET;
+		velocityViewDesc.format = DATA_FORMAT::R16G16_SFLOAT;
+		m_sceneVelocityRTV = m_device->CreateRenderTargetTextureView(m_sceneVelocity.get(), velocityViewDesc);
+		velocityViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
+		m_sceneVelocitySRV = m_device->CreateShaderResourceTextureView(m_sceneVelocity.get(), velocityViewDesc);
 		
 
 		//--------SCENE DEPTH--------//
@@ -3010,6 +3020,10 @@ namespace NK
 		execDesc.textureViews.Set("SCENE_COLOUR_HISTORY_RTV", m_sceneColourHistoryRTV.get());
 		execDesc.textureViews.Set("SCENE_COLOUR_HISTORY_SRV", m_sceneColourHistorySRV.get());
 		
+		execDesc.textures.Set("SCENE_VELOCITY", m_sceneVelocity.get());
+		execDesc.textureViews.Set("SCENE_VELOCITY_RTV", m_sceneVelocityRTV.get());
+		execDesc.textureViews.Set("SCENE_VELOCITY_SRV", m_sceneVelocitySRV.get());
+		
 		execDesc.textureViews.Set("SCENE_DEPTH_DSV", m_sceneDepthDSV.get());
 		execDesc.textureViews.Set("SCENE_DEPTH_SRV", m_sceneDepthSRV.get());
 		execDesc.textureViews.Set("SCENE_DEPTH_MSAA_DSV", m_sceneDepthMSAADSV.get());
@@ -3060,6 +3074,11 @@ namespace NK
 		{
 			CameraShaderData currCam = m_activeCamera->camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)).GetModelMatrix());
 			m_prevViewProj = m_currentViewProj; //Save unjittered matrix for next frame reprojection
+		}
+		
+		for (auto&& [transform] : m_reg.get().View<CTransform>())
+		{
+			transform.UpdatePrevModelMatrix();
 		}
 		
 		m_firstFrame = false;

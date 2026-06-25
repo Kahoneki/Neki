@@ -154,7 +154,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _multisampleDepthAttachment, ITextureView* _outputDepthAttachment, ITextureView* _stencilAttachment, bool _clearRTVs, bool _clearDSV)
+	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* const* _multisampleColourAttachments, ITextureView* const* _outputColourAttachments, ITextureView* _multisampleDepthAttachment, ITextureView* _outputDepthAttachment, ITextureView* _stencilAttachment, bool _clearRTVs, bool _clearDSV)
 	{
 		if (_outputDepthAttachment && _stencilAttachment)
 		{
@@ -171,15 +171,15 @@ namespace NK
 			if (_multisampleColourAttachments)
 			{
 				//Multisampling enabled, render into _multisampleColourAttachments and resolve into _outputColourAttachments
-				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_multisampleColourAttachments[i]))->GetImageView();
-				colourAttachmentInfos[i].resolveImageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
+				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(_multisampleColourAttachments[i])->GetImageView();
+				colourAttachmentInfos[i].resolveImageView = dynamic_cast<VulkanTextureView*>(_outputColourAttachments[i])->GetImageView();
 				colourAttachmentInfos[i].resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 				colourAttachmentInfos[i].resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
 			}
 			else
 			{
 				//Multisampling disabled, ignore _multisampleColourAttachments and just render straight into _outputColourAttachments
-				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
+				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(_outputColourAttachments[i])->GetImageView();
 			}
 
 			colourAttachmentInfos[i].loadOp = _clearRTVs ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -228,7 +228,7 @@ namespace NK
 		VkRect2D renderArea = {};
 		if (_outputColourAttachments)
 		{
-			renderArea = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[0]))->GetRenderArea();
+			renderArea = dynamic_cast<VulkanTextureView*>(_outputColourAttachments[0])->GetRenderArea();
 		}
 		else if (_outputDepthAttachment)
 		{
@@ -253,7 +253,7 @@ namespace NK
 
 
 
-	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* _multisampleColourAttachments, ITextureView* _outputColourAttachments, ITextureView* _depthStencilAttachment, bool _clearRTVs, bool _clearDSV)
+	void VulkanCommandBuffer::BeginRendering(std::size_t _numColourAttachments, ITextureView* const* _multisampleColourAttachments, ITextureView* const* _outputColourAttachments, ITextureView* _depthStencilAttachment, bool _clearRTVs, bool _clearDSV)
 	{
 		if (_depthStencilAttachment)
 		{
@@ -273,15 +273,15 @@ namespace NK
 			if (_multisampleColourAttachments)
 			{
 				//Multisampling enabled, render into _multisampleColourAttachments and resolve into _outputColourAttachments
-				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_multisampleColourAttachments[i]))->GetImageView();
-				colourAttachmentInfos[i].resolveImageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
+				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(_multisampleColourAttachments[i])->GetImageView();
+				colourAttachmentInfos[i].resolveImageView = dynamic_cast<VulkanTextureView*>(_outputColourAttachments[i])->GetImageView();
 				colourAttachmentInfos[i].resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 				colourAttachmentInfos[i].resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
 			}
 			else
 			{
 				//Multisampling disabled, ignore _multisampleColourAttachments and just render straight into _outputColourAttachments
-				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[i]))->GetImageView();
+				colourAttachmentInfos[i].imageView = dynamic_cast<VulkanTextureView*>(_outputColourAttachments[i])->GetImageView();
 			}
 
 			colourAttachmentInfos[i].loadOp = _clearRTVs ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;;
@@ -305,7 +305,7 @@ namespace NK
 		VkRect2D renderArea = {};
 		if (_outputColourAttachments)
 		{
-			renderArea = dynamic_cast<VulkanTextureView*>(&(_outputColourAttachments[0]))->GetRenderArea();
+			renderArea = dynamic_cast<VulkanTextureView*>(_outputColourAttachments[0])->GetRenderArea();
 		}
 		else if (_depthStencilAttachment)
 		{

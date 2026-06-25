@@ -6,7 +6,6 @@
 #include <Components/CLight.h>
 #include <Components/CSkybox.h>
 #include <Components/CTransform.h>
-#include <Components/CWindow.h>
 #include <Core-ECS/Registry.h>
 #include <Graphics/GPUUploader.h>
 #include <Graphics/RenderGraph.h>
@@ -17,6 +16,7 @@
 #include <Types/NekiTypes.h>
 
 #include <ImGuizmo.h>
+#include <nvsdk_ngx.h>
 
 
 namespace NK
@@ -266,34 +266,17 @@ namespace NK
 			SamplerIndex samplerIndex;
 	
 			float maxIrradiance;
+			
+			std::uint32_t padding;
+			
+			//For TAA
+			glm::mat4 prevModelMat;
+			glm::mat4 prevViewProjMat;
 		};
 		UniquePtr<IRootSignature> m_meshPassRootSignature;
 		
 		struct NTCPassPushConstantData : public MeshPassPushConstantData
 		{
-			std::uint32_t g0BufferIndex;
-			std::uint32_t g1BufferIndex;
-			std::uint32_t mlpBufferIndex;
-			std::uint32_t layer0_W_offset;
-			std::uint32_t layer0_B_offset;
-			std::uint32_t layer1_W_offset;
-			std::uint32_t layer1_B_offset;
-			std::uint32_t layer2_W_offset;
-			std::uint32_t layer2_B_offset;
-			std::uint32_t g0Channels;
-			std::uint32_t g1Channels;
-			std::uint32_t g0QuantLevels;
-			std::uint32_t g1QuantLevels;
-			std::uint32_t g0Resolution;
-			std::uint32_t imageResolution;
-			std::uint32_t numOctaves;
-			std::uint32_t tileSize;
-			std::uint32_t g0_offsets[4];
-			std::uint32_t g1_offsets[4];
-			std::uint32_t g0_resolutions[4];
-			std::uint32_t g1_resolutions[4];
-			std::uint32_t numLayers;
-			std::uint32_t hiddenNeurons;
 			std::uint32_t frameIndex;
 		};
 		UniquePtr<IRootSignature> m_NTCPassRootSignature;
@@ -334,8 +317,7 @@ namespace NK
 			ResourceIndex sceneDepthIndex;
 			ResourceIndex historyColourIndex;
 			SamplerIndex samplerIndex;
-			glm::mat4 inverseViewProj;
-			glm::mat4 prevViewProj;
+			ResourceIndex velocityTextureIndex;
 		};
 		UniquePtr<IRootSignature> m_taaPassRootSignature;
 
@@ -403,6 +385,16 @@ namespace NK
 		UniquePtr<ITexture> m_sceneColourHistory;
 		UniquePtr<ITextureView> m_sceneColourHistoryRTV;
 		UniquePtr<ITextureView> m_sceneColourHistorySRV;
+		
+		//For DLSS/FSR
+		UniquePtr<ITexture> m_sceneVelocity;
+		UniquePtr<ITextureView> m_sceneVelocityRTV;
+		UniquePtr<ITextureView> m_sceneVelocitySRV;
+		
+		
+		//For DLSS
+		NVSDK_NGX_Parameter* m_ngxParameters{ nullptr };
+		NVSDK_NGX_Handle* m_dlssFeature{ nullptr };
 
 
 		//Stores the model matrices for all models - regardless of whether the model is loaded or not

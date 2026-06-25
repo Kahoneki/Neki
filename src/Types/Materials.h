@@ -218,9 +218,34 @@ namespace NK
 		int hasReflectionChannelR;
 		int hasReflectionChannelG;
 		int hasReflectionChannelB;
+
+		std::uint32_t g0Channels;
+		std::uint32_t g1Channels;
+		std::uint32_t g0QuantLevels;
+		std::uint32_t g1QuantLevels;
+		std::uint32_t g0Resolution;
+		std::uint32_t imageResolution;
+		std::uint32_t numOctaves;
+		std::uint32_t tileSize;
+		std::uint32_t padding_align[2];
+		std::uint32_t g0_offsets[4];
+		std::uint32_t g1_offsets[4];
+		std::uint32_t g0_resolutions[4];
+		std::uint32_t g1_resolutions[4];
+		std::uint32_t numLayers;
+		std::uint32_t hiddenNeurons;
+		std::uint32_t layer0_W_offset;
+		std::uint32_t layer0_B_offset;
+		std::uint32_t layer1_W_offset;
+		std::uint32_t layer1_B_offset;
+		std::uint32_t layer2_W_offset;
+		std::uint32_t layer2_B_offset;
+		std::uint32_t g0BufferIndex;
+		std::uint32_t g1BufferIndex;
+		std::uint32_t mlpBufferIndex;
 	};
 	#if defined(__cplusplus)
-		SERIALISE(PBRMetallicRoughnessMaterialNTC, v.baseColourChannelR, v.baseColourChannelG, v.baseColourChannelB, v.baseColourChannelA, v.metalnessChannel, v.roughnessChannel, v.specularChannelR, v.specularChannelG, v.specularChannelB, v.shininessChannel, v.normalChannelX, v.normalChannelY, v.normalChannelZ, v.aoChannel, v.emissiveChannelR, v.emissiveChannelG, v.emissiveChannelB, v.opacityChannel, v.heightChannel, v.displacementChannel, v.reflectionChannelR, v.reflectionChannelG, v.reflectionChannelB, v.hasBaseColourChannelR, v.hasBaseColourChannelG, v.hasBaseColourChannelB, v.hasBaseColourChannelA, v.hasMetalnessChannel, v.hasRoughnessChannel, v.hasSpecularChannelR, v.hasSpecularChannelG, v.hasSpecularChannelB, v.hasShininessChannel, v.hasNormalChannelX, v.hasNormalChannelY, v.hasNormalChannelZ, v.hasAoChannel, v.hasEmissiveChannelR, v.hasEmissiveChannelG, v.hasEmissiveChannelB, v.hasOpacityChannel, v.hasHeightChannel, v.hasDisplacementChannel, v.hasReflectionChannelR, v.hasReflectionChannelG, v.hasReflectionChannelB)
+		SERIALISE(PBRMetallicRoughnessMaterialNTC, v.baseColourChannelR, v.baseColourChannelG, v.baseColourChannelB, v.baseColourChannelA, v.metalnessChannel, v.roughnessChannel, v.specularChannelR, v.specularChannelG, v.specularChannelB, v.shininessChannel, v.normalChannelX, v.normalChannelY, v.normalChannelZ, v.aoChannel, v.emissiveChannelR, v.emissiveChannelG, v.emissiveChannelB, v.opacityChannel, v.heightChannel, v.displacementChannel, v.reflectionChannelR, v.reflectionChannelG, v.reflectionChannelB, v.hasBaseColourChannelR, v.hasBaseColourChannelG, v.hasBaseColourChannelB, v.hasBaseColourChannelA, v.hasMetalnessChannel, v.hasRoughnessChannel, v.hasSpecularChannelR, v.hasSpecularChannelG, v.hasSpecularChannelB, v.hasShininessChannel, v.hasNormalChannelX, v.hasNormalChannelY, v.hasNormalChannelZ, v.hasAoChannel, v.hasEmissiveChannelR, v.hasEmissiveChannelG, v.hasEmissiveChannelB, v.hasOpacityChannel, v.hasHeightChannel, v.hasDisplacementChannel, v.hasReflectionChannelR, v.hasReflectionChannelG, v.hasReflectionChannelB, v.g0Channels, v.g1Channels, v.g0QuantLevels, v.g1QuantLevels, v.g0Resolution, v.imageResolution, v.numOctaves, v.tileSize, v.padding_align[0], v.g0_offsets[0], v.g0_offsets[1], v.g0_offsets[2], v.g0_offsets[3], v.g1_offsets[0], v.g1_offsets[1], v.g1_offsets[2], v.g1_offsets[3], v.g0_resolutions[0], v.g0_resolutions[1], v.g0_resolutions[2], v.g0_resolutions[3], v.g1_resolutions[0], v.g1_resolutions[1], v.g1_resolutions[2], v.g1_resolutions[3], v.numLayers, v.hiddenNeurons, v.layer0_W_offset, v.layer0_B_offset, v.layer1_W_offset, v.layer1_B_offset, v.layer2_W_offset, v.layer2_B_offset, v.g0BufferIndex, v.g1BufferIndex, v.mlpBufferIndex)
 	#endif
 	
 	struct PBRSpecularGlossinessMaterialNTC
