@@ -136,6 +136,12 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 	sceneColour = ACESFilm(sceneColour);
 
 	float d = LineariseDepth(sceneDepth, PC(nearPlane), PC(farPlane));
+	sceneColour = saturate(sceneColour);
+	float3 srgbColour = float3(
+		sceneColour.r <= 0.0031308 ? 12.92 * sceneColour.r : 1.055 * pow(sceneColour.r, 1.0 / 2.4) - 0.055,
+		sceneColour.g <= 0.0031308 ? 12.92 * sceneColour.g : 1.055 * pow(sceneColour.g, 1.0 / 2.4) - 0.055,
+		sceneColour.b <= 0.0031308 ? 12.92 * sceneColour.b : 1.055 * pow(sceneColour.b, 1.0 / 2.4) - 0.055
+	);
 
-	return float4(sceneColour, 1.0);
+	return float4(srgbColour, 1.0);
 }

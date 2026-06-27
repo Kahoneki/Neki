@@ -24,6 +24,7 @@ namespace NK
 
 		CreateSwapchain();
 		CreateSwapchainImageViews();
+		CreateSwapchainUAVs();
 
 		m_logger.Unindent();
 	}
@@ -119,7 +120,8 @@ namespace NK
 		bool idealFound{ false };
 		for (const VkSurfaceFormatKHR& availableFormat : formats)
 		{
-			if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+			//DLSS Requires a Storage Image (UAV), which cannot be an SRGB format. We must use UNORM.
+			if ((availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM || availableFormat.format == VK_FORMAT_R8G8B8A8_UNORM) && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 			{
 				idealFound = true;
 				surfaceFormat = availableFormat;
@@ -128,7 +130,7 @@ namespace NK
 		}
 		if (!idealFound)
 		{
-			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SWAPCHAIN, "Ideal swapchain image format (R8G8B8A8_SRGB with SRGB-nonlinear colour space) unavailable, falling back to format " + std::to_string(surfaceFormat.format) + " with colour space " + std::to_string(surfaceFormat.colorSpace) + "\n");
+			m_logger.IndentLog(LOGGER_CHANNEL::WARNING, LOGGER_LAYER::SWAPCHAIN, "Ideal swapchain image format (B8G8R8A8_UNORM / R8G8B8A8_UNORM with SRGB-nonlinear colour space) unavailable, falling back to format " + std::to_string(surfaceFormat.format) + " with colour space " + std::to_string(surfaceFormat.colorSpace) + "\n");
 		}
 		m_format = surfaceFormat.format;
 
@@ -189,7 +191,7 @@ namespace NK
 		createInfo.imageColorSpace = surfaceFormat.colorSpace;
 		createInfo.imageExtent = m_extent;
 		createInfo.imageArrayLayers = 1;
-		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
 		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		createInfo.queueFamilyIndexCount = 0;
 		createInfo.pQueueFamilyIndices = nullptr;
@@ -228,7 +230,7 @@ namespace NK
 			TextureDesc desc{};
 			desc.size = glm::ivec3(m_extent.width, m_extent.height, 1);
 			desc.arrayTexture = false;
-			desc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT;
+			desc.usage = TEXTURE_USAGE_FLAGS::COLOUR_ATTACHMENT | TEXTURE_USAGE_FLAGS::READ_WRITE;
 			desc.format = VulkanUtils::GetRHIFormat(m_format);
 			desc.dimension = TEXTURE_DIMENSION::DIM_2;
 			m_backBuffers.push_back(UniquePtr<ITexture>(NK_NEW(VulkanTexture, m_logger, m_allocator, m_device, desc, image)));
@@ -260,4 +262,24 @@ namespace NK
 		m_logger.Unindent();
 	}
 
+	
+	
+	void VulkanSwapchain::CreateSwapchainUAVs()
+	{
+		m_logger.Indent();
+		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::SURFACE, "Creating swapchain UAVs\n");
+		
+		for (std::size_t i{ 0 }; i < m_backBuffers.size(); ++i)
+		{
+			TextureViewDesc desc{};
+			desc.dimension = TEXTURE_VIEW_DIMENSION::DIM_2;
+			desc.format = VulkanUtils::GetRHIFormat(m_format);
+			desc.type = TEXTURE_VIEW_TYPE::SHADER_READ_WRITE;
+
+			m_backBufferUAVs.push_back(m_device.CreateShaderResourceTextureView(m_backBuffers[i].get(), desc));
+		}
+
+		m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::SWAPCHAIN, "Successfully created UAVs\n");
+		m_logger.Unindent();
+	}
 }

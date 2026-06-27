@@ -77,6 +77,7 @@ namespace NK
 		void InitPrefixSumPipeline();
 		void InitPostprocessPipeline();
 		void InitTAAPipeline();
+		void InitDLSS();
 
 		void InitRenderGraphs();
 		void InitScreenResources();
@@ -382,6 +383,7 @@ namespace NK
 		UniquePtr<ITexture> m_taaResolved;
 		UniquePtr<ITextureView> m_taaResolvedRTV;
 		UniquePtr<ITextureView> m_taaResolvedSRV;
+		UniquePtr<ITextureView> m_taaResolvedUAV;
 		UniquePtr<ITexture> m_sceneColourHistory;
 		UniquePtr<ITextureView> m_sceneColourHistoryRTV;
 		UniquePtr<ITextureView> m_sceneColourHistorySRV;

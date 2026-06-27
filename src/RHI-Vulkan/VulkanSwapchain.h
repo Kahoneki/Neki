@@ -25,6 +25,7 @@ namespace NK
 	private:
 		void CreateSwapchain();
 		void CreateSwapchainImageViews();
+		void CreateSwapchainUAVs();
 
 
 		VkExtent2D m_extent{ 0, 0 };

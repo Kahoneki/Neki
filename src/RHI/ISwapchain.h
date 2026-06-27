@@ -25,6 +25,7 @@ namespace NK
 
 		[[nodiscard]] inline ITexture* GetImage(std::uint32_t _index) const { return m_backBuffers[_index].get(); }
 		[[nodiscard]] inline ITextureView* GetImageView(std::uint32_t _index) const { return m_backBufferViews[_index].get(); }
+		[[nodiscard]] inline ITextureView* GetImageUAV(std::uint32_t _index) const { return m_backBufferUAVs[_index].get(); }
 		[[nodiscard]] inline std::uint32_t GetNumImages() const { return m_numBuffers; }
 
 		//Presents image with index _imageIndex to the screen - waits for _waitSemaphore before presenting
@@ -47,6 +48,7 @@ namespace NK
 
 		std::vector<UniquePtr<ITexture>> m_backBuffers;
 		std::vector<UniquePtr<ITextureView>> m_backBufferViews;
+		std::vector<UniquePtr<ITextureView>> m_backBufferUAVs;
 	};
 	
 }

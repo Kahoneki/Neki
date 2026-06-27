@@ -22,11 +22,13 @@
 #include <RHI/ISemaphore.h>
 #include <RHI/ISwapchain.h>
 
-
 #ifdef NEKI_VULKAN_SUPPORTED
 	#include <RHI-Vulkan/VulkanCommandBuffer.h>
 	#include <RHI-Vulkan/VulkanDevice.h>
 	#include <RHI-Vulkan/VulkanQueue.h>
+	#include <RHI-Vulkan/VulkanTexture.h>
+	#include <RHI-Vulkan/VulkanTextureView.h>
+	#include <RHI-Vulkan/VulkanUtils.h>
 #endif
 #ifdef NEKI_D3D12_SUPPORTED
 	#include <RHI-D3D12/D3D12CommandBuffer.h>
@@ -39,13 +41,14 @@
 #include <backends/imgui_impl_glfw.h>
 #ifdef NEKI_VULKAN_SUPPORTED
 	#include <backends/imgui_impl_vulkan.h>
+	#include <nvsdk_ngx_vk.h>
+	#include <nvsdk_ngx_helpers_vk.h>
 #endif
 #ifdef NEKI_D3D12_SUPPORTED
 	#include <backends/imgui_impl_dx12.h>
 #endif
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
-#include <nvsdk_ngx_vk.h>
 
 
 namespace NK
@@ -71,6 +74,7 @@ namespace NK
 		InitCube();
 		InitScreenQuad();
 		InitShadersAndPipelines();
+		InitDLSS();
 		InitRenderGraphs();
 		InitScreenResources();
 		InitBRDFLut();
@@ -129,6 +133,11 @@ namespace NK
 		#endif
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
+		
+		
+		if (m_dlssFeature) { NVSDK_NGX_VULKAN_ReleaseFeature(m_dlssFeature); m_dlssFeature = nullptr; }
+		if (m_ngxParameters) { NVSDK_NGX_VULKAN_DestroyParameters(m_ngxParameters); m_ngxParameters = nullptr; }
+		if (m_desc.backend == GRAPHICS_BACKEND::VULKAN) { NVSDK_NGX_VULKAN_Shutdown1(dynamic_cast<VulkanDevice*>(m_device.get())->GetDevice()); }
 
 
 		m_logger.Unindent();
@@ -169,39 +178,6 @@ namespace NK
 		{
 			#ifdef NEKI_VULKAN_SUPPORTED
 				m_device = UniquePtr<IDevice>(NK_NEW(VulkanDevice, m_logger, m_allocator));
-				
-				//DLSS
-				NVSDK_NGX_FeatureCommonInfo commonInfo{};
-				commonInfo.PathListInfo.Path = L".";
-
-				NVSDK_NGX_Result result = NVSDK_NGX_VULKAN_Init_with_ProjectID(
-					"NekiAppID",
-					NVSDK_NGX_ENGINE_TYPE_CUSTOM, "1.0",
-					L".", 
-					vkDevice->GetInstance(), 
-					vkDevice->GetPhysicalDevice(), 
-					vkDevice->GetDevice(), 
-					nullptr, nullptr, &commonInfo);
-
-				if (NVSDK_NGX_FAILED(result)) {
-					m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "Failed to initialize NVIDIA DLSS NGX.\n");
-				}
-
-				NVSDK_NGX_VULKAN_GetCapabilityParameters(&m_ngxParameters);
-
-				NVSDK_NGX_DLSS_Create_Params dlssCreateParams{};
-				dlssCreateParams.Feature.InWidth = m_desc.renderResolution.x;
-				dlssCreateParams.Feature.InHeight = m_desc.renderResolution.y;
-				dlssCreateParams.Feature.InTargetWidth = m_desc.window->GetSize().x;
-				dlssCreateParams.Feature.InTargetHeight = m_desc.window->GetSize().y;
-				dlssCreateParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_Balanced;
-
-				NVSDK_NGX_VULKAN_CreateFeature(
-					dynamic_cast<VulkanCommandBuffer*>(m_graphicsCommandBuffers[0].get())->GetBuffer(),
-					NVSDK_NGX_Feature_SuperSampling, 
-					m_ngxParameters, 
-					&m_dlssFeature, 
-					&dlssCreateParams);
 			#else
 				m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "_desc.backend = GRAPHICS_BACKEND::VULKAN but compiler definition NEKI_VULKAN_SUPPORTED is not defined - are you building for the correct cmake preset?\n");
 				throw std::invalid_argument("");
@@ -351,7 +327,7 @@ namespace NK
 				initInfo.Allocator = Context::GetAllocator()->GetVulkanCallbacks();
 				initInfo.UseDynamicRendering = true;
 				initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-				constexpr VkFormat colourAttachmentFormat{ VK_FORMAT_R8G8B8A8_SRGB };
+				const VkFormat colourAttachmentFormat{ VulkanUtils::GetVulkanFormat(m_swapchain->GetImage(0)->GetFormat()) };
 				initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
 				initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &colourAttachmentFormat;
 				initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
@@ -991,7 +967,7 @@ namespace NK
 		pipelineDesc.depthStencilDesc = depthStencilDesc;
 		pipelineDesc.multisamplingDesc = multisamplingDesc;
 		pipelineDesc.colourBlendDesc = colourBlendDesc;
-		pipelineDesc.colourAttachmentFormats = { DATA_FORMAT::R8G8B8A8_SRGB };
+		pipelineDesc.colourAttachmentFormats = { m_swapchain->GetImage(0)->GetFormat() };
 		pipelineDesc.depthStencilAttachmentFormat = DATA_FORMAT::UNDEFINED;
 
 		m_postprocessPipeline = m_device->CreatePipeline(pipelineDesc);
@@ -1066,6 +1042,69 @@ namespace NK
 		m_taaPipeline = m_device->CreatePipeline(pipelineDesc);
 	}
 
+	
+	
+void RenderLayer::InitDLSS()
+	{
+		if (m_desc.backend != GRAPHICS_BACKEND::VULKAN) return;
+
+		VulkanDevice* vkDevice = dynamic_cast<VulkanDevice*>(m_device.get());
+		const char* projectId = "a0f57b54-1daf-4934-90ae-c4035c192048";
+		PFN_vkGetInstanceProcAddr gipa = vkGetInstanceProcAddr;
+		PFN_vkGetDeviceProcAddr gdpa = vkGetDeviceProcAddr;
+
+		NVSDK_NGX_Result initResult = NVSDK_NGX_VULKAN_Init_with_ProjectID(
+			projectId,
+			NVSDK_NGX_ENGINE_TYPE_CUSTOM, "1.0",
+			L".", 
+			vkDevice->GetInstance(), 
+			vkDevice->GetPhysicalDevice(), 
+			vkDevice->GetDevice(), 
+			gipa, gdpa, nullptr);
+
+		if (NVSDK_NGX_FAILED(initResult))
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "Failed to initialize NVIDIA DLSS NGX.\n");
+			m_dlssFeature = nullptr;
+			return;
+		}
+
+		NVSDK_NGX_VULKAN_GetCapabilityParameters(&m_ngxParameters);
+
+		int dlssAvailable = 0;
+		NVSDK_NGX_Parameter_GetI(m_ngxParameters, NVSDK_NGX_Parameter_SuperSampling_Available, &dlssAvailable);
+		if (!dlssAvailable)
+		{
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "DLSS is not available on this hardware/driver.\n");
+			m_dlssFeature = nullptr;
+			return;
+		}
+
+		NVSDK_NGX_DLSS_Create_Params dlssCreateParams{};
+		dlssCreateParams.Feature.InWidth = m_desc.renderResolution.x;
+		dlssCreateParams.Feature.InHeight = m_desc.renderResolution.y;
+		dlssCreateParams.Feature.InTargetWidth = m_desc.window->GetSize().x;
+		dlssCreateParams.Feature.InTargetHeight = m_desc.window->GetSize().y;
+		dlssCreateParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_Balanced;
+
+		uint32_t creationNodeMask = 1;
+		uint32_t visibilityNodeMask = 1;
+
+		NVSDK_NGX_Result createResult = NGX_VULKAN_CREATE_DLSS_EXT(
+			dynamic_cast<VulkanCommandBuffer*>(m_graphicsCommandBuffers[0].get())->GetBuffer(),
+			creationNodeMask,
+			visibilityNodeMask,
+			&m_dlssFeature,
+			m_ngxParameters, 
+			&dlssCreateParams);
+			
+		if (NVSDK_NGX_FAILED(createResult)) {
+			m_logger.IndentLog(LOGGER_CHANNEL::ERROR, LOGGER_LAYER::RENDER_LAYER, "Failed to create DLSS Feature.\n");
+			m_dlssFeature = nullptr;
+		} else {
+			m_logger.IndentLog(LOGGER_CHANNEL::SUCCESS, LOGGER_LAYER::RENDER_LAYER, "Successfully created DLSS Feature.\n");
+		}
+	}
 
 
 	void RenderLayer::InitRenderGraphs()
@@ -1384,36 +1423,91 @@ namespace NK
 
 		
 		meshDesc.AddNode(
-				"TAA_PASS",
-				{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
-				 { "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
-				 { "SCENE_COLOUR_HISTORY", RESOURCE_STATE::SHADER_RESOURCE },
-				 { "SCENE_VELOCITY", RESOURCE_STATE::SHADER_RESOURCE }, 
-				 { "TAA_RESOLVED", RESOURCE_STATE::RENDER_TARGET }},
-				[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
-				{
-					ITextureView* rtv = _texViews.Get("TAA_RESOLVED_RTV"); // Get local pointer
-					_cmdBuf->BeginRendering(1, nullptr, &rtv, nullptr, nullptr, nullptr); // Pass address of pointer (&rtv)
-			
-					_cmdBuf->BindRootSignature(m_taaPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
-					_cmdBuf->SetViewport({ 0, 0 }, { m_desc.renderResolution });
-					_cmdBuf->SetScissor({ 0, 0 }, { m_desc.renderResolution });
+		"TAA_PASS",
+		{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
+		 { "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
+		 { "SCENE_COLOUR_HISTORY", RESOURCE_STATE::SHADER_RESOURCE },
+		 { "SCENE_VELOCITY", RESOURCE_STATE::SHADER_RESOURCE }, 
+		 { "TAA_RESOLVED", RESOURCE_STATE::RENDER_TARGET }},
+		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+		{
+			ITextureView* rtv = _texViews.Get("TAA_RESOLVED_RTV"); // Get local pointer
+			_cmdBuf->BeginRendering(1, nullptr, &rtv, nullptr, nullptr, nullptr); // Pass address of pointer (&rtv)
+		
+			_cmdBuf->BindRootSignature(m_taaPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
+			_cmdBuf->SetViewport({ 0, 0 }, { m_desc.renderResolution });
+			_cmdBuf->SetScissor({ 0, 0 }, { m_desc.renderResolution });
+		
+			TAAPassPushConstantData pushConstantData{};
+			pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
+			pushConstantData.sceneDepthIndex = _texViews.Get("SCENE_DEPTH_SRV")->GetIndex();
+			pushConstantData.historyColourIndex = _texViews.Get("SCENE_COLOUR_HISTORY_SRV")->GetIndex();
+			pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
+			pushConstantData.velocityTextureIndex = _texViews.Get("SCENE_VELOCITY_SRV")->GetIndex();
+		
+			std::size_t screenQuadVertexBufferStride{ sizeof(ScreenQuadVertex) };
+			_cmdBuf->PushConstants(m_taaPassRootSignature.get(), &pushConstantData);
+			_cmdBuf->BindPipeline(m_taaPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
+			_cmdBuf->BindVertexBuffers(0, 1, m_screenQuadVertBuffer.get(), &screenQuadVertexBufferStride);
+			_cmdBuf->BindIndexBuffer(m_screenQuadIndexBuffer.get(), DATA_FORMAT::R32_UINT);
+			_cmdBuf->DrawIndexed(6, 1, 0, 0);
+			_cmdBuf->EndRendering(1, nullptr, _texs.Get("TAA_RESOLVED"));
+		});
+		
+		
+		meshDesc.AddNode(
+		"DLSS_PASS",
+		{{ "SCENE_COLOUR", RESOURCE_STATE::SHADER_RESOURCE },
+		 { "SCENE_DEPTH", RESOURCE_STATE::SHADER_RESOURCE },
+		 { "SCENE_VELOCITY", RESOURCE_STATE::SHADER_RESOURCE }, 
+		 { "TAA_RESOLVED", RESOURCE_STATE::UNORDERED_ACCESS }},
+		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
+		{
+			if (!m_dlssFeature) return;
+			VulkanCommandBuffer* vkCmdBuf = dynamic_cast<VulkanCommandBuffer*>(_cmdBuf);
+			VkImage colorImg = dynamic_cast<VulkanTexture*>(_texs.Get("SCENE_COLOUR"))->GetTexture();
+			VkImage depthImg = dynamic_cast<VulkanTexture*>(_texs.Get("SCENE_DEPTH"))->GetTexture();
+			VkImage motionImg = dynamic_cast<VulkanTexture*>(_texs.Get("SCENE_VELOCITY"))->GetTexture();
+			VkImage outputImg = dynamic_cast<VulkanTexture*>(_texs.Get("TAA_RESOLVED"))->GetTexture();
+			VkImageView colorView = dynamic_cast<VulkanTextureView*>(_texViews.Get("SCENE_COLOUR_SRV"))->GetImageView();
+			VkImageView depthView = dynamic_cast<VulkanTextureView*>(_texViews.Get("SCENE_DEPTH_SRV"))->GetImageView();
+			VkImageView motionView = dynamic_cast<VulkanTextureView*>(_texViews.Get("SCENE_VELOCITY_SRV"))->GetImageView();
+			VkImageView outputView = dynamic_cast<VulkanTextureView*>(_texViews.Get("TAA_RESOLVED_UAV"))->GetImageView();
 
-					TAAPassPushConstantData pushConstantData{};
-					pushConstantData.sceneColourIndex = _texViews.Get("SCENE_COLOUR_SRV")->GetIndex();
-					pushConstantData.sceneDepthIndex = _texViews.Get("SCENE_DEPTH_SRV")->GetIndex();
-					pushConstantData.historyColourIndex = _texViews.Get("SCENE_COLOUR_HISTORY_SRV")->GetIndex();
-					pushConstantData.samplerIndex = _samplers.Get("SAMPLER")->GetIndex();
-					pushConstantData.velocityTextureIndex = _texViews.Get("SCENE_VELOCITY_SRV")->GetIndex();
+			VkImageSubresourceRange colorRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+			VkImageSubresourceRange depthRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
 
-					std::size_t screenQuadVertexBufferStride{ sizeof(ScreenQuadVertex) };
-					_cmdBuf->PushConstants(m_taaPassRootSignature.get(), &pushConstantData);
-					_cmdBuf->BindPipeline(m_taaPipeline.get(), PIPELINE_BIND_POINT::GRAPHICS);
-					_cmdBuf->BindVertexBuffers(0, 1, m_screenQuadVertBuffer.get(), &screenQuadVertexBufferStride);
-					_cmdBuf->BindIndexBuffer(m_screenQuadIndexBuffer.get(), DATA_FORMAT::R32_UINT);
-					_cmdBuf->DrawIndexed(6, 1, 0, 0);
-					_cmdBuf->EndRendering(1, nullptr, _texs.Get("TAA_RESOLVED"));
-				});
+			NVSDK_NGX_Resource_VK colourRes = NVSDK_NGX_Create_ImageView_Resource_VK(colorView, colorImg, colorRange, VK_FORMAT_R16G16B16A16_SFLOAT, m_desc.renderResolution.x, m_desc.renderResolution.y, false);
+			NVSDK_NGX_Resource_VK depthRes = NVSDK_NGX_Create_ImageView_Resource_VK(depthView, depthImg, depthRange, VK_FORMAT_D32_SFLOAT, m_desc.renderResolution.x, m_desc.renderResolution.y, false);
+			NVSDK_NGX_Resource_VK motionRes = NVSDK_NGX_Create_ImageView_Resource_VK(motionView, motionImg, colorRange, VK_FORMAT_R16G16_SFLOAT, m_desc.renderResolution.x, m_desc.renderResolution.y, false);
+			NVSDK_NGX_Resource_VK outputRes = NVSDK_NGX_Create_ImageView_Resource_VK(outputView, outputImg, colorRange, VK_FORMAT_R16G16B16A16_SFLOAT, m_desc.window->GetSize().x, m_desc.window->GetSize().y, true);
+
+			int phase = m_globalFrame % 16;
+			auto Halton = [](int index, int base) -> float {
+				float f = 1.0f, result = 0.0f;
+				while (index > 0) {
+					f = f / base;
+					result = result + f * (index % base);
+					index = index / base;
+				}
+				return result;
+			};
+			float jitterX{ (Halton(phase + 1, 2) - 0.5f) / m_desc.renderResolution.x };
+			float jitterY{ (Halton(phase + 1, 3) - 0.5f) / m_desc.renderResolution.y };
+
+			NVSDK_NGX_VK_DLSS_Eval_Params evalParams{};
+			evalParams.Feature.pInColor = &colourRes;
+			evalParams.Feature.pInOutput = &outputRes;
+			evalParams.pInDepth = &depthRes;
+			evalParams.pInMotionVectors = &motionRes;
+			evalParams.InJitterOffsetX = jitterX * m_desc.renderResolution.x;
+			evalParams.InJitterOffsetY = jitterY * m_desc.renderResolution.y;
+			evalParams.InMVScaleX = m_desc.renderResolution.x;
+			evalParams.InMVScaleY = m_desc.renderResolution.y;
+			evalParams.InReset = m_firstFrame ? 1 : 0; 
+
+			NGX_VULKAN_EVALUATE_DLSS_EXT(vkCmdBuf->GetBuffer(), m_dlssFeature, m_ngxParameters, &evalParams);
+		});
 		
 		
 		meshDesc.AddNode(
@@ -1459,7 +1553,7 @@ namespace NK
 		});
 
 		
-meshDesc.AddNode(
+		meshDesc.AddNode(
 		"POSTPROCESS_PASS",
 		{{ "TAA_RESOLVED", RESOURCE_STATE::SHADER_RESOURCE },
 		{ "SCENE_DEPTH", RESOURCE_STATE::DEPTH_READ },
@@ -1467,8 +1561,8 @@ meshDesc.AddNode(
 		{ "BACKBUFFER", RESOURCE_STATE::RENDER_TARGET }},
 		[&](ICommandBuffer* _cmdBuf, const BindingMap<IBuffer>& _bufs, const BindingMap<ITexture>& _texs, const BindingMap<IBufferView>& _bufViews, const BindingMap<ITextureView>& _texViews, const BindingMap<ISampler>& _samplers)
 		{
-			ITextureView* rtv = _texViews.Get("BACKBUFFER_RTV"); // Get local pointer
-			_cmdBuf->BeginRendering(1, nullptr, &rtv, nullptr, nullptr, nullptr); // Pass address of pointer (&rtv)
+			ITextureView* rtv = _texViews.Get("BACKBUFFER_RTV");
+			_cmdBuf->BeginRendering(1, nullptr, &rtv, nullptr, nullptr, nullptr);
 			
 			_cmdBuf->BindRootSignature(m_postprocessPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 
@@ -1578,6 +1672,7 @@ meshDesc.AddNode(
 		
 		//TAA
 		TextureDesc taaDesc = sceneColourDesc;
+		taaDesc.usage |= TEXTURE_USAGE_FLAGS::READ_WRITE;
 		m_taaResolved = m_device->CreateTexture(taaDesc);
 		m_sceneColourHistory = m_device->CreateTexture(taaDesc);
 		m_graphicsCommandBuffers[0]->TransitionBarrier(m_taaResolved.get(), RESOURCE_STATE::UNDEFINED, RESOURCE_STATE::SHADER_RESOURCE);
@@ -1589,6 +1684,8 @@ meshDesc.AddNode(
 		taaViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_ONLY;
 		m_taaResolvedSRV = m_device->CreateShaderResourceTextureView(m_taaResolved.get(), taaViewDesc);
 		m_sceneColourHistorySRV = m_device->CreateShaderResourceTextureView(m_sceneColourHistory.get(), taaViewDesc);
+		taaViewDesc.type = TEXTURE_VIEW_TYPE::SHADER_READ_WRITE;
+		m_taaResolvedUAV = m_device->CreateShaderResourceTextureView(m_taaResolved.get(), taaViewDesc);
 		
 		//--------END OF SCENE COLOUR--------//
 		
@@ -2971,6 +3068,7 @@ meshDesc.AddNode(
 		execDesc.commandBuffers["SCENE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		if (m_desc.enableMSAA) { execDesc.commandBuffers["MSAA_RESOLVE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
 		if (m_desc.enableSSAA) { execDesc.commandBuffers["SSAA_DOWNSAMPLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get(); }
+		execDesc.commandBuffers["DLSS_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["TAA_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["SUMMED_AREA_TABLE_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
 		execDesc.commandBuffers["POSTPROCESS_PASS"] = m_graphicsCommandBuffers[m_currentFrame].get();
@@ -3017,6 +3115,7 @@ meshDesc.AddNode(
 		execDesc.textures.Set("SCENE_COLOUR_HISTORY", m_sceneColourHistory.get());
 		execDesc.textureViews.Set("TAA_RESOLVED_RTV", m_taaResolvedRTV.get());
 		execDesc.textureViews.Set("TAA_RESOLVED_SRV", m_taaResolvedSRV.get());
+		execDesc.textureViews.Set("TAA_RESOLVED_UAV", m_taaResolvedUAV.get());
 		execDesc.textureViews.Set("SCENE_COLOUR_HISTORY_RTV", m_sceneColourHistoryRTV.get());
 		execDesc.textureViews.Set("SCENE_COLOUR_HISTORY_SRV", m_sceneColourHistorySRV.get());
 		
@@ -3037,6 +3136,7 @@ meshDesc.AddNode(
 		execDesc.textureViews.Set("SAT_FINAL_SRV", m_satFinalSRV.get());
 		
 		execDesc.textureViews.Set("BACKBUFFER_RTV", m_swapchain->GetImageView(imageIndex));
+		execDesc.textureViews.Set("BACKBUFFER_UAV", m_swapchain->GetImageUAV(imageIndex));
 		execDesc.textureViews.Set("SKYBOX_VIEW", m_skyboxTextureViews[m_currentFrame].get());
 		execDesc.textureViews.Set("IRRADIANCE_MAP_VIEW", m_irradianceMapViews[m_currentFrame].get());
 		execDesc.textureViews.Set("PREFILTER_MAP_VIEW", m_prefilterMapViews[m_currentFrame].get());
@@ -3074,6 +3174,25 @@ meshDesc.AddNode(
 		{
 			CameraShaderData currCam = m_activeCamera->camera->GetCurrentCameraShaderData(PROJECTION_METHOD::PERSPECTIVE, m_reg.get().GetComponent<CTransform>(m_reg.get().GetEntity(*m_activeCamera)).GetModelMatrix());
 			m_prevViewProj = m_currentViewProj; //Save unjittered matrix for next frame reprojection
+			
+			int phase = m_globalFrame % 16;
+			auto Halton = [](int index, int base) -> float {
+				float f = 1.0f, result = 0.0f;
+				while (index > 0) {
+					f = f / base;
+					result = result + f * (index % base);
+					index = index / base;
+				}
+				return result;
+			};
+			float jitterX = (Halton(phase + 1, 2) - 0.5f) / m_desc.renderResolution.x;
+			float jitterY = (Halton(phase + 1, 3) - 0.5f) / m_desc.renderResolution.y;
+
+			m_currentJitteredViewProj = m_currentViewProj;
+			m_currentJitteredViewProj[2][0] += jitterX * 2.0f; 
+			m_currentJitteredViewProj[2][1] += jitterY * 2.0f; 
+			
+			const_cast<CameraShaderData&>(currCam).projMat = m_currentJitteredViewProj * glm::inverse(currCam.viewMat);
 		}
 		
 		for (auto&& [transform] : m_reg.get().View<CTransform>())

@@ -304,6 +304,24 @@ namespace NK
 		m_logger.Indent();
 		m_logger.Log(LOGGER_CHANNEL::INFO, LOGGER_LAYER::DEVICE, "Creating instance\n");
 
+		//DLSS
+		std::uint32_t instanceExtCount{ 0 };
+		const char** instanceExts{ nullptr };
+		std::uint32_t deviceExtCount{ 0 };
+		const char** deviceExts{ nullptr };
+		NVSDK_NGX_VULKAN_RequiredExtensions(&instanceExtCount, &instanceExts, &deviceExtCount, &deviceExts);
+		for (std::uint32_t i{ 0 }; i < instanceExtCount; ++i)
+		{
+			m_requiredInstanceExtensions.push_back(instanceExts[i]);
+		}
+		for (std::uint32_t i{ 0 }; i < deviceExtCount; ++i)
+		{
+			if (strcmp(deviceExts[i], "VK_EXT_buffer_device_address") != 0 && strcmp(deviceExts[i], "VK_KHR_buffer_device_address") != 0)
+			{
+				m_requiredDeviceExtensions.push_back(deviceExts[i]);
+			}
+		}
+		
 		//Check that validation layers are available
 		if (m_enableInstanceValidationLayers && !ValidationLayersSupported())
 		{
@@ -581,12 +599,12 @@ namespace NK
 		compositeFeatures.pNext = &coopVecFeatures;
 
 		//DLSS
-		uint32_t ngxExtCount{ 0 };
-		VkExtensionProperties* ngxExts{ nullptr };
-		NVSDK_NGX_VULKAN_RequiredExtensions(&ngxExtCount, &ngxExts, nullptr, nullptr);
-		for (uint32_t i = 0; i < ngxExtCount; i++) {
-			requiredDeviceExtensions.push_back(ngxExts[i].extensionName);
-		}
+		// uint32_t ngxExtCount{ 0 };
+		// VkExtensionProperties* ngxExts{ nullptr };
+		// NVSDK_NGX_VULKAN_RequiredExtensions(&ngxExtCount, &ngxExts, nullptr, nullptr);
+		// for (uint32_t i = 0; i < ngxExtCount; i++) {
+		// 	m_requiredDeviceExtensions.push_back(ngxExts[i].extensionName);
+		// }
 		
 		//Create device
 		VkDeviceCreateInfo deviceCreateInfo{};
@@ -594,8 +612,8 @@ namespace NK
 		deviceCreateInfo.pNext = &compositeFeatures;
 		deviceCreateInfo.queueCreateInfoCount = static_cast<std::uint32_t>(queueCreateInfos.size());
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
-		deviceCreateInfo.enabledExtensionCount = requiredDeviceExtensions.size();
-		deviceCreateInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
+		deviceCreateInfo.enabledExtensionCount = m_requiredDeviceExtensions.size();
+		deviceCreateInfo.ppEnabledExtensionNames = m_requiredDeviceExtensions.data();
 
 		const VkResult result{ vkCreateDevice(m_physicalDevice, &deviceCreateInfo, m_allocator.GetVulkanCallbacks(), &m_device) };
 		if (result != VK_SUCCESS)
@@ -907,7 +925,7 @@ namespace NK
 		}
 		std::vector<VkExtensionProperties> deviceExtensions(deviceExtensionCount);
 		vkEnumerateDeviceExtensionProperties(_device, nullptr, &deviceExtensionCount, deviceExtensions.data());
-		for (const char* extensionName : requiredDeviceExtensions)
+		for (const char* extensionName : m_requiredDeviceExtensions)
 		{
 			bool extensionFound{ false };
 			for (const VkExtensionProperties& ext : deviceExtensions)
