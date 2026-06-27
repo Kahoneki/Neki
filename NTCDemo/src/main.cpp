@@ -36,8 +36,8 @@ public:
 	{
 		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Prefabs/Plane.nkmodel") };
 		// NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Prefabs/Plane.gltf", serialisedModelOutputPath.string(), true, true);
-		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/NTCSponzaTest/Sponza.nkmodel") };
-		// NK::ModelLoader::SerialiseNKModelNTC("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath.string(), true, true, { 1, 16, 1000 });
+		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/SponzaTest/Sponza.nkmodel") };
+		// NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath.string(), true, true);
 		// std::filesystem::path serialisedModelOutputPath2{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/Test/DamagedHelmet.nkmodel") };
 		// NK::ModelLoader::SerialiseNKModel("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath2.string(), true, true);
 		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/BistroTest/Bistro.nkmodel") };
@@ -52,26 +52,26 @@ public:
 		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/NTCTest/DamagedHelmet.nkmodel") };
 		// NK::ModelLoader::SerialiseNKModelNTC("Samples/Resource-Files/DamagedHelmet/DamagedHelmet.gltf", serialisedModelOutputPath.string(), true, true, {2, 16, 3000});
 		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/NTCSponzaTest/Sponza.nkmodel") };
-		// NK::ModelLoader::SerialiseNKModelNTC("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath.string(), true, true, {2, 16, 100});
+		// NK::ModelLoader::SerialiseNKModelNTC("Samples/Resource-Files/Sponza/Sponza.gltf", serialisedModelOutputPath.string(), true, true, {2, 16, 1000});
 		// std::filesystem::path serialisedModelOutputPath{ std::filesystem::path(NEKI_SOURCE_DIR) / std::string("Samples/Resource-Files/nkmodels/BistroTestNTC/Bistro.nkmodel") };
 		// NK::ModelLoader::SerialiseNKModelNTC("Samples/Resource-Files/Bistro_v5_2/BistroExterior.fbx", serialisedModelOutputPath.string(), true, true, {2,16,100});
 		
 		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/NTCTest/DamagedHelmet.nkmodel");
+		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/SponzaTest/Sponza.nkmodel");
 		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		helmetTransform.name = "Bistro";
 		// helmetTransform.SetLocalPosition({ -1.0f, 0.0f, 0.0f });
 		// helmetTransform.SetLocalRotation({ glm::radians(-90.0f), 0.0f, glm::radians(180.0f) });
-		// helmetTransform.SetLocalScale({ 0.01, 0.01, 0.01 });
+		helmetTransform.SetLocalScale({ 0.01, 0.01, 0.01 });
 		//
-		// m_helmetEntity2 = m_reg.Create();
-		// NK::CModelRenderer& helmetModelRenderer2{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity2) };
-		// helmetModelRenderer2.SetModelPath("Samples/Resource-Files/nkmodels/IntelSponzaTest/Sponza.nkmodel");
-		// NK::CTransform& helmetTransform2{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity2) };
-		// helmetTransform2.name = "Sponza";
-		// helmetTransform2.SetLocalPosition({ 0.0f, 0.0f, 0.0f });
+		m_helmetEntity2 = m_reg.Create();
+		NK::CModelRenderer& helmetModelRenderer2{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity2) };
+		helmetModelRenderer2.SetModelPath("Samples/Resource-Files/nkmodels/NTCTest/DamagedHelmet.nkmodel");
+		NK::CTransform& helmetTransform2{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity2) };
+		helmetTransform2.name = "Sponza";
+		helmetTransform2.SetLocalPosition({ -3.0f, 0.0f, 0.0f });
 		
 		m_skyboxEntity = m_reg.Create();
 		NK::CSkybox& skybox{ m_reg.AddComponent<NK::CSkybox>(m_skyboxEntity) };

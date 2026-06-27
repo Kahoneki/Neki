@@ -36,6 +36,7 @@ parser.add_argument('--quality', type=int, default=2, help="Quality Enum Value (
 parser.add_argument('--hidden_neurons', type=int, default=32, help="Number of hidden neurons per layer in MLP")
 parser.add_argument('--epochs', type=int, default=1000, help="Number of training epochs")
 parser.add_argument('--flip', action='store_true', help="Flip textures vertically on load")
+parser.add_argument('--index', type=str, nargs='+', required=True, help="Current material")
 args = parser.parse_args()
 
 if not os.path.isfile(args.out):
@@ -254,7 +255,7 @@ if not os.path.isfile(args.out):
         #Input coords shape: [N, 2]
         #Output coords shape: [N, 4 * num_octaves + 1 + g0_channels + g1_channels]
         def positional_encode(self, coords, mip):
-            if num_mips > 0:
+            if num_mips > 1:
                 normalised_lod = mip / (num_mips - 1)
             else:
                 normalised_lod = 0.0
@@ -442,7 +443,7 @@ if not os.path.isfile(args.out):
         avgTimePerEpoch = elapsedTime / (epoch+1)
         totalETA = avgTimePerEpoch * epochs
     
-        print(f"({epoch+1}/{epochs}) Loss: {avg_loss:.6f} (Base Colour PSNR: {avg_psnr:.4f}dB)\t\t(ETA: {timedelta(seconds=int(elapsedTime))} / {timedelta(seconds=int(totalETA))} - Time Remaining: {timedelta(seconds=int(totalETA - elapsedTime))})")
+        print(f"Material {args.index} ({epoch+1}/{epochs}) Loss: {avg_loss:.6f} (Base Colour PSNR: {avg_psnr:.4f}dB)\t\t(ETA: {timedelta(seconds=int(elapsedTime))} / {timedelta(seconds=int(totalETA))} - Time Remaining: {timedelta(seconds=int(totalETA - elapsedTime))})")
     
         if epoch + 1 == hard_quant_epoch:
             print(f"Hard-quantising latent texture and freezing it...")

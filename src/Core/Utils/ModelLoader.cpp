@@ -791,7 +791,8 @@ namespace NK
 			cmd += " --quality " + std::to_string(_neuralTrainingParameters.quality);
 			cmd += " --hidden_neurons " + std::to_string(_neuralTrainingParameters.hiddenNeurons);
 			cmd += " --epochs " + std::to_string(_neuralTrainingParameters.epochs);
-			if (_flipTextures) { cmd += " --flip"; }
+			if (_flipTextures) { cmd += " --flip "; }
+			cmd += std::string("--index " + std::to_string(i+1) + "/" + std::to_string(scene->mNumMaterials));
 			
 			std::string texArgs{ " --textures" };
 			std::string chanArgs{ " --channels" };

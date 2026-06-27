@@ -1331,6 +1331,7 @@ namespace NK
 						if (mat->lightingModel == LIGHTING_MODEL::BLINN_PHONG) { pipeline = m_blinnPhongPipeline.get(); }
 						else if (mat->lightingModel == LIGHTING_MODEL::PBR_METALLIC_ROUGHNESS) { pipeline = m_pbrMetallicRoughnessPipeline.get(); }
 						else if (mat->lightingModel == LIGHTING_MODEL::PBR_SPECULAR_GLOSSINESS) { pipeline = m_pbrSpecularGlossinessPipeline.get(); }
+						_cmdBuf->BindRootSignature(m_meshPassRootSignature.get(), PIPELINE_BIND_POINT::GRAPHICS);
 						_cmdBuf->BindPipeline(pipeline, PIPELINE_BIND_POINT::GRAPHICS);
 						_cmdBuf->PushConstants(m_meshPassRootSignature.get(), &pushConstantData);
 					}
@@ -2740,7 +2741,7 @@ namespace NK
 							//Inside model, so override visibility flag
 							isVisible = true;
 						}
-						isVisible = true;
+						// isVisible = true;
 					}
 					if (modelRenderer.meshVisibilityIndices[localMeshIdx] != 0xFFFFFFFF)
 					{
@@ -3146,9 +3147,10 @@ namespace NK
 		} };
 
 		//16x TAA Sequence
+		constexpr float jitterScale{ 0.1f };
 		const std::uint32_t haltonIndex{ static_cast<std::uint32_t>(m_globalFrame % 16) + 1 };
-		const float jitterX{ (Halton(haltonIndex, 2) - 0.5f) * 2.0f / m_desc.renderResolution.x };
-		const float jitterY{ (Halton(haltonIndex, 3) - 0.5f) * 2.0f / m_desc.renderResolution.y };
+		const float jitterX{ (Halton(haltonIndex, 2) - 0.5f) * 2.0f * jitterScale / m_desc.renderResolution.x };
+		const float jitterY{ (Halton(haltonIndex, 3) - 0.5f) * 2.0f * jitterScale / m_desc.renderResolution.y };
 
 		//Apply sub-pixel jitter
 		camShaderData.projMat[2][0] += jitterX;

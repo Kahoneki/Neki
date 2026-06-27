@@ -334,15 +334,11 @@ float4 FSMain(VertexOutput vertexOutput) : SV_TARGET
 
 
 	float3 ambientLighting = CalculateIBL(albedo, roughness, metallic, F0, normal, V);
-	ambientLighting = max(ambientLighting, float3(0.2f, 0.2f, 0.2f) * albedo);
 	if (material.hasAO)
 	{
 		ambientLighting *= g_textures[NonUniformResourceIndex(material.aoIdx)].Sample(linearSampler, vertexOutput.texCoord).r;
 	}
 	
-	
-	float3 irradiance = g_cubemaps[NonUniformResourceIndex(PC(irradianceCubemapIndex))].Sample(g_samplers[NonUniformResourceIndex(PC(samplerIndex))], normal).rgb;
-
     float3 colour = totalDirectLighting + ambientLighting + emissive;
 
     return float4(colour, 1.0);

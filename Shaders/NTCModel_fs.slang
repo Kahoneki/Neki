@@ -460,7 +460,7 @@ float3 CalculateIBL(float3 _albedo, float _roughness, float _metallic, float3 _F
     float NDotV = max(dot(_N, _V), 0.0);
     float3 R = reflect(-_V, _N);
 
-    const float MAX_REFLECTION_LOD = 4.0; 
+    const float MAX_REFLECTION_LOD = 10.0; 
     float3 prefilteredColour = g_cubemaps[pc.prefilterCubemapIndex].SampleLevel(g_samplers[pc.samplerIndex], R, _roughness * MAX_REFLECTION_LOD).rgb;
     float2 brdfLUT = g_textures[pc.brdfLUTIndex].Sample(g_samplers[pc.brdfLUTSamplerIndex], float2(NDotV, _roughness)).rg;
     float3 specularIBL = prefilteredColour * (_F0 * brdfLUT.x + brdfLUT.y);
