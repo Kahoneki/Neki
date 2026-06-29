@@ -59,7 +59,7 @@ public:
 		
 		m_helmetEntity = m_reg.Create();
 		NK::CModelRenderer& helmetModelRenderer{ m_reg.AddComponent<NK::CModelRenderer>(m_helmetEntity) };
-		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/SponzaTest/Sponza.nkmodel");
+		helmetModelRenderer.SetModelPath("Samples/Resource-Files/nkmodels/NTCSponzaTest/Sponza.nkmodel");
 		NK::CTransform& helmetTransform{ m_reg.GetComponent<NK::CTransform>(m_helmetEntity) };
 		helmetTransform.name = "Bistro";
 		// helmetTransform.SetLocalPosition({ -1.0f, 0.0f, 0.0f });

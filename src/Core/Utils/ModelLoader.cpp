@@ -674,6 +674,7 @@ namespace NK
 		                                        aiProcess_CalcTangentSpace |	//Calculate tangents and bitangents (required for TBN in normal mapping)
 		                                        aiProcess_MakeLeftHanded |
 		                                        aiProcess_JoinIdenticalVertices |
+		                                        aiProcess_PreTransformVertices |
 		                                        (_flipFaceWinding ? aiProcess_FlipWindingOrder : 0)
 		                                       ) };
 

@@ -494,6 +494,8 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
     float2 uvTexels = vertexOutput.texCoord * mipRes - 0.5f;
     float2 uvRandom = float2(random(seed), random(seed));
     float2 chosenTexel = floor(uvTexels + uvRandom);
+    
+    return float4(float(mip)/float(numMips),float(mip)/float(numMips),float(mip)/float(numMips),1);
 
     //Snap to nearest trained texel center
     float2 snappedUV = (chosenTexel + 0.5f) / mipRes;
@@ -565,7 +567,7 @@ float4 main(VertexOutput vertexOutput) : SV_TARGET
 
             if (shadowMapUV.x >= 0.0f && shadowMapUV.x <= 1.0f && shadowMapUV.y >= 0.0f && shadowMapUV.y <= 1.0f && posInLightNDC.z <= 1.0f)
             {
-                float shadowDepth = g_textures[NonUniformResourceIndex(light.shadowMapIndex)].Sample(linearSampler, shadowMapUV).r;
+                float shadowDepth = g_textures[NonUniformResourceIndex(light.shadowMapIndex)].SampleLevel(linearSampler, shadowMapUV, 0.0f).r;
                 float currentPixelDepth = posInLightNDC.z;
                 
                 float bias = 0.0005f; 
